@@ -1,0 +1,61 @@
+const MiniCssExtractPlugin = require('mini-css-extract-plugin');
+
+module.exports = {
+    mode: "development",
+    entry: {
+        hibiki: ["./src/hibiki.ts"],
+    },
+    output: {
+        path: __dirname,
+        filename: "dist/[name]-dev.js"
+    },
+    externals: {
+        "react": "React",
+        "react-dom": "ReactDOM",
+        "mobx": "mobx",
+    },
+    module: {
+        rules: [
+            {
+                test: /\.tsx?$/,
+                exclude: /node_modules/,
+                use: {
+                    loader: "babel-loader",
+                    options: {
+                        presets: ["@babel/preset-env", "@babel/preset-react", "@babel/preset-typescript"],
+                        plugins: [
+                            ["@babel/transform-runtime", {"regenerator": true}],
+                            "@babel/plugin-transform-react-jsx",
+                            ["@babel/plugin-proposal-decorators", { "legacy": true }],
+                            ["@babel/plugin-proposal-class-properties", { "loose": true }],
+                            ["@babel/plugin-proposal-private-methods", { "loose": true }],
+                            ["@babel/plugin-proposal-private-property-in-object", { "loose": true }],
+                            "babel-plugin-jsx-control-statements",
+                        ],
+                    },
+                },
+            },
+            {
+                test: /\.css$/,
+                use: [
+                    "style-loader",
+                    "css-loader",
+                ],
+            },
+            {
+                test: /\.less$/,
+                use: [
+                    {loader: MiniCssExtractPlugin.loader},
+                    "css-loader",
+                    "less-loader"
+                ]
+            },
+        ]
+    },
+    plugins: [
+        new MiniCssExtractPlugin({filename: "dist/[name].css", ignoreOrder: true})
+    ],
+    resolve: {
+        extensions: ['.ts', '.tsx', '.js', '.mjs', '.cjs', '.wasm', '.json']
+    },
+}
