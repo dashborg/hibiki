@@ -37,10 +37,13 @@
     "axios": "^0.24.0",
     "camelcase": "^6.2.0",
     "classnames": "^2.3.1",
+    "dayjs": "^1.10.7",
     "lodash": "^4.17.21",
     "md5": "^2.3.0",
-    "mobx": "^6.3.6",
-    "mobx-react": "^7.2.1",
+    "mobx": "5.15.7",
+    "mobx-react": "6.3.1",
+    "moo": "^0.5.1",
+    "nearley": "^2.20.1",
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
     "sprintf-js": "^1.1.2",
@@ -51,6 +54,6 @@
     "webpack-watch": "webpack --watch --config webpack.dev.js",
     "buildprod": "webpack --config webpack.prod.js",
     "typecheck": "tsc --jsx preserve --noEmit --esModuleInterop --target ES5 --experimentalDecorators --downlevelIteration src/hibiki.ts",
-    "expr-grammar": "nearleyc src/expr-grammar.ne -o src/expr-grammar.js"
+    "expr-grammar": "nearleyc src/hibiki-grammar.ne -o src/hibiki-grammar.js"
   }
 }
