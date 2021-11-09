@@ -76,6 +76,9 @@ function parseHtmlNode(htmlNode : Node) : HibikiNode {
     if (list != null) {
         node.list = list;
     }
+    if (node.tag == "script" && node.attrs != null && (node.attrs["type"] == "application/json" || node.attrs["type"] == "text/plain") && node.list != null && node.list.length == 1 && node.list[0].tag == "#text") {
+        return node.list[0];
+    }
     return node;
 }
 

@@ -496,13 +496,20 @@ class HibikiState {
     Modules : Record<string, HibikiHandlerModule> = {};
     DataRoots : Record<string, mobx.IObservableValue<any>>;
 
-    constructor(config? : HibikiConfig) {
-        config = config ?? {};
+    constructor() {
         this.DataRoots = {};
         this.DataRoots["global"] = mobx.observable.box({}, {name: "GlobalData"})
         this.DataRoots["state"] = mobx.observable.box({}, {name: "AppState"})
         this.ComponentLibrary = new ComponentLibrary();
         this.Modules["fetch"] = new FetchModule(this);
+    }
+
+    @mobx.action setConfig(config : HibikiConfig) {
+        config = config ?? {};
+    }
+
+    @mobx.action setGlobalData(globalData : any) {
+        this.DataRoots["global"].set(globalData);
     }
 
     @mobx.action setHtml(htmlobj : HibikiNode) {

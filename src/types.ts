@@ -37,11 +37,14 @@ type HibikiHandlerModule = {
 };
 
 type HibikiConfig = {
-    Hooks? : {
-        CsrfHook?  : () => Record<string, string>,
-        FetchInitHook? : (url : string, init : Record<string, any>) => void,
+    initHandler?           : string,
+    noConfigMergeFromHtml? : boolean,
+    noDataMergeFromHtml?   : boolean,
+    hooks? : {
+        csrfHook?  : () => Record<string, string>,
+        fetchInitHook? : (url : string, init : Record<string, any>) => void,
     },
-    Modules? : Record<string, HibikiHandlerModule>,
+    modules? : Record<string, HibikiHandlerModule>,
 };
 
 type PathUnionType = string | PathType;

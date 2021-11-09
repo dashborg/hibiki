@@ -1,23 +1,63 @@
 import * as React from "react";
+import * as mobx from "mobx";
 import {parseHtml} from "./html-parser";
 import {HibikiState, DataEnvironment} from "./state";
 import * as ReactDOM from "react-dom";
 import {HibikiRootNode, CORE_LIBRARY} from "./nodes";
+import {textContent} from "./utils";
+import merge from "lodash/merge";
+import type {HibikiNode, HibikiConfig} from "./types";
 
 declare var window : any;
 
-function initialize(hibikiRoot : HTMLElement, html : string | HTMLElement, rootData : any) {
-    let htmlObj = parseHtml(html);
-    console.log(htmlObj);
+function readHibikiOptsFromHtml(htmlObj : HibikiNode) : {config : HibikiConfig, initialData : any} {
+    let config : HibikiConfig = null;
+    let initialData : any = null;
+    if (htmlObj == null || htmlObj.list == null) {
+        return {config, initialData};
+    }
+    for (let i=0; i<htmlObj.list.length; i++) {
+        let subNode = htmlObj.list[i];
+        if (config == null && subNode.tag == "hibiki-config") {
+            config = JSON.parse(textContent(subNode));
+        }
+        if (initialData == null && subNode.tag == "hibiki-initialdata") {
+            initialData = JSON.parse(textContent(subNode));
+        }
+    }
+    return {config, initialData};
+}
+
+let createHibikiState = function createHibikiState(config : HibikiConfig, html : string | HTMLElement, initialData : any) : HibikiState {
     let state = new HibikiState();
-    state.setHtml(htmlObj);
     state.ComponentLibrary.addLibrary(CORE_LIBRARY);
     state.ComponentLibrary.importLib("@dashborg/core", null);
-    state.DataRoots["global"].set(rootData);
+    
+    config = config || {};
+    initialData = initialData || {};
+    let htmlObj : HibikiNode = null;
+    if (html != null) {
+        htmlObj = parseHtml(html);
+    }
+    state.setHtml(htmlObj);
+    let hibikiOpts = readHibikiOptsFromHtml(htmlObj);
+    if (!config.noConfigMergeFromHtml) {
+        config = merge((hibikiOpts.config ?? {}), config);
+    }
+    state.setConfig(config);
+    if (!config.noDataMergeFromHtml) {
+        initialData = merge((hibikiOpts.initialData ?? {}), initialData);
+    }
+    state.setGlobalData(initialData);
+    return state;
+}
+createHibikiState = mobx.action(createHibikiState);
+
+function render(elem : HTMLElement, state : HibikiState) {
     let renderNode = state.findPage("default");
-    let reactElem = React.createElement(HibikiRootNode, {page: "default", node: renderNode, dataenv: state.rootDataenv()}, null);
-    ReactDOM.render(reactElem, hibikiRoot);
-    window.HibikiState = state;
+    let props = {page: "default", node: renderNode, dataenv: state.rootDataenv()};
+    let reactElem = React.createElement(HibikiRootNode, props, null);
+    ReactDOM.render(reactElem, elem);
 }
 
 function loadTags() {
@@ -28,10 +68,12 @@ function loadTags() {
             let siblingNode = document.createElement("div");
             siblingNode.classList.add("hibiki-root");
             elem.parentNode.insertBefore(siblingNode, elem.nextSibling); // insertAfter
-            initialize(siblingNode, elem, {"test": [1,3,5], "color": "purple"});
+            let state = createHibikiState({}, elem, {"test": [1,3,5], "color": "purple"});
+            render(siblingNode, state);
         }
         else {
-            initialize(elem, elem, null);
+            let state = createHibikiState({}, elem, null);
+            render(elem, state);
         }
     }
 }
