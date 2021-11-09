@@ -4,9 +4,11 @@ import Axios from "axios";
 import {sprintf} from "sprintf-js";
 import {boundMethod} from 'autobind-decorator'
 import {v4 as uuidv4} from 'uuid';
-import {HibikiNode, ComponentType, LibraryType, RequestType} from "./types";
+import {HibikiNode, ComponentType, LibraryType, RequestType, HandlerPathObj, HibikiConfig, HibikiHandlerModule} from "./types";
 import * as DataCtx from "./datactx";
-import {isObject, SYM_PROXY, SYM_FLATTEN} from "./utils";
+import {isObject, textContent, SYM_PROXY, SYM_FLATTEN} from "./utils";
+import {RtContext} from "./error";
+import type {ErrorObj} from "./error";
 
 import {parseHtml} from "./html-parser";
 
@@ -18,6 +20,12 @@ function unbox(data : any) : any {
     }
     return data;
 }
+
+type DataEnvironmentOpts = {
+    componentRoot? : {[e : string] : any},
+    description? : string,
+    handlers? : {[e : string] : {handlerStr: string, parentEnv: boolean}}
+};
 
 class DataEnvironment {
     parent : DataEnvironment | null;
@@ -280,7 +288,7 @@ function DefaultCsrfHook() {
     }
     let csrfMetaElem = document.querySelector("meta[name=csrf-token]");
     if (csrfMetaElem != null) {
-        csrfToken = (csrfMetaTag as any).content;
+        csrfToken = (csrfMetaElem as any).content;
     }
     if (csrfToken != null) {
         return {
@@ -319,7 +327,7 @@ class ComponentLibrary {
                 console.log(sprintf("cannot redefine component %s/%s", libName, name));
                 continue;
             }
-            libObj.components[name] = {componentType: "hibiki-html", node: h, libName: libName, name: name};
+            libObj.components[name] = {componentType: "hibiki-html", node: h};
         }
     }
 
@@ -337,11 +345,11 @@ class ComponentLibrary {
             let cpath = libName + ":" + name;
             let importName = (prefix == null ? "" : prefix + "-") + name;
             let origComp = this.components[importName];
-            if (origComp != null && (origComp.libName != newComp.libName || origComp.name != newComp.name)) {
-                console.log(sprintf("Conflicting import %s %s:%s (discarding %s:%s)", importName, origComp.libName, origComp.name, newComp.libName, newComp.name));
+            if (origComp != null && (origComp.libName != libName || origComp.name != name)) {
+                console.log(sprintf("Conflicting import %s %s:%s (discarding %s:%s)", importName, origComp.libName, origComp.name, libName, name));
                 continue;
             }
-            this.components[importName] = newComp;
+            this.components[importName] = {componentType: newComp.componentType, libName: libName, name: name, impl: newComp.impl, reactimpl: newComp.reactimpl, node: newComp.node};
         }
     }
 
@@ -351,20 +359,25 @@ class ComponentLibrary {
 }
 
 class FetchModule {
+    dbstate : HibikiState;
     CsrfHook : () => Record<string, string> = DefaultCsrfHook;
-    FetchInitHook : (url : string, init : Record<string, any>) => void;
+    FetchInitHook : (url : URL, init : Record<string, any>) => void;
+
+    constructor(state : HibikiState) {
+        this.dbstate = state;
+    }
     
-    fetchConfig(url : string, params : any, init : Record<string, any>) : any {
+    fetchConfig(url : URL, params : any, init : Record<string, any>) : any {
         init = init || {};
-        init.headers = init.headers || {};
-        if (this.FeClientId) {
-            headers["X-Dashborg-FeClientId"] = this.FeClientId;
+        init.headers = init.headers || new Headers();
+        if (this.dbstate.FeClientId) {
+            init.headers.set("X-Dashborg-FeClientId", this.dbstate.FeClientId);
         }
         if (this.CsrfHook != null) {
             let csrfHeaders = this.CsrfHook();
             if (csrfHeaders != null) {
                 for (let h in csrfHeaders) {
-                    init.headers[h] = csrfHeaders[h];
+                    init.headers.set(h, csrfHeaders[h]);
                 }
             }
         }
@@ -401,7 +414,14 @@ class FetchModule {
         if (params != null && !isObject(params)) {
             throw sprintf("Invalid params passed to /@fetch for url '%s', params must be an object not an array", urlStr);
         }
+        let headersObj = new Headers();
         initParams = initParams ?? {};
+        if (initParams.headers != null && isObject(initParams.headers)) {
+            for (let key in initParams.headers) {
+                headersObj.set(key, initParams.headers[key]);
+            }
+        }
+        initParams.headers = headersObj;
         initParams.method = method;
         if (params != null) {
             if (method == "GET" || method == "DELETE") {
@@ -411,7 +431,7 @@ class FetchModule {
                         continue;
                     }
                     if (typeof(val) == "string" || typeof(val) == "number") {
-                        url.searchParams.set(key, val);
+                        url.searchParams.set(key, val.toString());
                     }
                     else {
                         url.searchParams.set(key, JSON.stringify(val));
@@ -419,13 +439,12 @@ class FetchModule {
                 }
             }
             else {
-                initParams.headers = initParams.headers || {};
-                initParams.headers["Content-Type"] = "application/json";
+                initParams.headers.set("Content-Type", "application/json");
                 initParams.body = JSON.stringify(params);
             }
         }
         initParams = this.fetchConfig(url, params, initParams);
-        let p = fetch(url, initParams).then((resp) => {
+        let p = fetch(url.toString(), initParams).then((resp) => {
             if (!resp.ok) {
                 throw sprintf("Bad status code response from '%s': %d %s", req.data[0], resp.status, resp.statusText);
             }
@@ -477,29 +496,13 @@ class HibikiState {
     Modules : Record<string, HibikiHandlerModule> = {};
     DataRoots : Record<string, mobx.IObservableValue<any>>;
 
-    constructor(config : HibikiConfig) {
+    constructor(config? : HibikiConfig) {
+        config = config ?? {};
         this.DataRoots = {};
         this.DataRoots["global"] = mobx.observable.box({}, {name: "GlobalData"})
         this.DataRoots["state"] = mobx.observable.box({}, {name: "AppState"})
         this.ComponentLibrary = new ComponentLibrary();
-        this.Modules["fetch"] = new FetchModule();
-    }
-
-    axiosConfig() : any {
-        let headers = {};
-        if (this.FeClientId) {
-            headers["X-Dashborg-FeClientId"] = this.FeClientId;
-        }
-        if (this.CsrfHook != null) {
-            let csrfHeaders = this.CsrfHook();
-            for (let h in csrfHeaders) {
-                headers[h] = csrfHeaders[h];
-            }
-        }
-        return {
-            headers: headers,
-            withCredentials: true,
-        };
+        this.Modules["fetch"] = new FetchModule(this);
     }
 
     @mobx.action setHtml(htmlobj : HibikiNode) {
@@ -535,27 +538,13 @@ class HibikiState {
         this.PostScriptRunQueue.push(fn);
     }
 
-    externalServerLoc() : string {
-        if (this.EmbedEnv == "dev" || window.location.hostname == "test.localdev") {
-            return "https://console.dashborg-dev.com:8080";
-        }
-        return "https://console.dashborg.net";
-    }
-
     @mobx.action setDataPath(path : string, data : any) {
         let dataenv = this.rootDataenv();
         DataCtx.SetPath(path, dataenv, data);
     }
 
-    initialLoad() {
-        this.doLoadPanel(null);
-    }
-
     destroyPanel() {
-        console.log("destroy panel state", this.getAppUrl());
-        if (this.DrainDisposer != null) {
-            this.DrainDisposer();
-        }
+        console.log("Destroy Hibiki State");
     }
 
     findPage(pageName? : string) : HibikiNode {
@@ -595,7 +584,7 @@ class HibikiState {
     }
 
     findComponent(componentName : string) : any {
-        let htmlobj = this.PanelHtmlObj.get();
+        let htmlobj = this.HtmlObj.get();
         if (htmlobj == null || htmlobj.list == null) {
             return null;
         }
@@ -608,7 +597,7 @@ class HibikiState {
     }
 
     findLocalHandler(handlerName : string) : any {
-        let htmlobj = this.PanelHtmlObj.get();
+        let htmlobj = this.HtmlObj.get();
         if (htmlobj == null || htmlobj.list == null) {
             return null;
         }
@@ -645,7 +634,7 @@ class HibikiState {
     }
 
     findScript(scriptName : string) : any {
-        let htmlobj = this.PanelHtmlObj.get();
+        let htmlobj = this.HtmlObj.get();
         if (htmlobj == null || htmlobj.list == null) {
             return null;
         }
@@ -657,328 +646,6 @@ class HibikiState {
         return null;
     }
 
-    @mobx.action doLoadPanel(challengeData : any) {
-        this.stopStreaming(true);
-        this.StreamStopped.set(false);
-        let self = this;
-        let dataenv = this.rootDataenv();
-        let paramsObj = smartParseUrlParams();
-        let dashjwt = paramsObj["_dashjwt"];
-        delete paramsObj["_dbe"];
-        delete paramsObj["_dashjwt"];
-        if (dashjwt != null) {
-            fixJwtUrl(["_dashjwt"]);
-        }
-        DataCtx.SetPath("$state.dashborg.apppage", dataenv, this.PageName);
-        DataCtx.SetPath("$state.urlparams", dataenv, paramsObj);
-        if (this.PostParams) {
-            DataCtx.SetPath("$state.postparams", dataenv, this.PostParams);
-        }
-        if (this.Embed) {
-            DataCtx.SetPath("$state.dashborg.embed", dataenv, true);
-        }
-        if (this.ParentApp != null) {
-            DataCtx.SetPath("$state.dashborg.parentapp", dataenv, this.ParentApp);
-        }
-        let config = this.axiosConfig();
-        config.headers["Content-Type"] = "application/json";
-        let postData = {
-            zonename: this.ZoneName,
-            panelname: this.PanelName,
-            panelstate: DataCtx.demobx(DataCtx.ResolvePath("$state", dataenv)),
-            dashjwt: dashjwt,
-            challengedata: null,
-            embedauthtoken: null,
-        };
-        if (this.EmbedAuthToken) {
-            postData.embedauthtoken = this.EmbedAuthToken;
-        }
-        if (challengeData != null) {
-            postData.challengedata = challengeData;
-        }
-        let jsonData = DataCtx.JsonStringify(postData);
-        let localHtmlRR = null;
-        
-        if (this.LocalHtml != null && this.LocalHtml.trim() != "") {
-            localHtmlRR = {
-                type: "html",
-                ts: Date.now(),
-                reqid: uuidv4(),
-                html: this.LocalHtml,
-            };
-        }
-        console.log("load app %s %s", this.AccId, this.getAppUrl());
-        if (this.PlaygroundHandlers != null) {
-            this.queueScriptText(this.PlaygroundHandlers, true);
-        }
-        if (this.AccId == "local") {
-            let fullDataP : Promise<any> = null;
-            if (window.DashborgService && window.DashborgService.hasHandler(this.PanelName, "handler", "/")) {
-                let rtnDataP = window.DashborgService.dispatchRequest(this.PanelName, "handler", "/");
-                fullDataP = Promise.resolve(rtnDataP)
-                    .then((rtnData) => {
-                        let fullData = {
-                            success: true,
-                            data: rtnData,
-                        };
-                        fullData.data.rra = fullData.data.rra || [];
-                        return fullData;
-                    });
-            }
-            else {
-                let fullData = {
-                    success: true,
-                    data: {
-                        feclientid: uuidv4(),
-                        rra: [],
-                    },
-                };
-                fullDataP = Promise.resolve(fullData);
-            }
-            fullDataP
-                .then((fullData) => {
-                    if (localHtmlRR != null) {
-                        fullData.data.rra.unshift(localHtmlRR);
-                    }
-                    return fullData;
-                })
-                .then((fullData) => this.convertRRAHtmlChain(fullData, true))
-                .then((fullData) => {
-                    this.handleHandlerResponse(fullData, true);
-                    return null;
-                })
-                .catch((e) => {
-                    self.reportError("Error loading panel[" + this.PanelName + "]: " + e)
-                })
-                .finally(() => {
-                    self.Loading.set(false);
-                });
-            console.log("LOCAL loadPanel", this.PanelName);
-            return;
-        }
-
-        Axios.post(this.serverLoc() + "/api2/load-panel", jsonData, config)
-             .then(jsonRespHandler)
-             .then((fullData) => {
-                 if (localHtmlRR != null && fullData && fullData.data) {
-                     fullData.data.rra = fullData.data.rra || [];
-                     fullData.data.rra.unshift(localHtmlRR);
-                 }
-                 return fullData;
-             })
-             .then((fullData) => this.convertRRAHtmlChain(fullData, true))
-             .then((fullData) => {
-                 self.handleHandlerResponse(fullData, true);
-             })
-             .catch((e) => {
-                 self.reportError("Error loading panel[" + this.PanelName + "]: " + e);
-             })
-             .finally(() => {
-                 self.Loading.set(false);
-             });
-    }
-
-    @mobx.action handleHandlerResponse(fullData : any, loadPanel : boolean) : any {
-        // console.log("got resp", (loadPanel ? "load-panel" : "handler"), fullData);
-        
-        let data = fullData.data;
-        data.rra = data.rra || [];
-        let hasHtml = hasHtmlRR(data.rra);
-        if (loadPanel) {
-            this.AuthChallenge.clear();
-            this.PanelData.set(this.InitialData || {});
-            this.WizardState.set({});
-            this.PanelErrCode.set(null);
-            this.PanelErrMsg.set(data.errmsg);
-            this.PanelInitErr.set(null);
-            this.AccInfo.set(data.accinfo || {});
-            this.FeClientId = data.feclientid;
-            this.AuthInfo.set(data.authinfo);
-            if (data.errcode != null && data.errcode != "") {
-                if (data.errcode == "INITERROR" || data.errcode == "INITERR") {
-                    this.PanelErrCode.set(data.errcode);
-                    this.PanelInitErr.set(data.initerr);
-                }
-                else {
-                    this.PanelErrCode.set(data.errcode);
-                }
-                // allow PanelErrCode to fall-through -- this allows "html" to be set from local panel
-            }
-            if (data.appinfo != null) {
-                if (data.appinfo.apptitle != null) {
-                    DataCtx.SetPath("setunless:$state.dashborg.apptitle", this.rootDataenv(), data.appinfo.apptitle);
-                }
-                if (data.appinfo.appconnected != null) {
-                    this.AppConnected.set(data.appinfo.appconnected);
-                    DataCtx.SetPath("$state.dashborg.appconnected", this.rootDataenv(), data.appinfo.appconnected);
-                }
-                this.AppInfo.set(data.appinfo);
-                if (data.appinfo.pagesenabled) {
-                    let appPage = this.getAppPage();
-                    DataCtx.SetPath("$state.dashborg.htmlpage", this.rootDataenv(), appPage);
-                }
-                else {
-                    DataCtx.SetPath("$state.dashborg.htmlpage", this.rootDataenv(), data.appinfo.htmlpage);
-                }
-            }
-            if (this.PanelName.startsWith("/")) {
-                DataCtx.SetPath("$state.dashborg.fspath", this.rootDataenv(), this.PanelName);
-            }
-            if (data.fileinfo != null) {
-                DataCtx.SetPath("$state.dashborg.fileinfo", this.rootDataenv(), data.fileinfo);
-            }
-        }
-        if (hasHtml) {
-            this.PanelHtmlObj.set(null);
-            this.DataNodeStates = {};
-            this.RenderVersion.set(this.RenderVersion.get() + 1);
-        }
-        let htmlRR = [];
-        for (let rr of data.rra) {
-            if (rr.type == "html") {
-                if (rr.data == null || rr.data.htmlobj == null || rr.data.htmlobj.list == null) {
-                    console.log("response htmlobj is null");
-                    continue;
-                }
-                htmlRR.push(rr);
-                continue;
-            }
-            else if (loadPanel && rr.type == "panelauthchallenge") {
-                this.AuthChallenge.push(rr.data);
-                continue;
-            }
-            else if (rr.type == "error") {
-                if (loadPanel) {
-                    this.reportError("Load Panel Error: " + rr.err);
-                }
-                else {
-                    this.reportError("Handler Error: " + rr.err);
-                }
-            }
-        }
-        let rtnVal = this.runActions(data.rra, data.reqid, null);
-        if (htmlRR.length > 0) {
-            setTimeout(mobx.action(() => {
-                let pho = this.PanelHtmlObj.get();
-                for (let rr of htmlRR) {
-                    if (pho == null) {
-                        pho = rr.data.htmlobj;
-                    }
-                    else {
-                        pho.list.push(...rr.data.htmlobj.list);
-                    }
-                }
-                this.PanelHtmlObj.set(pho);
-            }), 5);
-        }
-        setTimeout(this.handleRemoveParams, 10);
-        return rtnVal;
-    }
-
-    callLocalData(localHandlerName : string, handlerData : any[]) : Promise<any> {
-        if (!window.DashborgService) {
-            return Promise.reject("Cannot dispatch @local data call, no DashborgService defined: " + localHandlerName);
-        }
-        try {
-            let respPromise = window.DashborgService.dispatchRequest(this.PanelName, "data", localHandlerName, handlerData);
-            return Promise.resolve(respPromise);
-        }
-        catch(e) {
-            return Promise.reject("Error calling @local data handler " + localHandlerName + ": " + e);
-        }
-    }
-
-    callFetch(method : string, data : any[]) : Promise<any> {
-        console.log("call-fetch", method, data);
-        if (method == null) {
-            throw sprintf("Invalid null method passed to /@fetch:[method]");
-        }
-        method = method.toUpperCase();
-        if (!VALID_METHODS[method]) {
-            throw sprintf("Invalid method passed to /@fetch:[method]: '%s'", method);
-        }
-        if (data == null || data.length == 0 || typeof(data[0]) != "string") {
-            throw sprintf("Invalid call to /@fetch, first argument must be a string, the URL to fetch");
-        }
-        let initParams : any = {};
-        if (data.length >= 2 && data[1] != null) {
-            initParams = data[1];
-        }
-        initParams.method = method;
-        let p = fetch(data[0], initParams).then((resp) => {
-            if (!resp.ok) {
-                throw sprintf("Bad status code response from '%s': %d %s", data[0], resp.status, resp.statusText);
-            }
-            let contentType = resp.headers.get("Content-Type");
-            if (contentType != null && contentType.startsWith("application/json")) {
-                return resp.json();
-            }
-            else {
-                let blobp = resp.blob();
-                return blobp.then((blob) => {
-                    return new Promise((resolve, _) => {
-                        let reader = new FileReader();
-                        reader.onloadend = () => {
-                            let mimetype = blob.type;
-                            let semiIdx = (reader.result as string).indexOf(";");
-                            if (semiIdx == -1 || mimetype == null || mimetype == "") {
-                                throw "Invalid BLOB returned from fetch, bad mimetype or encoding";
-                            }
-                            let dbblob = new DataCtx.DashborgBlob();
-                            dbblob.mimetype = blob.type;
-                            // extra 7 bytes for "base64," ... e.g. data:image/jpeg;base64,[base64data]
-                            dbblob.data = (reader.result as string).substr(semiIdx+1+7);
-                            resolve(dbblob);
-                        };
-                        reader.readAsDataURL(blob);
-                    });
-                });
-            }
-        });
-        return p;
-    }
-
-    callData(handlerPath : string, handlerData : any[]) : Promise<any> {
-        if (handlerPath == null || handlerPath == "") {
-            return Promise.resolve(null);
-        }
-        let hpath = parseHandler(handlerPath);
-        if (hpath == null) {
-            throw "Invalid handler path: " + handlerPath;
-        }
-        if (hpath.ns == "" && this.AccId == "local") {
-            hpath.ns = "local";
-        }
-        if (hpath.ns == "local") {
-            if (hpath.path != "/" || hpath.pathfrag == "") {
-                throw "Invalid local data call, format as /@local:[handler-name]";
-            }
-            return this.callLocalData(hpath.pathfrag, handlerData);
-        }
-        if (hpath.ns == "fetch") {
-            return this.callFetch(hpath.pathfrag, handlerData);
-        }
-        if (hpath.ns != "" && hpath.ns != "app" && hpath.ns != "self") {
-            throw "Invalid handler namespace: " + handlerPath;
-        }
-        let dataenv = this.rootDataenv();
-        let postData = {
-            zonename: this.ZoneName,
-            panelname: this.PanelName,
-            path: handlerPath,
-            panelstate: DataCtx.demobx(DataCtx.ResolvePath("$state", dataenv)),
-            data: handlerData,
-        };
-        let jsonData = DataCtx.JsonStringify(postData);
-        let self = this;
-        let config = this.axiosConfig();
-        config.headers["Content-Type"] = "application/json";
-        console.log("call data-handler", handlerPath, handlerData);
-        return Axios.post(this.serverLoc() + "/api2/data", jsonData, config).then(jsonRespHandler).then((fullData) => {
-            return self.runActions(fullData.data, null);
-        });
-    }
-
     @mobx.action runActions(rra : any, reqid : string, opts? : any) : any {
         if (rra == null) {
             return null;
@@ -987,59 +654,35 @@ class HibikiState {
         opts = opts || {};
         let dataenv = this.rootDataenv();
         for (let rr of rra) {
-            if (rr.type == "setdata" && rr.selector == "@rtn") {
+            let selector = rr.selector ?? rr.path;
+            if (rr.type == "setdata" && selector == "@rtn") {
                 rtnval = rr.data;
                 continue;
             }
-            else if (rr.type == "blob" && rr.selector == "@rtn") {
+            else if (rr.type == "blob" && selector == "@rtn") {
                 rtnval = DataCtx.BlobFromRRA(rr);
                 continue;
             }
-            else if (rr.type == "blobext" && rr.selector == "@rtn") {
-                if (rtnval == null || !(rtnval instanceof DashborgBlob)) {
+            else if (rr.type == "blobext" && selector == "@rtn") {
+                if (rtnval == null || !(rtnval instanceof DataCtx.DashborgBlob)) {
                     console.log("Bad blobext:@rtn, no DashborgBlob to extend");
                     continue;
                 }
                 DataCtx.ExtBlobFromRRA(rtnval, rr);
             }
             else if (rr.type == "invalidate") {
-                this.invalidateRegex(rr.selector);
+                this.invalidateRegex(selector);
             }
             else if (rr.type == "html") {
                 let htmlObj = parseHtml(rr.data);
                 if (htmlObj != null) {
                     this.HtmlObj.set(htmlObj);
                 }
+                console.log("PARSE NEW HTML", htmlObj, DataCtx.demobx(this.HtmlObj.get()));
             }
             DataCtx.ApplySingleRRA(dataenv, rr);
         }
         return rtnval;
-    }
-
-    // opts rtContext, dataenv
-    async callLocalHandlerAsync(localHandlerName : string, handlerData : any, opts? : any) : Promise<any> {
-        let localHandler = this.findLocalHandler(localHandlerName);
-        if (localHandler != null) {
-            return this.runLocalHandler(localHandler, handlerData, opts);
-        }
-        if (!window.DashborgService) {
-            return Promise.reject("Cannot dispatch @local handler call, no DashborgService defined");
-        }
-        try {
-            let respPromise = window.DashborgService.dispatchRequest(this.PanelName, "handler", localHandlerName, handlerData);
-            let rtnP = Promise.resolve(respPromise).then((respData) => {
-                if (respData && respData.rra && respData.rra.length > 0) {
-                    return this.runActions(respData.rra, respData.reqid);
-                }
-                else {
-                    return null;
-                }
-            });
-            return rtnP;
-        }
-        catch(e) {
-            return Promise.reject("Error calling @local handler " + localHandlerName + ": " + e);
-        }
     }
 
     // opts: rtContext, dataenv
@@ -1075,43 +718,6 @@ class HibikiState {
             }
             return self.runActions(data.hibikiactions, null, null);
         });
-
-        
-        if (hpath.ns == "" && this.AccId == "local") {
-            hpath.ns = "local";
-        }
-        if (hpath.ns == "local") {
-            if (hpath.path != "/" || hpath.pathfrag == "") {
-                throw "Invalid local handler call, format as /@local:[handler-name]";
-            }
-            return this.callLocalHandlerAsync(hpath.pathfrag, handlerData, opts);
-        }
-        if (hpath.ns == "fetch") {
-            return this.callFetch(hpath.pathfrag, handlerData);
-        }
-        if (hpath.ns != "" && hpath.ns != "app" && hpath.ns != "self") {
-            throw "Invalid handler namespace: " + handlerPath;
-        }
-        let dataenv = this.rootDataenv();
-        let postData = {
-            zonename: this.ZoneName,
-            panelname: this.PanelName,
-            path: handlerPath,
-            data: handlerData,
-            panelstate: DataCtx.demobx(DataCtx.ResolvePath("$state", dataenv)),
-        };
-        let lvMap = {};
-        let jsonData = DataCtx.JsonStringifyForCall(lvMap, postData)
-        console.log("call handler", handlerPath, handlerData, lvMap);
-        let config = this.axiosConfig();
-        config.headers["Content-Type"] = "application/json";
-        let p = Axios.post(this.serverLoc() + "/api2/call-handler", jsonData, config)
-                     .then(jsonRespHandler)
-                     .then((fullData) => this.convertRRAHtmlChain(fullData, false))
-                     .then((fullData) => {
-                         return self.handleHandlerResponse(fullData, false);
-                     });
-        return p;
     }
 
     // opts: rtContext, dataenv
@@ -1127,6 +733,10 @@ class HibikiState {
             console.log(e);
         });
         return prtn;
+    }
+
+    callData(handlerPath : string, handlerData : any[]) : Promise<any> {
+        return Promise.resolve(null);
     }
 
     reportError(errorMessage : string, rtctx? : RtContext) {
@@ -1279,7 +889,7 @@ function resolveAttrVal(k : string, v : string, dataenv : DataEnvironment, opts 
     if (resolvedVal === true) {
         resolvedVal = 1;
     }
-    if (k == "blobsrc" && resolvedVal instanceof DashborgBlob) {
+    if (k == "blobsrc" && resolvedVal instanceof DataCtx.DashborgBlob) {
         return (resolvedVal as any);
     }
     if (opts.style && typeof(resolvedVal) == "number") {
@@ -1377,7 +987,7 @@ function getStyleMap(node : HibikiNode, styleName : string, dataenv : DataEnviro
     return rtn;
 }
 
-function parseHandler(handlerPath : string) : HPath {
+function parseHandler(handlerPath : string) : HandlerPathObj {
     if (handlerPath == null || handlerPath == "" || handlerPath[0] != '/') {
         return null;
     }

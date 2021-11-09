@@ -673,7 +673,7 @@ function setPathWrapper(op : string, path : PathType, dataenv : DataEnvironment,
     }
     if ((rootpp.pathkey == "global") || (rootpp.pathkey == "data")) {
         if (path.length == 1 && op == "set") {
-            dataenv.dbstate.PanelData.set(setData);
+            dataenv.dbstate.DataRoots["global"].set(setData);
             return;
         }
         let irData = dataenv.resolveRoot(rootpp.pathkey);
@@ -1878,15 +1878,16 @@ function EvalSimpleExpr(exprStr : string, dataenv : DataEnvironment, rtContext? 
 }
 
 function ApplySingleRRA(dataenv : DataEnvironment, rra : any) {
+    let selector = rra.selector ?? rra.path;
     if (rra.type == "setdata") {
-        SetPath(rra.selector, dataenv, rra.data);
+        SetPath(selector, dataenv, rra.data);
     }
     else if (rra.type == "blob") {
         let blob = BlobFromRRA(rra);
-        SetPath(rra.selector, dataenv, blob);
+        SetPath(selector, dataenv, blob);
     }
     else if (rra.type == "blobext") {
-        SetPath("blobext:" + rra.selector, dataenv, rra.blobbase64);
+        SetPath("blobext:" + selector, dataenv, rra.blobbase64);
     }
 }
 

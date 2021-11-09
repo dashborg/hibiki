@@ -1,4 +1,6 @@
 import type {HibikiState} from "./state";
+import type {RtContext} from "./error";
+import * as mobx from "mobx";
 
 type HibikiNode = {
     tag    : string,
@@ -6,7 +8,7 @@ type HibikiNode = {
     attrs? : Record<string, string>,
     list?  : HibikiNode[],
     style? : Record<string, string>,
-    moreStyles? : Record<string, Record<string, string>>,
+    morestyles? : Record<string, Record<string, string>>,
 }
 
 type RequestType = {
@@ -35,11 +37,11 @@ type HibikiHandlerModule = {
 };
 
 type HibikiConfig = {
-    Hooks : {
+    Hooks? : {
         CsrfHook?  : () => Record<string, string>,
         FetchInitHook? : (url : string, init : Record<string, any>) => void,
     },
-    Modules : Record<string, HibikiHandlerModule>,
+    Modules? : Record<string, HibikiHandlerModule>,
 };
 
 type PathUnionType = string | PathType;
@@ -99,13 +101,26 @@ type ComponentType = {
     libName : string,
     name : string,
     impl? : any,
-    reactimpl? : any,
+    reactimpl? : mobx.IObservableValue<any>,
+    node? : HibikiNode,
+}
+
+type LibComponentType = {
+    componentType : "hibiki-html" | "hibiki-native" | "react-custom",
+    impl? : any,
+    reactimpl? : mobx.IObservableValue<any>,
     node? : HibikiNode,
 }
 
 type LibraryType = {
     name: string,
-    components: Record<string, ComponentType>;
+    components: Record<string, LibComponentType>;
 };
 
-export type {HibikiNode, HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, TCFBlock, StmtBlock, Statement, ExprType, DataCtxErrorObjType, ComponentType, LibraryType};
+type HandlerPathObj = {
+    ns : string,
+    path : string,
+    pathfrag : string,
+};
+
+export type {HibikiNode, HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, TCFBlock, StmtBlock, Statement, ExprType, DataCtxErrorObjType, ComponentType, LibraryType, HandlerPathObj, RequestType};

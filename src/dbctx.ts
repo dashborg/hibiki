@@ -120,6 +120,9 @@ class DBCtx {
             }
             this.dataenv = elem.props.dataenv;
             this.node = elemAny.props.node;
+            if (nodeArg != null) {
+                this.node = nodeArg;
+            }
             this.uuid = elemAny.uuid;
         }
         else {
@@ -161,10 +164,6 @@ class DBCtx {
         }
     }
 
-    isEditMode() : boolean {
-        return this.dataenv.editMode;
-    }
-
     getTagName() : string {
         let rtn = this.node.tag;
         if (rtn.startsWith("html-")) {
@@ -200,6 +199,10 @@ class DBCtx {
         return this.node.attrs[attrName];
     }
 
+    isEditMode() : boolean {
+        return false;
+    }
+
     getRawAttrs() : {[e : string] : string} {
         return this.node.attrs || {};
     }
@@ -217,7 +220,7 @@ class DBCtx {
     }
 
     @boundMethod handleOnX(xval : string, val? : any) {
-        if (this.dataenv.editMode) {
+        if (this.isEditMode()) {
             return false;
         }
         let handler = this.resolveAttr(xval);

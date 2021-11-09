@@ -2,6 +2,13 @@ type RtContextItem = {
     desc : string;
 };
 
+type ErrorObj = {
+    message : string,
+    rtctx? : RtContext,
+    err? : Error,
+    blockStr? : string,
+};
+
 class RtContext {
     stack : RtContextItem[];
 
@@ -55,13 +62,6 @@ class RtContext {
         return rtn;
     }
 }
-
-type ErrorObj = {
-    message : string,
-    rtctx? : RtContext,
-    err? : Error,
-    blockStr? : string,
-};
 
 function getShortEMsg(e : any) {
     let emsg = e.toString();

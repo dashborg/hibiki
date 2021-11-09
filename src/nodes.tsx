@@ -6,7 +6,7 @@ import {sprintf} from "sprintf-js";
 import debounce from "lodash/debounce";
 import throttle from "lodash/throttle";
 import {boundMethod} from 'autobind-decorator'
-import {If, For, When, Otherwise, Choose} from "jsx-control-statements";
+import {If, For, When, Otherwise, Choose} from "tsx-control-statements/components";
 import {v4 as uuidv4} from 'uuid';
 import dayjs from "dayjs";
 import dayjsDuration from "dayjs/plugin/duration";
@@ -14,84 +14,16 @@ import dayjsRelativeTime from "dayjs/plugin/relativeTime";
 import dayjsUtc from "dayjs/plugin/utc";
 import dayjsRelative from "dayjs/plugin/relativeTime";
 
-import type {HibikiNode, ComponentType} from "./types";
+import type {HibikiNode, ComponentType, LibraryType} from "./types";
 import {DBCtx} from "./dbctx";
 import * as DataCtx from "./datactx";
 import {HibikiState, DataEnvironment, getAttributes, getAttribute, getStyleMap} from "./state";
 import {valToString, valToInt, valToFloat, resolveNumber, isObject, textContent, SYM_PROXY, SYM_FLATTEN} from "./utils";
 import {parseHtml} from "./html-parser";
+import * as NodeUtils from "./nodeutils";
+import {RtContext} from "./error";
 
-let BLOCKED_ELEMS = {
-    "html": true,
-    "body": true,
-    "meta": true,
-    "base": true,
-    "frameset": true,
-    "title": true,
-    "applet": true,
-};
-
-let INLINE_ELEMS = {
-    "a": true,
-    "abbr": true,
-    "acronym": true,
-    "b": true,
-    "bdo": true,
-    "big": true,
-    "br": true,
-    "button": true,
-    "cite": true,
-    "code": true,
-    "dfn": true,
-    "em": true,
-    "i": true,
-    "img": true,
-    "input": true,
-    "kbd": true,
-    "label": true,
-    "map": true,
-    "object": true,
-    "output": true,
-    "q": true,
-    "samp": true,
-    "script": true,
-    "select": true,
-    "small": true,
-    "span": true,
-    "strong": true,
-    "sub": true,
-    "sup": true,
-    "textarea": true,
-    "time": true,
-    "tt": true,
-    "var": true,
-};
-
-let HANDLER_ELEMS = {
-    "button": "onClick",
-    "a": "onClick",
-};
-
-let SUBMIT_ELEMS = {
-    "form": true,
-};
-
-let ONCHANGE_ELEMS = {
-    "select": true,
-    // and checkbox
-};
-
-let BINDVALUE_ONCHANGE_ELEMS = {
-    "input": true,
-    "textarea": true,
-    "select": true,
-};
-
-let GETVALUE_ELEMS = {
-    "select": true,
-    "input": true,
-    "textarea": true,
-};
+declare var window : any;
 
 dayjs.extend(dayjsDuration);
 dayjs.extend(dayjsRelativeTime);
@@ -111,8 +43,8 @@ class ErrorMsg extends React.Component<{message: string}, {}> {
 }
 
 @mobxReact.observer
-class HibikiRootNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
-    renderingDBState : DashborgPanelState;
+class HibikiRootNode extends React.Component<{page : string, dataenv : DataEnvironment}, {}> {
+    renderingDBState : HibikiState;
     loadUuid : string;
 
     constructor(props : any) {
@@ -120,7 +52,7 @@ class HibikiRootNode extends React.Component<{node : HibikiNode, dataenv : DataE
     }
     
     queueOnLoadCheck() {
-        if (this.renderingDBState == null || this.renderingDBState.PanelRendered) {
+        if (this.renderingDBState == null || this.renderingDBState.HasRendered) {
             return;
         }
         if (!window.DashborgLoaded) {
@@ -143,7 +75,8 @@ class HibikiRootNode extends React.Component<{node : HibikiNode, dataenv : DataE
                 return;
             }
         }
-        let ctx = new DBCtx(this);
+        let node = this.getHibikiNode();
+        let ctx = new DBCtx(this as any, node);
         setTimeout(() => ctx.dataenv.dbstate.fireScriptsLoaded(), 1);
         ctx.handleOnX("onloadhandler");
     }
@@ -155,19 +88,20 @@ class HibikiRootNode extends React.Component<{node : HibikiNode, dataenv : DataE
     componentDidUpdate() {
         this.queueOnLoadCheck();
     }
+
+    getHibikiNode() : HibikiNode {
+        return this.props.dataenv.dbstate.findPage(this.props.page);
+    }
     
     render() {
-        let ctx = new DBCtx(this);
-        let panelClasses = "";
+        let node = this.getHibikiNode();
+        let ctx = new DBCtx(this as any, node);
+        let rootClasses = "";
         if (ctx.dataenv.dbstate.Ui == "dashborg") {
-            panelClasses += "rootdiv dashelem col";
+            rootClasses += "rootdiv dashelem col";
         }
-        let cnMap = ctx.resolveCnMap("class", panelClasses);
+        let cnMap = ctx.resolveCnMap("class", rootClasses);
         let style = ctx.resolveStyleMap("style");
-        let allowPushAttr = ctx.resolveAttr("allowpush");
-        if (allowPushAttr) {
-            setTimeout(() => ctx.dataenv.dbstate.startPushStream(), 0);
-        }
         this.renderingDBState = ctx.dataenv.dbstate;
         return (
             <div style={style} className={cn(cnMap)}>
@@ -177,18 +111,18 @@ class HibikiRootNode extends React.Component<{node : HibikiNode, dataenv : DataE
     }
 }
 
-function ctxRenderHtmlChildren(ctx : DBCtx, dataenv? : DataEnvironment) : (Element[] | Element) {
+function ctxRenderHtmlChildren(ctx : DBCtx, dataenv? : DataEnvironment) : Element[] {
     if (dataenv == null) {
         dataenv = ctx.childDataenv;
     }
     return baseRenderHtmlChildren(ctx.node.list, dataenv);
 }
 
-function renderHtmlChildren(node : {list? : NodeType[]}, dataenv : DataEnvironment) : (Element[] | Element) {
+function renderHtmlChildren(node : {list? : HibikiNode[]}, dataenv : DataEnvironment) : Element[] {
     return baseRenderHtmlChildren(node.list, dataenv);
 }
 
-function baseRenderHtmlChildren(list : NodeType[], dataenv : DataEnvironment) : Element[] {
+function baseRenderHtmlChildren(list : HibikiNode[], dataenv : DataEnvironment) : Element[] {
     let rtn : any[] = [];
     if (list == null || list.length == 0) {
         return null;
@@ -200,7 +134,7 @@ function baseRenderHtmlChildren(list : NodeType[], dataenv : DataEnvironment) : 
         else if (child.tag == "#comment") {
             continue;
         }
-        else if (BLOCKED_ELEMS[child.tag]) {
+        else if (NodeUtils.BLOCKED_ELEMS[child.tag]) {
             continue;
         }
         else if (child.tag == "if-break") {
@@ -252,7 +186,7 @@ function baseRenderHtmlChildren(list : NodeType[], dataenv : DataEnvironment) : 
 }
 
 @mobxReact.observer
-class NodeList extends React.Component<{list : NodeType[], ctx : DBCtx}> {
+class NodeList extends React.Component<{list : HibikiNode[], ctx : DBCtx}> {
     render() {
         let {list, ctx} = this.props;
         let rtn = baseRenderHtmlChildren(list, ctx.childDataenv);
@@ -264,7 +198,7 @@ class NodeList extends React.Component<{list : NodeType[], ctx : DBCtx}> {
 }
 
 @mobxReact.observer
-class HtmlNode extends React.Component<{node : NodeType, dataenv : DataEnvironment}, {}> {
+class HtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
     nodeType : string = "unknown";
     
     renderInner(ctx : DBCtx) : any {
@@ -283,7 +217,7 @@ class HtmlNode extends React.Component<{node : NodeType, dataenv : DataEnvironme
         if (component != null) {
             if (component.componentType == "react-custom") {
                 this.nodeType = "custom-react";
-                return <CustomReactNode node={node} dataenv={dataenv}/>;
+                return <CustomReactNode component={component} node={node} dataenv={dataenv}/>;
             }
             else if (component.componentType == "hibiki-native") {
                 this.nodeType = "component";
@@ -309,20 +243,38 @@ class HtmlNode extends React.Component<{node : NodeType, dataenv : DataEnvironme
     render() {
         let ctx = new DBCtx(this);
         let content = this.renderInner(ctx)
-        if (ctx.isEditMode() && ctx.dataenv.dbstate.EditWrapper != null) {
-            return ctx.dataenv.dbstate.EditWrapper(ctx, content, this.nodeType);
-        }
         return content;
     }
 }
 
 @mobxReact.observer
-class RawHtmlNode extends React.Component<{node : NodeType, dataenv : DataEnvironment}, {}> {
+class CustomReactNode extends React.Component<{node : HibikiNode, component : ComponentType, dataenv : DataEnvironment}, {}> {
+    render() {
+        let ctx = new DBCtx(this);
+        let dataenv = ctx.dataenv;
+        let component = this.props.component;
+        let implBox = component.reactimpl;
+        let reactImpl = implBox.get();
+        if (reactImpl == null) {
+            return null;
+        }
+        let attrs = ctx.resolveAttrs({raw: true});
+        let nodeVar = NodeUtils.makeNodeVar(ctx);
+        let childEnv = ctx.childDataenv.makeSpecialChildEnv({node: nodeVar});
+        childEnv.htmlContext = "react " + ctx.node.tag;
+        let rtnElems = renderHtmlChildren(ctx.node, childEnv)
+        let reactElem = React.createElement(reactImpl, attrs, rtnElems);
+        return reactElem;
+    }
+}
+
+@mobxReact.observer
+class RawHtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
     constructor(props : any) {
         super(props);
         let ctx = new DBCtx(this);
         if (!ctx.isEditMode()) {
-            if (GETVALUE_ELEMS[ctx.getTagName()]) {
+            if (NodeUtils.GETVALUE_ELEMS[ctx.getTagName()]) {
                 ctx.setDefaultForData("value");
             }
         }
@@ -341,7 +293,7 @@ class RawHtmlNode extends React.Component<{node : NodeType, dataenv : DataEnviro
             return;
         }
         let isReadOnly = !!ctx.resolveAttr("readonly");
-        let isOnChangeElem = ONCHANGE_ELEMS[ctx.getTagName()];
+        let isOnChangeElem = NodeUtils.ONCHANGE_ELEMS[ctx.getTagName()];
         let typeAttr = ctx.resolveAttr("type");
         let isCheckbox = (ctx.getTagName() == "input" && typeAttr == "checkbox");
         let valueLV = ctx.resolveData("value", true);
@@ -357,7 +309,7 @@ class RawHtmlNode extends React.Component<{node : NodeType, dataenv : DataEnviro
         }
         else {
             outputValue = e.target.value;
-            handleConvertType(ctx, outputValue);
+            NodeUtils.handleConvertType(ctx, outputValue);
             if (isReadOnly) {
                 if (isOnChangeElem) {
                     ctx.handleOnChange(outputValue);
@@ -383,10 +335,10 @@ class RawHtmlNode extends React.Component<{node : NodeType, dataenv : DataEnviro
             disabled: null,
         };
         if (attrs.automerge != null) { // ?? TODO
-            let automergeArr = parseAutomerge(attrs.automerge);
+            let automergeArr = NodeUtils.parseAutomerge(attrs.automerge);
             for (let i=0; i<automergeArr.length; i++) {
                 let amParams = automergeArr[i];
-                automerge(ctx, automergeAttrs, amParams.name, amParams.opts);
+                NodeUtils.automerge(ctx, automergeAttrs, amParams.name, amParams.opts);
             }
         }
         
@@ -402,16 +354,16 @@ class RawHtmlNode extends React.Component<{node : NodeType, dataenv : DataEnviro
                         elemProps["href"] = "#";
                     }
                 }
-                if (BINDVALUE_ONCHANGE_ELEMS[tagName]) {
+                if (NodeUtils.BINDVALUE_ONCHANGE_ELEMS[tagName]) {
                     elemProps.onChange = this.handleBindValueOnChange;
                 }
-                if (k == "handler" && HANDLER_ELEMS[tagName]) {
-                    elemProps[HANDLER_ELEMS[tagName]] = ctx.runHandler;
+                if (k == "handler" && NodeUtils.HANDLER_ELEMS[tagName]) {
+                    elemProps[NodeUtils.HANDLER_ELEMS[tagName]] = ctx.runHandler;
                     if (tagName == "a" && elemProps["href"] == null) {
                         elemProps["href"] = "#";
                     }
                 }
-                if (k == "onsubmithandler" && SUBMIT_ELEMS[tagName]) {
+                if (k == "onsubmithandler" && NodeUtils.SUBMIT_ELEMS[tagName]) {
                     elemProps.onSubmit = ctx.handleOnSubmit;
                 }
             }
@@ -446,7 +398,7 @@ class RawHtmlNode extends React.Component<{node : NodeType, dataenv : DataEnviro
                 }
                 continue;
             }
-            if ((k == "value" || k == "defaultvalue") && GETVALUE_ELEMS[tagName]) {
+            if ((k == "value" || k == "defaultvalue") && NodeUtils.GETVALUE_ELEMS[tagName]) {
                 continue;
             }
             if (k == "download" && v == "1") {
@@ -455,7 +407,7 @@ class RawHtmlNode extends React.Component<{node : NodeType, dataenv : DataEnviro
             }
             elemProps[k] = v;
         }
-        if (!ctx.isEditMode() && GETVALUE_ELEMS[tagName]) {
+        if (!ctx.isEditMode() && NodeUtils.GETVALUE_ELEMS[tagName]) {
             let isCheckbox = (tagName == "input" && typeAttr == "checkbox");
             let valueLV = ctx.resolveData("value", true);
             let value = DataCtx.demobx(valueLV.get());
@@ -487,7 +439,7 @@ class RawHtmlNode extends React.Component<{node : NodeType, dataenv : DataEnviro
 }
 
 @mobxReact.observer
-class CustomNode extends React.Component<{node : NodeType, component : ComponentType, dataenv : DataEnvironment}, {}> {
+class CustomNode extends React.Component<{node : HibikiNode, component : ComponentType, dataenv : DataEnvironment}, {}> {
     constructor(props : any) {
         super(props);
         this.makeChildEnv(true);
@@ -498,9 +450,9 @@ class CustomNode extends React.Component<{node : NodeType, component : Component
         let component = this.props.component;
         let implNode = component.node;
         let rawImplAttrs = implNode.attrs || {};
-        let nodeVar = makeNodeVar(ctx);
-        let childrenVar = makeChildrenVar(ctx.dataenv, ctx.node);
-        let datatypes = parseDataTypes(rawImplAttrs.datatypes);
+        let nodeVar = NodeUtils.makeNodeVar(ctx);
+        let childrenVar = NodeUtils.makeChildrenVar(ctx.dataenv, ctx.node);
+        let datatypes = NodeUtils.parseDataTypes(rawImplAttrs.datatypes);
         let nodeDataBox = ctx.dataenv.dbstate.NodeDataMap.get(ctx.uuid);
         if (nodeDataBox == null) {
             let uuidName = "id_" + ctx.uuid.replace(/-/g, "_");
@@ -528,7 +480,7 @@ class CustomNode extends React.Component<{node : NodeType, component : Component
         }
         let crootProxy = componentRootProxy(nodeDataLV, resolvedAttrs);
         let childEnv = ctx.childDataenv.makeSpecialChildEnv(specials, {componentRoot: crootProxy, handlers: handlers});
-        childEnv.htmlContext = "component " + component.path;
+        childEnv.htmlContext = "component " + ctx.node.tag;
         if (initialize && rawImplAttrs.defaults != null) {
             try {
                 let block = DataCtx.ParseBlockThrow(rawImplAttrs.defaults);
@@ -567,129 +519,6 @@ class CustomNode extends React.Component<{node : NodeType, component : Component
             return <React.Fragment>{rtnElems}</React.Fragment>
         }
     }
-}
-
-
-function renderTextSpan(text : string, style : any) : any {
-    if (text === undefined) {
-        text = null;
-    }
-    if (style != null && Object.keys(style).length > 0) {
-        return <span style={style}>{text}</span>;
-    }
-    return text;
-}
-
-function renderTextData(node : NodeType, dataenv : DataEnvironment) : any {
-    let ctx = new DBCtx(null, node, dataenv);
-    let style = ctx.resolveStyleMap("style");
-    let dataLV = ctx.resolveData("data", false);
-    let bindVal = DataCtx.demobx(dataLV.get());
-    if (bindVal == null && ctx.hasAttr("nulltext")) {
-        let nullText = ctx.resolveAttr("nulltext");
-        let rtn = formatVal(nullText, null);
-        return renderTextSpan(rtn, style);
-    }
-    let rtn = formatVal(bindVal, ctx.resolveAttr("format"));
-    return renderTextSpan(rtn, style);
-}
-
-function makeNodeVar(ctx : DBCtx) : any {
-    let node = ctx.node;
-    if (node == null) {
-        return null;
-    }
-    let rtn : any = {};
-    rtn.tag = ctx.getTagName();
-    rtn._type = "DashborgNode";
-    rtn.attrs = ctx.resolveAttrs({raw: true});
-    rtn.stylemap = {};
-    rtn.uuid = ctx.uuid;
-    rtn.dataenv = ctx.childDataenv;
-    rtn.cnmap = {};
-
-    // classes
-    let classAttrs = {};
-    for (let attrkey in rtn.attrs) {
-        if (attrkey == "class") {
-            classAttrs["class"] = true;
-            continue;
-        }
-        if (!attrkey.startsWith("class-")) {
-            continue;
-        }
-        let dotIndex = attrkey.indexOf(".");
-        if (dotIndex != -1) {
-            attrkey = attrkey.substr(0, dotIndex);
-        }
-        classAttrs[attrkey] = true;
-    }
-    for (let cnAttr in classAttrs) {
-        rtn.cnmap[cnAttr] = ctx.resolveCnMap(cnAttr);
-    }
-
-    // styles
-    if (node.style != null) {
-        rtn.stylemap["style"] = ctx.resolveStyleMap("style");
-    }
-    if (node.morestyles != null) {
-        for (let sn in node.morestyles) {
-            rtn.stylemap[sn] = ctx.resolveStyleMap(sn);
-        }
-    }
-    
-    return rtn;
-}
-
-function makeChildrenVar(dataenv : DataEnvironment, node : NodeType) : any {
-    if (node == null || node.list == null || node.list.length == 0) {
-        return null;
-    }
-    let rtn : any = {};
-    rtn.all = node.list;
-    rtn.bytag = {};
-    rtn.byslot = {};
-    for (let i=0; i<node.list.length; i++) {
-        let n = node.list[i];
-        let tagname = n.tag;
-        if (rtn.bytag[tagname] == null) {
-            rtn.bytag[tagname] = [];
-        }
-        rtn.bytag[tagname].push(n);
-        let slotname = getAttribute(n, "slot", dataenv);
-        if (slotname != null) {
-            if (rtn.byslot[slotname] == null) {
-                rtn.byslot[slotname] = [];
-            }
-            rtn.byslot[slotname].push(n);
-        }
-    }
-    return rtn;
-}
-
-function parseDataTypes(datatypes : string) : {[e : string] : boolean} {
-    let rtn : {[e : string] : boolean} = {};
-    if (datatypes == null || datatypes.trim() == "") {
-        return rtn;
-    }
-    let split = datatypes.split(/,/);
-    for (let i=0; i<split.length; i++) {
-        let field = split[i].trim();
-        if (field == "") {
-            continue;
-        }
-        if (!field.match(/\*?[a-z][a-z0-9_]*/)) {
-            console.log("Bad field definition: ", field);
-            continue;
-        }
-        let isWriteable = false;
-        if (field.startsWith("*")) {
-            isWriteable = true;
-            field = field.substr(1);
-        }
-        rtn[field] = isWriteable;
-    }
-    return rtn;
 }
 
 function componentRootProxy(nodeDataLV : DataCtx.ObjectLValue, resolvedAttrs : {[e : string] : any}) : {[e : string] : any} {
@@ -737,36 +566,15 @@ function componentRootProxy(nodeDataLV : DataCtx.ObjectLValue, resolvedAttrs : {
     return new Proxy({}, traps);
 }
 
-function formatVal(val : any, format : string) : string {
-    let rtn = null;
-    try {
-        if (format == null || format == "") {
-            rtn = String(val);
-        }
-        else if (format == "json") {
-            rtn = DataCtx.JsonStringify(val, 2);
-        }
-        else if (mobx.isArrayLike(val)) {
-            rtn = sprintf(format, ...val);
-        }
-        else {
-            rtn = sprintf(format, val);
-        }
-    } catch (e) {
-        rtn = "ERR[" + e + "]";
-    }
-    return rtn;
-}
-
 @mobxReact.observer
 class TextNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
     render() {
-        return renderTextData(this.props.node, this.props.dataenv);
+        return NodeUtils.renderTextData(this.props.node, this.props.dataenv);
     }
 }
 
 @mobxReact.observer
-class IfNode extends React.Component<{node : NodeType, dataenv : DataEnvironment}, {}> {
+class IfNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
     render() {
         let ctx = new DBCtx(this);
         let condition = true;
@@ -783,7 +591,7 @@ class IfNode extends React.Component<{node : NodeType, dataenv : DataEnvironment
 }
 
 @mobxReact.observer
-class ForEachNode extends React.Component<{node : NodeType, dataenv : DataEnvironment}, {}> {
+class ForEachNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
     render() {
         // let {node, data, dbstate, attrs, bindattr, bindVal} = this.setup();
         let ctx = new DBCtx(this);
@@ -793,11 +601,11 @@ class ForEachNode extends React.Component<{node : NodeType, dataenv : DataEnviro
         if (bindVal == null) {
             return null;
         }
-        let [iterator, isMap] = makeIterator(bindVal);
+        let [iterator, isMap] = NodeUtils.makeIterator(bindVal);
         let index = 0;
         for (let rawVal of iterator) {
             let ctxVars = {"index": index};
-            let [key, val] = getKV(rawVal, isMap);
+            let [key, val] = NodeUtils.getKV(rawVal, isMap);
             if (key != null) {
                 ctxVars["key"] = key;
             }
@@ -818,7 +626,7 @@ class ForEachNode extends React.Component<{node : NodeType, dataenv : DataEnviro
 }
 
 @mobxReact.observer
-class ScriptNode extends React.Component<{node : NodeType, dataenv : DataEnvironment}, {}> {
+class ScriptNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
     render() {
         let ctx = new DBCtx(this);
         let blobsrc = ctx.resolveAttr("blobsrc");
@@ -841,7 +649,7 @@ class ScriptNode extends React.Component<{node : NodeType, dataenv : DataEnviron
 }
 
 @mobxReact.observer
-class DateFormatNode extends React.Component<{node : NodeType, dataenv : DataEnvironment}, {}> {
+class DateFormatNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
     render() {
         let ctx = new DBCtx(this);
         let dataLV = ctx.resolveData("data", false);
@@ -853,7 +661,7 @@ class DateFormatNode extends React.Component<{node : NodeType, dataenv : DataEnv
             try {
                 bindVal = parseFloat(dayjs(bindVal).format("x"));
             } catch (e) {
-                return renderTextSpan("invalid", style);
+                return NodeUtils.renderTextSpan("invalid", style);
             }
         }
         let relativeAttr = !!ctx.resolveAttr("relative");
@@ -862,13 +670,13 @@ class DateFormatNode extends React.Component<{node : NodeType, dataenv : DataEnv
             bindVal = parseFloat(bindVal);
         }
         if (bindVal == null) {
-            return renderTextSpan(nulltext || "null", style);
+            return NodeUtils.renderTextSpan(nulltext || "null", style);
         }
         if (bindVal == 0 && !durationAttr) {
-            return renderTextSpan(nulltext || "null", style);
+            return NodeUtils.renderTextSpan(nulltext || "null", style);
         }
         if (typeof(bindVal) != "number" || isNaN(bindVal)) {
-            return renderTextSpan("invalid", style);
+            return NodeUtils.renderTextSpan("invalid", style);
         }
         let text = null;
         try {
@@ -905,52 +713,18 @@ class DateFormatNode extends React.Component<{node : NodeType, dataenv : DataEnv
         } catch (e) {
             text = "ERR[" + e + "]";
         }
-        return renderTextSpan(text, style);
+        return NodeUtils.renderTextSpan(text, style);
     }
-}
-
-function makeIterator(bindVal : any) : [any, boolean] {
-    let iterator = null;
-    let isMap = false;
-    if (bindVal == null) {
-        return [[], false];
-    }
-    if (bindVal instanceof DataCtx.DashborgBlob || (isObject(bindVal) && bindVal._type == "DashborgNode")) {
-        return [[bindVal], false];
-    }
-    if (bindVal instanceof DataEnvironment || bindVal instanceof DataCtx.LValue) {
-        return [[], false];
-    }
-    if (bindVal instanceof Map || mobx.isObservableMap(bindVal)) {
-        return [bindVal, true];
-    }
-    if (mobx.isArrayLike(bindVal)) {
-        return [bindVal, false];
-    }
-    if (typeof(bindVal) == "object") {
-        return [Object.entries(bindVal), true];
-    }
-    else {
-        return [[bindVal], false];
-    }
-}
-
-function getKV(ival : any, isMap : boolean) : [any, any] {
-    if (isMap) {
-        let [key, val] = ival;
-        return [key, val];
-    }
-    return [null, ival];
 }
 
 @mobxReact.observer
-class NopNode extends React.Component<{node : NodeType, dataenv : DataEnvironment}, {}> {
+class NopNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
     render() {
         return null;
     }
 }
 
-class RunHandlerNode extends React.Component<{node : NodeType, dataenv : DataEnvironment}, {}> {
+class RunHandlerNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
     componentDidMount() {
         let ctx = new DBCtx(this);
         ctx.handleOnX("onrunhandler");
@@ -962,7 +736,7 @@ class RunHandlerNode extends React.Component<{node : NodeType, dataenv : DataEnv
 }
 
 @mobxReact.observer
-class WithContextNode extends React.Component<{node : NodeType, dataenv : DataEnvironment}, {}> {
+class WithContextNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
     render() {
         let ctx = new DBCtx(this);
         let contextattr = ctx.resolveAttr("context");
@@ -980,7 +754,7 @@ class WithContextNode extends React.Component<{node : NodeType, dataenv : DataEn
 }
 
 @mobxReact.observer
-class ChildrenNode extends React.Component<{node : NodeType, dataenv : DataEnvironment}, {}> {
+class ChildrenNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
     render() {
         let ctx = new DBCtx(this);
         let dataLV = ctx.resolveData("data", false);
@@ -1010,7 +784,7 @@ class ChildrenNode extends React.Component<{node : NodeType, dataenv : DataEnvir
 }
 
 @mobxReact.observer
-class DynNode extends React.Component<{node : NodeType, dataenv : DataEnvironment}, {}> {
+class DynNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
     curHtml : string = null;
     curHtmlObj : HibikiNode = null;
 
@@ -1042,7 +816,7 @@ class DynNode extends React.Component<{node : NodeType, dataenv : DataEnvironmen
     }
 }
 
-class SimpleQueryNode extends React.Component<{node : NodeType, dataenv : DataEnvironment}, {}> {
+class SimpleQueryNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
     refreshCount : mobx.IObservableValue<number>;
     callNum : number = 0;
     autorunDisposer : () => void = null;
@@ -1153,7 +927,7 @@ class SimpleQueryNode extends React.Component<{node : NodeType, dataenv : DataEn
 }
 
 @mobxReact.observer
-class InlineDataNode extends React.Component<{node : NodeType, dataenv : DataEnvironment}> {
+class InlineDataNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}> {
     constructor(props : any) {
         super(props);
     }
@@ -1196,7 +970,7 @@ class InlineDataNode extends React.Component<{node : NodeType, dataenv : DataEnv
     }
 }
 
-class RenderLogNode extends React.Component<{node : NodeType, dataenv : DataEnvironment}, {}> {
+class RenderLogNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
     render() {
         let ctx = new DBCtx(this);
         let dataLV = ctx.resolveData("data", false);
@@ -1206,7 +980,7 @@ class RenderLogNode extends React.Component<{node : NodeType, dataenv : DataEnvi
 }
 
 @mobxReact.observer
-class DataSorterNode extends React.Component<{node : NodeType, dataenv : DataEnvironment}, {}> {
+class DataSorterNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
     autorunDisposer : () => void = null;
 
     sortcolComputed : mobx.IComputedValue<string>;
@@ -1321,7 +1095,7 @@ class DataSorterNode extends React.Component<{node : NodeType, dataenv : DataEnv
 }
 
 @mobxReact.observer
-class DataPagerNode extends React.Component<{node : NodeType, dataenv : DataEnvironment}, {}> {
+class DataPagerNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
     autorunDisposer : () => void = null;
     dataComputed : mobx.IComputedValue<any[]>;
     dataIsNullComputed : mobx.IComputedValue<boolean>;
@@ -1447,7 +1221,34 @@ class DataPagerNode extends React.Component<{node : NodeType, dataenv : DataEnvi
     }
 }
 
-let CORE_LIBRARY = {
+class SimpleTableNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
+    render() {
+        return (
+            <table>
+                <thead>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        );
+    }
+}
+
+@mobxReact.observer
+class DashElemNode extends React.Component<{ctx : DBCtx, extClass? : string, extStyle? : any}, {}> {
+    render() {
+        let ctx = this.props.ctx;
+        let cnMap = ctx.resolveCnMap("class", this.props.extClass);
+        let style = ctx.resolveStyleMap("style", this.props.extStyle);
+        return (
+            <div className={cn(cnMap, "dashelem")} style={style}>
+                {this.props.children}
+            </div>
+        );
+    }
+}
+
+let CORE_LIBRARY : LibraryType = {
     name: "@dashborg/core",
     components: {
         "if": {componentType: "hibiki-native", impl: IfNode},
@@ -1470,6 +1271,7 @@ let CORE_LIBRARY = {
         "d-renderlog": {componentType: "hibiki-native", impl: RenderLogNode},
         "d-datasorter": {componentType: "hibiki-native", impl: DataSorterNode},
         "d-datapager": {componentType: "hibiki-native", impl: DataPagerNode},
+        "d-table": {componentType: "hibiki-native", impl: SimpleTableNode},
     },
 };
 

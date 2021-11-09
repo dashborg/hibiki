@@ -15,6 +15,7 @@
     "@babel/preset-env": "^7.16.0",
     "@babel/preset-react": "^7.16.0",
     "@babel/preset-typescript": "^7.16.0",
+    "@types/classnames": "2.2.6",
     "@types/node": "^16.11.6",
     "@types/react": "^17.0.34",
     "@types/uuid": "^8.3.1",
@@ -36,7 +37,7 @@
     "autobind-decorator": "^2.4.0",
     "axios": "^0.24.0",
     "camelcase": "^6.2.0",
-    "classnames": "^2.3.1",
+    "classnames": "2.2.6",
     "dayjs": "^1.10.7",
     "lodash": "^4.17.21",
     "md5": "^2.3.0",
@@ -47,6 +48,7 @@
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
     "sprintf-js": "^1.1.2",
+    "tsx-control-statements": "^4.1.1",
     "uuid": "^8.3.2"
   },
   "scripts": {

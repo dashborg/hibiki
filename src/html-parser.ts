@@ -68,8 +68,8 @@ function parseHtmlNode(htmlNode : Node) : HibikiNode {
             node.style = styleMap;
         }
         if (attr.name.startsWith("style-")) {
-            node.moreStyles = node.moreStyles || {};
-            node.moreStyles[attr.name] = parseStyleAttr(attr.value);
+            node.morestyles = node.morestyles || {};
+            node.morestyles[attr.name] = parseStyleAttr(attr.value);
         }
     }
     let list = parseNodeChildren(htmlNode);

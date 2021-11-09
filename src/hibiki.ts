@@ -1,3 +1,4 @@
+import * as React from "react";
 import {parseHtml} from "./html-parser";
 import {HibikiState, DataEnvironment} from "./state";
 import * as ReactDOM from "react-dom";
@@ -7,13 +8,14 @@ declare var window : any;
 
 function initialize(hibikiRoot : HTMLElement, html : string | HTMLElement, rootData : any) {
     let htmlObj = parseHtml(html);
+    console.log(htmlObj);
     let state = new HibikiState();
     state.setHtml(htmlObj);
     state.ComponentLibrary.addLibrary(CORE_LIBRARY);
     state.ComponentLibrary.importLib("@dashborg/core", null);
     state.DataRoots["global"].set(rootData);
     let renderNode = state.findPage("default");
-    let reactElem = React.createElement(HibikiRootNode, {node: renderNode, dataenv: state.rootDataenv()}, null);
+    let reactElem = React.createElement(HibikiRootNode, {page: "default", node: renderNode, dataenv: state.rootDataenv()}, null);
     ReactDOM.render(reactElem, hibikiRoot);
     window.HibikiState = state;
 }
