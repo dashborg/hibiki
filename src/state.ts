@@ -4,7 +4,7 @@ import Axios from "axios";
 import {sprintf} from "sprintf-js";
 import {boundMethod} from 'autobind-decorator'
 import {v4 as uuidv4} from 'uuid';
-import {HibikiNode, ComponentType, LibraryType, RequestType, HandlerPathObj, HibikiConfig, HibikiHandlerModule} from "./types";
+import {HibikiNode, ComponentType, LibraryType, HandlerPathObj, HibikiConfig, HibikiHandlerModule, RequestType} from "./types";
 import * as DataCtx from "./datactx";
 import {isObject, textContent, SYM_PROXY, SYM_FLATTEN} from "./utils";
 import {RtContext} from "./error";
@@ -371,7 +371,7 @@ class FetchModule {
         init = init || {};
         init.headers = init.headers || new Headers();
         if (this.dbstate.FeClientId) {
-            init.headers.set("X-Dashborg-FeClientId", this.dbstate.FeClientId);
+            init.headers.set("X-Hibiki-FeClientId", this.dbstate.FeClientId);
         }
         if (this.CsrfHook != null) {
             let csrfHeaders = this.CsrfHook();
@@ -390,7 +390,7 @@ class FetchModule {
         return init;
     }
     
-    runHandler(req : RequestType) : Promise<any> {
+    callHandler(req : RequestType) : Promise<any> {
         let method = req.path.pathfrag;
         if (method == null) {
             throw sprintf("Invalid null method passed to /@fetch:[method]");
@@ -463,7 +463,7 @@ class FetchModule {
                             if (semiIdx == -1 || mimetype == null || mimetype == "") {
                                 throw "Invalid BLOB returned from fetch, bad mimetype or encoding";
                             }
-                            let dbblob = new DataCtx.DashborgBlob();
+                            let dbblob = new DataCtx.HibikiBlob();
                             dbblob.mimetype = blob.type;
                             // extra 7 bytes for "base64," ... e.g. data:image/jpeg;base64,[base64data]
                             dbblob.data = (reader.result as string).substr(semiIdx+1+7);
@@ -492,6 +492,7 @@ class HibikiState {
     HasRendered = false;
     ScriptsLoaded : mobx.IObservableValue<boolean> = mobx.observable.box(false, {name: "ScriptsLoaded"});
     NodeDataMap : Map<string, mobx.IObservableValue<any>> = new Map();  // TODO clear on unmount
+    ExtHtmlObj : mobx.ObservableMap<string,any> = mobx.observable.map({}, {name: "ExtHtmlObj", deep: false});
     
     Modules : Record<string, HibikiHandlerModule> = {};
     DataRoots : Record<string, mobx.IObservableValue<any>>;
@@ -525,7 +526,7 @@ class HibikiState {
     @mobx.action fireScriptsLoaded() {
         let dataenv = this.rootDataenv();
         this.ScriptsLoaded.set(true);
-        DataCtx.SetPath("$state.dashborg.scriptsloaded", dataenv, true);
+        DataCtx.SetPath("$state.hibiki.scriptsloaded", dataenv, true);
         while (this.PostScriptRunQueue.length > 0) {
             let fn = this.PostScriptRunQueue.shift();
             try {
@@ -653,12 +654,19 @@ class HibikiState {
         return null;
     }
 
-    @mobx.action runActions(rra : any, reqid : string, opts? : any) : any {
+    returnValueFromActions(rra : any) : any {
+        return this.processActions(rra, true);
+    }
+
+    runActions(rra : any) : any {
+        return this.processActions(rra, false);
+    }
+
+    @mobx.action processActions(rra : any, pureRequest : boolean) : any {
         if (rra == null) {
             return null;
         }
         let rtnval = null;
-        opts = opts || {};
         let dataenv = this.rootDataenv();
         for (let rr of rra) {
             let selector = rr.selector ?? rr.path;
@@ -671,13 +679,17 @@ class HibikiState {
                 continue;
             }
             else if (rr.type == "blobext" && selector == "@rtn") {
-                if (rtnval == null || !(rtnval instanceof DataCtx.DashborgBlob)) {
-                    console.log("Bad blobext:@rtn, no DashborgBlob to extend");
+                if (rtnval == null || !(rtnval instanceof DataCtx.HibikiBlob)) {
+                    console.log("Bad blobext:@rtn, no HibikiBlob to extend");
                     continue;
                 }
                 DataCtx.ExtBlobFromRRA(rtnval, rr);
+                continue;
             }
-            else if (rr.type == "invalidate") {
+            if (pureRequest) {
+                continue;
+            }
+            if (rr.type == "invalidate") {
                 this.invalidateRegex(selector);
             }
             else if (rr.type == "html") {
@@ -693,7 +705,7 @@ class HibikiState {
     }
 
     // opts: rtContext, dataenv
-    async callHandlerAsync(handlerPath : string, handlerData : any[], opts? : any) : Promise<any> {
+    async callHandlerInternalAsync(handlerPath : string, handlerData : any[], pureRequest : boolean, opts? : any) : Promise<any> {
         opts = opts || {};
         if (handlerPath == null || handlerPath == "") {
             throw "Invalid handler path"
@@ -707,7 +719,7 @@ class HibikiState {
         if (module == null) {
             throw sprintf("Invalid handler, no module '%s' found for path: %s", moduleName, handlerPath);
         }
-        let req = {
+        let req : RequestType = {
             path: {
                 module: moduleName,
                 path: hpath.path,
@@ -716,24 +728,25 @@ class HibikiState {
             data: handlerData,
             rtContext: opts.rtContext,
             state: this,
+            pure : pureRequest,
         };
         let self = this;
-        let rtnp = module.runHandler(req);
+        let rtnp = module.callHandler(req);
         return rtnp.then((data) => {
             if (data == null || typeof(data) != "object" || !("hibikiactions" in data) || !Array.isArray(data.hibikiactions)) {
                 return data;
             }
-            return self.runActions(data.hibikiactions, null, null);
+            return self.processActions(data.hibikiactions, pureRequest);
         });
     }
 
-    // opts: rtContext, dataenv
-    callHandler(handlerPath : string, handlerData : any[], opts? : any) : Promise<any> {
+    callHandler(handlerPath : string, handlerData : any[], opts? : {rtContext? : RtContext}) : Promise<any> {
+        opts = opts || {};
         let self = this;
-        let handlerP = this.callHandlerAsync(handlerPath, handlerData, opts);
+        let handlerP = this.callHandlerInternalAsync(handlerPath, handlerData, false);
         let prtn = handlerP.catch((e) => {
             self.reportErrorObj({
-                message: "Error calling handler " + handlerPath + ": " + e,
+                message: sprintf("Error calling handler %s", handlerPath),
                 err: e,
                 rtctx: opts.rtContext,
             });
@@ -742,13 +755,23 @@ class HibikiState {
         return prtn;
     }
 
-    callData(handlerPath : string, handlerData : any[]) : Promise<any> {
-        return Promise.resolve(null);
+    callData(handlerPath : string, handlerData : any[], opts? : {rtContext? : RtContext}) : Promise<any> {
+        let self = this;
+        let handlerP = this.callHandlerInternalAsync(handlerPath, handlerData, true);
+        let prtn = handlerP.catch((e) => {
+            self.reportErrorObj({
+                message: sprintf("Error calling data handler %s", handlerPath),
+                err: e,
+                rtctx: opts.rtContext,
+            });
+            console.log(e);
+        });
+        return prtn;
     }
 
     reportError(errorMessage : string, rtctx? : RtContext) {
         if (this.ErrorCallback == null) {
-            console.log("Dashborg Panel Error", errorMessage);
+            console.log("Hibiki Error |", errorMessage);
             return;
         }
         let msg : ErrorObj = {message: errorMessage, rtctx: rtctx};
@@ -757,7 +780,19 @@ class HibikiState {
 
     reportErrorObj(errorObj : ErrorObj) {
         if (this.ErrorCallback == null) {
-            console.log("Dashborg Panel Error", errorObj);
+            let logObj : any[] = [errorObj.message];
+            if (errorObj.rtctx != null) {
+                logObj.push("|");
+                logObj.push(errorObj.rtctx);
+            }
+            if (errorObj.blockStr != null) {
+                logObj.push("|");
+                logObj.push(errorObj.blockStr);
+            }
+            console.log("Hibiki Error |", ...logObj);
+            if (errorObj.err != null) {
+                console.log(errorObj.err);
+            }
             return;
         }
         this.ErrorCallback(errorObj);
@@ -896,7 +931,7 @@ function resolveAttrVal(k : string, v : string, dataenv : DataEnvironment, opts 
     if (resolvedVal === true) {
         resolvedVal = 1;
     }
-    if (k == "blobsrc" && resolvedVal instanceof DataCtx.DashborgBlob) {
+    if (k == "blobsrc" && resolvedVal instanceof DataCtx.HibikiBlob) {
         return (resolvedVal as any);
     }
     if (opts.style && typeof(resolvedVal) == "number") {

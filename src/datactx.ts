@@ -12,7 +12,7 @@ declare var window : any;
 
 const MAX_ARRAY_SIZE = 10000;
 
-class DashborgBlob {
+class HibikiBlob {
     mimetype = null;
     data = null;
 
@@ -940,7 +940,7 @@ function MapReplacer(key : string, value : any) : any {
         }
         return rtn;
     }
-    else if (this[key] instanceof DashborgBlob) {
+    else if (this[key] instanceof HibikiBlob) {
         let bloblen = 0;
         if (this[key].data != null) {
             bloblen = this[key].data.length;
@@ -998,10 +998,10 @@ function DeepEqual(data1 : any, data2 : any) : boolean {
     if (d1arr || d2arr) {
         return false;
     }
-    if (data1 instanceof DashborgBlob && data2 instanceof DashborgBlob) {
+    if (data1 instanceof HibikiBlob && data2 instanceof HibikiBlob) {
         return data1.mimetype == data2.mimetype && data1.data == data2.data;
     }
-    if (data1 instanceof DashborgBlob || data2 instanceof DashborgBlob) {
+    if (data1 instanceof HibikiBlob || data2 instanceof HibikiBlob) {
         return false;
     }
     if (data1 instanceof DataEnvironment || data2 instanceof DataEnvironment) {
@@ -1063,7 +1063,7 @@ function demobxInternal(v : any) : [any, boolean] {
     if (typeof(v) != "object") {
         return [v, false];
     }
-    if (v instanceof DashborgBlob || v instanceof LValue || v instanceof DataEnvironment || v._type == "DashborgNode") {
+    if (v instanceof HibikiBlob || v instanceof LValue || v instanceof DataEnvironment || v._type == "DashborgNode") {
         return [v, false];
     }
     if (v instanceof Map) {
@@ -1337,7 +1337,7 @@ function evalFnAst(fnAst : any, dataenv : DataEnvironment) : any {
     }
     else if (fnAst.fn == "blobastext") {
         let blob = evalExprAst(fnAst.exprs[0], dataenv);
-        if (blob == null || !(blob instanceof DashborgBlob)) {
+        if (blob == null || !(blob instanceof HibikiBlob)) {
             return null;
         }
         if (!blob.mimetype.startsWith("text/")) {
@@ -1347,21 +1347,21 @@ function evalFnAst(fnAst : any, dataenv : DataEnvironment) : any {
     }
     else if (fnAst.fn == "blobasbase64") {
         let blob = evalExprAst(fnAst.exprs[0], dataenv);
-        if (blob == null || !(blob instanceof DashborgBlob)) {
+        if (blob == null || !(blob instanceof HibikiBlob)) {
             return null;
         }
         return blob.data;
     }
     else if (fnAst.fn == "blobmimetype") {
         let blob = evalExprAst(fnAst.exprs[0], dataenv);
-        if (blob == null || !(blob instanceof DashborgBlob)) {
+        if (blob == null || !(blob instanceof HibikiBlob)) {
             return null;
         }
         return blob.mimetype;
     }
     else if (fnAst.fn == "bloblen") {
         let blob = evalExprAst(fnAst.exprs[0], dataenv);
-        if (blob == null || !(blob instanceof DashborgBlob)) {
+        if (blob == null || !(blob instanceof HibikiBlob)) {
             return null;
         }
         let bloblen = 0;
@@ -1610,7 +1610,7 @@ let ExecuteStmtRaw = function ExecuteStmtRaw(stmtAst : Statement, dataenv : Data
             data = demobx(data);
         }
         rtctx.replaceContext(sprintf("Calling handler %s", handler));
-        let p = dataenv.dbstate.callHandlerAsync(handler, data, {rtContext: rtctx, dataenv: dataenv});
+        let p = dataenv.dbstate.callHandlerInternalAsync(handler, data, false, {rtContext: rtctx, dataenv: dataenv});
         if (stmtAst.lvalue) {
             let lvaluePath = parseAssignLVThrow(stmtAst.lvalue, dataenv);
             return p.then((rtnVal) => {
@@ -1704,7 +1704,7 @@ let ExecuteStmtRaw = function ExecuteStmtRaw(stmtAst : Statement, dataenv : Data
     }
     if (stmtAst.stmt == "log") {
         let exprs = demobx(evalExprArray(stmtAst.exprs, dataenv));
-        console.log("dashborg-log", ...exprs);
+        console.log("hibiki-log", ...exprs);
         return null;
     }
     if (stmtAst.stmt == "expr") {
@@ -1891,25 +1891,25 @@ function ApplySingleRRA(dataenv : DataEnvironment, rra : any) {
     }
 }
 
-function BlobFromRRA(rra : any) : DashborgBlob {
+function BlobFromRRA(rra : any) : HibikiBlob {
     if (rra.type != "blob") {
         return null;
     }
-    let blob = new DashborgBlob();
+    let blob = new HibikiBlob();
     blob.mimetype = rra.blobmimetype;
     blob.data = rra.blobbase64;
     return blob;
 }
 
-function ExtBlobFromRRA(blob : DashborgBlob, rra : any) {
+function ExtBlobFromRRA(blob : HibikiBlob, rra : any) {
     if (blob == null) {
-        throw sprintf("Cannot extend null DashborgBlob")
+        throw sprintf("Cannot extend null HibikiBlob")
     }
     blob.data += rra.blobbase64;
 }
 
 function blobExtDataPath(path : PathType, curData : any, newData : any) : any {
-    if (curData == null || !(curData instanceof DashborgBlob)) {
+    if (curData == null || !(curData instanceof HibikiBlob)) {
         throw sprintf("SetPath cannot blobext a non-blob, path=%s, typeof=%s", StringPath(path), typeof(curData));
     }
     curData.data += newData;
@@ -2008,6 +2008,6 @@ function convertSimpleType(typeName : string, value : string, defaultValue : any
     return value;
 }
 
-export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, ApplySingleRRA, JsonEqual, ParseSetPathThrow, ParseSetPath, DashborgBlob, ParseBlock, ParseBlockThrow, ExecuteBlock, CreateContextThrow, ParseAndExecuteBlock, ObjectSetPath, DeepEqual, BoundValue, ParseLValuePath, ParseLValuePathThrow, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow};
+export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, ApplySingleRRA, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ParseBlock, ParseBlockThrow, ExecuteBlock, CreateContextThrow, ParseAndExecuteBlock, ObjectSetPath, DeepEqual, BoundValue, ParseLValuePath, ParseLValuePathThrow, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow};
 
 export type {PathType};

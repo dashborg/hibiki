@@ -270,7 +270,7 @@ function makeIterator(bindVal : any) : [any, boolean] {
     if (bindVal == null) {
         return [[], false];
     }
-    if (bindVal instanceof DataCtx.DashborgBlob || (isObject(bindVal) && bindVal._type == "DashborgNode")) {
+    if (bindVal instanceof DataCtx.HibikiBlob || (isObject(bindVal) && bindVal._type == "DashborgNode")) {
         return [[bindVal], false];
     }
     if (bindVal instanceof DataEnvironment || bindVal instanceof DataCtx.LValue) {

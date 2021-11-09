@@ -374,7 +374,7 @@ class RawHtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnvi
                 if (v == null) {
                     continue;
                 }
-                if (!(v instanceof DataCtx.DashborgBlob)) {
+                if (!(v instanceof DataCtx.HibikiBlob)) {
                     console.log("Invalid blobsrc attribute, not a Blob object");
                     continue;
                 }
@@ -866,7 +866,7 @@ class SimpleQueryNode extends React.Component<{node : HibikiNode, dataenv : Data
             }
             rtctx.popContext();
             rtctx.pushContext(sprintf("Calling data handler '%s'", handler));
-            let qrtn = dbstate.callData(handler, handlerData);
+            let qrtn = dbstate.callHandlerInternalAsync(handler, handlerData, true, {rtContext: rtctx, dataenv: ctx.dataenv});
             qrtn.then((queryRtn) => {
                 if (curCallNum != this.callNum) {
                     console.log("<d-data> not setting stale data return");

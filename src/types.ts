@@ -20,6 +20,7 @@ type RequestType = {
     data : any[],
     rtContext : RtContext,
     state : HibikiState,
+    pure : boolean,
 };
 
 type HibikiAction = {
@@ -33,7 +34,7 @@ type HibikiAction = {
 };
 
 type HibikiHandlerModule = {
-    runHandler: (req : RequestType) => Promise<any>;
+    callHandler : (req : RequestType) => Promise<any>;
 };
 
 type HibikiConfig = {
