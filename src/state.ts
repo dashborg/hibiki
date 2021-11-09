@@ -4,10 +4,13 @@ import Axios from "axios";
 import {sprintf} from "sprintf-js";
 import {boundMethod} from 'autobind-decorator'
 import {v4 as uuidv4} from 'uuid';
-import {HibikiNode, ComponentType, LibraryType} from "./types";
+import {HibikiNode, ComponentType, LibraryType, RequestType} from "./types";
 import * as DataCtx from "./datactx";
+import {isObject, SYM_PROXY, SYM_FLATTEN} from "./utils";
 
 import {parseHtml} from "./html-parser";
+
+let VALID_METHODS = {"GET": true, "POST": true, "PUT": true, "PATCH": true, "DELETE": true};
 
 function unbox(data : any) : any {
     if (mobx.isBoxedObservable(data)) {
@@ -279,10 +282,12 @@ function DefaultCsrfHook() {
     if (csrfMetaElem != null) {
         csrfToken = (csrfMetaTag as any).content;
     }
-    return {
-        "X-Csrf-Token": csrfToken,
-        "X-CSRFToken": csrfToken,
-    };
+    if (csrfToken != null) {
+        return {
+            "X-Csrf-Token": csrfToken,
+            "X-CSRFToken": csrfToken,
+        };
+    }
 }
 
 class ComponentLibrary {
@@ -345,6 +350,115 @@ class ComponentLibrary {
     }
 }
 
+class FetchModule {
+    CsrfHook : () => Record<string, string> = DefaultCsrfHook;
+    FetchInitHook : (url : string, init : Record<string, any>) => void;
+    
+    fetchConfig(url : string, params : any, init : Record<string, any>) : any {
+        init = init || {};
+        init.headers = init.headers || {};
+        if (this.FeClientId) {
+            headers["X-Dashborg-FeClientId"] = this.FeClientId;
+        }
+        if (this.CsrfHook != null) {
+            let csrfHeaders = this.CsrfHook();
+            if (csrfHeaders != null) {
+                for (let h in csrfHeaders) {
+                    init.headers[h] = csrfHeaders[h];
+                }
+            }
+        }
+        if (!("mode" in init)) {
+            // init.mode = "cors";
+        }
+        if (this.FetchInitHook) {
+            this.FetchInitHook(url, init);
+        }
+        return init;
+    }
+    
+    runHandler(req : RequestType) : Promise<any> {
+        let method = req.path.pathfrag;
+        if (method == null) {
+            throw sprintf("Invalid null method passed to /@fetch:[method]");
+        }
+        console.log("call-fetch", req.path, req.data);
+        method = method.toUpperCase();
+        if (!VALID_METHODS[method]) {
+            throw sprintf("Invalid method passed to /@fetch:[method]: '%s'", method);
+        }
+        let [urlStr, params, initParams] = (req.data ?? []);
+        if (urlStr == null || typeof(urlStr) != "string") {
+            throw sprintf("Invalid call to /@fetch, first argument must be a string (the URL to fetch)");
+        }
+        let url : URL = null;
+        try {
+            url = new URL(urlStr);
+        }
+        catch (e) {
+            throw sprintf("Invalid URL passed to fetch '%s': %s", urlStr, e.toString());
+        }
+        if (params != null && !isObject(params)) {
+            throw sprintf("Invalid params passed to /@fetch for url '%s', params must be an object not an array", urlStr);
+        }
+        initParams = initParams ?? {};
+        initParams.method = method;
+        if (params != null) {
+            if (method == "GET" || method == "DELETE") {
+                for (let key in params) {
+                    let val = params[key];
+                    if (val == null || typeof(val) == "function") {
+                        continue;
+                    }
+                    if (typeof(val) == "string" || typeof(val) == "number") {
+                        url.searchParams.set(key, val);
+                    }
+                    else {
+                        url.searchParams.set(key, JSON.stringify(val));
+                    }
+                }
+            }
+            else {
+                initParams.headers = initParams.headers || {};
+                initParams.headers["Content-Type"] = "application/json";
+                initParams.body = JSON.stringify(params);
+            }
+        }
+        initParams = this.fetchConfig(url, params, initParams);
+        let p = fetch(url, initParams).then((resp) => {
+            if (!resp.ok) {
+                throw sprintf("Bad status code response from '%s': %d %s", req.data[0], resp.status, resp.statusText);
+            }
+            let contentType = resp.headers.get("Content-Type");
+            if (contentType != null && contentType.startsWith("application/json")) {
+                return resp.json();
+            }
+            else {
+                let blobp = resp.blob();
+                return blobp.then((blob) => {
+                    return new Promise((resolve, _) => {
+                        let reader = new FileReader();
+                        reader.onloadend = () => {
+                            let mimetype = blob.type;
+                            let semiIdx = (reader.result as string).indexOf(";");
+                            if (semiIdx == -1 || mimetype == null || mimetype == "") {
+                                throw "Invalid BLOB returned from fetch, bad mimetype or encoding";
+                            }
+                            let dbblob = new DataCtx.DashborgBlob();
+                            dbblob.mimetype = blob.type;
+                            // extra 7 bytes for "base64," ... e.g. data:image/jpeg;base64,[base64data]
+                            dbblob.data = (reader.result as string).substr(semiIdx+1+7);
+                            resolve(dbblob);
+                        };
+                        reader.readAsDataURL(blob);
+                    });
+                });
+            }
+        });
+        return p;
+    }
+}
+
 class HibikiState {
     FeClientId : string = null;
     Ui : string = null;
@@ -360,10 +474,7 @@ class HibikiState {
     ScriptsLoaded : mobx.IObservableValue<boolean> = mobx.observable.box(false, {name: "ScriptsLoaded"});
     NodeDataMap : Map<string, mobx.IObservableValue<any>> = new Map();  // TODO clear on unmount
     
-    Modules : {[e : string] : HibikiHandlerModule} = {};
-    CsrfHook : () => Record<string, string> = DefaultCsrfHook;
-    FetchInitHook : (url : string, init : Record<string, any>) => void;
-    
+    Modules : Record<string, HibikiHandlerModule> = {};
     DataRoots : Record<string, mobx.IObservableValue<any>>;
 
     constructor(config : HibikiConfig) {
@@ -371,30 +482,7 @@ class HibikiState {
         this.DataRoots["global"] = mobx.observable.box({}, {name: "GlobalData"})
         this.DataRoots["state"] = mobx.observable.box({}, {name: "AppState"})
         this.ComponentLibrary = new ComponentLibrary();
-    }
-
-    fetchConfig(url : string, init? : {[e : string] : any}) : any {
-        init = init || {};
-        init.headers = init.headers || {};
-        if (this.FeClientId) {
-            headers["X-Dashborg-FeClientId"] = this.FeClientId;
-        }
-        if (this.CsrfHook != null) {
-            let csrfHeaders = this.CsrfHook();
-            for (let h in csrfHeaders) {
-                init.headers[h] = csrfHeaders[h];
-            }
-        }
-        if (!("credentials" in init)) {
-            init.credentials = "include";
-        }
-        if (!("mode" in init)) {
-            init.mode = "cors";
-        }
-        if (this.FetchInitHook) {
-            this.FetchInitHook(url, init);
-        }
-        return init;
+        this.Modules["fetch"] = new FetchModule();
     }
 
     axiosConfig() : any {
@@ -768,7 +856,7 @@ class HibikiState {
                 }
             }
         }
-        let rtnVal = this.processRRA(data.rra, data.reqid, null);
+        let rtnVal = this.runActions(data.rra, data.reqid, null);
         if (htmlRR.length > 0) {
             setTimeout(mobx.action(() => {
                 let pho = this.PanelHtmlObj.get();
@@ -887,15 +975,11 @@ class HibikiState {
         config.headers["Content-Type"] = "application/json";
         console.log("call data-handler", handlerPath, handlerData);
         return Axios.post(this.serverLoc() + "/api2/data", jsonData, config).then(jsonRespHandler).then((fullData) => {
-            return self.processRRA(fullData.data, null);
+            return self.runActions(fullData.data, null);
         });
     }
 
-    applyRRA(rr : any, isStreaming : boolean, dataenv : DataEnvironment) {
-        DataCtx.ApplySingleRRA(dataenv, rr);
-    }
-
-    @mobx.action processRRA(rra : any, reqid : string, opts? : any) : any {
+    @mobx.action runActions(rra : any, reqid : string, opts? : any) : any {
         if (rra == null) {
             return null;
         }
@@ -927,7 +1011,7 @@ class HibikiState {
                     this.HtmlObj.set(htmlObj);
                 }
             }
-            this.applyRRA(rr, opts.isDrain, dataenv);
+            DataCtx.ApplySingleRRA(dataenv, rr);
         }
         return rtnval;
     }
@@ -945,7 +1029,7 @@ class HibikiState {
             let respPromise = window.DashborgService.dispatchRequest(this.PanelName, "handler", localHandlerName, handlerData);
             let rtnP = Promise.resolve(respPromise).then((respData) => {
                 if (respData && respData.rra && respData.rra.length > 0) {
-                    return this.processRRA(respData.rra, respData.reqid);
+                    return this.runActions(respData.rra, respData.reqid);
                 }
                 else {
                     return null;
@@ -960,6 +1044,7 @@ class HibikiState {
 
     // opts: rtContext, dataenv
     async callHandlerAsync(handlerPath : string, handlerData : any[], opts? : any) : Promise<any> {
+        opts = opts || {};
         if (handlerPath == null || handlerPath == "") {
             throw "Invalid handler path"
         }
@@ -967,6 +1052,31 @@ class HibikiState {
         if (hpath == null) {
             throw "Invalid handler path: " + handlerPath;
         }
+        let moduleName = hpath.ns ?? "default";
+        let module = this.Modules[moduleName];
+        if (module == null) {
+            throw sprintf("Invalid handler, no module '%s' found for path: %s", moduleName, handlerPath);
+        }
+        let req = {
+            path: {
+                module: moduleName,
+                path: hpath.path,
+                pathfrag: hpath.pathfrag,
+            },
+            data: handlerData,
+            rtContext: opts.rtContext,
+            state: this,
+        };
+        let self = this;
+        let rtnp = module.runHandler(req);
+        return rtnp.then((data) => {
+            if (data == null || typeof(data) != "object" || !("hibikiactions" in data) || !Array.isArray(data.hibikiactions)) {
+                return data;
+            }
+            return self.runActions(data.hibikiactions, null, null);
+        });
+
+        
         if (hpath.ns == "" && this.AccId == "local") {
             hpath.ns = "local";
         }
@@ -976,10 +1086,12 @@ class HibikiState {
             }
             return this.callLocalHandlerAsync(hpath.pathfrag, handlerData, opts);
         }
+        if (hpath.ns == "fetch") {
+            return this.callFetch(hpath.pathfrag, handlerData);
+        }
         if (hpath.ns != "" && hpath.ns != "app" && hpath.ns != "self") {
             throw "Invalid handler namespace: " + handlerPath;
         }
-        opts = opts || {};
         let dataenv = this.rootDataenv();
         let postData = {
             zonename: this.ZoneName,
@@ -991,7 +1103,6 @@ class HibikiState {
         let lvMap = {};
         let jsonData = DataCtx.JsonStringifyForCall(lvMap, postData)
         console.log("call handler", handlerPath, handlerData, lvMap);
-        let self = this;
         let config = this.axiosConfig();
         config.headers["Content-Type"] = "application/json";
         let p = Axios.post(this.serverLoc() + "/api2/call-handler", jsonData, config)
@@ -1005,27 +1116,17 @@ class HibikiState {
 
     // opts: rtContext, dataenv
     callHandler(handlerPath : string, handlerData : any[], opts? : any) : Promise<any> {
-        try {
-            let self = this;
-            let handlerP = this.callHandlerAsync(handlerPath, handlerData, opts);
-            let prtn = handlerP.catch((e) => {
-                self.reportErrorObj({
-                    message: "Error calling handler " + handlerPath + ": " + e,
-                    err: e,
-                    rtctx: opts.rtContext,
-                });
-                console.log(e);
-            });
-            return prtn;
-        }
-        catch (e) {
-            this.reportErrorObj({
+        let self = this;
+        let handlerP = this.callHandlerAsync(handlerPath, handlerData, opts);
+        let prtn = handlerP.catch((e) => {
+            self.reportErrorObj({
                 message: "Error calling handler " + handlerPath + ": " + e,
                 err: e,
                 rtctx: opts.rtContext,
             });
-            return null;
-        }
+            console.log(e);
+        });
+        return prtn;
     }
 
     reportError(errorMessage : string, rtctx? : RtContext) {
@@ -1274,6 +1375,30 @@ function getStyleMap(node : HibikiNode, styleName : string, dataenv : DataEnviro
         rtn[k] = rval;
     }
     return rtn;
+}
+
+function parseHandler(handlerPath : string) : HPath {
+    if (handlerPath == null || handlerPath == "" || handlerPath[0] != '/') {
+        return null;
+    }
+    let match = handlerPath.match("^(?:/@([a-zA-Z_][a-zA-Z0-9_]*))?(/[a-zA-Z0-9._/-]*)?(?:[:](@?[a-zA-Z][a-zA-Z0-9_-]*))?$")
+    if (match == null) {
+        return null;
+    }
+    return {ns: (match[1] ?? ""), path: (match[2] ?? "/"), pathfrag: (match[3] ?? "")};
+}
+
+function hasHtmlRR(rra : any[]) : boolean {
+    if (rra == null) {
+        return false;
+    }
+    for (let i=0; i<rra.length; i++) {
+        let rr = rra[i];
+        if (rr.type == "html") {
+            return true;
+        }
+    }
+    return false;
 }
 
 export {HibikiState, DataEnvironment, getAttributes, getAttribute, getStyleMap};

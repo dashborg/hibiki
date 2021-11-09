@@ -1,3 +1,5 @@
+import type {HibikiState} from "./state";
+
 type HibikiNode = {
     tag    : string,
     text?  : string,
@@ -7,7 +9,29 @@ type HibikiNode = {
     moreStyles? : Record<string, Record<string, string>>,
 }
 
+type RequestType = {
+    path : {
+        module : string,
+        path : string,
+        pathfrag : string,
+    },
+    data : any[],
+    rtContext : RtContext,
+    state : HibikiState,
+};
+
+type HibikiAction = {
+    type          : string,   // "setdata", "invalidate", "html", "error", "blob", "blobext"
+    ts?           : number,
+    selector?     : string,
+    data?         : any,
+    err?          : string,
+    blobbase64?   : string,
+    blobmimetype? : string,
+};
+
 type HibikiHandlerModule = {
+    runHandler: (req : RequestType) => Promise<any>;
 };
 
 type HibikiConfig = {

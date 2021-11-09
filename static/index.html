@@ -23,15 +23,62 @@
             </div>
           </div>
         </section>
-        <section class="section">
-          <div class="container">
-            <div class="columns">
-              <local-card></local-card>
-              <local-card></local-card>
-            </div>
+        <div class="section">
+          <div class="content">
+            <html-ul>
+              <d-foreach bind="$.test">
+                <li class="level">
+                  <div class="level-left">
+                    <d-text bind="." format="[%d]" style="font-weight: bold; color: *$.color"></d-text>
+                    <a onclickhandler="$.modalopen = true;" href="#" class="ml-4">Open Modal</a>
+                    <button onclickhandler="$.test[@index] = $.test[@index]+1;" class="button is-info ml-4">+1</button>
+                  </div>
+                </li>
+              </d-foreach>
+            </html-ul>
+          </div>
+        </div>
+        <section class="section" style="margin-bottom: 50px;">
+          <button class="button is-info block" onclickhandler="$.output = /@fetch:get('http://localhost:5000/api/test')">Run @fetch /api/test</button>
+          <button class="button is-info block" onclickhandler="$.output = /@fetch:get('http://localhost:5000/api/test-handler', {x: 22})">Run @fetch /api/test-handler</button>
+          <button class="button is-info block" onclickhandler="$.output = /@fetch:post('http://localhost:5000/api/test-handler2', {name: 'mike'})">Run @fetch /api/test-handler2</button>
+          <div class="block">
+            <pre><d-text bind="$" format="json"></d-text></pre>
           </div>
         </section>
+        <div class="modal" class.is-active="*$.modalopen">
+          <div onclickhandler="$.modalopen = false;" class="modal-background"></div>
+          <div class="modal-content">
+            <div class="box">
+              <div class="content">
+                hello this is a modal!
+              </div>
+              <button onclickhandler="$.modalopen = false;" class="button is-info">Close</button>
+            </div>
+          </div>
+          <button onclickhandler="$.modalopen = false;" class="modal-close is-large" aria-label="close"></button>
+        </div>
+        <d-inlinedata output.bindpath="$.foo">
+          [8, 22, 1, 32]
+        </d-inlinedata>
+        <d-datasorter bind="$.foo" output.bindpath="$.foo_sorted"></d-datasorter>
+        <section class="section">
+          <d-dyn bind="'<h1 class=title>dyn-hello</h1>'"></d-dyn>
+          <div class="block"><d-dateformat bind="1636423085938" format="hh:mm a"></d-dateformat></div>
+          <div class="block"><d-dateformat bind="1636423085938" relative></d-dateformat></div>
+          <div class="block"><d-dateformat bind="2502" duration format="mm:ss.SSS"></d-dateformat></div>
+        </section>
+        <section class="section" style="margin-bottom: 50px;">
+          <d-foreach bind="$.foo_sorted">
+            <d-withcontext context="@x = $local+100">
+              <define-vars context="@y = @x+2000"></define-vars>
+              <p><d-text bind="@y"></d-text></p>
+            </d-withcontext>
+          </d-foreach>
+        </section>
+        
       </page>
+      
       <define-component name="card">
         <div class="card column">
           <div class="card-image">

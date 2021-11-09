@@ -141,6 +141,7 @@ statement ->
     | pushAppStatement      {% id %}
     | popAppStatement       {% id %}
     | navToStatement        {% id %}
+    | nopStatement          {% id %}
 
 throwStatement -> %KW_THROW fullExpr {% (data) => ({stmt: "throw", expr: data[1]}) %}
 

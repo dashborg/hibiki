@@ -146,6 +146,7 @@ var grammar = {
     {"name": "statement", "symbols": ["pushAppStatement"], "postprocess": id},
     {"name": "statement", "symbols": ["popAppStatement"], "postprocess": id},
     {"name": "statement", "symbols": ["navToStatement"], "postprocess": id},
+    {"name": "statement", "symbols": ["nopStatement"], "postprocess": id},
     {"name": "throwStatement", "symbols": [(lexer.has("KW_THROW") ? {type: "KW_THROW"} : KW_THROW), "fullExpr"], "postprocess": (data) => ({stmt: "throw", expr: data[1]})},
     {"name": "switchAppStatement$ebnf$1$subexpression$1", "symbols": [(lexer.has("COMMA") ? {type: "COMMA"} : COMMA), "fullExpr"]},
     {"name": "switchAppStatement$ebnf$1", "symbols": ["switchAppStatement$ebnf$1$subexpression$1"], "postprocess": id},

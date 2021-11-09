@@ -19,6 +19,7 @@ import {DBCtx} from "./dbctx";
 import * as DataCtx from "./datactx";
 import {HibikiState, DataEnvironment, getAttributes, getAttribute, getStyleMap} from "./state";
 import {valToString, valToInt, valToFloat, resolveNumber, isObject, textContent, SYM_PROXY, SYM_FLATTEN} from "./utils";
+import {parseHtml} from "./html-parser";
 
 let BLOCKED_ELEMS = {
     "html": true,
@@ -99,14 +100,23 @@ dayjs.extend(dayjsRelativeTime);
 window.dayjs = dayjs;
 
 @mobxReact.observer
-class RootNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
+class ErrorMsg extends React.Component<{message: string}, {}> {
+    render() {
+        return (
+            <div className="ui negative message dashelem">
+                <p>{this.props.message}</p>
+            </div>
+        );
+    }
+}
+
+@mobxReact.observer
+class HibikiRootNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
     renderingDBState : DashborgPanelState;
     loadUuid : string;
 
     constructor(props : any) {
         super(props);
-        this.props.dataenv.dbstate.ComponentLibrary.addLibrary(CORE_LIBRARY);
-        this.props.dataenv.dbstate.ComponentLibrary.importLib("@dashborg/core", null);
     }
     
     queueOnLoadCheck() {
@@ -218,7 +228,6 @@ function baseRenderHtmlChildren(list : NodeType[], dataenv : DataEnvironment) : 
             try {
                 let ctxDataenv = DataCtx.ParseAndCreateContextThrow(contextAttr, dataenv, "<define-vars>");
                 dataenv = ctxDataenv;
-                console.log("running define vars", ctxDataenv.specials);
             }
             catch (e) {
                 rtn.push(<ErrorMsg message={"<define-vars> Error parsing/executing context block: " + e}/>);
@@ -756,14 +765,712 @@ class TextNode extends React.Component<{node : HibikiNode, dataenv : DataEnviron
     }
 }
 
+@mobxReact.observer
+class IfNode extends React.Component<{node : NodeType, dataenv : DataEnvironment}, {}> {
+    render() {
+        let ctx = new DBCtx(this);
+        let condition = true;
+        let cattr = ctx.resolveAttr("condition");
+        if (cattr != null) {
+            let conditionVal = ctx.evalExpr(cattr);
+            condition = !!conditionVal;
+        }
+        if (!condition) {
+            return null;
+        }
+        return <NodeList list={ctx.node.list} ctx={ctx}/>;
+    }
+}
+
+@mobxReact.observer
+class ForEachNode extends React.Component<{node : NodeType, dataenv : DataEnvironment}, {}> {
+    render() {
+        // let {node, data, dbstate, attrs, bindattr, bindVal} = this.setup();
+        let ctx = new DBCtx(this);
+        let dataLV = ctx.resolveData("data", false);
+        let rtnElems = [];
+        let bindVal = dataLV.get();
+        if (bindVal == null) {
+            return null;
+        }
+        let [iterator, isMap] = makeIterator(bindVal);
+        let index = 0;
+        for (let rawVal of iterator) {
+            let ctxVars = {"index": index};
+            let [key, val] = getKV(rawVal, isMap);
+            if (key != null) {
+                ctxVars["key"] = key;
+            }
+            let childEnv = ctx.dataenv.makeChildEnv(val, ctxVars);
+            let childElements = renderHtmlChildren(ctx.node, childEnv);
+            if (childElements != null) {
+                rtnElems.push(...childElements);
+            }
+            index++;
+        }
+        if (rtnElems.length == 0) {
+            return null;
+        }
+        return (
+            <React.Fragment>{rtnElems}</React.Fragment>
+        );
+    }
+}
+
+@mobxReact.observer
+class ScriptNode extends React.Component<{node : NodeType, dataenv : DataEnvironment}, {}> {
+    render() {
+        let ctx = new DBCtx(this);
+        let blobsrc = ctx.resolveAttr("blobsrc");
+        let srcAttr = ctx.resolveAttr("src");
+        let isSync = ctx.resolveAttr("sync")
+        if (blobsrc == null && srcAttr == null) {
+            let scriptText = textContent(ctx.node);
+            if (scriptText == null || scriptText.trim() == "") {
+                return null;
+            }
+            ctx.dataenv.dbstate.queueScriptText(scriptText, isSync);
+            return null;
+        }
+        if (blobsrc != null) {
+            srcAttr = blobsrc.makeDataUrl();
+        }
+        ctx.dataenv.dbstate.queueScriptSrc(srcAttr, isSync);
+        return null;
+    }
+}
+
+@mobxReact.observer
+class DateFormatNode extends React.Component<{node : NodeType, dataenv : DataEnvironment}, {}> {
+    render() {
+        let ctx = new DBCtx(this);
+        let dataLV = ctx.resolveData("data", false);
+        let bindVal = DataCtx.demobx(dataLV.get());
+        let modeAttr = ctx.resolveAttr("mode");
+        let nulltext = ctx.resolveAttr("nulltext");
+        let style = ctx.resolveStyleMap("style");
+        if (typeof(bindVal) == "string" && modeAttr == "parse") {
+            try {
+                bindVal = parseFloat(dayjs(bindVal).format("x"));
+            } catch (e) {
+                return renderTextSpan("invalid", style);
+            }
+        }
+        let relativeAttr = !!ctx.resolveAttr("relative");
+        let durationAttr = ctx.resolveAttr("duration");
+        if (typeof(bindVal) == "string") {
+            bindVal = parseFloat(bindVal);
+        }
+        if (bindVal == null) {
+            return renderTextSpan(nulltext || "null", style);
+        }
+        if (bindVal == 0 && !durationAttr) {
+            return renderTextSpan(nulltext || "null", style);
+        }
+        if (typeof(bindVal) != "number" || isNaN(bindVal)) {
+            return renderTextSpan("invalid", style);
+        }
+        let text = null;
+        try {
+            let val = bindVal;
+            let formatAttr = ctx.resolveAttr("format");
+            if (modeAttr == "s") {
+                val = val * 1000;
+            }
+            else if (modeAttr == "ms") {
+                val = val;
+            }
+            else if (modeAttr == "us") {
+                val = val / 1000;
+            }
+            else if (modeAttr == "ns") {
+                val = val / 1000000;
+            }
+            if (durationAttr) {
+                let dur = dayjs.duration(val);
+                if (formatAttr == null || formatAttr == "humanize") {
+                    text = dur.humanize();
+                }
+                else {
+                    text = dayjs.utc(dur.as("milliseconds")).format(formatAttr);
+                }
+            }
+            else if (relativeAttr) {
+                text = dayjs(val).fromNow();
+            }
+            else {
+                text = dayjs(val).format(formatAttr);
+            }
+            
+        } catch (e) {
+            text = "ERR[" + e + "]";
+        }
+        return renderTextSpan(text, style);
+    }
+}
+
+function makeIterator(bindVal : any) : [any, boolean] {
+    let iterator = null;
+    let isMap = false;
+    if (bindVal == null) {
+        return [[], false];
+    }
+    if (bindVal instanceof DataCtx.DashborgBlob || (isObject(bindVal) && bindVal._type == "DashborgNode")) {
+        return [[bindVal], false];
+    }
+    if (bindVal instanceof DataEnvironment || bindVal instanceof DataCtx.LValue) {
+        return [[], false];
+    }
+    if (bindVal instanceof Map || mobx.isObservableMap(bindVal)) {
+        return [bindVal, true];
+    }
+    if (mobx.isArrayLike(bindVal)) {
+        return [bindVal, false];
+    }
+    if (typeof(bindVal) == "object") {
+        return [Object.entries(bindVal), true];
+    }
+    else {
+        return [[bindVal], false];
+    }
+}
+
+function getKV(ival : any, isMap : boolean) : [any, any] {
+    if (isMap) {
+        let [key, val] = ival;
+        return [key, val];
+    }
+    return [null, ival];
+}
+
+@mobxReact.observer
+class NopNode extends React.Component<{node : NodeType, dataenv : DataEnvironment}, {}> {
+    render() {
+        return null;
+    }
+}
+
+class RunHandlerNode extends React.Component<{node : NodeType, dataenv : DataEnvironment}, {}> {
+    componentDidMount() {
+        let ctx = new DBCtx(this);
+        ctx.handleOnX("onrunhandler");
+    }
+    
+    render() {
+        return null;
+    }
+}
+
+@mobxReact.observer
+class WithContextNode extends React.Component<{node : NodeType, dataenv : DataEnvironment}, {}> {
+    render() {
+        let ctx = new DBCtx(this);
+        let contextattr = ctx.resolveAttr("context");
+        if (contextattr == null) {
+            return <ErrorMsg message="<d-withcontext> no context attribute"/>;
+        }
+        try {
+            let ctxDataenv = DataCtx.ParseAndCreateContextThrow(contextattr, ctx.childDataenv, "<d-withcontext>");
+            return ctxRenderHtmlChildren(ctx, ctxDataenv);
+        }
+        catch (e) {
+            return <ErrorMsg message={"<d-withcontext> Error parsing/executing context block: " + e}/>;
+        }
+    }
+}
+
+@mobxReact.observer
+class ChildrenNode extends React.Component<{node : NodeType, dataenv : DataEnvironment}, {}> {
+    render() {
+        let ctx = new DBCtx(this);
+        let dataLV = ctx.resolveData("data", false);
+        let children = dataLV.get();
+        if (children == null) {
+            if (ctx.node.list == null) {
+                return null;
+            }
+            let rtnElems = ctxRenderHtmlChildren(ctx);
+            if (rtnElems == null) {
+                return null;
+            }
+            return <React.Fragment>{rtnElems}</React.Fragment>;
+        }
+        for (let i=0; i<children.length; i++) {
+            let c = children[i];
+            if (c == null || c.tag == null) {
+                return <ErrorMsg message={sprintf("<d-children> bad child node @ index:%d", i)}/>;
+            }
+        }
+        let rtnElems = renderHtmlChildren({list: children}, ctx.childDataenv);
+        if (rtnElems == null) {
+            return null;
+        }
+        return <React.Fragment>{rtnElems}</React.Fragment>;
+    }
+}
+
+@mobxReact.observer
+class DynNode extends React.Component<{node : NodeType, dataenv : DataEnvironment}, {}> {
+    curHtml : string = null;
+    curHtmlObj : HibikiNode = null;
+
+    render() {
+        let ctx = new DBCtx(this);
+        let dataLV = ctx.resolveData("data", false);
+        let bindVal = DataCtx.demobx(dataLV.get());
+        if (bindVal == null) {
+            return null;
+        }
+        if (bindVal != this.curHtml) {
+            this.curHtml = bindVal;
+            this.curHtmlObj = null;
+            try {
+                this.curHtmlObj = parseHtml(bindVal);
+            }
+            catch (e) {
+                ctx.dataenv.dbstate.reportErrorObj({message: "Error parsing HTML in d-dyn node: " + e.toString(), err: e});
+            }
+        }
+        if (this.curHtmlObj == null) {
+            return null;
+        }
+        return (
+            <React.Fragment>
+                <NodeList list={this.curHtmlObj.list} ctx={ctx}/>
+            </React.Fragment>
+        );
+    }
+}
+
+class SimpleQueryNode extends React.Component<{node : NodeType, dataenv : DataEnvironment}, {}> {
+    refreshCount : mobx.IObservableValue<number>;
+    callNum : number = 0;
+    autorunDisposer : () => void = null;
+    nameComputed : mobx.IComputedValue<string>;
+
+    constructor(props : any) {
+        super(props);
+        let self = this;
+        this.refreshCount = mobx.observable.box(0, {name: "refreshCount"});
+        this.nameComputed = mobx.computed(() => {
+            let ctx = new DBCtx(self);
+            let name = ctx.resolveAttr("name");
+            if (name != null) {
+                return name;
+            }
+            try {
+                let ctx = new DBCtx(self);
+                let queryStr = ctx.resolveAttr("query");
+                let callStmt = DataCtx.ParseStaticCallStatement(queryStr);
+                let handler = DataCtx.evalExprAst(callStmt.handler, ctx.dataenv);
+                return handler || "invalid-query";
+            }
+            catch (e) {
+                return "invalid-query";
+            }
+        }, {name: "nameComputed"});
+    }
+
+    executeQuery(ctx : DBCtx, curCallNum : number) {
+        let dbstate = ctx.dataenv.dbstate;
+        let rtctx = new RtContext();
+        let name = ctx.resolveAttr("name");
+        rtctx.pushContext(sprintf("Evaluating <d-data name=\"%s\"> (in %s)", name, ctx.dataenv.getHtmlContext()));
+        try {
+            let queryStr = ctx.resolveAttr("query");
+            if (queryStr == null) {
+                return;
+            }
+            rtctx.pushContext("Parsing 'query' attribute (must be a data handler expression)");
+            let callStmt = DataCtx.ParseStaticCallStatement(queryStr);
+            let handler = DataCtx.evalExprAst(callStmt.handler, ctx.dataenv);
+            rtctx.popContext();
+            rtctx.pushContext("Evaluating 'query' parameters");
+            let handlerData = null;
+            if (callStmt.data != null) {
+                handlerData = DataCtx.evalExprAst(callStmt.data, ctx.dataenv);
+            }
+            rtctx.popContext();
+            rtctx.pushContext(sprintf("Calling data handler '%s'", handler));
+            let qrtn = dbstate.callData(handler, handlerData);
+            qrtn.then((queryRtn) => {
+                if (curCallNum != this.callNum) {
+                    console.log("<d-data> not setting stale data return");
+                    return;
+                }
+                let outputLV = ctx.resolveData("output", true);
+                outputLV.set(queryRtn);
+            }).catch((e) => {
+                dbstate.reportErrorObj({message: e.toString(), err: e, rtctx: rtctx});
+            });
+        }
+        catch (e) {
+            dbstate.reportErrorObj({message: e.toString(), err: e, rtctx: rtctx});
+        }
+    }
+
+    @boundMethod
+    doGetData() {
+        let ctx = new DBCtx(this);
+        let dbstate = ctx.dataenv.dbstate;
+        let version = dbstate.RenderVersion.get();
+        let refreshCount = this.refreshCount.get();
+        this.callNum++;
+        let curCallNum = this.callNum;
+        let name = this.nameComputed.get();
+        dbstate.registerDataNodeState(ctx.uuid, name, this);
+        setTimeout(() => this.executeQuery(ctx, curCallNum), 10);
+    }
+
+    forceRefresh() {
+        this.refreshCount.set(this.refreshCount.get() + 1);
+    }
+
+    componentDidMount() {
+        this.autorunDisposer = mobx.autorun(this.doGetData);
+    }
+
+    componentWillUnmount() {
+        if (this.autorunDisposer != null) {
+            this.autorunDisposer();
+        }
+    }
+    
+    render() {
+        let ctx = new DBCtx(this);
+        let queryStr = ctx.resolveAttr("query");
+        if (queryStr == null) {
+            return <ErrorMsg message="<d-data> without query attribute"/>;
+        }
+        try {
+            DataCtx.ParseStaticCallStatement(queryStr);
+        }
+        catch (e) {
+            return <ErrorMsg message="<d-data> error parsing query attribute"/>;
+        }
+        return null;
+    }
+}
+
+@mobxReact.observer
+class InlineDataNode extends React.Component<{node : NodeType, dataenv : DataEnvironment}> {
+    constructor(props : any) {
+        super(props);
+    }
+
+    componentDidMount() {
+        let ctx = new DBCtx(this);
+        if (ctx.isEditMode()) {
+            return;
+        }
+        let format = ctx.resolveAttr("format");
+        if (format == null) {
+            format = "json";
+        }
+        if (format != "json" && format != "jseval") {
+            console.log("<d-inlinedata> invalid 'format' attribute");
+            return null;
+        }
+        let text = textContent(ctx.node);
+        try {
+            let setData = null;
+            if (format == "json") {
+                setData = JSON.parse(text);
+            }
+            else if (format == "jseval") {
+                let evalVal = eval("(" + text + ")");
+                if (typeof(evalVal) == "function") {
+                    evalVal = evalVal();
+                }
+                setData = evalVal;
+            }
+            let outputLV = ctx.resolveData("output", true);
+            outputLV.set(setData);
+        } catch (e) {
+            console.log("ERROR parsing <d-inlinedata> value", e);
+        }
+    }
+    
+    render() {
+        return null;
+    }
+}
+
+class RenderLogNode extends React.Component<{node : NodeType, dataenv : DataEnvironment}, {}> {
+    render() {
+        let ctx = new DBCtx(this);
+        let dataLV = ctx.resolveData("data", false);
+        console.log("Dashborg RenderLog", DataCtx.demobx(dataLV.get()));
+        return null;
+    }
+}
+
+@mobxReact.observer
+class DataSorterNode extends React.Component<{node : NodeType, dataenv : DataEnvironment}, {}> {
+    autorunDisposer : () => void = null;
+
+    sortcolComputed : mobx.IComputedValue<string>;
+    sortascComputed : mobx.IComputedValue<boolean>;
+    dataComputed : mobx.IComputedValue<any[]>;
+
+    constructor(props : any) {
+        super(props);
+
+        let self = this;
+        this.sortcolComputed = mobx.computed(() => {
+            let ctx = new DBCtx(self);
+            let columnLV = ctx.resolveData("sortspec", false).subMapKey("column");
+            return DataCtx.demobx(columnLV.get());
+        });
+
+        this.sortascComputed = mobx.computed(() => {
+            let ctx = new DBCtx(self);
+            let sortSpecLV = ctx.resolveData("sortspec", false)
+            if (sortSpecLV.get() == null) {
+                return true;
+            }
+            let ascLV = sortSpecLV.subMapKey("asc");
+            return !!ascLV.get();
+        });
+    }
+    
+    @boundMethod
+    doSort() {
+        let ctx = new DBCtx(this);
+        let sortcol = this.sortcolComputed.get();
+        let sortasc = this.sortascComputed.get();
+
+        let data = null;
+        let sortInPlace = ctx.resolveAttr("inplace");
+        if (sortInPlace) {
+            let valueLV = ctx.resolveData("data", true);
+            data = valueLV.get();
+            if (data == null) {
+                return;
+            }
+            if (!mobx.isObservableArray(data)) {
+                console.log("d-datasorter value is not an array lvalue");
+                return;
+            }
+        }
+        else {
+            let dataLV = ctx.resolveData("data", false);
+            data = dataLV.get();
+            if (data == null || !mobx.isArrayLike(data)) {
+                data = [];
+            }
+        }
+        mobx.action(() => {
+            let sortedData = data;
+            sortedData = data.sort((a, b) => {
+                let rtn = 0;
+                if (a == null && b == null) {
+                    return 0;
+                }
+                if (a == null && b != null) {
+                    return (sortasc ? -1 : 1);
+                }
+                if (a != null && b == null) {
+                    return (sortasc ? 1 : -1);
+                }
+                if (sortcol != null && (typeof(a) != "object" || typeof(b) != "object")) {
+                    return 0;
+                }
+                let aval = (sortcol == null ? a : a[sortcol]);
+                let bval = (sortcol == null ? b : b[sortcol]);
+                if (typeof(aval) == "string") {
+                    aval = aval.toLowerCase();
+                }
+                if (typeof(bval) == "string") {
+                    bval = bval.toLowerCase();
+                }
+                if (aval < bval) {
+                    rtn = -1;
+                }
+                if (aval > bval) {
+                    rtn = 1;
+                }
+                if (!sortasc) {
+                    rtn = -rtn;
+                }
+                return rtn;
+            });
+            if (sortInPlace) {
+                data.replace(sortedData);
+            }
+            else {
+                let valueLV = ctx.resolveData("output", true);
+                valueLV.set(sortedData);
+            }
+        })();
+    }
+
+    componentDidMount() {
+        this.autorunDisposer = mobx.autorun(this.doSort);
+    }
+
+    componentWillUnmount() {
+        if (this.autorunDisposer != null) {
+            this.autorunDisposer();
+        }
+    }
+
+    render() {
+        return null;
+    }
+}
+
+@mobxReact.observer
+class DataPagerNode extends React.Component<{node : NodeType, dataenv : DataEnvironment}, {}> {
+    autorunDisposer : () => void = null;
+    dataComputed : mobx.IComputedValue<any[]>;
+    dataIsNullComputed : mobx.IComputedValue<boolean>;
+    totalsizeComputed : mobx.IComputedValue<number>;
+    pagesizeComputed : mobx.IComputedValue<number>;
+    curpageComputed : mobx.IComputedValue<number>;
+
+    constructor(props : any) {
+        super(props);
+        let ctx = new DBCtx(this);
+        let curpageLV = ctx.resolveData("pagespec", true).subMapKey("curpage");
+        if (curpageLV.get() == null && ctx.hasAttr("curpage.default")) {
+            let defaultCurpage = ctx.resolveAttr("curpage.default", {raw: true});
+            curpageLV.set(defaultCurpage);
+        }
+        let self = this;
+
+        this.dataIsNullComputed = mobx.computed(() => {
+            let dataLV = ctx.resolveData("data", false);
+            let data = dataLV.get();
+            return (data == null);
+        }, {name: "data-isnull"});
+            
+        this.dataComputed = mobx.computed(() => {
+            let ctx = new DBCtx(self);
+            let dataLV = ctx.resolveData("data", false);
+            let data = dataLV.get();
+            if (data == null || !mobx.isArrayLike(data)) {
+                data = [];
+            }
+            return data;
+        }, {name: "data"});
+        
+        this.totalsizeComputed = mobx.computed(() => {
+            let data = self.dataComputed.get();
+            return data.length;
+        }, {name: "totalsize"});
+
+        this.pagesizeComputed = mobx.computed(() => {
+            let ctx = new DBCtx(self);
+            return resolveNumber(ctx.resolveAttr("pagesize"), (val) => (val > 0), 10);
+        }, {name: "pagesize"});
+        
+        this.curpageComputed = mobx.computed(() => {
+            let ctx = new DBCtx(self);
+            let curpageLV = ctx.resolveData("pagespec", true).subMapKey("curpage");
+            let curpage = resolveNumber(DataCtx.demobx(curpageLV.get()), (val) => (val >= 0), 0);
+            if (curpage < 0) {
+                curpage = 0;
+            }
+            if (curpage > 0) {
+                let totalsize = self.totalsizeComputed.get();
+                let pagesize = self.pagesizeComputed.get();
+                if (curpage * pagesize >= totalsize) {
+                    curpage = Math.floor((totalsize-1) / pagesize);
+                }
+            }
+            return curpage;
+        }, {name: "curpage"});
+    }
+
+    // pagespec
+    //   pagesize
+    //   curpage
+    //   total
+    //   hasnext
+    //   hasprev
+    //   start
+    //   num
+    
+    @boundMethod
+    doPagination() {
+        let ctx = new DBCtx(this);
+        let dataIsNull = this.dataIsNullComputed.get();
+        if (dataIsNull) {
+            setTimeout(mobx.action(() => {
+                let nodataLV = ctx.resolveData("pagespec", true).subMapKey("nodata");
+                nodataLV.set(true);
+            }), 0);
+            return;
+        }
+        let pagesize = this.pagesizeComputed.get();
+        let curpage = this.curpageComputed.get();
+        let data = this.dataComputed.get();
+        let totalsize = data.length;
+        let start = curpage*pagesize;
+        let num = (start + pagesize > totalsize ? totalsize - start : pagesize);
+        let lastpage = Math.floor((totalsize-1) / pagesize);
+        if (lastpage < 0) {
+            lastpage = 0;
+        }
+        let pageSpec = {
+            start: start,
+            num: num,
+            pagesize: pagesize,
+            curpage: curpage,
+            total: totalsize,
+            hasnext: (totalsize > start+num),
+            hasprev: (curpage > 0),
+            lastpage: lastpage,
+        };
+        setTimeout(mobx.action(() => {
+            let output = data.slice(curpage*pagesize, (curpage+1)*pagesize);
+            let valueLV = ctx.resolveData("output", true);
+            valueLV.set(output);
+            let pageSpecLV = ctx.resolveData("pagespec", true);
+            pageSpecLV.set(pageSpec);
+        }), 0);
+    }
+
+    componentDidMount() {
+        this.autorunDisposer = mobx.autorun(this.doPagination);
+    }
+
+    componentWillUnmount() {
+        if (this.autorunDisposer != null) {
+            this.autorunDisposer();
+        }
+    }
+
+    render() {
+        return null;
+    }
+}
+
 let CORE_LIBRARY = {
     name: "@dashborg/core",
     components: {
-        "d-text": {
-            componentType: "hibiki-native",
-            impl: TextNode,
-        },
+        "if": {componentType: "hibiki-native", impl: IfNode},
+        "d-if": {componentType: "hibiki-native", impl: IfNode},
+        "if-break": {componentType: "hibiki-native", impl: IfNode},
+        "foreach": {componentType: "hibiki-native", impl: ForEachNode},
+        "d-foreach": {componentType: "hibiki-native", impl: ForEachNode},
+        "d-text": {componentType: "hibiki-native", impl: TextNode},
+        "script": {componentType: "hibiki-native", impl: ScriptNode},
+        "d-script": {componentType: "hibiki-native", impl: ScriptNode},
+        "d-dateformat": {componentType: "hibiki-native", impl: DateFormatNode},
+        "define-vars": {componentType: "hibiki-native", impl: NopNode},
+        "define-handler": {componentType: "hibiki-native", impl: NopNode},
+        "d-dyn": {componentType: "hibiki-native", impl: DynNode},
+        "d-runhandler": {componentType: "hibiki-native", impl: RunHandlerNode},
+        "d-withcontext": {componentType: "hibiki-native", impl: WithContextNode},
+        "d-children": {componentType: "hibiki-native", impl: ChildrenNode},
+        "d-data": {componentType: "hibiki-native", impl: SimpleQueryNode},
+        "d-inlinedata": {componentType: "hibiki-native", impl: InlineDataNode},
+        "d-renderlog": {componentType: "hibiki-native", impl: RenderLogNode},
+        "d-datasorter": {componentType: "hibiki-native", impl: DataSorterNode},
+        "d-datapager": {componentType: "hibiki-native", impl: DataPagerNode},
     },
 };
 
-export {RootNode};
+export {HibikiRootNode, CORE_LIBRARY};
