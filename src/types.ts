@@ -46,6 +46,8 @@ type HibikiConfig = {
         fetchInitHook? : (url : string, init : Record<string, any>) => void,
     },
     modules? : Record<string, HibikiHandlerModule>,
+    noUsageImg : boolean,
+    noWelcomeMessage : boolean,
 };
 
 type PathUnionType = string | PathType;

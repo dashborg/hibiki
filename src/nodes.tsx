@@ -31,6 +31,9 @@ dayjs.extend(dayjsUtc)
 dayjs.extend(dayjsRelativeTime);
 window.dayjs = dayjs;
 
+let welcomeMessage = false;
+let usageFired = false;
+
 @mobxReact.observer
 class ErrorMsg extends React.Component<{message: string}, {}> {
     render() {
@@ -83,6 +86,17 @@ class HibikiRootNode extends React.Component<{page : string, dataenv : DataEnvir
 
     componentDidMount() {
         this.queueOnLoadCheck();
+        let flowerEmoji = String.fromCodePoint(0x1F338);
+        if (this.props.dataenv.dbstate.allowUsageImg() && !usageFired) {
+            usageFired = true;
+            let usageImg = new Image();
+            usageImg.src = "https://static.dashborg.net/static/hibiki-usage.gif";
+            usageImg.onload = function() {};
+        }
+        if (this.props.dataenv.dbstate.allowWelcomeMessage() && !welcomeMessage) {
+            welcomeMessage = true;
+            console.log(flowerEmoji + " Hibiki HTML https://github.com/dashborg/hibiki | Developed by Dashborg https://dashborg.net");
+        }
     }
 
     componentDidUpdate() {

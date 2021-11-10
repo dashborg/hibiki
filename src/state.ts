@@ -493,6 +493,7 @@ class HibikiState {
     ScriptsLoaded : mobx.IObservableValue<boolean> = mobx.observable.box(false, {name: "ScriptsLoaded"});
     NodeDataMap : Map<string, mobx.IObservableValue<any>> = new Map();  // TODO clear on unmount
     ExtHtmlObj : mobx.ObservableMap<string,any> = mobx.observable.map({}, {name: "ExtHtmlObj", deep: false});
+    Config : HibikiConfig = {};
     
     Modules : Record<string, HibikiHandlerModule> = {};
     DataRoots : Record<string, mobx.IObservableValue<any>>;
@@ -507,6 +508,7 @@ class HibikiState {
 
     @mobx.action setConfig(config : HibikiConfig) {
         config = config ?? {};
+        this.Config = config;
     }
 
     @mobx.action setGlobalData(globalData : any) {
@@ -517,6 +519,14 @@ class HibikiState {
         this.HtmlObj.set(htmlobj);
         this.ComponentLibrary.buildLib("local", htmlobj, true);
         this.ComponentLibrary.importLib("local", "local");
+    }
+
+    allowUsageImg() : boolean {
+        return !this.Config.noUsageImg;
+    }
+
+    allowWelcomeMessage() : boolean {
+        return !this.Config.noWelcomeMessage;
     }
 
     rootDataenv() : DataEnvironment {
