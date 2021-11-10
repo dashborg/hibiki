@@ -5,7 +5,7 @@
   "main": "dist/hibiki.js",
   "repository": "https://github.com/sawka/hibiki",
   "author": "Michael Sawka <mike@dashborg.net>",
-  "license": "MIT",
+  "license": "See LICENSE in LICENSE",
   "devDependencies": {
     "@babel/cli": "^7.16.0",
     "@babel/core": "^7.16.0",
