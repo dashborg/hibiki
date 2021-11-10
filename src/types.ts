@@ -95,7 +95,7 @@ type Statement = {
 type ExprType = any;
 
 type DataCtxErrorObjType = {
-    _type : "DashborgError",
+    _type : "HibikiError",
     message : string,
     context: string,
     rtctx : RtContext,

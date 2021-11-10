@@ -5,7 +5,7 @@ import {HibikiNode} from "./types";
 
 declare var window : any;
 
-const ssFeClientIdKey = "dashborg-feclientid";
+const ssFeClientIdKey = "hibiki-feclientid";
 const SYM_PROXY = Symbol("proxy");
 const SYM_FLATTEN = Symbol("flatten");
 

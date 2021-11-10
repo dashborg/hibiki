@@ -108,7 +108,6 @@ function parseHtml(input : string | HTMLElement) : HibikiNode {
         elem.innerHTML = input;
     }
     let rootNode = (elem.tagName.toLowerCase() == "template" ? elem.content : elem);
-    console.log(rootNode);
     let rtn : HibikiNode = {tag: "#def", list: []};
     rtn.list = parseNodeChildren(rootNode) || [];
     return rtn;

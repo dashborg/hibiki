@@ -58,18 +58,18 @@ class HibikiRootNode extends React.Component<{page : string, dataenv : DataEnvir
         if (this.renderingDBState == null || this.renderingDBState.HasRendered) {
             return;
         }
-        if (!window.DashborgLoaded) {
-            window.DashborgLoaded = {};
+        if (!window.HibikiLoaded) {
+            window.HibikiLoaded = {};
         }
         this.loadUuid = uuidv4();
-        let runJS = "window.DashborgLoaded['" + this.loadUuid + "'] = true;";
+        let runJS = "window.HibikiLoaded['" + this.loadUuid + "'] = true;";
         this.props.dataenv.dbstate.queueScriptText(runJS, true);
         setTimeout(() => this.checkLoaded(1), 100);
     }
 
     checkLoaded(iterNum : number) {
-        // console.log("check loaded", iterNum, window["DashborgLoaded"], window.d3);
-        if (!window.DashborgLoaded[this.loadUuid]) {
+        // console.log("check loaded", iterNum, window["HibikiLoaded"], window.d3);
+        if (!window.HibikiLoaded[this.loadUuid]) {
             if (iterNum > 100) {
                 console.log("Script Queue Never finished after 10s (Panel checkLoaded)");
             }
@@ -95,7 +95,7 @@ class HibikiRootNode extends React.Component<{page : string, dataenv : DataEnvir
         }
         if (this.props.dataenv.dbstate.allowWelcomeMessage() && !welcomeMessage) {
             welcomeMessage = true;
-            console.log(flowerEmoji + " Hibiki HTML https://github.com/dashborg/hibiki | Developed by Dashborg https://dashborg.net");
+            console.log(flowerEmoji + " Hibiki HTML https://github.com/dashborg/hibiki | Developed by Dashborg Inc https://dashborg.net");
         }
     }
 
@@ -470,7 +470,7 @@ class CustomNode extends React.Component<{node : HibikiNode, component : Compone
         let nodeDataBox = ctx.dataenv.dbstate.NodeDataMap.get(ctx.uuid);
         if (nodeDataBox == null) {
             let uuidName = "id_" + ctx.uuid.replace(/-/g, "_");
-            nodeDataBox = mobx.observable.box({_dashborg: {"customtag": rawImplAttrs.name, uuid: ctx.uuid}}, {name: uuidName});
+            nodeDataBox = mobx.observable.box({_hibiki: {"customtag": rawImplAttrs.name, uuid: ctx.uuid}}, {name: uuidName});
             ctx.dataenv.dbstate.NodeDataMap.set(ctx.uuid, nodeDataBox);
         }
         let nodeDataLV = new DataCtx.ObjectLValue(null, nodeDataBox);
@@ -988,7 +988,7 @@ class RenderLogNode extends React.Component<{node : HibikiNode, dataenv : DataEn
     render() {
         let ctx = new DBCtx(this);
         let dataLV = ctx.resolveData("data", false);
-        console.log("Dashborg RenderLog", DataCtx.demobx(dataLV.get()));
+        console.log("Hibiki RenderLog", DataCtx.demobx(dataLV.get()));
         return null;
     }
 }
@@ -1263,7 +1263,7 @@ class DashElemNode extends React.Component<{ctx : DBCtx, extClass? : string, ext
 }
 
 let CORE_LIBRARY : LibraryType = {
-    name: "@dashborg/core",
+    name: "@hibiki/core",
     components: {
         "if": {componentType: "hibiki-native", impl: IfNode},
         "d-if": {componentType: "hibiki-native", impl: IfNode},

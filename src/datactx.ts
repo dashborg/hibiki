@@ -926,7 +926,7 @@ function LValueMapReplacer(lvMap : any, key : string, value : any) : any {
     if (this[key] instanceof LValue) {
         let id = uuidv4();
         lvMap[id] = this[key];
-        return {_type: "DashborgLValue", lvalueref: id};
+        return {_type: "HibikiLValue", lvalueref: id};
     }
     return MapReplacer.bind(this)(key, value);
 }
@@ -1013,7 +1013,7 @@ function DeepEqual(data1 : any, data2 : any) : boolean {
     if (typeof(data1) != "object" || typeof(data2) != "object") {
         return false;
     }
-    if (data1._type == "DashborgNode" || data2._type == "DashborgNode") {
+    if (data1._type == "HibikiNode" || data2._type == "HibikiNode") {
         return data1.uuid == data2.uuid;
     }
     // objects and maps...
@@ -1063,7 +1063,7 @@ function demobxInternal(v : any) : [any, boolean] {
     if (typeof(v) != "object") {
         return [v, false];
     }
-    if (v instanceof HibikiBlob || v instanceof LValue || v instanceof DataEnvironment || v._type == "DashborgNode") {
+    if (v instanceof HibikiBlob || v instanceof LValue || v instanceof DataEnvironment || v._type == "HibikiNode") {
         return [v, false];
     }
     if (v instanceof Map) {
@@ -1645,7 +1645,7 @@ let ExecuteStmtRaw = function ExecuteStmtRaw(stmtAst : Statement, dataenv : Data
         if (event == null || event == "") {
             return null;
         }
-        if (target == null || !target.tag || target._type != "DashborgNode") {
+        if (target == null || !target.tag || target._type != "HibikiNode") {
             throw sprintf("Invalid target in 'fire' statement");
         }
         if (!event.endsWith("handler")) {
@@ -1723,7 +1723,7 @@ let ExecuteStmtRaw = function ExecuteStmtRaw(stmtAst : Statement, dataenv : Data
         if (typeof(expr) != "object") {
             throw sprintf("Invalid value passed to reportError, must be string or error object");
         }
-        if (expr._type == "DashborgError") {
+        if (expr._type == "HibikiError") {
             dataenv.dbstate.reportErrorObj({message: expr.message, rtctx: expr.rtctx, err: expr.err});
             return null;
         }
@@ -1786,7 +1786,7 @@ function makeErrorObj(e : any, rtctx : RtContext) : DataCtxErrorObjType {
         message = e.toString();
     }
     return {
-        _type: "DashborgError",
+        _type: "HibikiError",
         message: message,
         context: rtctx.asString(),
         rtctx: rtctx.makeCopy(),

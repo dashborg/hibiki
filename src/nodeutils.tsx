@@ -173,7 +173,7 @@ function makeNodeVar(ctx : DBCtx) : any {
     }
     let rtn : any = {};
     rtn.tag = ctx.getTagName();
-    rtn._type = "DashborgNode";
+    rtn._type = "HibikiNode";
     rtn.attrs = ctx.resolveAttrs({raw: true});
     rtn.stylemap = {};
     rtn.uuid = ctx.uuid;
@@ -270,7 +270,7 @@ function makeIterator(bindVal : any) : [any, boolean] {
     if (bindVal == null) {
         return [[], false];
     }
-    if (bindVal instanceof DataCtx.HibikiBlob || (isObject(bindVal) && bindVal._type == "DashborgNode")) {
+    if (bindVal instanceof DataCtx.HibikiBlob || (isObject(bindVal) && bindVal._type == "HibikiNode")) {
         return [[bindVal], false];
     }
     if (bindVal instanceof DataEnvironment || bindVal instanceof DataCtx.LValue) {

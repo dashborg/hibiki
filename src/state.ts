@@ -395,7 +395,7 @@ class FetchModule {
         if (method == null) {
             throw sprintf("Invalid null method passed to /@fetch:[method]");
         }
-        console.log("call-fetch", req.path, req.data);
+        // console.log("call-fetch", req.path, req.data);
         method = method.toUpperCase();
         if (!VALID_METHODS[method]) {
             throw sprintf("Invalid method passed to /@fetch:[method]: '%s'", method);

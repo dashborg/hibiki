@@ -31,7 +31,7 @@ function readHibikiOptsFromHtml(htmlObj : HibikiNode) : {config : HibikiConfig, 
 let createHibikiState = function createHibikiState(config : HibikiConfig, html : string | HTMLElement, initialData : any) : HibikiState {
     let state = new HibikiState();
     state.ComponentLibrary.addLibrary(CORE_LIBRARY);
-    state.ComponentLibrary.importLib("@dashborg/core", null);
+    state.ComponentLibrary.importLib("@hibiki/core", null);
     
     config = config || {};
     initialData = initialData || {};
