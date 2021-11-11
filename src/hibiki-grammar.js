@@ -52,6 +52,7 @@ let lexer = moo.states({
                         KW_NOP: "nop",
                         KW_BUBBLE: "bubble",
                         KW_LOG: "log",
+                        KW_ALERT: "alert",
                         KW_EXPR: "expr",
                         KW_LOCAL: "local",
                         KW_IF: "if",
@@ -138,6 +139,7 @@ var grammar = {
     {"name": "statement", "symbols": ["fireStatement"], "postprocess": id},
     {"name": "statement", "symbols": ["bubbleStatement"], "postprocess": id},
     {"name": "statement", "symbols": ["logStatement"], "postprocess": id},
+    {"name": "statement", "symbols": ["alertStatement"], "postprocess": id},
     {"name": "statement", "symbols": ["exprStatement"], "postprocess": id},
     {"name": "statement", "symbols": ["ifStatement"], "postprocess": id},
     {"name": "statement", "symbols": ["throwStatement"], "postprocess": id},
@@ -281,6 +283,7 @@ var grammar = {
             return rtn;
         } },
     {"name": "logStatement", "symbols": [(lexer.has("KW_LOG") ? {type: "KW_LOG"} : KW_LOG), "literalArrayElements"], "postprocess": (data) => ({stmt: "log", exprs: data[1]})},
+    {"name": "alertStatement", "symbols": [(lexer.has("KW_ALERT") ? {type: "KW_ALERT"} : KW_ALERT), "literalArrayElements"], "postprocess": (data) => ({stmt: "alert", exprs: data[1]})},
     {"name": "reportErrorStatement", "symbols": [(lexer.has("KW_REPORTERROR") ? {type: "KW_REPORTERROR"} : KW_REPORTERROR), "fullExpr"], "postprocess":  (data) => {
             return {stmt: "reporterror", expr: data[1]};
         } },
@@ -466,6 +469,7 @@ var grammar = {
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_NOP") ? {type: "KW_NOP"} : KW_NOP)], "postprocess": id},
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_BUBBLE") ? {type: "KW_BUBBLE"} : KW_BUBBLE)], "postprocess": id},
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_LOG") ? {type: "KW_LOG"} : KW_LOG)], "postprocess": id},
+    {"name": "idOrKeyword", "symbols": [(lexer.has("KW_ALERT") ? {type: "KW_ALERT"} : KW_ALERT)], "postprocess": id},
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_EXPR") ? {type: "KW_EXPR"} : KW_EXPR)], "postprocess": id},
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_LOCAL") ? {type: "KW_LOCAL"} : KW_LOCAL)], "postprocess": id},
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_IF") ? {type: "KW_IF"} : KW_IF)], "postprocess": id},

@@ -48,6 +48,7 @@ let lexer = moo.states({
                         KW_NOP: "nop",
                         KW_BUBBLE: "bubble",
                         KW_LOG: "log",
+                        KW_ALERT: "alert",
                         KW_EXPR: "expr",
                         KW_LOCAL: "local",
                         KW_IF: "if",
@@ -133,6 +134,7 @@ statement ->
     | fireStatement         {% id %}
     | bubbleStatement       {% id %}
     | logStatement          {% id %}
+    | alertStatement        {% id %}
     | exprStatement         {% id %}
     | ifStatement           {% id %}
     | throwStatement        {% id %}
@@ -254,6 +256,8 @@ fireStatement ->
     } %}
 
 logStatement -> %KW_LOG literalArrayElements {% (data) => ({stmt: "log", exprs: data[1]}) %}
+
+alertStatement -> %KW_ALERT literalArrayElements {% (data) => ({stmt: "alert", exprs: data[1]}) %}
 
 reportErrorStatement -> %KW_REPORTERROR fullExpr {% (data) => {
         return {stmt: "reporterror", expr: data[1]};
@@ -465,6 +469,7 @@ idOrKeyword ->
     | %KW_NOP    {% id %}
     | %KW_BUBBLE {% id %}
     | %KW_LOG    {% id %}
+    | %KW_ALERT  {% id %}
     | %KW_EXPR   {% id %}
     | %KW_LOCAL  {% id %}
     | %KW_IF     {% id %}

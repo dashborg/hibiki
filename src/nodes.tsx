@@ -218,6 +218,9 @@ class HtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnviron
     renderInner(ctx : DBCtx) : any {
         let node = ctx.node;
         let nodeName = node.tag;
+        if (nodeName.startsWith("hibiki-")) {
+            return null;
+        }
         if (!ctx.isEditMode() && ctx.hasAttr("if")) {
             let ifText = ctx.resolveAttr("if");
             let ifExpr = ctx.evalExpr(ifText);
@@ -466,7 +469,7 @@ class CustomNode extends React.Component<{node : HibikiNode, component : Compone
         let rawImplAttrs = implNode.attrs || {};
         let nodeVar = NodeUtils.makeNodeVar(ctx);
         let childrenVar = NodeUtils.makeChildrenVar(ctx.dataenv, ctx.node);
-        let datatypes = NodeUtils.parseDataTypes(rawImplAttrs.datatypes);
+        let argDecls = NodeUtils.parseArgsDecl(rawImplAttrs.args);
         let nodeDataBox = ctx.dataenv.dbstate.NodeDataMap.get(ctx.uuid);
         if (nodeDataBox == null) {
             let uuidName = "id_" + ctx.uuid.replace(/-/g, "_");
@@ -504,8 +507,8 @@ class CustomNode extends React.Component<{node : HibikiNode, component : Compone
                 console.log(sprintf("ERROR parsing/executing 'defaults' in component %s", rawImplAttrs.name), e);
             }
         }
-        for (let key in datatypes) {
-            let resolvedAttr = ctx.resolveAttrData(key, datatypes[key]);
+        for (let key in argDecls) {
+            let resolvedAttr = ctx.resolveAttrData(key, argDecls[key]);
             if (resolvedAttr != null) {
                 resolvedAttrs[key] = resolvedAttr;
             }

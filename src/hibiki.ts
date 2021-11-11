@@ -19,13 +19,43 @@ function readHibikiOptsFromHtml(htmlObj : HibikiNode) : {config : HibikiConfig, 
     for (let i=0; i<htmlObj.list.length; i++) {
         let subNode = htmlObj.list[i];
         if (config == null && subNode.tag == "hibiki-config") {
-            config = JSON.parse(textContent(subNode));
+            let text = textContent(subNode).trim();
+            if (text != "") {
+                config = JSON.parse(text);
+            }
         }
         if (initialData == null && subNode.tag == "hibiki-initialdata") {
-            initialData = JSON.parse(textContent(subNode));
+            let text = textContent(subNode).trim();
+            if (text != "") {
+                initialData = JSON.parse(text);
+            }
         }
     }
     return {config, initialData};
+}
+
+function readHibikiConfigFromOuterHtml(htmlElem : string | HTMLElement) : HibikiConfig {
+    let rtn : HibikiConfig = {};
+    if (typeof(htmlElem) == "string") {
+        return rtn;
+    }
+    let initHandlerAttr = htmlElem.getAttribute("inithandler");
+    if (initHandlerAttr != null) {
+        rtn.initHandler = initHandlerAttr;
+    }
+    if (htmlElem.hasAttribute("nousageimg")) {
+        rtn.noUsageImg = true;
+    }
+    if (htmlElem.hasAttribute("nowelcomemessage")) {
+        rtn.noWelcomeMessage = true;
+    }
+    if (htmlElem.hasAttribute("noconfigmergefromhtml")) {
+        rtn.noConfigMergeFromHtml = true;
+    }
+    if (htmlElem.hasAttribute("nodatamergefromhtml")) {
+        rtn.noDataMergeFromHtml = true;
+    }
+    return rtn;
 }
 
 let createHibikiState = function createHibikiState(config : HibikiConfig, html : string | HTMLElement, initialData : any) : HibikiState {
@@ -40,6 +70,8 @@ let createHibikiState = function createHibikiState(config : HibikiConfig, html :
         htmlObj = parseHtml(html);
     }
     state.setHtml(htmlObj);
+    let configFromOuterHtml = readHibikiConfigFromOuterHtml(html);
+    config = merge(config, configFromOuterHtml);
     let hibikiOpts = readHibikiOptsFromHtml(htmlObj);
     if (!config.noConfigMergeFromHtml) {
         config = merge((hibikiOpts.config ?? {}), config);
@@ -60,15 +92,23 @@ function render(elem : HTMLElement, state : HibikiState) {
     ReactDOM.render(reactElem, elem);
 }
 
-function loadTags() {
+function loadTags(opts? : {autoLoad? : boolean}) {
+    opts = opts || {};
     let elems = document.querySelectorAll("hibiki, template[hibiki]");
     for (let i=0; i<elems.length; i++) {
         let elem : HTMLElement = elems[i] as HTMLElement;
+        if (elem.hasAttribute("loaded")) {
+            continue;
+        }
+        if (opts.autoLoad && elem.hasAttribute("noautoload")) {
+            continue;
+        }
+        elem.setAttribute("loaded", "1");
         if (elem.tagName.toLowerCase() == "template") {
             let siblingNode = document.createElement("div");
             siblingNode.classList.add("hibiki-root");
             elem.parentNode.insertBefore(siblingNode, elem.nextSibling); // insertAfter
-            let state = createHibikiState({}, elem, {"test": [1,3,5], "color": "purple"});
+            let state = createHibikiState({}, elem, null);
             render(siblingNode, state);
         }
         else {
@@ -83,3 +123,5 @@ window.hibiki = {
     HibikiState,
     DataEnvironment,
 };
+
+document.addEventListener("DOMContentLoaded", () => loadTags({autoLoad: true}));

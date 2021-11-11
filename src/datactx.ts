@@ -1151,6 +1151,21 @@ function evalFnAst(fnAst : any, dataenv : DataEnvironment) : any {
         e2 = String(e2);
         return e1.indexOf(e2);
     }
+    else if (fnAst.fn == "splice") {
+        let elist = evalExprArray(fnAst.exprs, dataenv);
+        if (elist.length == 0) {
+            return [];
+        }
+        if (elist.length == 1) {
+            return elist[0];
+        }
+        if (!mobx.isArrayLike(elist[0])) {
+            return null;
+        }
+        let newArr = [...elist[0]];
+        let [spliceStart, spliceDeleteCount, ...spliceItems] = elist.slice(1);
+        return newArr.splice(spliceStart, spliceDeleteCount, ...spliceItems);
+    }
     else if (fnAst.fn == "slice") {
         let e1 = evalExprAst(fnAst.exprs[0], dataenv);
         let e2 = null;
@@ -1705,6 +1720,11 @@ let ExecuteStmtRaw = function ExecuteStmtRaw(stmtAst : Statement, dataenv : Data
     if (stmtAst.stmt == "log") {
         let exprs = demobx(evalExprArray(stmtAst.exprs, dataenv));
         console.log("hibiki-log", ...exprs);
+        return null;
+    }
+    if (stmtAst.stmt == "alert") {
+        let exprs = demobx(evalExprArray(stmtAst.exprs, dataenv));
+        alert(...exprs);
         return null;
     }
     if (stmtAst.stmt == "expr") {

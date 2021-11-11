@@ -239,7 +239,7 @@ function makeChildrenVar(dataenv : DataEnvironment, node : HibikiNode) : any {
     return rtn;
 }
 
-function parseDataTypes(datatypes : string) : {[e : string] : boolean} {
+function parseArgsDecl(datatypes : string) : {[e : string] : boolean} {
     let rtn : {[e : string] : boolean} = {};
     if (datatypes == null || datatypes.trim() == "") {
         return rtn;
@@ -428,4 +428,4 @@ function automerge(ctx : DBCtx, automergeAttrs : AutoMergeAttrsType, subName : s
     }
 }
 
-export {BLOCKED_ELEMS, INLINE_ELEMS, HANDLER_ELEMS, SUBMIT_ELEMS, ONCHANGE_ELEMS, BINDVALUE_ONCHANGE_ELEMS, GETVALUE_ELEMS, renderTextSpan, renderTextData, makeNodeVar, makeChildrenVar, parseDataTypes, makeIterator, getKV, parseAutomerge, handleConvertType, automerge};
+export {BLOCKED_ELEMS, INLINE_ELEMS, HANDLER_ELEMS, SUBMIT_ELEMS, ONCHANGE_ELEMS, BINDVALUE_ONCHANGE_ELEMS, GETVALUE_ELEMS, renderTextSpan, renderTextData, makeNodeVar, makeChildrenVar, parseArgsDecl, makeIterator, getKV, parseAutomerge, handleConvertType, automerge};
