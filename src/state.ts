@@ -327,6 +327,10 @@ class ComponentLibrary {
                 console.log(sprintf("cannot redefine component %s/%s", libName, name));
                 continue;
             }
+            if (h.attrs.react) {
+                libObj.components[name] = {componentType: "react-custom", reactimpl: mobx.observable.box(null)};
+                continue;
+            }
             libObj.components[name] = {componentType: "hibiki-html", node: h};
         }
     }
@@ -355,6 +359,26 @@ class ComponentLibrary {
 
     findComponent(tagName : string) : ComponentType {
         return this.components[tagName];
+    }
+
+    setLocalReactComponent(name : string, reactImpl : any) {
+        let component : ComponentType = {
+            componentType: "react-custom",
+            libName: "local",
+            name: name,
+            reactimpl: mobx.observable.box(reactImpl),
+        };
+        let cname = "local-" + name;
+        if (this.components[cname] == null) {
+            this.components[cname] = component;
+        }
+        else {
+            let ecomp = this.components[cname];
+            if (ecomp.componentType != "react-custom" || ecomp.reactimpl.get() != null) {
+                throw sprintf("Cannot redefine component %s (existing %s/%s)", cname, ecomp.libName, ecomp.name);
+            }
+            ecomp.reactimpl.set(reactImpl);
+        }
     }
 }
 
@@ -574,28 +598,27 @@ class HibikiState {
             return null;
         }
         let starTag = null;
-        let hasDefs = false;
+        let hasPages = false;
         for (let h of htmlobj.list) {
-            if (h.tag == "page" || h.tag == "define-component") {
-                hasDefs = true;
+            if (h.tag != "page") {
+                continue;
             }
-            if (h.tag == "page") {
-                let tagNameAttr = "default";
-                if (h.attrs) {
-                    tagNameAttr = h.attrs["name"] ?? h.attrs["appname"] ?? "default";
-                }
-                if (tagNameAttr == pageName) {
-                    return h;
-                }
-                if (tagNameAttr == "*" && starTag == null) {
-                    starTag = h;
-                }
+            hasPages = true;
+            let tagNameAttr = "default";
+            if (h.attrs) {
+                tagNameAttr = h.attrs["name"] ?? h.attrs["appname"] ?? "default";
+            }
+            if (tagNameAttr == pageName) {
+                return h;
+            }
+            if (tagNameAttr == "*" && starTag == null) {
+                starTag = h;
             }
         }
         if (starTag != null) {
             return starTag;
         }
-        if (!hasDefs) {
+        if (!hasPages) {
             return htmlobj;
         }
         return null;

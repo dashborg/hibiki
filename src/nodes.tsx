@@ -233,7 +233,8 @@ class HtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnviron
         let component = dbstate.ComponentLibrary.findComponent(node.tag);
         if (component != null) {
             if (component.componentType == "react-custom") {
-                this.nodeType = "custom-react";
+                console.log("custom-react-copmp", component);
+                this.nodeType = "react-component";
                 return <CustomReactNode component={component} node={node} dataenv={dataenv}/>;
             }
             else if (component.componentType == "hibiki-native") {
@@ -241,7 +242,7 @@ class HtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnviron
                 return <component.impl node={node} dataenv={dataenv}/>;
             }
             else if (component.componentType == "hibiki-html") {
-                this.nodeType = "html-component";
+                this.nodeType = "hibiki-html-component";
                 return <CustomNode component={component} node={node} dataenv={dataenv}/>;
             }
             else {
@@ -1279,6 +1280,7 @@ let CORE_LIBRARY : LibraryType = {
         "d-dateformat": {componentType: "hibiki-native", impl: DateFormatNode},
         "define-vars": {componentType: "hibiki-native", impl: NopNode},
         "define-handler": {componentType: "hibiki-native", impl: NopNode},
+        "define-component": {componentType: "hibiki-native", impl: NopNode},
         "d-dyn": {componentType: "hibiki-native", impl: DynNode},
         "d-runhandler": {componentType: "hibiki-native", impl: RunHandlerNode},
         "d-withcontext": {componentType: "hibiki-native", impl: WithContextNode},

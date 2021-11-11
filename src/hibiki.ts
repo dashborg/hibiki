@@ -110,10 +110,12 @@ function loadTags(opts? : {autoLoad? : boolean}) {
             elem.parentNode.insertBefore(siblingNode, elem.nextSibling); // insertAfter
             let state = createHibikiState({}, elem, null);
             render(siblingNode, state);
+            window.HibikiState = state;
         }
         else {
             let state = createHibikiState({}, elem, null);
             render(elem, state);
+            window.HibikiState = state;
         }
     }
 }
