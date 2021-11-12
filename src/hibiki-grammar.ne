@@ -71,6 +71,7 @@ let lexer = moo.states({
         COLON:    ":",
         COMMA:    ",",
         STAR:     "*",
+        DOUBLE_STAR: "**",
         CARET:    "^",
         SLASH:    "/",
         PERCENT:  "%",
@@ -181,16 +182,6 @@ ifStatement -> %KW_IF %LPAREN fullExpr %RPAREN %LBRACE statementBlock %RBRACE (%
         return rtn;
     } %}
 
-exprOrExprArray -> fullExpr (%COMMA fullExpr):*  {% (data) => {
-    let arr = [];
-    let dataExpr = data[0];
-    arr.push(dataExpr);
-    if (data[1] != null && data[1].length > 0) {
-        arr.push(...data[1].map((v) => v[1]));
-    }
-    return {etype: "array", exprs: arr};
-} %}
-
 callStatement -> (lvalue %EQUAL):? callStatementNoAssign {% (data) => {
         if (data[0]) {
             let lvalueArr = data[0][0];
@@ -204,19 +195,36 @@ callStatementNoAssign ->
       staticCallStatement  {% id %}
     | %KW_CALL fullExpr (%COMMA fullExpr):?  {% (data) => {
           let dataExpr = null;
-          if (data[2]!= null) {
+          if (data[2] != null) {
               dataExpr = data[2][1];
           }
           return {stmt: "call", handler: data[1], data: dataExpr}
       } %}
 
-staticCallStatement -> %CALLPATH (%LPAREN exprOrExprArray:? %RPAREN):?    {% (data) => {
-      let dataExpr = null;
-      if (data[1] != null) {
-          dataExpr = data[1][1];
-      }
-      return {stmt: "call", handler: {etype: "literal", val: data[0].value}, data: dataExpr};
-  } %}
+staticCallStatement -> %CALLPATH (%LPAREN literalArrayElements:? %RPAREN):?    {% (data) => {
+          let dataExpr = null;
+          if (data[1] != null) {
+              dataExpr = {etype: "array", exprs: data[1][1]};
+          }
+          return {stmt: "call", handler: {etype: "literal", val: data[0].value}, data: dataExpr};
+      } %}
+
+kwExprPart -> literalMapKey %EQUAL fullExpr  {% (data) => {
+          return {etype: "kv", key: data[0], val: [2]};
+      } %}
+
+kwExprList -> kwExprPart (%COMMA kwExprPart):*   {% (data) => {
+          let kwExprs = [];
+          kwExprs.push(data[0]);
+          kwExprs.push(...data[1].map((v) => v[1]));
+          return {etype: "map", exprs: kwExprs};
+      } %}
+
+callParams -> 
+      null
+    | literalArrayElements
+    | kwExprList
+    | literalArrayElementsNoComma %COMMA kwExprList
 
 assignmentStatement ->
       lvalue %EQUAL fullExpr {% (data) => {
@@ -332,11 +340,15 @@ primaryExpr ->
 
 
 fnExpr -> 
-      %FN %LPAREN optionalLiteralArrayElements %RPAREN {% (data) => ({etype: "fn", fn: data[0].value, exprs: data[2]}) %}
+      %FN %LPAREN optionalLiteralArrayElements %RPAREN {% (data) => {
+          return {etype: "fn", fn: data[0].value, exprs: data[2]};
+      } %}
     | %KW_REF %LPAREN lvaluePath %RPAREN {% (data) => ({etype: "ref", path: data[2]}) %}
 
 literalArray ->
-      %LBRACK optionalLiteralArrayElements %RBRACK {% (data) => ({etype: "array", exprs: data[1]}) %}
+      %LBRACK optionalLiteralArrayElements %RBRACK {% (data) => {
+          return {etype: "array", exprs: data[1]};
+      } %}
       | %LBRACK fullExpr %DOTDOT fullExpr %RBRACK {% (data) => ({etype: "array-range", exprs: [data[1], data[3]]}) %}
 
 optionalLiteralArrayElements -> literalArrayElements:? {% (data) => {
@@ -346,11 +358,15 @@ optionalLiteralArrayElements -> literalArrayElements:? {% (data) => {
         return data[0];
     } %}
 
-literalArrayElements -> fullExpr (%COMMA fullExpr):* %COMMA:? {% (data) => {
+literalArrayElementsNoComma -> fullExpr (%COMMA fullExpr):* {% (data) => {
         let rtn = [];
         rtn.push(data[0]);
         rtn.push(...data[1].map((v) => v[1]));
         return rtn;
+    } %}
+
+literalArrayElements -> literalArrayElementsNoComma %COMMA:? {% (data) => {
+        return data[0];
     } %}
 
 literalMap -> %LBRACE literalMapElements:? %RBRACE {% (data) => ({etype: "map", exprs: data[1]}) %}

@@ -75,6 +75,7 @@ let lexer = moo.states({
         COLON:    ":",
         COMMA:    ",",
         STAR:     "*",
+        DOUBLE_STAR: "**",
         CARET:    "^",
         SLASH:    "/",
         PERCENT:  "%",
@@ -194,18 +195,6 @@ var grammar = {
             }
             return rtn;
         } },
-    {"name": "exprOrExprArray$ebnf$1", "symbols": []},
-    {"name": "exprOrExprArray$ebnf$1$subexpression$1", "symbols": [(lexer.has("COMMA") ? {type: "COMMA"} : COMMA), "fullExpr"]},
-    {"name": "exprOrExprArray$ebnf$1", "symbols": ["exprOrExprArray$ebnf$1", "exprOrExprArray$ebnf$1$subexpression$1"], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
-    {"name": "exprOrExprArray", "symbols": ["fullExpr", "exprOrExprArray$ebnf$1"], "postprocess":  (data) => {
-            let arr = [];
-            let dataExpr = data[0];
-            arr.push(dataExpr);
-            if (data[1] != null && data[1].length > 0) {
-                arr.push(...data[1].map((v) => v[1]));
-            }
-            return {etype: "array", exprs: arr};
-        } },
     {"name": "callStatement$ebnf$1$subexpression$1", "symbols": ["lvalue", (lexer.has("EQUAL") ? {type: "EQUAL"} : EQUAL)]},
     {"name": "callStatement$ebnf$1", "symbols": ["callStatement$ebnf$1$subexpression$1"], "postprocess": id},
     {"name": "callStatement$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
@@ -223,12 +212,12 @@ var grammar = {
     {"name": "callStatementNoAssign$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
     {"name": "callStatementNoAssign", "symbols": [(lexer.has("KW_CALL") ? {type: "KW_CALL"} : KW_CALL), "fullExpr", "callStatementNoAssign$ebnf$1"], "postprocess":  (data) => {
             let dataExpr = null;
-            if (data[2]!= null) {
+            if (data[2] != null) {
                 dataExpr = data[2][1];
             }
             return {stmt: "call", handler: data[1], data: dataExpr}
         } },
-    {"name": "staticCallStatement$ebnf$1$subexpression$1$ebnf$1", "symbols": ["exprOrExprArray"], "postprocess": id},
+    {"name": "staticCallStatement$ebnf$1$subexpression$1$ebnf$1", "symbols": ["literalArrayElements"], "postprocess": id},
     {"name": "staticCallStatement$ebnf$1$subexpression$1$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
     {"name": "staticCallStatement$ebnf$1$subexpression$1", "symbols": [(lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "staticCallStatement$ebnf$1$subexpression$1$ebnf$1", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)]},
     {"name": "staticCallStatement$ebnf$1", "symbols": ["staticCallStatement$ebnf$1$subexpression$1"], "postprocess": id},
@@ -236,10 +225,26 @@ var grammar = {
     {"name": "staticCallStatement", "symbols": [(lexer.has("CALLPATH") ? {type: "CALLPATH"} : CALLPATH), "staticCallStatement$ebnf$1"], "postprocess":  (data) => {
             let dataExpr = null;
             if (data[1] != null) {
-                dataExpr = data[1][1];
+                dataExpr = {etype: "array", exprs: data[1][1]};
             }
             return {stmt: "call", handler: {etype: "literal", val: data[0].value}, data: dataExpr};
         } },
+    {"name": "kwExprPart", "symbols": ["literalMapKey", (lexer.has("EQUAL") ? {type: "EQUAL"} : EQUAL), "fullExpr"], "postprocess":  (data) => {
+            return {etype: "kv", key: data[0], val: [2]};
+        } },
+    {"name": "kwExprList$ebnf$1", "symbols": []},
+    {"name": "kwExprList$ebnf$1$subexpression$1", "symbols": [(lexer.has("COMMA") ? {type: "COMMA"} : COMMA), "kwExprPart"]},
+    {"name": "kwExprList$ebnf$1", "symbols": ["kwExprList$ebnf$1", "kwExprList$ebnf$1$subexpression$1"], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
+    {"name": "kwExprList", "symbols": ["kwExprPart", "kwExprList$ebnf$1"], "postprocess":  (data) => {
+            let kwExprs = [];
+            kwExprs.push(data[0]);
+            kwExprs.push(...data[1].map((v) => v[1]));
+            return {etype: "map", exprs: kwExprs};
+        } },
+    {"name": "callParams", "symbols": []},
+    {"name": "callParams", "symbols": ["literalArrayElements"]},
+    {"name": "callParams", "symbols": ["kwExprList"]},
+    {"name": "callParams", "symbols": ["literalArrayElementsNoComma", (lexer.has("COMMA") ? {type: "COMMA"} : COMMA), "kwExprList"]},
     {"name": "assignmentStatement", "symbols": ["lvalue", (lexer.has("EQUAL") ? {type: "EQUAL"} : EQUAL), "fullExpr"], "postprocess":  (data) => {
             return {stmt: "assign", lvalue: data[0][1], setop: data[0][0], expr: data[2]};
         } },
@@ -332,9 +337,13 @@ var grammar = {
     {"name": "primaryExpr", "symbols": ["fnExpr"], "postprocess": id},
     {"name": "primaryExpr", "symbols": [(lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "fullExpr", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => data[1]},
     {"name": "primaryExpr", "symbols": ["pathExprNonTerm"], "postprocess": id},
-    {"name": "fnExpr", "symbols": [(lexer.has("FN") ? {type: "FN"} : FN), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "optionalLiteralArrayElements", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => ({etype: "fn", fn: data[0].value, exprs: data[2]})},
+    {"name": "fnExpr", "symbols": [(lexer.has("FN") ? {type: "FN"} : FN), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "optionalLiteralArrayElements", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess":  (data) => {
+            return {etype: "fn", fn: data[0].value, exprs: data[2]};
+        } },
     {"name": "fnExpr", "symbols": [(lexer.has("KW_REF") ? {type: "KW_REF"} : KW_REF), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "lvaluePath", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => ({etype: "ref", path: data[2]})},
-    {"name": "literalArray", "symbols": [(lexer.has("LBRACK") ? {type: "LBRACK"} : LBRACK), "optionalLiteralArrayElements", (lexer.has("RBRACK") ? {type: "RBRACK"} : RBRACK)], "postprocess": (data) => ({etype: "array", exprs: data[1]})},
+    {"name": "literalArray", "symbols": [(lexer.has("LBRACK") ? {type: "LBRACK"} : LBRACK), "optionalLiteralArrayElements", (lexer.has("RBRACK") ? {type: "RBRACK"} : RBRACK)], "postprocess":  (data) => {
+            return {etype: "array", exprs: data[1]};
+        } },
     {"name": "literalArray", "symbols": [(lexer.has("LBRACK") ? {type: "LBRACK"} : LBRACK), "fullExpr", (lexer.has("DOTDOT") ? {type: "DOTDOT"} : DOTDOT), "fullExpr", (lexer.has("RBRACK") ? {type: "RBRACK"} : RBRACK)], "postprocess": (data) => ({etype: "array-range", exprs: [data[1], data[3]]})},
     {"name": "optionalLiteralArrayElements$ebnf$1", "symbols": ["literalArrayElements"], "postprocess": id},
     {"name": "optionalLiteralArrayElements$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
@@ -344,16 +353,19 @@ var grammar = {
             }
             return data[0];
         } },
-    {"name": "literalArrayElements$ebnf$1", "symbols": []},
-    {"name": "literalArrayElements$ebnf$1$subexpression$1", "symbols": [(lexer.has("COMMA") ? {type: "COMMA"} : COMMA), "fullExpr"]},
-    {"name": "literalArrayElements$ebnf$1", "symbols": ["literalArrayElements$ebnf$1", "literalArrayElements$ebnf$1$subexpression$1"], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
-    {"name": "literalArrayElements$ebnf$2", "symbols": [(lexer.has("COMMA") ? {type: "COMMA"} : COMMA)], "postprocess": id},
-    {"name": "literalArrayElements$ebnf$2", "symbols": [], "postprocess": function(d) {return null;}},
-    {"name": "literalArrayElements", "symbols": ["fullExpr", "literalArrayElements$ebnf$1", "literalArrayElements$ebnf$2"], "postprocess":  (data) => {
+    {"name": "literalArrayElementsNoComma$ebnf$1", "symbols": []},
+    {"name": "literalArrayElementsNoComma$ebnf$1$subexpression$1", "symbols": [(lexer.has("COMMA") ? {type: "COMMA"} : COMMA), "fullExpr"]},
+    {"name": "literalArrayElementsNoComma$ebnf$1", "symbols": ["literalArrayElementsNoComma$ebnf$1", "literalArrayElementsNoComma$ebnf$1$subexpression$1"], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
+    {"name": "literalArrayElementsNoComma", "symbols": ["fullExpr", "literalArrayElementsNoComma$ebnf$1"], "postprocess":  (data) => {
             let rtn = [];
             rtn.push(data[0]);
             rtn.push(...data[1].map((v) => v[1]));
             return rtn;
+        } },
+    {"name": "literalArrayElements$ebnf$1", "symbols": [(lexer.has("COMMA") ? {type: "COMMA"} : COMMA)], "postprocess": id},
+    {"name": "literalArrayElements$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
+    {"name": "literalArrayElements", "symbols": ["literalArrayElementsNoComma", "literalArrayElements$ebnf$1"], "postprocess":  (data) => {
+            return data[0];
         } },
     {"name": "literalMap$ebnf$1", "symbols": ["literalMapElements"], "postprocess": id},
     {"name": "literalMap$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
