@@ -14,11 +14,11 @@ import dayjsRelativeTime from "dayjs/plugin/relativeTime";
 import dayjsUtc from "dayjs/plugin/utc";
 import dayjsRelative from "dayjs/plugin/relativeTime";
 
-import type {HibikiNode, ComponentType, LibraryType} from "./types";
+import type {HibikiNode, ComponentType, LibraryType, HibikiExtState} from "./types";
 import {DBCtx} from "./dbctx";
 import * as DataCtx from "./datactx";
 import {HibikiState, DataEnvironment, getAttributes, getAttribute, getStyleMap} from "./state";
-import {valToString, valToInt, valToFloat, resolveNumber, isObject, textContent, SYM_PROXY, SYM_FLATTEN} from "./utils";
+import {valToString, valToInt, valToFloat, resolveNumber, isObject, textContent, SYM_PROXY, SYM_FLATTEN, jseval} from "./utils";
 import {parseHtml} from "./html-parser";
 import * as NodeUtils from "./nodeutils";
 import {RtContext} from "./error";
@@ -46,12 +46,16 @@ class ErrorMsg extends React.Component<{message: string}, {}> {
 }
 
 @mobxReact.observer
-class HibikiRootNode extends React.Component<{page : string, dataenv : DataEnvironment}, {}> {
+class HibikiRootNode extends React.Component<{state : HibikiExtState}, {}> {
     renderingDBState : HibikiState;
     loadUuid : string;
 
     constructor(props : any) {
         super(props);
+    }
+
+    getState() : HibikiState {
+        return (this.props.state as any).state;
     }
     
     queueOnLoadCheck() {
@@ -63,7 +67,8 @@ class HibikiRootNode extends React.Component<{page : string, dataenv : DataEnvir
         }
         this.loadUuid = uuidv4();
         let runJS = "window.HibikiLoaded['" + this.loadUuid + "'] = true;";
-        this.props.dataenv.dbstate.queueScriptText(runJS, true);
+        let dbstate = this.getState();
+        dbstate.queueScriptText(runJS, true);
         setTimeout(() => this.checkLoaded(1), 100);
     }
 
@@ -79,21 +84,23 @@ class HibikiRootNode extends React.Component<{page : string, dataenv : DataEnvir
             }
         }
         let node = this.getHibikiNode();
-        let ctx = new DBCtx(this as any, node);
+        let dbstate = this.getState();
+        let ctx = new DBCtx(null, node, dbstate.rootDataenv());
         setTimeout(() => ctx.dataenv.dbstate.fireScriptsLoaded(), 1);
         ctx.handleOnX("onloadhandler");
     }
 
     componentDidMount() {
         this.queueOnLoadCheck();
+        let dbstate = this.getState();
         let flowerEmoji = String.fromCodePoint(0x1F338);
-        if (this.props.dataenv.dbstate.allowUsageImg() && !usageFired) {
+        if (dbstate.allowUsageImg() && !usageFired) {
             usageFired = true;
             let usageImg = new Image();
             usageImg.src = "https://static.dashborg.net/static/hibiki-usage.gif";
             usageImg.onload = function() {};
         }
-        if (this.props.dataenv.dbstate.allowWelcomeMessage() && !welcomeMessage) {
+        if (dbstate.allowWelcomeMessage() && !welcomeMessage) {
             welcomeMessage = true;
             console.log(flowerEmoji + " Hibiki HTML https://github.com/dashborg/hibiki | Developed by Dashborg Inc https://dashborg.net");
         }
@@ -104,12 +111,13 @@ class HibikiRootNode extends React.Component<{page : string, dataenv : DataEnvir
     }
 
     getHibikiNode() : HibikiNode {
-        return this.props.dataenv.dbstate.findPage(this.props.page);
+        return this.getState().findCurrentPage();
     }
     
     render() {
+        let dbstate = this.getState();
         let node = this.getHibikiNode();
-        let ctx = new DBCtx(this as any, node);
+        let ctx = new DBCtx(null, node, dbstate.rootDataenv());
         let rootClasses = "";
         if (ctx.dataenv.dbstate.Ui == "dashborg") {
             rootClasses += "rootdiv dashelem col";
@@ -970,10 +978,7 @@ class InlineDataNode extends React.Component<{node : HibikiNode, dataenv : DataE
                 setData = JSON.parse(text);
             }
             else if (format == "jseval") {
-                let evalVal = eval("(" + text + ")");
-                if (typeof(evalVal) == "function") {
-                    evalVal = evalVal();
-                }
+                let evalVal = jseval(text);
                 setData = evalVal;
             }
             let outputLV = ctx.resolveData("output", true);

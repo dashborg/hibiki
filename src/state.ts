@@ -4,7 +4,7 @@ import Axios from "axios";
 import {sprintf} from "sprintf-js";
 import {boundMethod} from 'autobind-decorator'
 import {v4 as uuidv4} from 'uuid';
-import {HibikiNode, ComponentType, LibraryType, HandlerPathObj, HibikiConfig, HibikiHandlerModule, RequestType} from "./types";
+import {HibikiNode, ComponentType, LibraryType, HandlerPathObj, HibikiConfig, HibikiHandlerModule, RequestType, HibikiAction} from "./types";
 import * as DataCtx from "./datactx";
 import {isObject, textContent, SYM_PROXY, SYM_FLATTEN} from "./utils";
 import {RtContext} from "./error";
@@ -264,8 +264,8 @@ class DataEnvironment {
         return rtn;
     }
 
-    setDataPath(path : string, value : any) {
-        this.dbstate.setDataPath(path, value);
+    setDataPath(path : string, data : any) {
+        DataCtx.SetPath(path, this, data);
     }
 
     evalExpr(expr : string, keepMobx? : boolean) : any {
@@ -502,6 +502,41 @@ class FetchModule {
     }
 }
 
+class HibikiExtState {
+    state : HibikiState;
+    
+    constructor(state : HibikiState) {
+        this.state = state;
+    }
+
+    setHtml(html : string | HTMLElement) {
+        let htmlObj = parseHtml(html);
+        this.state.setHtml(htmlObj);
+    }
+
+    setData(path : string, data : any) {
+        let dataenv = this.state.rootDataenv();
+        dataenv.setDataPath(path, data);
+    }
+
+    getData(path : string) : any {
+        let dataenv = this.state.rootDataenv();
+        return dataenv.resolvePath(path, false);
+    }
+
+    setLocalReactComponent(name : string, reactImpl : any) {
+        this.state.ComponentLibrary.setLocalReactComponent(name, reactImpl);
+    }
+
+    runActions(actions : HibikiAction[]) : any {
+        return this.state.runActions(actions);
+    }
+
+    setHtmlPage(htmlPage : string) {
+        this.state.setHtmlPage(htmlPage);
+    }
+}
+
 class HibikiState {
     FeClientId : string = null;
     Ui : string = null;
@@ -518,6 +553,7 @@ class HibikiState {
     NodeDataMap : Map<string, mobx.IObservableValue<any>> = new Map();  // TODO clear on unmount
     ExtHtmlObj : mobx.ObservableMap<string,any> = mobx.observable.map({}, {name: "ExtHtmlObj", deep: false});
     Config : HibikiConfig = {};
+    HtmlPage : mobx.IObservableValue<string> = mobx.observable.box("default", {name: "HtmlPage"});
     
     Modules : Record<string, HibikiHandlerModule> = {};
     DataRoots : Record<string, mobx.IObservableValue<any>>;
@@ -528,6 +564,14 @@ class HibikiState {
         this.DataRoots["state"] = mobx.observable.box({}, {name: "AppState"})
         this.ComponentLibrary = new ComponentLibrary();
         this.Modules["fetch"] = new FetchModule(this);
+    }
+
+    getExtState() : HibikiExtState {
+        return new HibikiExtState(this);
+    }
+
+    @mobx.action setHtmlPage(htmlPage : string) {
+        this.HtmlPage.set(htmlPage);
     }
 
     @mobx.action setConfig(config : HibikiConfig) {
@@ -580,13 +624,12 @@ class HibikiState {
         this.PostScriptRunQueue.push(fn);
     }
 
-    @mobx.action setDataPath(path : string, data : any) {
-        let dataenv = this.rootDataenv();
-        DataCtx.SetPath(path, dataenv, data);
-    }
-
     destroyPanel() {
         console.log("Destroy Hibiki State");
+    }
+
+    findCurrentPage() : HibikiNode {
+        return this.findPage(this.HtmlPage.get());
     }
 
     findPage(pageName? : string) : HibikiNode {
@@ -691,7 +734,7 @@ class HibikiState {
         return this.processActions(rra, true);
     }
 
-    runActions(rra : any) : any {
+    runActions(rra : HibikiAction[]) : any {
         return this.processActions(rra, false);
     }
 
@@ -760,7 +803,7 @@ class HibikiState {
             },
             data: handlerData,
             rtContext: opts.rtContext,
-            state: this,
+            state: this.getExtState(),
             pure : pureRequest,
         };
         let self = this;
@@ -1086,4 +1129,4 @@ function hasHtmlRR(rra : any[]) : boolean {
     return false;
 }
 
-export {HibikiState, DataEnvironment, getAttributes, getAttribute, getStyleMap};
+export {HibikiState, DataEnvironment, getAttributes, getAttribute, getStyleMap, HibikiExtState};

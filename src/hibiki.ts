@@ -4,9 +4,9 @@ import {parseHtml} from "./html-parser";
 import {HibikiState, DataEnvironment} from "./state";
 import * as ReactDOM from "react-dom";
 import {HibikiRootNode, CORE_LIBRARY} from "./nodes";
-import {textContent} from "./utils";
+import {evalDeepTextContent} from "./utils";
 import merge from "lodash/merge";
-import type {HibikiNode, HibikiConfig} from "./types";
+import type {HibikiNode, HibikiConfig, Hibiki, HibikiExtState} from "./types";
 
 declare var window : any;
 
@@ -19,16 +19,10 @@ function readHibikiOptsFromHtml(htmlObj : HibikiNode) : {config : HibikiConfig, 
     for (let i=0; i<htmlObj.list.length; i++) {
         let subNode = htmlObj.list[i];
         if (config == null && subNode.tag == "hibiki-config") {
-            let text = textContent(subNode).trim();
-            if (text != "") {
-                config = JSON.parse(text);
-            }
+            config = evalDeepTextContent(subNode, true);
         }
         if (initialData == null && subNode.tag == "hibiki-initialdata") {
-            let text = textContent(subNode).trim();
-            if (text != "") {
-                initialData = JSON.parse(text);
-            }
+            initialData = evalDeepTextContent(subNode, true);
         }
     }
     return {config, initialData};
@@ -58,7 +52,8 @@ function readHibikiConfigFromOuterHtml(htmlElem : string | HTMLElement) : Hibiki
     return rtn;
 }
 
-let createHibikiState = function createHibikiState(config : HibikiConfig, html : string | HTMLElement, initialData : any) : HibikiState {
+// TODO handle errors
+let createState = function createState(config : HibikiConfig, html : string | HTMLElement, initialData : any) : HibikiExtState {
     let state = new HibikiState();
     state.ComponentLibrary.addLibrary(CORE_LIBRARY);
     state.ComponentLibrary.importLib("@hibiki/core", null);
@@ -81,49 +76,55 @@ let createHibikiState = function createHibikiState(config : HibikiConfig, html :
         initialData = merge((hibikiOpts.initialData ?? {}), initialData);
     }
     state.setGlobalData(initialData);
-    return state;
+    return state.getExtState();
 }
-createHibikiState = mobx.action(createHibikiState);
+createState = mobx.action(createState);
 
-function render(elem : HTMLElement, state : HibikiState) {
-    let renderNode = state.findPage("default");
-    let props = {page: "default", node: renderNode, dataenv: state.rootDataenv()};
+function render(elem : HTMLElement, state : HibikiExtState) {
+    let props = {state: state};
     let reactElem = React.createElement(HibikiRootNode, props, null);
     ReactDOM.render(reactElem, elem);
 }
 
-function loadTags(opts? : {autoLoad? : boolean}) {
-    opts = opts || {};
-    let elems = document.querySelectorAll("hibiki, template[hibiki]");
-    for (let i=0; i<elems.length; i++) {
-        let elem : HTMLElement = elems[i] as HTMLElement;
-        if (elem.hasAttribute("loaded")) {
-            continue;
-        }
-        if (opts.autoLoad && elem.hasAttribute("noautoload")) {
-            continue;
-        }
-        elem.setAttribute("loaded", "1");
-        if (elem.tagName.toLowerCase() == "template") {
-            let siblingNode = document.createElement("div");
-            siblingNode.classList.add("hibiki-root");
-            elem.parentNode.insertBefore(siblingNode, elem.nextSibling); // insertAfter
-            let state = createHibikiState({}, elem, null);
-            render(siblingNode, state);
-            window.HibikiState = state;
-        }
-        else {
-            let state = createHibikiState({}, elem, null);
-            render(elem, state);
-            window.HibikiState = state;
-        }
+function loadTag(elem : HTMLElement) : HibikiExtState {
+    if (elem.hasAttribute("loaded")) {
+        console.log("Hibiki tag already loaded", elem);
+        return;
+    }
+    elem.setAttribute("loaded", "1");
+    if (elem.tagName.toLowerCase() == "template") {
+        let siblingNode = document.createElement("div");
+        siblingNode.classList.add("hibiki-root");
+        elem.parentNode.insertBefore(siblingNode, elem.nextSibling); // insertAfter
+        let state = createState({}, elem, null);
+        render(siblingNode, state);
+        return state;
+    }
+    else {
+        let state = createState({}, elem, null);
+        render(elem, state);
+        return state;
     }
 }
 
-window.hibiki = {
-    loadTags,
-    HibikiState,
-    DataEnvironment,
+function autoloadTags() {
+    let elems = document.querySelectorAll("hibiki, template[hibiki]");
+    for (let i=0; i<elems.length; i++) {
+        let elem : HTMLElement = elems[i] as HTMLElement;
+        if (elem.hasAttribute("noautoload")) {
+            continue;
+        }
+        window.HibikiState = loadTag(elem);
+    }
+}
+
+let hibiki : Hibiki = {
+    autoloadTags: autoloadTags,
+    loadTag: loadTag,
+    render: render,
+    createState: createState,
 };
 
-document.addEventListener("DOMContentLoaded", () => loadTags({autoLoad: true}));
+window.Hibiki = hibiki;
+
+document.addEventListener("DOMContentLoaded", () => autoloadTags());

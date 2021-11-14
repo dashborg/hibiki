@@ -248,5 +248,63 @@ function textContent(node : HibikiNode) : string {
     return rtn;
 }
 
-export {jsonRespHandler, parseUrlParams, valToString, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, makeUrlParamsFromObject, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, SYM_PROXY, SYM_FLATTEN};
+function deepTextContent(node : HibikiNode) : string {
+    if (node == null || node.list == null) {
+        return "";
+    }
+    if (node.tag == "#text") {
+        return node.text;
+    }
+    let rtn = "";
+    for (let sn of node.list) {
+        let sntext = deepTextContent(sn);
+        rtn = rtn + sntext;
+    }
+    return rtn;
+}
+
+function jseval(text : string) : any {
+    let evalVal = eval("(" + text + ")");
+    if (typeof(evalVal) == "function") {
+        evalVal = evalVal();
+    }
+    return evalVal;
+}
+
+function evalDeepTextContent(node : HibikiNode, throwError : boolean) : any {
+    let text = deepTextContent(node).trim();
+    if (text == "") {
+        return null;
+    }
+    let format = rawAttr(node, "format");
+    try {
+        if (format == null || format == "json") {
+            return JSON.parse(text);
+        }
+        else if (format == "jseval") {
+            return jseval(text);
+        }
+        else {
+            if (throwError) {
+                throw "Invalid 'format' attribute, must be 'json', 'jseval'";
+            }
+            return null;
+        }
+    }
+    catch (e) {
+        if (throwError) {
+            throw e;
+        }
+        return null;
+    }
+}
+
+function rawAttr(node : HibikiNode, attrName : string) : string {
+    if (node == null || node.attrs == null) {
+        return null;
+    }
+    return node.attrs[attrName];
+}
+
+export {jsonRespHandler, parseUrlParams, valToString, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, makeUrlParamsFromObject, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, rawAttr, evalDeepTextContent, jseval};
 
