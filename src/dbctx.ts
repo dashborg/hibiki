@@ -139,14 +139,12 @@ class DBCtx {
         let ldattr = this.resolveAttr("localdata");
         if (ldattr != null) {
             let newData = this.evalExpr(ldattr);
-            this.childDataenv = this.dataenv.makeChildEnv(newData);
+            let htmlContext = sprintf("localdata:<%s>", this.node.tag);
+            this.childDataenv = this.dataenv.makeChildEnv(newData, null, {htmlContext: htmlContext});
         }
         else {
             this.childDataenv = this.dataenv;
         }
-        // this.setupDebounce("handleonclick", this.handleOnClickRaw, (dbm) => {
-        //     this.handleOnClick = dbm;
-        // });
     }
 
     setupDebounce<T>(attr : string, method : T, setter : (T) => void) {
@@ -231,7 +229,8 @@ class DBCtx {
         if (val != null) {
             context = {"value": val};
         }
-        let execDataenv = this.dataenv.makeSpecialChildEnv(context);
+        let htmlContext = sprintf("<%s>:%s", this.node.tag, xval);
+        let execDataenv = this.dataenv.makeSpecialChildEnv(context, {htmlContext: htmlContext});
         let rtContext = sprintf("<%s>:%s (in %s)", this.node.tag, xval, execDataenv.getHtmlContext());
         let errorBlock = null;
         let errorHandler = (xval == "onerrorhandler" ? null : this.resolveAttr("onerrorhandler"));

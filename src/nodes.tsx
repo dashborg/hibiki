@@ -57,6 +57,14 @@ class HibikiRootNode extends React.Component<{state : HibikiExtState}, {}> {
     getState() : HibikiState {
         return (this.props.state as any).state;
     }
+
+    getDataenv() : DataEnvironment {
+        let state = this.getState();
+        let rde = state.rootDataenv();
+        let htmlContext = sprintf("<page %s>", state.HtmlPage.get());
+        let dataenv = rde.makeChildEnv(null, null, {htmlContext: htmlContext});
+        return dataenv;
+    }
     
     queueOnLoadCheck() {
         if (this.renderingDBState == null || this.renderingDBState.HasRendered) {
@@ -85,7 +93,8 @@ class HibikiRootNode extends React.Component<{state : HibikiExtState}, {}> {
         }
         let node = this.getHibikiNode();
         let dbstate = this.getState();
-        let ctx = new DBCtx(null, node, dbstate.rootDataenv());
+        let dataenv = this.getDataenv();
+        let ctx = new DBCtx(null, node, dataenv);
         setTimeout(() => ctx.dataenv.dbstate.fireScriptsLoaded(), 1);
         ctx.handleOnX("onloadhandler");
     }
@@ -117,7 +126,8 @@ class HibikiRootNode extends React.Component<{state : HibikiExtState}, {}> {
     render() {
         let dbstate = this.getState();
         let node = this.getHibikiNode();
-        let ctx = new DBCtx(null, node, dbstate.rootDataenv());
+        let dataenv = this.getDataenv();
+        let ctx = new DBCtx(null, node, dataenv);
         let rootClasses = "";
         if (ctx.dataenv.dbstate.Ui == "dashborg") {
             rootClasses += "rootdiv dashelem col";
@@ -196,8 +206,12 @@ function baseRenderHtmlChildren(list : HibikiNode[], dataenv : DataEnvironment) 
                 rtn.push(<ErrorMsg message={"<define-handler> no name attribute"}/>);
                 continue;
             }
+            if (dataenv.handlers[attrs.name] != null) {
+                rtn.push(<ErrorMsg message={"<define-handler> cannot redefine handler.  handlers are scoped to the nearest <page> or <define-component> tag."}/>);
+                continue;
+            }
             let handlerStr = textContent(child);
-            dataenv.handlers[attrs.name] = {handlerStr: handlerStr, parentEnv: false};
+            dataenv.handlers[attrs.name] = {handlerStr: handlerStr, parentEnv: false, node: child};
             continue;
         }
         else {
@@ -286,8 +300,8 @@ class CustomReactNode extends React.Component<{node : HibikiNode, component : Co
         }
         let attrs = ctx.resolveAttrs({raw: true});
         let nodeVar = NodeUtils.makeNodeVar(ctx);
-        let childEnv = ctx.childDataenv.makeSpecialChildEnv({node: nodeVar});
-        childEnv.htmlContext = "react " + ctx.node.tag;
+        let htmlContext = sprintf("react:<%s>", ctx.node.tag);
+        let childEnv = ctx.childDataenv.makeSpecialChildEnv({node: nodeVar}, {htmlContext: htmlContext});
         let rtnElems = renderHtmlChildren(ctx.node, childEnv)
         let reactElem = React.createElement(reactImpl, attrs, rtnElems);
         return reactElem;
@@ -495,18 +509,22 @@ class CustomNode extends React.Component<{node : HibikiNode, component : Compone
         for (let key in rawImplAttrs) {
             let val = rawImplAttrs[key];
             if (key.endsWith("handler") && val != null && typeof(val) == "string") {
-                handlers[key] = {handlerStr: val, parentEnv: false};
+                handlers[key] = {handlerStr: val, parentEnv: false, node: implNode};
             }
         }
         for (let key in ctxAttrs) {
             let val = ctxAttrs[key];
             if (key.endsWith("handler") && val != null && typeof(val) == "string") {
-                handlers[key] = {handlerStr: val, parentEnv: true};
+                handlers[key] = {handlerStr: val, parentEnv: true, node: ctx.node};
             }
         }
         let crootProxy = componentRootProxy(nodeDataLV, resolvedAttrs);
-        let childEnv = ctx.childDataenv.makeSpecialChildEnv(specials, {componentRoot: crootProxy, handlers: handlers});
-        childEnv.htmlContext = "component " + ctx.node.tag;
+        let envOpts = {
+            componentRoot: crootProxy,
+            handlers: handlers,
+            htmlContext: sprintf("component:<%s>", ctx.node.tag),
+        };
+        let childEnv = ctx.childDataenv.makeSpecialChildEnv(specials, envOpts);
         if (initialize && rawImplAttrs.defaults != null) {
             try {
                 let block = DataCtx.ParseBlockThrow(rawImplAttrs.defaults);
@@ -635,7 +653,8 @@ class ForEachNode extends React.Component<{node : HibikiNode, dataenv : DataEnvi
             if (key != null) {
                 ctxVars["key"] = key;
             }
-            let childEnv = ctx.dataenv.makeChildEnv(val, ctxVars);
+            let htmlContext = sprintf("<d-foreach %d>", index);
+            let childEnv = ctx.dataenv.makeChildEnv(val, ctxVars, {htmlContext: htmlContext});
             let childElements = renderHtmlChildren(ctx.node, childEnv);
             if (childElements != null) {
                 rtnElems.push(...childElements);

@@ -4,7 +4,7 @@ import Axios from "axios";
 import {sprintf} from "sprintf-js";
 import {boundMethod} from 'autobind-decorator'
 import {v4 as uuidv4} from 'uuid';
-import {HibikiNode, ComponentType, LibraryType, HandlerPathObj, HibikiConfig, HibikiHandlerModule, RequestType, HibikiAction} from "./types";
+import {HibikiNode, ComponentType, LibraryType, HandlerPathObj, HibikiConfig, HibikiHandlerModule, RequestType, HibikiAction, TCFBlock} from "./types";
 import * as DataCtx from "./datactx";
 import {isObject, textContent, SYM_PROXY, SYM_FLATTEN} from "./utils";
 import {RtContext} from "./error";
@@ -21,20 +21,27 @@ function unbox(data : any) : any {
     return data;
 }
 
+type HandlerValType = {
+    handlerStr : string,
+    parentEnv: boolean,
+    node : HibikiNode,
+};
+
 type DataEnvironmentOpts = {
     componentRoot? : {[e : string] : any},
     description? : string,
-    handlers? : {[e : string] : {handlerStr: string, parentEnv: boolean}}
+    handlers? : Record<string, HandlerValType>,
+    htmlContext? : string,
 };
 
 class DataEnvironment {
     parent : DataEnvironment | null;
     dbstate : HibikiState;
     data : any;
-    specials : {[e : string] : any};
-    handlers : {[e : string] : {handlerStr: string, parentEnv: boolean}};
+    specials : Record<string, any>;
+    handlers : Record<string, HandlerValType>;
     onlySpecials : boolean;
-    componentRoot : {[e : string] : any};
+    componentRoot : Record<string, any>;
     htmlContext : string;
     description : string;
 
@@ -49,6 +56,7 @@ class DataEnvironment {
             this.componentRoot = opts.componentRoot;
             this.description = opts.description;
             this.handlers = opts.handlers || {};
+            this.htmlContext = opts.htmlContext;
         }
     }
 
@@ -60,6 +68,28 @@ class DataEnvironment {
             return "none";
         }
         return this.parent.getHtmlContext();
+    }
+
+    getFullHtmlContext() : string {
+        let env : DataEnvironment = this;
+        let rtn = "";
+        while (env != null) {
+            if (env.htmlContext != null) {
+                if (rtn == "") {
+                    rtn = env.htmlContext;
+                }
+                else {
+                    if (env.htmlContext != "<root>") {
+                        rtn = env.htmlContext + " | " + rtn;
+                    }
+                }
+            }
+            env = env.parent;
+        }
+        if (rtn == "") {
+            return "<unknown>";
+        }
+        return rtn;
     }
 
     getRootDataEnv() : DataEnvironment {
@@ -171,6 +201,39 @@ class DataEnvironment {
             Object.assign(rtn, stack[i]);
         }
         return rtn;
+    }
+
+    printStack() {
+        let jsonSpecials = DataCtx.JsonStringify(this.specials);
+        console.log("DE", this.htmlContext, jsonSpecials.substr(0, 50));
+        if (this.parent != null) {
+            this.parent.printStack();
+        }
+    }
+
+    bubbleEvent(event : string, datacontext : Record<string,any>, rtctx : RtContext) : Promise<any> {
+        if (!(event in this.handlers)) {
+            if (this.parent == null) {
+                this.dbstate.unhandledEvent(event, datacontext, rtctx);
+                return;
+            }
+            this.parent.bubbleEvent(event, datacontext, rtctx);
+            return;
+        }
+        let hval = this.handlers[event];
+        let env : DataEnvironment = this;
+        if (hval.parentEnv && this.parent != null) {
+            env = this.parent;
+        }
+        let htmlContext = sprintf("bubble(%s)", event);
+        let bubbleEnv = env.makeSpecialChildEnv(datacontext, {htmlContext: htmlContext});
+        let tcfBlock : TCFBlock = {block: null};
+        return null;
+        
+        // rtctx.pushContext(sprintf("Parsing <%s>:%s (in %s)", bubbleEnv.htmlContext, event, bubbleEnv.getHtmlContext()));
+        // tcfBlock.block = ParseBlockThrow(hval.handler);
+        // rtctx.popContext();
+        // return ExecuteBlockP(tcfBlock, bubbleEnv, rtctx, false);
     }
 
     getHandlerAndEnv(handlerName : string) : {handler: string, dataenv: DataEnvironment} {
@@ -597,8 +660,12 @@ class HibikiState {
         return !this.Config.noWelcomeMessage;
     }
 
+    unhandledEvent(event : string, datacontext : Record<string, any>, rtctx : RtContext) {
+        console.log("unhandled event", event, datacontext, rtctx);
+    }
+
     rootDataenv() : DataEnvironment {
-        return new DataEnvironment(this, null, {description: "root"});
+        return new DataEnvironment(this, null, {htmlContext: "<root>"});
     }
 
     @mobx.action fireScriptsLoaded() {
@@ -711,7 +778,8 @@ class HibikiState {
         if (dataenv == null) {
             dataenv = this.rootDataenv();
         }
-        let contextDataenv = dataenv.makeSpecialChildEnv({params: handlerData});
+        let htmlContext = sprintf("@local:%s", handlerHtml.attrs.name)
+        let contextDataenv = dataenv.makeSpecialChildEnv({params: handlerData}, {htmlContext: htmlContext});
         rtctx.pushContext(sprintf("Running @local handler '%s'", handlerHtml.attrs.name));
         let p = DataCtx.ParseAndExecuteBlock(handlerText, null, contextDataenv, rtctx);
         return p;

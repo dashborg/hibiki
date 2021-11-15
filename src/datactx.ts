@@ -592,7 +592,8 @@ function internalResolvePath(path : PathType, irData : any, dataenv : DataEnviro
 
 function resolveDynfind(arr : any[], expr : any, dataenv : DataEnvironment) : number {
     for (let i=0; i<arr.length; i++) {
-        let childEnv = dataenv.makeChildEnv(arr[i], {"index": i});
+        let htmlContext = sprintf("dynfind[%d]", i);
+        let childEnv = dataenv.makeChildEnv(arr[i], {"index": i}, {htmlContext: htmlContext});
         let e1 = evalExprAst(expr, childEnv);
         if (!!e1) {
             return i;
@@ -1673,7 +1674,8 @@ let ExecuteStmtRaw = function ExecuteStmtRaw(stmtAst : Statement, dataenv : Data
         if (stmtAst.context != null) {
             context = evalExprAst(stmtAst.context, dataenv);
         }
-        let fireEnv = target.dataenv.makeSpecialChildEnv(context);
+        let htmlContext = sprintf("fire(%s)", event);
+        let fireEnv = target.dataenv.makeSpecialChildEnv(context, {htmlContext: htmlContext});
         let blockStr = target.attrs[event];
         if (blockStr == null || blockStr == "" || blockStr == "1") {
             return null;
@@ -1710,7 +1712,8 @@ let ExecuteStmtRaw = function ExecuteStmtRaw(stmtAst : Statement, dataenv : Data
             return null;
         }
         rtctx.replaceContext(sprintf("bubble event %s from [%s] caught in [%s]", event, dataenv.getHtmlContext(), hval.dataenv.getHtmlContext()));
-        let bubbleEnv = hval.dataenv.makeSpecialChildEnv(context);
+        let htmlContext = sprintf("bubble(%s)", event);
+        let bubbleEnv = hval.dataenv.makeSpecialChildEnv(context, {htmlContext: htmlContext});
         let tcfBlock : TCFBlock = {block: null};
         rtctx.pushContext(sprintf("Parsing <%s>:%s (in %s)", dataenv.htmlContext, event, hval.dataenv.getHtmlContext()));
         tcfBlock.block = ParseBlockThrow(hval.handler);
@@ -1720,6 +1723,7 @@ let ExecuteStmtRaw = function ExecuteStmtRaw(stmtAst : Statement, dataenv : Data
     if (stmtAst.stmt == "log") {
         let exprs = demobx(evalExprArray(stmtAst.exprs, dataenv));
         console.log("hibiki-log", ...exprs);
+        console.log("hibiki-log htmlcontext: ", dataenv.getFullHtmlContext());
         return null;
     }
     if (stmtAst.stmt == "alert") {
@@ -1831,7 +1835,8 @@ function ExecuteBlockP(block : TCFBlock, dataenv : DataEnvironment, rtctx : RtCo
     if (block.catchBlock != null) {
         prtn = prtn.catch((e) => {
             let errorObj = makeErrorObj(e, rtctx);
-            let errorEnv = dataenv.makeSpecialChildEnv({error: errorObj});
+            let htmlContext = "errorhandler";
+            let errorEnv = dataenv.makeSpecialChildEnv({error: errorObj}, {htmlContext: htmlContext});
             rtctx.pushContext(block.contextStr || "error handler");
             let ep = ExecuteBlockPThrow(block.catchBlock, errorEnv, rtctx);
             return ep;
@@ -1864,10 +1869,10 @@ function CreateContextThrow(block : any,  dataenv : DataEnvironment, rtContext? 
     return dataenv.specials;
 }
 
-function ParseAndCreateContextThrow(ctxStr : string, dataenv : DataEnvironment, rtContextStr? : string) : DataEnvironment {
-    let ctxDataenv = dataenv.makeSpecialChildEnv({});
+function ParseAndCreateContextThrow(ctxStr : string, dataenv : DataEnvironment, htmlContext : string) : DataEnvironment {
+    let ctxDataenv = dataenv.makeSpecialChildEnv({}, {htmlContext: htmlContext});
     let block = ParseBlockThrow(ctxStr);
-    CreateContextThrow(block, ctxDataenv, rtContextStr);
+    CreateContextThrow(block, ctxDataenv, htmlContext);
     return ctxDataenv;
 }
 
