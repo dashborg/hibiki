@@ -7,6 +7,8 @@ import {boundMethod} from 'autobind-decorator'
 import {ParseAndExecuteBlock} from "./datactx";
 import {HibikiNode} from "./types";
 import debounce from "lodash/debounce";
+import * as NodeUtils from "./nodeutils";
+import {RtContext} from "./error";
 
 let NODASHELEM = {
     "tr": true,
@@ -217,51 +219,43 @@ class DBCtx {
         this.dataenv.setDataPath(path, value);
     }
 
-    @boundMethod handleOnX(xval : string, val? : any) {
+    @boundMethod handleEvent(event : string, val? : any) {
         if (this.isEditMode()) {
             return false;
         }
-        let handler = this.resolveAttr(xval);
-        if (handler == null) {
-            return false;
-        }
-        let context = null;
+        let handlers = NodeUtils.makeHandlers(this.node);
+        let datacontext = null;
         if (val != null) {
-            context = {"value": val};
+            datacontext = {"value": val};
         }
-        let htmlContext = sprintf("<%s>:%s", this.node.tag, xval);
-        let execDataenv = this.dataenv.makeSpecialChildEnv(context, {htmlContext: htmlContext});
-        let rtContext = sprintf("<%s>:%s (in %s)", this.node.tag, xval, execDataenv.getHtmlContext());
-        let errorBlock = null;
-        let errorHandler = (xval == "onerrorhandler" ? null : this.resolveAttr("onerrorhandler"));
-        if (errorHandler) {
-            let errorContext = sprintf("Error handler <%s>:onerrorhandler (in %s)", this.node.tag, execDataenv.getHtmlContext());
-            errorBlock = {blockStr: errorHandler, contextStr: errorContext};
-        }
-        ParseAndExecuteBlock(handler, errorBlock, execDataenv, rtContext);
+        let htmlContext = sprintf("<%s>", this.node.tag);
+        let envOpts = {
+            htmlContext: htmlContext,
+            handlers: handlers,
+            eventBoundary: "hard",
+        };
+        let execDataenv = this.dataenv.makeSpecialChildEnv(null, envOpts);
+        let rtctx = new RtContext();
+        rtctx.pushContext(sprintf("event <%s>:*%s (in %s)", this.node.tag, event, this.dataenv.getHtmlContext()));
+        execDataenv.fireEvent({event: event, bubble: false, datacontext: datacontext}, rtctx);
         return false;
     }
 
     @boundMethod handleOnSubmit(e : any) {
         console.log("running handleonsubmit", this);
         e.preventDefault();
-        return this.handleOnX("onsubmithandler");
+        return this.handleEvent("submit");
     }
 
     @boundMethod handleOnClick(e : any) {
         if (e != null) {
             e.preventDefault();
         }
-        this.handleOnX("onclickhandler");
-        this.handleOnX("handler");
+        this.handleEvent("click");
     }
 
     @boundMethod handleOnChange(newVal : any) {
-        return this.handleOnX("onchangehandler", newVal);
-    }
-
-    @boundMethod runHandler() {
-        return this.handleOnX("handler");
+        return this.handleEvent("change", newVal);
     }
 
     getNodeLValueRoot() : DataCtx.LValue {

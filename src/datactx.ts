@@ -1652,78 +1652,30 @@ let ExecuteStmtRaw = function ExecuteStmtRaw(stmtAst : Statement, dataenv : Data
         }
         return null;
     }
-    if (stmtAst.stmt == "fire") {
-        let target = evalExprAst(stmtAst.target, dataenv);
-        if (target == null) {
-            return null;
-        }
+    if (stmtAst.stmt == "bubble" || stmtAst.stmt == "fire") {
         let event = evalExprAst(stmtAst.event, dataenv);
         if (event == null || event == "") {
-            return null;
-        }
-        if (target == null || !target.tag || target._type != "HibikiNode") {
-            throw sprintf("Invalid target in 'fire' statement");
-        }
-        if (!event.endsWith("handler")) {
-            event = event + "handler";
-        }
-        if (target.attrs == null || target.attrs[event] == null || target.attrs[event] == "") {
             return null;
         }
         let context = null;
         if (stmtAst.context != null) {
             context = evalExprAst(stmtAst.context, dataenv);
         }
-        let htmlContext = sprintf("fire(%s)", event);
-        let fireEnv = target.dataenv.makeSpecialChildEnv(context, {htmlContext: htmlContext});
-        let blockStr = target.attrs[event];
-        if (blockStr == null || blockStr == "" || blockStr == "1") {
+        let bubble = (stmtAst.stmt == "bubble");
+        let eventDE = dataenv.getEventBoundary("*");
+        eventDE = (eventDE != null && eventDE.parent != null ? eventDE.parent.getEventBoundary("*") : null);
+        if (eventDE == null) {
+            dataenv.dbstate.unhandledEvent({event: event, datacontext: context, bubble: bubble}, rtctx);
             return null;
         }
-        let errorHandlerBlockStr = (event == "onerrorhandler" ? null : target.attrs["onerrorhandler"]);
-        rtctx.replaceContext(sprintf("Fire <%s>:%s (in %s)", target.tag, event, fireEnv.getHtmlContext()));
-
-        let tcfBlock : TCFBlock = {block: null};
-        rtctx.pushContext(sprintf("Parsing <%s>:%s (in %s)", target.tag, event, fireEnv.getHtmlContext()));
-        tcfBlock.block = ParseBlockThrow(blockStr);
-        rtctx.popContext();
-        if (errorHandlerBlockStr) {
-            rtctx.pushContext(sprintf("Parsing <%s>:onerrorhandler (in %s)", target.tag, fireEnv.getHtmlContext()));
-            tcfBlock.catchBlock = ParseBlockThrow(errorHandlerBlockStr);
-            tcfBlock.contextStr = sprintf("Error Handler <%s>:onerrorhandler (in %s)", target.tag, fireEnv.getHtmlContext());
-            rtctx.popContext();
-        }
-        return ExecuteBlockP(tcfBlock, fireEnv, rtctx, false);
+        return eventDE.fireEvent({event: event, bubble: bubble, datacontext: context}, rtctx);
     }
-    if (stmtAst.stmt == "bubble") {
-        let event = evalExprAst(stmtAst.event, dataenv);
-        if (event == null || event == "") {
-            return null;
-        }
-        if (!event.endsWith("handler")) {
-            event = event + "handler";
-        }
-        let context = null;
-        if (stmtAst.context != null) {
-            context = evalExprAst(stmtAst.context, dataenv);
-        }
-        let hval = dataenv.getHandlerAndEnv(event);
-        if (hval == null) {
-            return null;
-        }
-        rtctx.replaceContext(sprintf("bubble event %s from [%s] caught in [%s]", event, dataenv.getHtmlContext(), hval.dataenv.getHtmlContext()));
-        let htmlContext = sprintf("bubble(%s)", event);
-        let bubbleEnv = hval.dataenv.makeSpecialChildEnv(context, {htmlContext: htmlContext});
-        let tcfBlock : TCFBlock = {block: null};
-        rtctx.pushContext(sprintf("Parsing <%s>:%s (in %s)", dataenv.htmlContext, event, hval.dataenv.getHtmlContext()));
-        tcfBlock.block = ParseBlockThrow(hval.handler);
-        rtctx.popContext();
-        return ExecuteBlockP(tcfBlock, bubbleEnv, rtctx, false);
-    }
-    if (stmtAst.stmt == "log") {
+    if (stmtAst.stmt == "log" || stmtAst.stmt == "debug") {
         let exprs = demobx(evalExprArray(stmtAst.exprs, dataenv));
         console.log("hibiki-log", ...exprs);
-        console.log("hibiki-log htmlcontext: ", dataenv.getFullHtmlContext());
+        if (stmtAst.stmt == "debug") {
+            dataenv.printStack();
+        }
         return null;
     }
     if (stmtAst.stmt == "alert") {
@@ -2033,6 +1985,11 @@ function convertSimpleType(typeName : string, value : string, defaultValue : any
     return value;
 }
 
-export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, ApplySingleRRA, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ParseBlock, ParseBlockThrow, ExecuteBlock, CreateContextThrow, ParseAndExecuteBlock, ObjectSetPath, DeepEqual, BoundValue, ParseLValuePath, ParseLValuePathThrow, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow};
+export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, ApplySingleRRA, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ParseBlock, ParseBlockThrow, ExecuteBlock, CreateContextThrow, ParseAndExecuteBlock, ObjectSetPath, DeepEqual, BoundValue, ParseLValuePath, ParseLValuePathThrow, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, ExecuteBlockP};
 
 export type {PathType};
+
+
+
+
+

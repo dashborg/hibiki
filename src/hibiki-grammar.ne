@@ -48,6 +48,7 @@ let lexer = moo.states({
                         KW_NOP: "nop",
                         KW_BUBBLE: "bubble",
                         KW_LOG: "log",
+                        KW_DEBUG: "debug",
                         KW_ALERT: "alert",
                         KW_EXPR: "expr",
                         KW_LOCAL: "local",
@@ -135,44 +136,15 @@ statement ->
     | fireStatement         {% id %}
     | bubbleStatement       {% id %}
     | logStatement          {% id %}
+    | debugStatement        {% id %}
     | alertStatement        {% id %}
     | exprStatement         {% id %}
     | ifStatement           {% id %}
     | throwStatement        {% id %}
     | reportErrorStatement  {% id %}
-    | switchAppStatement    {% id %}
-    | pushAppStatement      {% id %}
-    | popAppStatement       {% id %}
-    | navToStatement        {% id %}
     | nopStatement          {% id %}
 
-throwStatement -> %KW_THROW fullExpr {% (data) => ({stmt: "throw", expr: data[1]}) %}
-
-switchAppStatement -> %KW_SWITCHAPP %LPAREN fullExpr (%COMMA fullExpr):? %RPAREN {% (data) => {
-        let rtn = {stmt: "switchapp", appexpr: data[2]};
-        if (data[3] != null) {
-            rtn.params = data[3][1];
-        }
-        return rtn;
-    } %}
-
-pushAppStatement -> %KW_PUSHAPP %LPAREN fullExpr (%COMMA fullExpr):? %RPAREN {% (data) => {
-        let rtn = {stmt: "pushapp", appexpr: data[2]};
-        if (data[3] != null) {
-            rtn.params = data[3][1];
-        }
-        return rtn;
-    } %}
-
-popAppStatement -> %KW_POPAPP (%LPAREN %RPAREN):? {% (data) => ({stmt: "popapp"}) %}
-
-navToStatement -> %KW_NAVTO %LPAREN fullExpr (%COMMA fullExpr):? %RPAREN {% (data) => {
-        let rtn = {stmt: "navto", pageexpr: data[2]};
-        if (data[3] != null) {
-            rtn.params = data[3][1];
-        }
-        return rtn;
-    } %}
+throwStatement -> %KW_THROW callParamsSingle {% (data) => ({stmt: "throw", expr: data[1]}) %}
 
 ifStatement -> %KW_IF %LPAREN fullExpr %RPAREN %LBRACE statementBlock %RBRACE (%KW_ELSE %LBRACE statementBlock %RBRACE):? {% (data) => {
         let rtn = {stmt: "if", condExpr: data[2], thenBlock: data[5]};
@@ -220,11 +192,19 @@ kwExprList -> kwExprPart (%COMMA kwExprPart):*   {% (data) => {
           return {etype: "map", exprs: kwExprs};
       } %}
 
-callParams -> 
+callParams2 -> 
       null
     | literalArrayElements
     | kwExprList
     | literalArrayElementsNoComma %COMMA kwExprList
+
+callParams -> %LPAREN literalArrayElements:? %RPAREN {% (data) => data[1] %}
+
+optCallParams -> callParams:? {% (data) => data[0] %}
+
+callParamsSingle -> %LPAREN fullExpr:? %RPAREN {% (data) => data[1] %}
+
+optCallParamsSingle -> callParamsSingle:? {% (data) => data[0] %}
 
 assignmentStatement ->
       lvalue %EQUAL fullExpr {% (data) => {
@@ -233,41 +213,31 @@ assignmentStatement ->
 
 exprStatement -> %KW_EXPR fullExpr {% (data) => ({stmt: "expr", expr: data[1]}) %}
 
-invalidateStatement -> %KW_INVALIDATE literalArrayElements:? {% (data) => ({stmt: "invalidate", exprs: data[1]}) %}
+invalidateStatement -> %KW_INVALIDATE optCallParams {% (data) => {
+        return {stmt: "invalidate", exprs: data[1]};
+    } %}
+
+nopStatement -> %KW_NOP (%LPAREN %RPAREN):? {% (data) => ({stmt: "nop"}) %}
 
 bubbleStatement ->
-    %KW_BUBBLE idOrKeyword (%LPAREN fullExpr:? %RPAREN):? {% (data) => {
-        let rtn = {stmt: "bubble", event: {etype: "literal", val: data[1].value}};
-        if (data[2] != null) {
-            rtn.context = data[2][1];
-        }
+    %KW_BUBBLE %DASHGT idOrKeyword optCallParamsSingle {% (data) => {
+        let rtn = {stmt: "bubble", event: {etype: "literal", val: data[2].value, context: data[3]}};
         return rtn;
     } %}
 
-nopStatement -> %KW_NOP {% (data) => ({stmt: "nop"}) %}
-
-fireStatement -> 
-    %KW_FIRE fullExpr %COMMA fullExpr (%COMMA fullExpr):? {% (data) => {
-        let rtn = {stmt: "fire", target: data[1], event: data[3]};
-        if (data[4] != null) {
-            rtn.context = data[4][1];
-        }
+fireStatement ->
+    %KW_FIRE %DASHGT idOrKeyword optCallParamsSingle {% (data) => {
+        let rtn = {stmt: "fire", event: {etype: "literal", val: data[2].value, context: data[3]}};
         return rtn;
     } %}
 
-  | %KW_FIRE fullExpr %DASHGT idOrKeyword (%LPAREN fullExpr:? %RPAREN):? {% (data) => {
-        let rtn = {stmt: "fire", target: data[1], event: {etype: "literal", val: data[3].value}};
-        if (data[4] != null) {
-            rtn.context = data[4][1];
-        }
-        return rtn;
-    } %}
+logStatement -> %KW_LOG callParams {% (data) => ({stmt: "log", exprs: data[1]}) %}
 
-logStatement -> %KW_LOG literalArrayElements {% (data) => ({stmt: "log", exprs: data[1]}) %}
+logStatement -> %KW_DEBUG callParams {% (data) => ({stmt: "debug", exprs: data[1]}) %}
 
-alertStatement -> %KW_ALERT literalArrayElements {% (data) => ({stmt: "alert", exprs: data[1]}) %}
+alertStatement -> %KW_ALERT callParams {% (data) => ({stmt: "alert", exprs: data[1]}) %}
 
-reportErrorStatement -> %KW_REPORTERROR fullExpr {% (data) => {
+reportErrorStatement -> %KW_REPORTERROR callParamsSingle {% (data) => {
         return {stmt: "reporterror", expr: data[1]};
     } %}
 
@@ -485,6 +455,7 @@ idOrKeyword ->
     | %KW_NOP    {% id %}
     | %KW_BUBBLE {% id %}
     | %KW_LOG    {% id %}
+    | %KW_DEBUG  {% id %}
     | %KW_ALERT  {% id %}
     | %KW_EXPR   {% id %}
     | %KW_LOCAL  {% id %}

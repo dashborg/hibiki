@@ -23,6 +23,17 @@ type RequestType = {
     pure : boolean,
 };
 
+type EventType = {
+    event : string,
+    bubble : boolean,
+    datacontext : Record<string, any>;
+};
+
+type HandlerValType = {
+    handlerStr : string,
+    node : HibikiNode,
+};
+
 type HibikiAction = {
     type          : string,   // "setdata", "invalidate", "html", "error", "blob", "blobext"
     ts?           : number,
@@ -145,4 +156,4 @@ interface HibikiExtState {
     setHtmlPage(htmlPage : string);
 };
 
-export type {HibikiNode, HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, TCFBlock, StmtBlock, Statement, ExprType, DataCtxErrorObjType, ComponentType, LibraryType, HandlerPathObj, RequestType, Hibiki, HibikiAction, HibikiExtState};
+export type {HibikiNode, HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, TCFBlock, StmtBlock, Statement, ExprType, DataCtxErrorObjType, ComponentType, LibraryType, HandlerPathObj, RequestType, Hibiki, HibikiAction, HibikiExtState, EventType, HandlerValType};

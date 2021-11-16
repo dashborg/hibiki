@@ -249,11 +249,11 @@ function textContent(node : HibikiNode) : string {
 }
 
 function deepTextContent(node : HibikiNode) : string {
-    if (node == null || node.list == null) {
-        return "";
-    }
     if (node.tag == "#text") {
         return node.text;
+    }
+    if (node == null || node.list == null) {
+        return "";
     }
     let rtn = "";
     for (let sn of node.list) {

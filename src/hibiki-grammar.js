@@ -52,6 +52,7 @@ let lexer = moo.states({
                         KW_NOP: "nop",
                         KW_BUBBLE: "bubble",
                         KW_LOG: "log",
+                        KW_DEBUG: "debug",
                         KW_ALERT: "alert",
                         KW_EXPR: "expr",
                         KW_LOCAL: "local",
@@ -140,51 +141,14 @@ var grammar = {
     {"name": "statement", "symbols": ["fireStatement"], "postprocess": id},
     {"name": "statement", "symbols": ["bubbleStatement"], "postprocess": id},
     {"name": "statement", "symbols": ["logStatement"], "postprocess": id},
+    {"name": "statement", "symbols": ["debugStatement"], "postprocess": id},
     {"name": "statement", "symbols": ["alertStatement"], "postprocess": id},
     {"name": "statement", "symbols": ["exprStatement"], "postprocess": id},
     {"name": "statement", "symbols": ["ifStatement"], "postprocess": id},
     {"name": "statement", "symbols": ["throwStatement"], "postprocess": id},
     {"name": "statement", "symbols": ["reportErrorStatement"], "postprocess": id},
-    {"name": "statement", "symbols": ["switchAppStatement"], "postprocess": id},
-    {"name": "statement", "symbols": ["pushAppStatement"], "postprocess": id},
-    {"name": "statement", "symbols": ["popAppStatement"], "postprocess": id},
-    {"name": "statement", "symbols": ["navToStatement"], "postprocess": id},
     {"name": "statement", "symbols": ["nopStatement"], "postprocess": id},
-    {"name": "throwStatement", "symbols": [(lexer.has("KW_THROW") ? {type: "KW_THROW"} : KW_THROW), "fullExpr"], "postprocess": (data) => ({stmt: "throw", expr: data[1]})},
-    {"name": "switchAppStatement$ebnf$1$subexpression$1", "symbols": [(lexer.has("COMMA") ? {type: "COMMA"} : COMMA), "fullExpr"]},
-    {"name": "switchAppStatement$ebnf$1", "symbols": ["switchAppStatement$ebnf$1$subexpression$1"], "postprocess": id},
-    {"name": "switchAppStatement$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
-    {"name": "switchAppStatement", "symbols": [(lexer.has("KW_SWITCHAPP") ? {type: "KW_SWITCHAPP"} : KW_SWITCHAPP), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "fullExpr", "switchAppStatement$ebnf$1", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess":  (data) => {
-            let rtn = {stmt: "switchapp", appexpr: data[2]};
-            if (data[3] != null) {
-                rtn.params = data[3][1];
-            }
-            return rtn;
-        } },
-    {"name": "pushAppStatement$ebnf$1$subexpression$1", "symbols": [(lexer.has("COMMA") ? {type: "COMMA"} : COMMA), "fullExpr"]},
-    {"name": "pushAppStatement$ebnf$1", "symbols": ["pushAppStatement$ebnf$1$subexpression$1"], "postprocess": id},
-    {"name": "pushAppStatement$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
-    {"name": "pushAppStatement", "symbols": [(lexer.has("KW_PUSHAPP") ? {type: "KW_PUSHAPP"} : KW_PUSHAPP), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "fullExpr", "pushAppStatement$ebnf$1", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess":  (data) => {
-            let rtn = {stmt: "pushapp", appexpr: data[2]};
-            if (data[3] != null) {
-                rtn.params = data[3][1];
-            }
-            return rtn;
-        } },
-    {"name": "popAppStatement$ebnf$1$subexpression$1", "symbols": [(lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)]},
-    {"name": "popAppStatement$ebnf$1", "symbols": ["popAppStatement$ebnf$1$subexpression$1"], "postprocess": id},
-    {"name": "popAppStatement$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
-    {"name": "popAppStatement", "symbols": [(lexer.has("KW_POPAPP") ? {type: "KW_POPAPP"} : KW_POPAPP), "popAppStatement$ebnf$1"], "postprocess": (data) => ({stmt: "popapp"})},
-    {"name": "navToStatement$ebnf$1$subexpression$1", "symbols": [(lexer.has("COMMA") ? {type: "COMMA"} : COMMA), "fullExpr"]},
-    {"name": "navToStatement$ebnf$1", "symbols": ["navToStatement$ebnf$1$subexpression$1"], "postprocess": id},
-    {"name": "navToStatement$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
-    {"name": "navToStatement", "symbols": [(lexer.has("KW_NAVTO") ? {type: "KW_NAVTO"} : KW_NAVTO), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "fullExpr", "navToStatement$ebnf$1", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess":  (data) => {
-            let rtn = {stmt: "navto", pageexpr: data[2]};
-            if (data[3] != null) {
-                rtn.params = data[3][1];
-            }
-            return rtn;
-        } },
+    {"name": "throwStatement", "symbols": [(lexer.has("KW_THROW") ? {type: "KW_THROW"} : KW_THROW), "callParamsSingle"], "postprocess": (data) => ({stmt: "throw", expr: data[1]})},
     {"name": "ifStatement$ebnf$1$subexpression$1", "symbols": [(lexer.has("KW_ELSE") ? {type: "KW_ELSE"} : KW_ELSE), (lexer.has("LBRACE") ? {type: "LBRACE"} : LBRACE), "statementBlock", (lexer.has("RBRACE") ? {type: "RBRACE"} : RBRACE)]},
     {"name": "ifStatement$ebnf$1", "symbols": ["ifStatement$ebnf$1$subexpression$1"], "postprocess": id},
     {"name": "ifStatement$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
@@ -241,55 +205,45 @@ var grammar = {
             kwExprs.push(...data[1].map((v) => v[1]));
             return {etype: "map", exprs: kwExprs};
         } },
-    {"name": "callParams", "symbols": []},
-    {"name": "callParams", "symbols": ["literalArrayElements"]},
-    {"name": "callParams", "symbols": ["kwExprList"]},
-    {"name": "callParams", "symbols": ["literalArrayElementsNoComma", (lexer.has("COMMA") ? {type: "COMMA"} : COMMA), "kwExprList"]},
+    {"name": "callParams2", "symbols": []},
+    {"name": "callParams2", "symbols": ["literalArrayElements"]},
+    {"name": "callParams2", "symbols": ["kwExprList"]},
+    {"name": "callParams2", "symbols": ["literalArrayElementsNoComma", (lexer.has("COMMA") ? {type: "COMMA"} : COMMA), "kwExprList"]},
+    {"name": "callParams$ebnf$1", "symbols": ["literalArrayElements"], "postprocess": id},
+    {"name": "callParams$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
+    {"name": "callParams", "symbols": [(lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "callParams$ebnf$1", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => data[1]},
+    {"name": "optCallParams$ebnf$1", "symbols": ["callParams"], "postprocess": id},
+    {"name": "optCallParams$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
+    {"name": "optCallParams", "symbols": ["optCallParams$ebnf$1"], "postprocess": (data) => data[0]},
+    {"name": "callParamsSingle$ebnf$1", "symbols": ["fullExpr"], "postprocess": id},
+    {"name": "callParamsSingle$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
+    {"name": "callParamsSingle", "symbols": [(lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "callParamsSingle$ebnf$1", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => data[1]},
+    {"name": "optCallParamsSingle$ebnf$1", "symbols": ["callParamsSingle"], "postprocess": id},
+    {"name": "optCallParamsSingle$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
+    {"name": "optCallParamsSingle", "symbols": ["optCallParamsSingle$ebnf$1"], "postprocess": (data) => data[0]},
     {"name": "assignmentStatement", "symbols": ["lvalue", (lexer.has("EQUAL") ? {type: "EQUAL"} : EQUAL), "fullExpr"], "postprocess":  (data) => {
             return {stmt: "assign", lvalue: data[0][1], setop: data[0][0], expr: data[2]};
         } },
     {"name": "exprStatement", "symbols": [(lexer.has("KW_EXPR") ? {type: "KW_EXPR"} : KW_EXPR), "fullExpr"], "postprocess": (data) => ({stmt: "expr", expr: data[1]})},
-    {"name": "invalidateStatement$ebnf$1", "symbols": ["literalArrayElements"], "postprocess": id},
-    {"name": "invalidateStatement$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
-    {"name": "invalidateStatement", "symbols": [(lexer.has("KW_INVALIDATE") ? {type: "KW_INVALIDATE"} : KW_INVALIDATE), "invalidateStatement$ebnf$1"], "postprocess": (data) => ({stmt: "invalidate", exprs: data[1]})},
-    {"name": "bubbleStatement$ebnf$1$subexpression$1$ebnf$1", "symbols": ["fullExpr"], "postprocess": id},
-    {"name": "bubbleStatement$ebnf$1$subexpression$1$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
-    {"name": "bubbleStatement$ebnf$1$subexpression$1", "symbols": [(lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "bubbleStatement$ebnf$1$subexpression$1$ebnf$1", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)]},
-    {"name": "bubbleStatement$ebnf$1", "symbols": ["bubbleStatement$ebnf$1$subexpression$1"], "postprocess": id},
-    {"name": "bubbleStatement$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
-    {"name": "bubbleStatement", "symbols": [(lexer.has("KW_BUBBLE") ? {type: "KW_BUBBLE"} : KW_BUBBLE), "idOrKeyword", "bubbleStatement$ebnf$1"], "postprocess":  (data) => {
-            let rtn = {stmt: "bubble", event: {etype: "literal", val: data[1].value}};
-            if (data[2] != null) {
-                rtn.context = data[2][1];
-            }
+    {"name": "invalidateStatement", "symbols": [(lexer.has("KW_INVALIDATE") ? {type: "KW_INVALIDATE"} : KW_INVALIDATE), "optCallParams"], "postprocess":  (data) => {
+            return {stmt: "invalidate", exprs: data[1]};
+        } },
+    {"name": "nopStatement$ebnf$1$subexpression$1", "symbols": [(lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)]},
+    {"name": "nopStatement$ebnf$1", "symbols": ["nopStatement$ebnf$1$subexpression$1"], "postprocess": id},
+    {"name": "nopStatement$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
+    {"name": "nopStatement", "symbols": [(lexer.has("KW_NOP") ? {type: "KW_NOP"} : KW_NOP), "nopStatement$ebnf$1"], "postprocess": (data) => ({stmt: "nop"})},
+    {"name": "bubbleStatement", "symbols": [(lexer.has("KW_BUBBLE") ? {type: "KW_BUBBLE"} : KW_BUBBLE), (lexer.has("DASHGT") ? {type: "DASHGT"} : DASHGT), "idOrKeyword", "optCallParamsSingle"], "postprocess":  (data) => {
+            let rtn = {stmt: "bubble", event: {etype: "literal", val: data[2].value, context: data[3]}};
             return rtn;
         } },
-    {"name": "nopStatement", "symbols": [(lexer.has("KW_NOP") ? {type: "KW_NOP"} : KW_NOP)], "postprocess": (data) => ({stmt: "nop"})},
-    {"name": "fireStatement$ebnf$1$subexpression$1", "symbols": [(lexer.has("COMMA") ? {type: "COMMA"} : COMMA), "fullExpr"]},
-    {"name": "fireStatement$ebnf$1", "symbols": ["fireStatement$ebnf$1$subexpression$1"], "postprocess": id},
-    {"name": "fireStatement$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
-    {"name": "fireStatement", "symbols": [(lexer.has("KW_FIRE") ? {type: "KW_FIRE"} : KW_FIRE), "fullExpr", (lexer.has("COMMA") ? {type: "COMMA"} : COMMA), "fullExpr", "fireStatement$ebnf$1"], "postprocess":  (data) => {
-            let rtn = {stmt: "fire", target: data[1], event: data[3]};
-            if (data[4] != null) {
-                rtn.context = data[4][1];
-            }
+    {"name": "fireStatement", "symbols": [(lexer.has("KW_FIRE") ? {type: "KW_FIRE"} : KW_FIRE), (lexer.has("DASHGT") ? {type: "DASHGT"} : DASHGT), "idOrKeyword", "optCallParamsSingle"], "postprocess":  (data) => {
+            let rtn = {stmt: "fire", event: {etype: "literal", val: data[2].value, context: data[3]}};
             return rtn;
         } },
-    {"name": "fireStatement$ebnf$2$subexpression$1$ebnf$1", "symbols": ["fullExpr"], "postprocess": id},
-    {"name": "fireStatement$ebnf$2$subexpression$1$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
-    {"name": "fireStatement$ebnf$2$subexpression$1", "symbols": [(lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "fireStatement$ebnf$2$subexpression$1$ebnf$1", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)]},
-    {"name": "fireStatement$ebnf$2", "symbols": ["fireStatement$ebnf$2$subexpression$1"], "postprocess": id},
-    {"name": "fireStatement$ebnf$2", "symbols": [], "postprocess": function(d) {return null;}},
-    {"name": "fireStatement", "symbols": [(lexer.has("KW_FIRE") ? {type: "KW_FIRE"} : KW_FIRE), "fullExpr", (lexer.has("DASHGT") ? {type: "DASHGT"} : DASHGT), "idOrKeyword", "fireStatement$ebnf$2"], "postprocess":  (data) => {
-            let rtn = {stmt: "fire", target: data[1], event: {etype: "literal", val: data[3].value}};
-            if (data[4] != null) {
-                rtn.context = data[4][1];
-            }
-            return rtn;
-        } },
-    {"name": "logStatement", "symbols": [(lexer.has("KW_LOG") ? {type: "KW_LOG"} : KW_LOG), "literalArrayElements"], "postprocess": (data) => ({stmt: "log", exprs: data[1]})},
-    {"name": "alertStatement", "symbols": [(lexer.has("KW_ALERT") ? {type: "KW_ALERT"} : KW_ALERT), "literalArrayElements"], "postprocess": (data) => ({stmt: "alert", exprs: data[1]})},
-    {"name": "reportErrorStatement", "symbols": [(lexer.has("KW_REPORTERROR") ? {type: "KW_REPORTERROR"} : KW_REPORTERROR), "fullExpr"], "postprocess":  (data) => {
+    {"name": "logStatement", "symbols": [(lexer.has("KW_LOG") ? {type: "KW_LOG"} : KW_LOG), "callParams"], "postprocess": (data) => ({stmt: "log", exprs: data[1]})},
+    {"name": "logStatement", "symbols": [(lexer.has("KW_DEBUG") ? {type: "KW_DEBUG"} : KW_DEBUG), "callParams"], "postprocess": (data) => ({stmt: "debug", exprs: data[1]})},
+    {"name": "alertStatement", "symbols": [(lexer.has("KW_ALERT") ? {type: "KW_ALERT"} : KW_ALERT), "callParams"], "postprocess": (data) => ({stmt: "alert", exprs: data[1]})},
+    {"name": "reportErrorStatement", "symbols": [(lexer.has("KW_REPORTERROR") ? {type: "KW_REPORTERROR"} : KW_REPORTERROR), "callParamsSingle"], "postprocess":  (data) => {
             return {stmt: "reporterror", expr: data[1]};
         } },
     {"name": "lvalue$ebnf$1$subexpression$1", "symbols": ["idOrKeyword", (lexer.has("COLON") ? {type: "COLON"} : COLON)]},
@@ -481,6 +435,7 @@ var grammar = {
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_NOP") ? {type: "KW_NOP"} : KW_NOP)], "postprocess": id},
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_BUBBLE") ? {type: "KW_BUBBLE"} : KW_BUBBLE)], "postprocess": id},
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_LOG") ? {type: "KW_LOG"} : KW_LOG)], "postprocess": id},
+    {"name": "idOrKeyword", "symbols": [(lexer.has("KW_DEBUG") ? {type: "KW_DEBUG"} : KW_DEBUG)], "postprocess": id},
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_ALERT") ? {type: "KW_ALERT"} : KW_ALERT)], "postprocess": id},
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_EXPR") ? {type: "KW_EXPR"} : KW_EXPR)], "postprocess": id},
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_LOCAL") ? {type: "KW_LOCAL"} : KW_LOCAL)], "postprocess": id},

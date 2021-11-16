@@ -4,7 +4,7 @@ import Axios from "axios";
 import {sprintf} from "sprintf-js";
 import {boundMethod} from 'autobind-decorator'
 import {v4 as uuidv4} from 'uuid';
-import {HibikiNode, ComponentType, LibraryType, HandlerPathObj, HibikiConfig, HibikiHandlerModule, RequestType, HibikiAction, TCFBlock} from "./types";
+import {HibikiNode, ComponentType, LibraryType, HandlerPathObj, HibikiConfig, HibikiHandlerModule, RequestType, HibikiAction, TCFBlock, EventType, HandlerValType} from "./types";
 import * as DataCtx from "./datactx";
 import {isObject, textContent, SYM_PROXY, SYM_FLATTEN} from "./utils";
 import {RtContext} from "./error";
@@ -14,6 +14,16 @@ import {parseHtml} from "./html-parser";
 
 let VALID_METHODS = {"GET": true, "POST": true, "PUT": true, "PATCH": true, "DELETE": true};
 
+function eventBubbles(event : string) : boolean {
+    if (event == "load") {
+        return false;
+    }
+    if (event.startsWith("x")) {
+        return false;
+    }
+    return true;
+}
+
 function unbox(data : any) : any {
     if (mobx.isBoxedObservable(data)) {
         return data.get();
@@ -21,17 +31,12 @@ function unbox(data : any) : any {
     return data;
 }
 
-type HandlerValType = {
-    handlerStr : string,
-    parentEnv: boolean,
-    node : HibikiNode,
-};
-
 type DataEnvironmentOpts = {
     componentRoot? : {[e : string] : any},
     description? : string,
     handlers? : Record<string, HandlerValType>,
     htmlContext? : string,
+    eventBoundary? : string, // "soft" | "hard",
 };
 
 class DataEnvironment {
@@ -44,6 +49,7 @@ class DataEnvironment {
     componentRoot : Record<string, any>;
     htmlContext : string;
     description : string;
+    eventBoundary : "soft" | "hard";
 
     constructor(dbstate : HibikiState, data : any, opts? : DataEnvironmentOpts) {
         this.parent = null;
@@ -52,11 +58,15 @@ class DataEnvironment {
         this.specials = {};
         this.handlers = {};
         this.onlySpecials = false;
+        this.eventBoundary = null;
         if (opts != null) {
             this.componentRoot = opts.componentRoot;
             this.description = opts.description;
             this.handlers = opts.handlers || {};
             this.htmlContext = opts.htmlContext;
+            if (opts.eventBoundary == "soft" || opts.eventBoundary == "hard") {
+                this.eventBoundary = opts.eventBoundary;
+            }
         }
     }
 
@@ -205,50 +215,63 @@ class DataEnvironment {
 
     printStack() {
         let jsonSpecials = DataCtx.JsonStringify(this.specials);
-        console.log("DE", this.htmlContext, jsonSpecials.substr(0, 50));
+        let deType = "";
+        if (this.eventBoundary == "hard") {
+            deType = "--|";
+        }
+        else if (this.eventBoundary == "soft") {
+            deType = "-*|";
+        }
+        else {
+            deType = "  |";
+        }
         if (this.parent != null) {
             this.parent.printStack();
         }
+        let hkeysStr = Object.keys(this.handlers).join(",");
+        let specialsStr = Object.keys(this.specials).map((v) => "@" + v).join(",");
+        let stackStr = sprintf("%s %-30s | %-30s | %s", deType, this.htmlContext, specialsStr, hkeysStr);
+        console.log(stackStr);
     }
 
-    bubbleEvent(event : string, datacontext : Record<string,any>, rtctx : RtContext) : Promise<any> {
-        if (!(event in this.handlers)) {
-            if (this.parent == null) {
-                this.dbstate.unhandledEvent(event, datacontext, rtctx);
-                return;
+    // always returns hard
+    // returns soft if event == "*" or env.handlers[event] != null
+    getEventBoundary(event : string) : DataEnvironment {
+        let env : DataEnvironment = this;;
+        while (env != null) {
+            if (env.eventBoundary == "hard") {
+                return env;
             }
-            this.parent.bubbleEvent(event, datacontext, rtctx);
-            return;
+            if (event != null && env.eventBoundary == "soft") {
+                if (event == "*" || env.handlers[event] != null) {
+                    return env;
+                }
+            }
+            env = env.parent;
         }
-        let hval = this.handlers[event];
-        let env : DataEnvironment = this;
-        if (hval.parentEnv && this.parent != null) {
-            env = this.parent;
-        }
-        let htmlContext = sprintf("bubble(%s)", event);
-        let bubbleEnv = env.makeSpecialChildEnv(datacontext, {htmlContext: htmlContext});
-        let tcfBlock : TCFBlock = {block: null};
-        return null;
-        
-        // rtctx.pushContext(sprintf("Parsing <%s>:%s (in %s)", bubbleEnv.htmlContext, event, bubbleEnv.getHtmlContext()));
-        // tcfBlock.block = ParseBlockThrow(hval.handler);
-        // rtctx.popContext();
-        // return ExecuteBlockP(tcfBlock, bubbleEnv, rtctx, false);
+        return env;
     }
 
-    getHandlerAndEnv(handlerName : string) : {handler: string, dataenv: DataEnvironment} {
-        if (handlerName in this.handlers) {
-            let hval = this.handlers[handlerName];
-            let env : DataEnvironment = this;
-            if (hval.parentEnv && this.parent != null) {
-                env = this.parent;
-            }
-            return {handler: hval.handlerStr, dataenv: env};
-        }
-        if (this.parent == null) {
+    fireEvent(event : EventType, rtctx : RtContext) : Promise<any> {
+        let env = this.getEventBoundary(event.event);
+        if (env == null) {
             return null;
         }
-        return this.parent.getHandlerAndEnv(handlerName);
+        if (!(event.event in env.handlers)) {
+            if (!event.bubble || env.parent == null) {
+                return null;
+            }
+            return env.parent.fireEvent(event, rtctx);
+        }
+        let hval = env.handlers[event.event];
+        let htmlContext = sprintf("event%s(%s)", (event.bubble ? "-bubble" : ""), event.event);
+        let eventEnv = env.makeSpecialChildEnv(event.datacontext, {htmlContext: htmlContext});
+        let tcfBlock : TCFBlock = {block: null};
+        let ctxStr = sprintf("Parsing <%s>:%s.handler (in [[%s]])", hval.node.tag, event.event, env.getFullHtmlContext());
+        rtctx.pushContext(ctxStr);
+        tcfBlock.block = DataCtx.ParseBlockThrow(hval.handlerStr);
+        rtctx.popContext();
+        return DataCtx.ExecuteBlockP(tcfBlock, eventEnv, rtctx, false);;
     }
 
     getContextKey(contextkey : string) : any {
@@ -660,8 +683,8 @@ class HibikiState {
         return !this.Config.noWelcomeMessage;
     }
 
-    unhandledEvent(event : string, datacontext : Record<string, any>, rtctx : RtContext) {
-        console.log("unhandled event", event, datacontext, rtctx);
+    unhandledEvent(event : EventType, rtctx : RtContext) {
+        console.log("unhandled event", event.event, rtctx);
     }
 
     rootDataenv() : DataEnvironment {

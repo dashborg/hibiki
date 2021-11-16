@@ -1,7 +1,7 @@
 import * as mobx from "mobx";
 
 import {DBCtx} from "./dbctx";
-import type {HibikiNode} from "./types";
+import type {HibikiNode, HandlerValType} from "./types";
 import * as DataCtx from "./datactx";
 import {sprintf} from "sprintf-js";
 import {isObject} from "./utils";
@@ -52,11 +52,6 @@ let INLINE_ELEMS = {
     "time": true,
     "tt": true,
     "var": true,
-};
-
-let HANDLER_ELEMS = {
-    "button": "onClick",
-    "a": "onClick",
 };
 
 let SUBMIT_ELEMS = {
@@ -428,4 +423,22 @@ function automerge(ctx : DBCtx, automergeAttrs : AutoMergeAttrsType, subName : s
     }
 }
 
-export {BLOCKED_ELEMS, INLINE_ELEMS, HANDLER_ELEMS, SUBMIT_ELEMS, ONCHANGE_ELEMS, BINDVALUE_ONCHANGE_ELEMS, GETVALUE_ELEMS, renderTextSpan, renderTextData, makeNodeVar, makeChildrenVar, parseArgsDecl, makeIterator, getKV, parseAutomerge, handleConvertType, automerge};
+function makeHandlers(node : HibikiNode) : Record<string, HandlerValType> {
+    let handlers = {};
+    if (node.attrs == null) {
+        return handlers;
+    }
+    for (let key in node.attrs) {
+        if (key == "handler" || key.endsWith(".handler")) {
+            let eventName = key.replace(/\.handler$/, "");
+            handlers[eventName] = {handlerStr: node.attrs[key], node: node};
+        }
+        else if (key == "onclickhandler") {
+            console.log("WARNING: old onclickhandler parsed");
+            handlers["click"] = {handlerStr: node.attrs[key], node: node};
+        }
+    }
+    return handlers;
+}
+
+export {BLOCKED_ELEMS, INLINE_ELEMS, SUBMIT_ELEMS, ONCHANGE_ELEMS, BINDVALUE_ONCHANGE_ELEMS, GETVALUE_ELEMS, renderTextSpan, renderTextData, makeNodeVar, makeChildrenVar, parseArgsDecl, makeIterator, getKV, parseAutomerge, handleConvertType, automerge, makeHandlers};

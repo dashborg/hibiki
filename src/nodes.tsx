@@ -62,7 +62,7 @@ class HibikiRootNode extends React.Component<{state : HibikiExtState}, {}> {
         let state = this.getState();
         let rde = state.rootDataenv();
         let htmlContext = sprintf("<page %s>", state.HtmlPage.get());
-        let dataenv = rde.makeChildEnv(null, null, {htmlContext: htmlContext});
+        let dataenv = rde.makeChildEnv(null, null, {htmlContext: htmlContext, eventBoundary: "hard"});
         return dataenv;
     }
     
@@ -96,7 +96,7 @@ class HibikiRootNode extends React.Component<{state : HibikiExtState}, {}> {
         let dataenv = this.getDataenv();
         let ctx = new DBCtx(null, node, dataenv);
         setTimeout(() => ctx.dataenv.dbstate.fireScriptsLoaded(), 1);
-        ctx.handleOnX("onloadhandler");
+        ctx.handleEvent("load");
     }
 
     componentDidMount() {
@@ -206,12 +206,14 @@ function baseRenderHtmlChildren(list : HibikiNode[], dataenv : DataEnvironment) 
                 rtn.push(<ErrorMsg message={"<define-handler> no name attribute"}/>);
                 continue;
             }
-            if (dataenv.handlers[attrs.name] != null) {
-                rtn.push(<ErrorMsg message={"<define-handler> cannot redefine handler.  handlers are scoped to the nearest <page> or <define-component> tag."}/>);
+            let eventDE = dataenv.getEventBoundary("*");
+            if (eventDE == null) {
+                rtn.push(<ErrorMsg message={"<define-handler> no event boundary"}/>);
                 continue;
             }
             let handlerStr = textContent(child);
-            dataenv.handlers[attrs.name] = {handlerStr: handlerStr, parentEnv: false, node: child};
+            console.log("DEFINE-HANDLER", attrs.name, dataenv.getFullHtmlContext());
+            eventDE.handlers[attrs.name] = {handlerStr: handlerStr, node: child}
             continue;
         }
         else {
@@ -322,9 +324,10 @@ class RawHtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnvi
 
     componentDidMount() {
         let ctx = new DBCtx(this);
-        if (!ctx.isEditMode()) {
-            ctx.dataenv.dbstate.queuePostScriptRunFn(() => ctx.handleOnX("onmounthandler"));
+        if (ctx.isEditMode()) {
+            return;
         }
+        ctx.dataenv.dbstate.queuePostScriptRunFn(() => ctx.handleEvent("mount"));
     }
     
     @boundMethod handleBindValueOnChange(e) {
@@ -388,7 +391,7 @@ class RawHtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnvi
                 continue;
             }
             if (!ctx.isEditMode()) {
-                if (k == "onclickhandler") {
+                if (k == "click.handler") {
                     elemProps.onClick = ctx.handleOnClick;
                     if (tagName == "a" && elemProps["href"] == null) {
                         elemProps["href"] = "#";
@@ -397,13 +400,7 @@ class RawHtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnvi
                 if (NodeUtils.BINDVALUE_ONCHANGE_ELEMS[tagName]) {
                     elemProps.onChange = this.handleBindValueOnChange;
                 }
-                if (k == "handler" && NodeUtils.HANDLER_ELEMS[tagName]) {
-                    elemProps[NodeUtils.HANDLER_ELEMS[tagName]] = ctx.runHandler;
-                    if (tagName == "a" && elemProps["href"] == null) {
-                        elemProps["href"] = "#";
-                    }
-                }
-                if (k == "onsubmithandler" && NodeUtils.SUBMIT_ELEMS[tagName]) {
+                if (k == "submit.handler" && NodeUtils.SUBMIT_ELEMS[tagName]) {
                     elemProps.onSubmit = ctx.handleOnSubmit;
                 }
             }
@@ -499,32 +496,23 @@ class CustomNode extends React.Component<{node : HibikiNode, component : Compone
             nodeDataBox = mobx.observable.box({_hibiki: {"customtag": rawImplAttrs.name, uuid: ctx.uuid}}, {name: uuidName});
             ctx.dataenv.dbstate.NodeDataMap.set(ctx.uuid, nodeDataBox);
         }
+        let ctxHandlers = NodeUtils.makeHandlers(ctx.node);
+        let eventCtx = sprintf("<%s>", ctx.node.tag);
+        let eventDE = ctx.childDataenv.makeSpecialChildEnv(null, {eventBoundary: "hard", handlers: ctxHandlers, htmlContext: eventCtx});
         let nodeDataLV = new DataCtx.ObjectLValue(null, nodeDataBox);
-        let specials : {[e:string] : any} = {};
+        let specials : Record<string, any> = {};
         specials.children = childrenVar;
         specials.node = nodeVar;
         let resolvedAttrs = {};
-        let handlers = {};
-        let ctxAttrs = ctx.getRawAttrs();
-        for (let key in rawImplAttrs) {
-            let val = rawImplAttrs[key];
-            if (key.endsWith("handler") && val != null && typeof(val) == "string") {
-                handlers[key] = {handlerStr: val, parentEnv: false, node: implNode};
-            }
-        }
-        for (let key in ctxAttrs) {
-            let val = ctxAttrs[key];
-            if (key.endsWith("handler") && val != null && typeof(val) == "string") {
-                handlers[key] = {handlerStr: val, parentEnv: true, node: ctx.node};
-            }
-        }
+        let handlers = NodeUtils.makeHandlers(implNode);
         let crootProxy = componentRootProxy(nodeDataLV, resolvedAttrs);
         let envOpts = {
             componentRoot: crootProxy,
             handlers: handlers,
-            htmlContext: sprintf("component:<%s>", ctx.node.tag),
+            htmlContext: sprintf("component:<%s>", implNode.attrs.name),
+            eventBoundary: "soft",
         };
-        let childEnv = ctx.childDataenv.makeSpecialChildEnv(specials, envOpts);
+        let childEnv = eventDE.makeSpecialChildEnv(specials, envOpts);
         if (initialize && rawImplAttrs.defaults != null) {
             try {
                 let block = DataCtx.ParseBlockThrow(rawImplAttrs.defaults);
@@ -772,7 +760,7 @@ class NopNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironm
 class RunHandlerNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
     componentDidMount() {
         let ctx = new DBCtx(this);
-        ctx.handleOnX("onrunhandler");
+        ctx.handleEvent("run");
     }
     
     render() {
