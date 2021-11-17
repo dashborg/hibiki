@@ -236,7 +236,7 @@ class DBCtx {
         };
         let execDataenv = this.dataenv.makeSpecialChildEnv(null, envOpts);
         let rtctx = new RtContext();
-        rtctx.pushContext(sprintf("event <%s>:*%s (in %s)", this.node.tag, event, this.dataenv.getHtmlContext()));
+        rtctx.pushContext(sprintf("event <%s>:*%s (in %s)", this.node.tag, event, this.dataenv.getHtmlContext()), null);
         execDataenv.fireEvent({event: event, bubble: false, datacontext: datacontext}, rtctx);
         return false;
     }

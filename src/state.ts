@@ -252,9 +252,21 @@ class DataEnvironment {
         return env;
     }
 
+    getParentEventBoundary(event : string) : DataEnvironment {
+        let eb1 = this.getEventBoundary(event);
+        if (eb1 == null || eb1.parent == null) {
+            return null;
+        }
+        return eb1.parent.getEventBoundary(event);
+    }
+
     fireEvent(event : EventType, rtctx : RtContext) : Promise<any> {
+        if (event.event != "mount") {
+            console.log("FIRE-EVENT", event.event, this.getFullHtmlContext());
+        }
         let env = this.getEventBoundary(event.event);
         if (env == null) {
+            this.dbstate.unhandledEvent(event, rtctx);
             return null;
         }
         if (!(event.event in env.handlers)) {
@@ -268,9 +280,11 @@ class DataEnvironment {
         let eventEnv = env.makeSpecialChildEnv(event.datacontext, {htmlContext: htmlContext});
         let tcfBlock : TCFBlock = {block: null};
         let ctxStr = sprintf("Parsing <%s>:%s.handler (in [[%s]])", hval.node.tag, event.event, env.getFullHtmlContext());
-        rtctx.pushContext(ctxStr);
+        rtctx.pushContext(ctxStr, {handlerEnv: eventEnv, handlerName: event.event});
         tcfBlock.block = DataCtx.ParseBlockThrow(hval.handlerStr);
         rtctx.popContext();
+        ctxStr = sprintf("Running <%s>:%s.handler (in [[%s]])", hval.node.tag, event.event, env.getFullHtmlContext());
+        rtctx.pushContext(ctxStr, {handlerEnv: eventEnv, handlerName: event.event});
         return DataCtx.ExecuteBlockP(tcfBlock, eventEnv, rtctx, false);;
     }
 
@@ -684,7 +698,7 @@ class HibikiState {
     }
 
     unhandledEvent(event : EventType, rtctx : RtContext) {
-        console.log("unhandled event", event.event, rtctx);
+        console.log("unhandled event", event.event, event.datacontext, rtctx);
     }
 
     rootDataenv() : DataEnvironment {
@@ -804,6 +818,7 @@ class HibikiState {
         let htmlContext = sprintf("@local:%s", handlerHtml.attrs.name)
         let contextDataenv = dataenv.makeSpecialChildEnv({params: handlerData}, {htmlContext: htmlContext});
         rtctx.pushContext(sprintf("Running @local handler '%s'", handlerHtml.attrs.name));
+        // TODO - use ParseBlockThrow / ExecuteBlockP to return a promise that can throw errors
         let p = DataCtx.ParseAndExecuteBlock(handlerText, null, contextDataenv, rtctx);
         return p;
     }

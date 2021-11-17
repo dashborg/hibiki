@@ -6,7 +6,7 @@ import {DataEnvironment} from "./state";
 import {sprintf} from "sprintf-js";
 import {RtContext, ErrorObj, getShortEMsg} from "./error";
 import {makeUrlParamsFromObject, SYM_PROXY, SYM_FLATTEN} from "./utils";
-import {PathPart, PathType, PathUnionType, TCFBlock, StmtBlock, Statement, ExprType, DataCtxErrorObjType} from "./types";
+import {PathPart, PathType, PathUnionType, TCFBlock, StmtBlock, Statement, ExprType, DataCtxErrorObjType, EventType, HandlerValType} from "./types";
 
 declare var window : any;
 
@@ -1591,7 +1591,7 @@ function evalExprAst(exprAst : any, dataenv : DataEnvironment) : any {
 
 let ExecuteStmtRaw = function ExecuteStmtRaw(stmtAst : Statement, dataenv : DataEnvironment, rtctx : RtContext, opts : any) : Promise<any> {
     opts = opts || {};
-    rtctx.pushContext(stmtAst.stmt + " stmt");
+    rtctx.pushContext(stmtAst.stmt + " stmt", null);
     if (stmtAst.stmt == "assign") {
         let lvaluePath = parseAssignLVThrow(stmtAst.lvalue, dataenv);
         let expr = evalExprAst(stmtAst.expr, dataenv);
@@ -1601,12 +1601,12 @@ let ExecuteStmtRaw = function ExecuteStmtRaw(stmtAst : Statement, dataenv : Data
     if (stmtAst.stmt == "if") {
         let condVal = evalExprAst(stmtAst.condExpr, dataenv);
         if (condVal) {
-            rtctx.replaceContext("Then clause");
+            rtctx.replaceContext("then clause", null);
             return ExecuteBlockPThrow(stmtAst.thenBlock, dataenv, rtctx);
         }
         else {
             if (stmtAst.elseBlock) {
-                rtctx.replaceContext("Else clause");
+                rtctx.replaceContext("else clause", null);
                 return ExecuteBlockPThrow(stmtAst.elseBlock, dataenv, rtctx);
             }
         }
@@ -1625,7 +1625,7 @@ let ExecuteStmtRaw = function ExecuteStmtRaw(stmtAst : Statement, dataenv : Data
             data = evalExprAst(stmtAst.data, dataenv);
             data = demobx(data);
         }
-        rtctx.replaceContext(sprintf("Calling handler %s", handler));
+        rtctx.replaceContext(sprintf("Calling handler %s", handler), null);
         let p = dataenv.dbstate.callHandlerInternalAsync(handler, data, false, {rtContext: rtctx, dataenv: dataenv});
         if (stmtAst.lvalue) {
             let lvaluePath = parseAssignLVThrow(stmtAst.lvalue, dataenv);
@@ -1662,19 +1662,22 @@ let ExecuteStmtRaw = function ExecuteStmtRaw(stmtAst : Statement, dataenv : Data
             context = evalExprAst(stmtAst.context, dataenv);
         }
         let bubble = (stmtAst.stmt == "bubble");
-        let eventDE = dataenv.getEventBoundary("*");
-        eventDE = (eventDE != null && eventDE.parent != null ? eventDE.parent.getEventBoundary("*") : null);
+        let eventDE = dataenv.getParentEventBoundary("*");
         if (eventDE == null) {
             dataenv.dbstate.unhandledEvent({event: event, datacontext: context, bubble: bubble}, rtctx);
             return null;
         }
+        rtctx.replaceContext(sprintf("%s->%s", (bubble ? "bubble" : "fire"), event), null);
         return eventDE.fireEvent({event: event, bubble: bubble, datacontext: context}, rtctx);
     }
     if (stmtAst.stmt == "log" || stmtAst.stmt == "debug") {
         let exprs = demobx(evalExprArray(stmtAst.exprs, dataenv));
         console.log("hibiki-log", ...exprs);
         if (stmtAst.stmt == "debug") {
+            console.log("DataEnvironment Stack");
             dataenv.printStack();
+            console.log("Runtime Context", rtctx);
+            console.log(rtctx.asString());
         }
         return null;
     }
@@ -1733,7 +1736,7 @@ function ParseAndExecuteBlock(blockStr : string, errorHandler : ({blockStr : str
     }
     else {
         rtctx = new RtContext();
-        rtctx.pushContext(rtContextUnion);
+        rtctx.pushContext(rtContextUnion, null);
     }
     let block : StmtBlock = null;
     let errorBlock : StmtBlock = null;
@@ -1782,6 +1785,10 @@ async function ExecuteBlockPThrow(block : StmtBlock, dataenv : DataEnvironment, 
     return;
 }
 
+async function ParseAsync(blockStr : string) : Promise<StmtBlock> {
+    return ParseBlockThrow(blockStr);
+}
+
 function ExecuteBlockP(block : TCFBlock, dataenv : DataEnvironment, rtctx : RtContext, topLevelCatch : boolean) : Promise<any> {
     let prtn = ExecuteBlockPThrow(block.block, dataenv, rtctx);
     if (block.catchBlock != null) {
@@ -1789,10 +1796,34 @@ function ExecuteBlockP(block : TCFBlock, dataenv : DataEnvironment, rtctx : RtCo
             let errorObj = makeErrorObj(e, rtctx);
             let htmlContext = "errorhandler";
             let errorEnv = dataenv.makeSpecialChildEnv({error: errorObj}, {htmlContext: htmlContext});
-            rtctx.pushContext(block.contextStr || "error handler");
+            rtctx.pushContext(block.contextStr || "error handler", {handlerEnv: errorEnv, handlerName: "error"});
             let ep = ExecuteBlockPThrow(block.catchBlock, errorEnv, rtctx);
             return ep;
         });
+    }
+    else {
+        if (rtctx.stack.length > 10) {
+            return prtn;
+        }
+        let hctx = rtctx.getTopHandlerContext();
+        if (hctx != null) {
+            let handlerEnv = hctx.handlerEnv;
+            if (hctx.handlerName == "error") {
+                handlerEnv = handlerEnv.getParentEventBoundary("*");
+            }
+            else {
+                handlerEnv = handlerEnv.getEventBoundary("*");
+            }
+            // console.log("hctx", hctx);
+            // if (handlerEnv != null) {
+            //     handlerEnv.printStack();
+            // }
+            // console.log(rtctx.asString());
+            prtn = prtn.catch((e) => {
+                let errorObj = makeErrorObj(e, rtctx);
+                handlerEnv.fireEvent({event: "error", bubble: true, datacontext: {error: errorObj}}, rtctx);
+            });
+        }
     }
     if (topLevelCatch) {
         prtn = prtn.catch((e) => {
@@ -1813,7 +1844,7 @@ function CreateContextThrow(block : any,  dataenv : DataEnvironment, rtContext? 
         rtContext = "context";
     }
     let rtctx = new RtContext();
-    rtctx.pushContext(rtContext);
+    rtctx.pushContext(rtContext, null);
     for (let i=0; i<block.length; i++) {
         let stmt = block[i];
         ExecuteStmtRaw(stmt, dataenv, rtctx, {context: true});
@@ -1985,7 +2016,7 @@ function convertSimpleType(typeName : string, value : string, defaultValue : any
     return value;
 }
 
-export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, ApplySingleRRA, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ParseBlock, ParseBlockThrow, ExecuteBlock, CreateContextThrow, ParseAndExecuteBlock, ObjectSetPath, DeepEqual, BoundValue, ParseLValuePath, ParseLValuePathThrow, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, ExecuteBlockP};
+export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, ApplySingleRRA, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ParseBlock, ParseBlockThrow, ExecuteBlock, CreateContextThrow, ParseAndExecuteBlock, ObjectSetPath, DeepEqual, BoundValue, ParseLValuePath, ParseLValuePathThrow, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, ExecuteBlockP, ParseAsync};
 
 export type {PathType};
 

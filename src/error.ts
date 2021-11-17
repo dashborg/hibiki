@@ -1,5 +1,15 @@
+import type {DataEnvironment} from "./state";
+import {sprintf} from "sprintf-js";
+
 type RtContextItem = {
-    desc : string;
+    desc : string,
+    handlerName? : string,
+    handlerEnv? : DataEnvironment,
+};
+
+type RtContextOpts = {
+    handlerName? : string,
+    handlerEnv? : DataEnvironment,
 };
 
 type ErrorObj = {
@@ -9,6 +19,13 @@ type ErrorObj = {
     blockStr? : string,
 };
 
+function rtItemAsString(rtci : RtContextItem) : string {
+    if (rtci.handlerName != null && rtci.handlerEnv != null) {
+        return sprintf("[%s %s] %s", rtci.handlerName, rtci.handlerEnv.getFullHtmlContext(), rtci.desc);
+    }
+    return rtci.desc;
+}
+
 class RtContext {
     stack : RtContextItem[];
 
@@ -16,8 +33,20 @@ class RtContext {
         this.stack = [];
     }
 
-    replaceContext(desc : string) {
-        this.stack[this.stack.length-1] = {desc: desc};
+    replaceContext(desc : string, opts : RtContextOpts) {
+        opts = opts || {};
+        // console.log("RT-REPLACE", this.stack.length, this.stack[this.stack.length-1].desc, "=>", desc);
+        this.stack[this.stack.length-1] = {desc: desc, handlerName: opts.handlerName, handlerEnv: opts.handlerEnv};
+    }
+
+    getTopHandlerContext() : RtContextItem {
+        for (let i=this.stack.length-1; i>=0; i--) {
+            let item = this.stack[i];
+            if (item.handlerName != null && item.handlerEnv != null) {
+                return item;
+            }
+        }
+        return null;
     }
 
     getLastContext() : string {
@@ -27,8 +56,10 @@ class RtContext {
         return this.stack[this.stack.length-1].desc;
     }
 
-    pushContext(desc : string) {
-        this.stack.push({desc: desc});
+    pushContext(desc : string, opts : RtContextOpts) {
+        opts = opts || {};
+        // console.log("RT-PUSH", this.stack.length+1, desc);
+        this.stack.push({desc: desc, handlerName: opts.handlerName, handlerEnv: opts.handlerEnv});
     }
 
     popContext() {
@@ -36,14 +67,15 @@ class RtContext {
             return;
         }
         this.stack.pop();
+        // console.log("RT-POP", this.stack.length);
     }
 
     asString() : string {
-        return this.stack.map((ctx) => ctx.desc).reverse().join("\n");
+        return this.getStackTrace().join("\n");
     }
 
     getStackTrace() : string[] {
-        return this.stack.reverse().map((ctx) => ctx.desc);
+        return this.stack.slice().reverse().map((ctx) => rtItemAsString(ctx));
     }
 
     stackSize() : number {
@@ -51,6 +83,7 @@ class RtContext {
     }
 
     revertStack(size : number) {
+        // console.log("RT-REVERT", this.stack.length, "=>", size);
         if (size < this.stack.length) {
             this.stack.length = size;
         }

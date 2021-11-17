@@ -212,7 +212,6 @@ function baseRenderHtmlChildren(list : HibikiNode[], dataenv : DataEnvironment) 
                 continue;
             }
             let handlerStr = textContent(child);
-            console.log("DEFINE-HANDLER", attrs.name, dataenv.getFullHtmlContext());
             eventDE.handlers[attrs.name] = {handlerStr: handlerStr, node: child}
             continue;
         }
@@ -882,23 +881,24 @@ class SimpleQueryNode extends React.Component<{node : HibikiNode, dataenv : Data
         let dbstate = ctx.dataenv.dbstate;
         let rtctx = new RtContext();
         let name = ctx.resolveAttr("name");
-        rtctx.pushContext(sprintf("Evaluating <d-data name=\"%s\"> (in %s)", name, ctx.dataenv.getHtmlContext()));
+        // TODO register handlerName/handlerEnv for error bubbling
+        rtctx.pushContext(sprintf("Evaluating <d-data name=\"%s\"> (in %s)", name, ctx.dataenv.getHtmlContext()), null);
         try {
             let queryStr = ctx.resolveAttr("query");
             if (queryStr == null) {
                 return;
             }
-            rtctx.pushContext("Parsing 'query' attribute (must be a data handler expression)");
+            rtctx.pushContext("Parsing 'query' attribute (must be a data handler expression)", null);
             let callStmt = DataCtx.ParseStaticCallStatement(queryStr);
             let handler = DataCtx.evalExprAst(callStmt.handler, ctx.dataenv);
             rtctx.popContext();
-            rtctx.pushContext("Evaluating 'query' parameters");
+            rtctx.pushContext("Evaluating 'query' parameters", null);
             let handlerData = null;
             if (callStmt.data != null) {
                 handlerData = DataCtx.evalExprAst(callStmt.data, ctx.dataenv);
             }
             rtctx.popContext();
-            rtctx.pushContext(sprintf("Calling data handler '%s'", handler));
+            rtctx.pushContext(sprintf("Calling data handler '%s'", handler), null);
             let qrtn = dbstate.callHandlerInternalAsync(handler, handlerData, true, {rtContext: rtctx, dataenv: ctx.dataenv});
             qrtn.then((queryRtn) => {
                 if (curCallNum != this.callNum) {
