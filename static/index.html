@@ -9,12 +9,32 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/17.0.2/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mobx/5.15.4/mobx.umd.min.js"></script>
     <script src="/dist/hibiki-dev.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.2/css/bulma.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
   </head>
   <body>
     <template hibiki>
+      <hibiki-config><script type="application/js-literal">
+          {
+              "approot": "http://localhost:5000",
+              "appurls": {
+                  "/api/test-handler2": {"method": "POST"}
+              }
+          }
+      </script></hibiki-config>
+      <hibiki-initialdata><script type="application/json">
+          {
+              "hello": 22,
+              "test": [1,2,3]
+          }
+      </script></hibiki-initialdata>
       <page>
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.2/css/bulma.min.css">
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+        <define-handler name="foo">
+          log(22);
+        </define-handler>
+        <define-handler name="error">
+          log("top-error", @error);
+        </define-handler>
         <section class="hero is-primary">
           <div class="hero-body">
             <div class="container">
@@ -23,6 +43,8 @@
             </div>
           </div>
         </section>
+        <img src="https://static.dashborg.net/static/logo.png">
+        <d-data query="/@fetch:get('http://localhost:5000/api/test-handler')" output.bindpath="$.apitest"></d-data>
         <div class="section">
           <div class="content">
             <html-ul>
@@ -30,8 +52,8 @@
                 <li class="level">
                   <div class="level-left">
                     <d-text bind="." format="[%d]" style="font-weight: bold; color: *$.color"></d-text>
-                    <a onclickhandler="$.modalopen = true;" href="#" class="ml-4">Open Modal</a>
-                    <button onclickhandler="$.test[@index] = $.test[@index]+1;" class="button is-info ml-4">+1</button>
+                    <a click.handler="$.modalopen = true;" href="#" class="ml-4">Open Modal</a>
+                    <button click.handler="$.test[@index] = $.test[@index]+1;" class="button is-info ml-4">+1</button>
                   </div>
                 </li>
               </d-foreach>
@@ -39,24 +61,26 @@
           </div>
         </div>
         <section class="section" style="margin-bottom: 50px;">
-          <button class="button is-info block" onclickhandler="$.output = /@fetch:get('http://localhost:5000/api/test')">Run @fetch /api/test</button>
-          <button class="button is-info block" onclickhandler="$.output = /@fetch:get('http://localhost:5000/api/test-handler', {x: 22})">Run @fetch /api/test-handler</button>
-          <button class="button is-info block" onclickhandler="$.output = /@fetch:post('http://localhost:5000/api/test-handler2', {name: 'mike'})">Run @fetch /api/test-handler2</button>
+          <define-vars context="@x = 55;"></define-vars>
+          <local-btn foo.handler="log(28); bubble->foo();" click.handler="$.output = /@fetch:get('http://localhost:5000/api/test'); log(5); bubble->foo()" y="*55"></local-btn>
+          <button class="button is-info block" click.handler="$.output = /@fetch:get('http://localhost:5000/api/test-handler', {x: 22})">Run @fetch /api/test-handler</button>
+          <button class="button is-info block" click.handler="$.output = /@fetch:post('http://localhost:5000/api/test-handler2', {name: 'mike'})">Run @fetch /api/test-handler2</button>
+          <button class="button is-info block" click.handler="/@fetch:get('http://localhost:5000/api/page2')">Page 2</button>
           <div class="block">
             <pre><d-text bind="$" format="json"></d-text></pre>
           </div>
         </section>
         <div class="modal" class.is-active="*$.modalopen">
-          <div onclickhandler="$.modalopen = false;" class="modal-background"></div>
+          <div click.handler="$.modalopen = false;" class="modal-background"></div>
           <div class="modal-content">
             <div class="box">
               <div class="content">
                 hello this is a modal!
               </div>
-              <button onclickhandler="$.modalopen = false;" class="button is-info">Close</button>
+              <button click.handler="$.modalopen = false;" class="button is-info">Close</button>
             </div>
           </div>
-          <button onclickhandler="$.modalopen = false;" class="modal-close is-large" aria-label="close"></button>
+          <button click.handler="$.modalopen = false;" class="modal-close is-large" aria-label="close"></button>
         </div>
         <d-inlinedata output.bindpath="$.foo">
           [8, 22, 1, 32]
@@ -78,6 +102,10 @@
         </section>
         
       </page>
+
+      <define-component name="btn" click.handler="log('in-define-component'); fire->click" args="y" error.handler="log('ehandler2'); throw('last');">
+        <button class="button is-info block" click.handler="throw('moo'); fire->click()" error.handler="log('ehandler1'); throw('boo');">Run @fetch /api/test</button>
+      </define-component>
       
       <define-component name="card">
         <div class="card column">
@@ -110,8 +138,5 @@
         </div>
       </define-component>
     </template>
-    <script>
-      hibiki.loadTags();
-    </script>
   </body>
 </html>
