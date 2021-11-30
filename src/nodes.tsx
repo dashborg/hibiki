@@ -18,7 +18,7 @@ import type {HibikiNode, ComponentType, LibraryType, HibikiExtState} from "./typ
 import {DBCtx} from "./dbctx";
 import * as DataCtx from "./datactx";
 import {HibikiState, DataEnvironment, getAttributes, getAttribute, getStyleMap} from "./state";
-import {valToString, valToInt, valToFloat, resolveNumber, isObject, textContent, SYM_PROXY, SYM_FLATTEN, jseval} from "./utils";
+import {valToString, valToInt, valToFloat, resolveNumber, isObject, textContent, SYM_PROXY, SYM_FLATTEN, jseval, nodeStr} from "./utils";
 import {parseHtml} from "./html-parser";
 import * as NodeUtils from "./nodeutils";
 import {RtContext} from "./error";
@@ -489,10 +489,11 @@ class CustomNode extends React.Component<{node : HibikiNode, component : Compone
         let nodeVar = NodeUtils.makeNodeVar(ctx);
         let childrenVar = NodeUtils.makeChildrenVar(ctx.dataenv, ctx.node);
         let argDecls = NodeUtils.parseArgsDecl(rawImplAttrs.args);
+        let componentName = rawImplAttrs.name;
         let nodeDataBox = ctx.dataenv.dbstate.NodeDataMap.get(ctx.uuid);
         if (nodeDataBox == null) {
             let uuidName = "id_" + ctx.uuid.replace(/-/g, "_");
-            nodeDataBox = mobx.observable.box({_hibiki: {"customtag": rawImplAttrs.name, uuid: ctx.uuid}}, {name: uuidName});
+            nodeDataBox = mobx.observable.box({_hibiki: {"customtag": componentName, uuid: ctx.uuid}}, {name: uuidName});
             ctx.dataenv.dbstate.NodeDataMap.set(ctx.uuid, nodeDataBox);
         }
         let ctxHandlers = NodeUtils.makeHandlers(ctx.node);
@@ -508,17 +509,17 @@ class CustomNode extends React.Component<{node : HibikiNode, component : Compone
         let envOpts = {
             componentRoot: crootProxy,
             handlers: handlers,
-            htmlContext: sprintf("component:<%s>", implNode.attrs.name),
+            htmlContext: sprintf("<define-component %s>", componentName),
             eventBoundary: "soft",
         };
         let childEnv = eventDE.makeSpecialChildEnv(specials, envOpts);
         if (initialize && rawImplAttrs.defaults != null) {
             try {
                 let block = DataCtx.ParseBlockThrow(rawImplAttrs.defaults);
-                DataCtx.CreateContextThrow(block, childEnv, sprintf("<%s>:defaults", rawImplAttrs.name));
+                DataCtx.CreateContextThrow(block, childEnv, sprintf("<define-component %s>:defaults", componentName));
             }
             catch (e) {
-                console.log(sprintf("ERROR parsing/executing 'defaults' in component %s", rawImplAttrs.name), e);
+                console.log(sprintf("ERROR parsing/executing 'defaults' in <define-component %s>", componentName), e);
             }
         }
         for (let key in argDecls) {
@@ -882,7 +883,7 @@ class SimpleQueryNode extends React.Component<{node : HibikiNode, dataenv : Data
         let rtctx = new RtContext();
         let name = ctx.resolveAttr("name");
         // TODO register handlerName/handlerEnv for error bubbling
-        rtctx.pushContext(sprintf("Evaluating <d-data name=\"%s\"> (in %s)", name, ctx.dataenv.getHtmlContext()), null);
+        rtctx.pushContext(sprintf("Evaluating %s (in %s)", nodeStr(ctx.node), ctx.dataenv.getFullHtmlContext()), null);
         try {
             let queryStr = ctx.resolveAttr("query");
             if (queryStr == null) {

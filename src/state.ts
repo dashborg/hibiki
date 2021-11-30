@@ -6,7 +6,7 @@ import {boundMethod} from 'autobind-decorator'
 import {v4 as uuidv4} from 'uuid';
 import {HibikiNode, ComponentType, LibraryType, HandlerPathObj, HibikiConfig, HibikiHandlerModule, RequestType, HibikiAction, TCFBlock, EventType, HandlerValType} from "./types";
 import * as DataCtx from "./datactx";
-import {isObject, textContent, SYM_PROXY, SYM_FLATTEN} from "./utils";
+import {isObject, textContent, SYM_PROXY, SYM_FLATTEN, nodeStr} from "./utils";
 import {RtContext} from "./error";
 import type {ErrorObj} from "./error";
 
@@ -84,7 +84,7 @@ class DataEnvironment {
         let env : DataEnvironment = this;
         let rtn = "";
         while (env != null) {
-            if (env.htmlContext != null) {
+            if (env.htmlContext != null && env.htmlContext != "<define-vars>") {
                 if (rtn == "") {
                     rtn = env.htmlContext;
                 }
@@ -261,9 +261,9 @@ class DataEnvironment {
     }
 
     fireEvent(event : EventType, rtctx : RtContext) : Promise<any> {
-        if (event.event != "mount") {
-            console.log("FIRE-EVENT", event.event, this.getFullHtmlContext());
-        }
+        // if (event.event != "mount") {
+        //     console.log("FIRE-EVENT", event.event, this.getFullHtmlContext());
+        // }
         let env = this.getEventBoundary(event.event);
         if (env == null) {
             this.dbstate.unhandledEvent(event, rtctx);
@@ -279,11 +279,11 @@ class DataEnvironment {
         let htmlContext = sprintf("event%s(%s)", (event.bubble ? "-bubble" : ""), event.event);
         let eventEnv = env.makeSpecialChildEnv(event.datacontext, {htmlContext: htmlContext});
         let tcfBlock : TCFBlock = {block: null};
-        let ctxStr = sprintf("Parsing <%s>:%s.handler (in [[%s]])", hval.node.tag, event.event, env.getFullHtmlContext());
+        let ctxStr = sprintf("Parsing %s:%s.handler (in [[%s]])", nodeStr(hval.node), event.event, env.getFullHtmlContext());
         rtctx.pushContext(ctxStr, {handlerEnv: eventEnv, handlerName: event.event});
         tcfBlock.block = DataCtx.ParseBlockThrow(hval.handlerStr);
         rtctx.popContext();
-        ctxStr = sprintf("Running <%s>:%s.handler (in [[%s]])", hval.node.tag, event.event, env.getFullHtmlContext());
+        ctxStr = sprintf("Running %s:%s.handler (in [[%s]])", nodeStr(hval.node), event.event, env.getFullHtmlContext());
         rtctx.pushContext(ctxStr, {handlerEnv: eventEnv, handlerName: event.event});
         return DataCtx.ExecuteBlockP(tcfBlock, eventEnv, rtctx, false);;
     }
@@ -962,19 +962,17 @@ class HibikiState {
 
     reportErrorObj(errorObj : ErrorObj) {
         if (this.ErrorCallback == null) {
-            let logObj : any[] = [errorObj.message];
+            let errStr = "Hibiki Error | " + errorObj.message + "\n";
             if (errorObj.rtctx != null) {
-                logObj.push("|");
-                logObj.push(errorObj.rtctx);
+                errStr += errorObj.rtctx.asString("> ") + "\n";
             }
             if (errorObj.blockStr != null) {
-                logObj.push("|");
-                logObj.push(errorObj.blockStr);
+                errStr += "BLOCK: " + errorObj.blockStr + "\n";
             }
-            console.log("Hibiki Error |", ...logObj);
             if (errorObj.err != null) {
-                console.log(errorObj.err);
+                errStr += "\nJavaScript Error: " + errorObj.err.stack + "\n";
             }
+            console.log(errStr);
             return;
         }
         this.ErrorCallback(errorObj);

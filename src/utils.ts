@@ -179,7 +179,7 @@ function smartDecodeParams(paramsStr : string) : {[e : string] : any} {
             rtn[key] = null;
             continue;
         }
-        if (val[0] == "-" || (val[0] >= "0" && val[0] <= "9")) {
+        if ((val[0] == "-" || val[0] == "+" || (val[0] >= "0" && val[0] <= "9")) && (val.match(/^[+-]?\d+(\.\d+)?$/))) {
             let ival = parseFloat(val);
             if (!isNaN(ival)) {
                 rtn[key] = ival;
@@ -306,5 +306,12 @@ function rawAttr(node : HibikiNode, attrName : string) : string {
     return node.attrs[attrName];
 }
 
-export {jsonRespHandler, parseUrlParams, valToString, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, makeUrlParamsFromObject, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, rawAttr, evalDeepTextContent, jseval};
+function nodeStr(node : HibikiNode) : string {
+    if (node.attrs != null && node.attrs.name != null) {
+        return "<" + node.tag + " " + node.attrs.name + ">";
+    }
+    return "<" + node.tag + ">";
+}
+
+export {jsonRespHandler, parseUrlParams, valToString, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, makeUrlParamsFromObject, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, rawAttr, evalDeepTextContent, jseval, nodeStr};
 

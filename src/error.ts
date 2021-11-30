@@ -70,8 +70,12 @@ class RtContext {
         // console.log("RT-POP", this.stack.length);
     }
 
-    asString() : string {
-        return this.getStackTrace().join("\n");
+    asString(indentStr? : string) : string {
+        let st = this.getStackTrace();
+        if (indentStr != null) {
+            st = st.map((s) => indentStr + s);
+        }
+        return st.join("\n");
     }
 
     getStackTrace() : string[] {
