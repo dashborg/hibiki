@@ -46,7 +46,7 @@ class ErrorMsg extends React.Component<{message: string}, {}> {
 }
 
 @mobxReact.observer
-class HibikiRootNode extends React.Component<{state : HibikiExtState}, {}> {
+class HibikiRootNode extends React.Component<{hibikiState : HibikiExtState}, {}> {
     renderingDBState : HibikiState;
     loadUuid : string;
 
@@ -54,12 +54,12 @@ class HibikiRootNode extends React.Component<{state : HibikiExtState}, {}> {
         super(props);
     }
 
-    getState() : HibikiState {
-        return (this.props.state as any).state;
+    getHibikiState() : HibikiState {
+        return (this.props.hibikiState as any).state;
     }
 
     getDataenv() : DataEnvironment {
-        let state = this.getState();
+        let state = this.getHibikiState();
         let rde = state.rootDataenv();
         let htmlContext = sprintf("<page %s>", state.HtmlPage.get());
         let dataenv = rde.makeChildEnv(null, null, {htmlContext: htmlContext, eventBoundary: "hard"});
@@ -75,7 +75,7 @@ class HibikiRootNode extends React.Component<{state : HibikiExtState}, {}> {
         }
         this.loadUuid = uuidv4();
         let runJS = "window.HibikiLoaded['" + this.loadUuid + "'] = true;";
-        let dbstate = this.getState();
+        let dbstate = this.getHibikiState();
         dbstate.queueScriptText(runJS, true);
         setTimeout(() => this.checkLoaded(1), 100);
     }
@@ -92,7 +92,7 @@ class HibikiRootNode extends React.Component<{state : HibikiExtState}, {}> {
             }
         }
         let node = this.getHibikiNode();
-        let dbstate = this.getState();
+        let dbstate = this.getHibikiState();
         let dataenv = this.getDataenv();
         let ctx = new DBCtx(null, node, dataenv);
         setTimeout(() => ctx.dataenv.dbstate.fireScriptsLoaded(), 1);
@@ -101,7 +101,7 @@ class HibikiRootNode extends React.Component<{state : HibikiExtState}, {}> {
 
     componentDidMount() {
         this.queueOnLoadCheck();
-        let dbstate = this.getState();
+        let dbstate = this.getHibikiState();
         let flowerEmoji = String.fromCodePoint(0x1F338);
         if (dbstate.allowUsageImg() && !usageFired) {
             usageFired = true;
@@ -120,11 +120,11 @@ class HibikiRootNode extends React.Component<{state : HibikiExtState}, {}> {
     }
 
     getHibikiNode() : HibikiNode {
-        return this.getState().findCurrentPage();
+        return this.getHibikiState().findCurrentPage();
     }
     
     render() {
-        let dbstate = this.getState();
+        let dbstate = this.getHibikiState();
         let node = this.getHibikiNode();
         let dataenv = this.getDataenv();
         let ctx = new DBCtx(null, node, dataenv);

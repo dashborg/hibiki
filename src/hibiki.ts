@@ -88,7 +88,7 @@ let createState = function createState(config : HibikiConfig, html : string | HT
 createState = mobx.action(createState);
 
 function render(elem : HTMLElement, state : HibikiExtState) {
-    let props = {state: state};
+    let props = {hibikiState: state};
     let reactElem = React.createElement(HibikiRootNode, props, null);
     state.setInitCallback(() => {
         ReactDOM.render(reactElem, elem);
@@ -141,6 +141,7 @@ let hibiki : Hibiki = {
     loadTag: loadTag,
     render: render,
     createState: createState,
+    HibikiReact : HibikiRootNode,
 };
 
 window.Hibiki = hibiki;
