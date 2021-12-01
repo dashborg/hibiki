@@ -165,20 +165,23 @@ callStatement -> (lvalue %EQUAL):? callStatementNoAssign {% (data) => {
 
 callStatementNoAssign ->
       staticCallStatement  {% id %}
-    | %KW_CALL fullExpr (%COMMA fullExpr):?  {% (data) => {
+    | dynCallStatement     {% id %}
+
+dynCallStatement -> %KW_CALL fullExpr (%LPAREN namedCallParams %RPAREN):? {% (data) => {
           let dataExpr = null;
           if (data[2] != null) {
-              dataExpr = data[2][1];
+              dataExpr = {etype: "array", exprs: data[2][1]};
           }
-          return {stmt: "call", handler: data[1], data: dataExpr}
+          return {stmt: "call", handler: data[1], data: dataExpr};
       } %}
 
-staticCallStatement -> %CALLPATH (%LPAREN literalArrayElements:? %RPAREN):?    {% (data) => {
+staticCallStatement -> %CALLPATH (%LPAREN namedCallParams %RPAREN):?    {% (data) => {
           let dataExpr = null;
           if (data[1] != null) {
               dataExpr = {etype: "array", exprs: data[1][1]};
           }
-          return {stmt: "call", handler: {etype: "literal", val: data[0].value}, data: dataExpr};
+          let handler = {etype: "literal", val: data[0].value};
+          return {stmt: "call", handler: handler, data: dataExpr};
       } %}
 
 kwExprPart -> literalMapKey %EQUAL fullExpr  {% (data) => {
@@ -192,11 +195,11 @@ kwExprList -> kwExprPart (%COMMA kwExprPart):*   {% (data) => {
           return {etype: "map", exprs: kwExprs};
       } %}
 
-callParams2 -> 
-      null
-    | literalArrayElements
-    | kwExprList
-    | literalArrayElementsNoComma %COMMA kwExprList
+namedCallParams -> 
+      null                   {% (data) => { return null; } %}
+    | literalArrayElements   {% id %}
+#    | kwExprList
+#    | literalArrayElementsNoComma %COMMA kwExprList
 
 callParams -> %LPAREN literalArrayElements:? %RPAREN {% (data) => data[1] %}
 
