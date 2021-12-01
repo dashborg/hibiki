@@ -151,6 +151,7 @@ interface Hibiki {
     loadTag(elem: HTMLElement) : HibikiExtState;
     render(elem : HTMLElement, state : HibikiExtState);
     createState(config : HibikiConfig, html : string | HTMLElement, initialData : any) : HibikiExtState;
+    HibikiReact : new(props : any) => React.Component<{hibikiState : HibikiExtState}, {}>;
 };
 
 interface HibikiExtState {
