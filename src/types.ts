@@ -11,6 +11,11 @@ type HibikiNode = {
     morestyles? : Record<string, Record<string, string>>,
 }
 
+type JSFuncType = {
+    fn : (...args : any[]) => any,
+    native : boolean,
+};
+
 type RequestType = {
     path : {
         module : string,
@@ -159,4 +164,4 @@ interface HibikiExtState {
     initialize(force : boolean);
 };
 
-export type {HibikiNode, HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, TCFBlock, StmtBlock, Statement, ExprType, DataCtxErrorObjType, ComponentType, LibraryType, HandlerPathObj, RequestType, Hibiki, HibikiAction, HibikiExtState, EventType, HandlerValType};
+export type {HibikiNode, HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, TCFBlock, StmtBlock, Statement, ExprType, DataCtxErrorObjType, ComponentType, LibraryType, HandlerPathObj, RequestType, Hibiki, HibikiAction, HibikiExtState, EventType, HandlerValType, JSFuncType};

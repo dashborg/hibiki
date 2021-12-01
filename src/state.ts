@@ -4,10 +4,11 @@ import Axios from "axios";
 import {sprintf} from "sprintf-js";
 import {boundMethod} from 'autobind-decorator'
 import {v4 as uuidv4} from 'uuid';
-import {HibikiNode, ComponentType, LibraryType, HandlerPathObj, HibikiConfig, HibikiHandlerModule, RequestType, HibikiAction, TCFBlock, EventType, HandlerValType} from "./types";
+import {HibikiNode, ComponentType, LibraryType, HandlerPathObj, HibikiConfig, HibikiHandlerModule, RequestType, HibikiAction, TCFBlock, EventType, HandlerValType, JSFuncType} from "./types";
 import * as DataCtx from "./datactx";
 import {isObject, textContent, SYM_PROXY, SYM_FLATTEN, nodeStr} from "./utils";
 import {RtContext, HibikiError} from "./error";
+import {DefaultJSFuncs} from "./jsfuncs";
 
 import {parseHtml} from "./html-parser";
 
@@ -112,7 +113,7 @@ class DataEnvironment {
     resolveRoot(rootName : string, opts?: {caret? : number}) : any {
         opts = opts || {};
         if (opts.caret != null && opts.caret < 0 || opts.caret > 1) {
-            throw "Invalid caret value, must be 0 or 1";
+            throw new Error("Invalid caret value, must be 0 or 1");
         }
         if (rootName == "global" || rootName == "data") {
             return unbox(this.dbstate.DataRoots["global"]);
@@ -173,7 +174,7 @@ class DataEnvironment {
             if (rootName in this.dbstate.DataRoots) {
                 return unbox(this.dbstate.DataRoots[rootName]);
             }
-            throw "Invalid root path";
+            throw new Error("Invalid root path");
         }
     }
 
@@ -479,7 +480,7 @@ class ComponentLibrary {
         else {
             let ecomp = this.components[cname];
             if (ecomp.componentType != "react-custom" || ecomp.reactimpl.get() != null) {
-                throw sprintf("Cannot redefine component %s (existing %s/%s)", cname, ecomp.libName, ecomp.name);
+                throw new Error(sprintf("Cannot redefine component %s (existing %s/%s)", cname, ecomp.libName, ecomp.name));
             }
             ecomp.reactimpl.set(reactImpl);
         }
@@ -521,7 +522,7 @@ class FetchModule {
     callHandler(req : RequestType) : Promise<any> {
         let method = req.path.pathfrag;
         if (method == null) {
-            throw sprintf("Invalid null method passed to /@fetch:[method]");
+            throw new Error(sprintf("Invalid null method passed to /@fetch:[method]"));
         }
         // console.log("call-fetch", req.path, req.data);
         method = method.toUpperCase();
@@ -537,10 +538,10 @@ class FetchModule {
             url = new URL(urlStr);
         }
         catch (e) {
-            throw sprintf("Invalid URL passed to fetch '%s': %s", urlStr, e.toString());
+            throw new Error(sprintf("Invalid URL passed to fetch '%s': %s", urlStr, e.toString()));
         }
         if (params != null && !isObject(params)) {
-            throw sprintf("Invalid params passed to /@fetch for url '%s', params must be an object not an array", urlStr);
+            throw new Error(sprintf("Invalid params passed to /@fetch for url '%s', params must be an object not an array", urlStr));
         }
         let headersObj = new Headers();
         initParams = initParams ?? {};
@@ -574,7 +575,7 @@ class FetchModule {
         initParams = this.fetchConfig(url, params, initParams);
         let p = fetch(url.toString(), initParams).then((resp) => {
             if (!resp.ok) {
-                throw sprintf("Bad status code response from '%s': %d %s", req.data[0], resp.status, resp.statusText);
+                throw new Error(sprintf("Bad status code response from '%s': %d %s", req.data[0], resp.status, resp.statusText));
             }
             let contentType = resp.headers.get("Content-Type");
             if (contentType != null && contentType.startsWith("application/json")) {
@@ -589,7 +590,7 @@ class FetchModule {
                             let mimetype = blob.type;
                             let semiIdx = (reader.result as string).indexOf(";");
                             if (semiIdx == -1 || mimetype == null || mimetype == "") {
-                                throw "Invalid BLOB returned from fetch, bad mimetype or encoding";
+                                throw new Error("Invalid BLOB returned from fetch, bad mimetype or encoding");
                             }
                             let dbblob = new DataCtx.HibikiBlob();
                             dbblob.mimetype = blob.type;
@@ -667,6 +668,7 @@ class HibikiState {
     Config : HibikiConfig = {};
     HtmlPage : mobx.IObservableValue<string> = mobx.observable.box("default", {name: "HtmlPage"});
     InitCallbacks : (() => void)[];
+    JSFuncs : Record<string, JSFuncType>;
     
     Modules : Record<string, HibikiHandlerModule> = {};
     DataRoots : Record<string, mobx.IObservableValue<any>>;
@@ -678,6 +680,7 @@ class HibikiState {
         this.ComponentLibrary = new ComponentLibrary();
         this.Modules["fetch"] = new FetchModule(this);
         this.InitCallbacks = [];
+        this.JSFuncs = DefaultJSFuncs;
     }
 
     setInitCallback(fn : () => void) {
@@ -967,16 +970,16 @@ class HibikiState {
     async callHandlerInternalAsync(handlerPath : string, handlerData : any[], pureRequest : boolean, opts? : any) : Promise<any> {
         opts = opts || {};
         if (handlerPath == null || handlerPath == "") {
-            throw "Invalid handler path"
+            throw new Error("Invalid handler path");
         }
         let hpath = parseHandler(handlerPath);
         if (hpath == null) {
-            throw "Invalid handler path: " + handlerPath;
+            throw new Error("Invalid handler path: " + handlerPath);
         }
         let moduleName = hpath.ns ?? "default";
         let module = this.Modules[moduleName];
         if (module == null) {
-            throw sprintf("Invalid handler, no module '%s' found for path: %s", moduleName, handlerPath);
+            throw new Error(sprintf("Invalid handler, no module '%s' found for path: %s", moduleName, handlerPath));
         }
         let req : RequestType = {
             path: {

@@ -5,7 +5,7 @@ import hibikiGrammar from "./hibiki-grammar.js";
 import {DataEnvironment} from "./state";
 import {sprintf} from "sprintf-js";
 import {RtContext, getShortEMsg, HibikiError} from "./error";
-import {makeUrlParamsFromObject, SYM_PROXY, SYM_FLATTEN} from "./utils";
+import {makeUrlParamsFromObject, SYM_PROXY, SYM_FLATTEN, isObject} from "./utils";
 import {PathPart, PathType, PathUnionType, TCFBlock, StmtBlock, Statement, ExprType, DataCtxErrorObjType, EventType, HandlerValType} from "./types";
 
 declare var window : any;
@@ -13,22 +13,13 @@ declare var window : any;
 const MAX_ARRAY_SIZE = 10000;
 
 class HibikiBlob {
-    mimetype = null;
-    data = null;
+    mimetype : string = null;
+    data : string = null;
+    _type : "HibikiBlob" = "HibikiBlob";
 
     makeDataUrl() : string {
         return "data:" + this.mimetype + ";base64," + this.data;
     }
-}
-
-function isObject(v : any) : boolean {
-    if (v == null) {
-        return false;
-    }
-    if (mobx.isArrayLike(v)) {
-        return false;
-    }
-    return typeof(v) == "object";
 }
 
 function rtnIfType(v : any, itype : string) : any {
@@ -245,7 +236,7 @@ class BoundValue {
             }
             return pval[pathkey];
         }
-        throw "invalid pathtype=" + pp.pathtype;
+        throw new Error("invalid pathtype=" + pp.pathtype);
     }
 
     getWithIntention(itype : string) : any {
@@ -429,11 +420,11 @@ function ParseBlockThrow(blockStr : string) : StmtBlock {
     }
     catch (e) {
         let emsg = getShortEMsg(e);
-        throw emsg;
+        throw new Error(emsg);
     }
     // console.log(blockParser);
     if (blockParser.results == null || blockParser.results.length == 0) {
-        throw "Error parsing block, unterminated statement: " + blockStr;
+        throw new Error("Error parsing block, unterminated statement: " + blockStr);
     }
     let block = blockParser.results[0];
     if (blockParser.results.length > 1) {
@@ -461,18 +452,18 @@ function ParsePathThrow(pathStr : string) : PathType {
     }
     catch (e) {
         let emsg = getShortEMsg(e);
-        throw emsg;
+        throw new Error(emsg);
     }
     if (exprParser.results == null || exprParser.results.length == 0) {
-        throw "Error parsing path, unterminated expression: + " + pathStr;
+        throw new Error("Error parsing path, unterminated expression: + " + pathStr);
     }
     let path = exprParser.results[0].path;
     for (let i=0; i<path.length; i++) {
         if (path[i].pathtype == "dyn") {
-            throw "Error parsing path, path must be static (no dynamic references allowed): + " + pathStr;
+            throw new Error("Error parsing path, path must be static (no dynamic references allowed): + " + pathStr);
         }
         if (path[i].pathtype == "deref") {
-            throw "Error parsing path, path must be static (no dereferencing allowed): + " + pathStr;
+            throw new Error("Error parsing path, path must be static (no dereferencing allowed): + " + pathStr);
         }
     }
     return path;
@@ -506,7 +497,7 @@ function internalResolvePath(path : PathType, irData : any, dataenv : DataEnviro
     let pp = path[level];
     if (pp.pathtype == "root") {
         if (level != 0) {
-            throw sprintf("Root($) path invalid in ResolvePath except at level 0, path=%s, level=%d", StringPath(path), level)
+            throw new Error(sprintf("Root($) path invalid in ResolvePath except at level 0, path=%s, level=%d", StringPath(path), level));
         }
         if (pp.pathkey == "expr") {
             let newIrData = pp.value;
@@ -517,7 +508,7 @@ function internalResolvePath(path : PathType, irData : any, dataenv : DataEnviro
             newIrData = dataenv.resolveRoot(pp.pathkey, {caret: pp.caret});
         }
         catch (e) {
-            throw sprintf("Invalid root path, path=%s, pathkey=%s, level=%d", StringPath(path), pp.pathkey, level)
+            throw new Error(sprintf("Invalid root path, path=%s, pathkey=%s, level=%d", StringPath(path), pp.pathkey, level));
         }
         return internalResolvePath(path, newIrData, dataenv, level+1);
     }
@@ -529,10 +520,10 @@ function internalResolvePath(path : PathType, irData : any, dataenv : DataEnviro
             return internalResolvePath(path, irData.subArrayIndex(pp.pathindex), dataenv, level+1);
         }
         if (!mobx.isArrayLike(irData)) {
-            throw sprintf("Cannot resolve array index (non-array) in ResolvePath, path=%s, level=%d", StringPath(path), level)
+            throw new Error(sprintf("Cannot resolve array index (non-array) in ResolvePath, path=%s, level=%d", StringPath(path), level));
         }
         if (pp.pathindex < 0) {
-            throw sprintf("Bad array index: %d in ResolvePath, path=%s, level=%d", pp.pathindex, StringPath(path), level);
+            throw new Error(sprintf("Bad array index: %d in ResolvePath, path=%s, level=%d", pp.pathindex, StringPath(path), level));
         }
         if (pp.pathindex >= irData.length) {
             return null;
@@ -547,7 +538,7 @@ function internalResolvePath(path : PathType, irData : any, dataenv : DataEnviro
             return internalResolvePath(path, irData.subMapKey(pp.pathkey), dataenv, level+1);
         }
         if (typeof(irData) != "object") {
-            throw sprintf("Cannot resolve map key (non-object) in ResolvePath, path=%s, level=%d", StringPath(path), level);
+            throw new Error(sprintf("Cannot resolve map key (non-object) in ResolvePath, path=%s, level=%d", StringPath(path), level));
         }
         if ((irData instanceof Map) || mobx.isObservableMap(irData)) {
             return internalResolvePath(path, irData.get(pp.pathkey), dataenv, level+1);
@@ -556,7 +547,7 @@ function internalResolvePath(path : PathType, irData : any, dataenv : DataEnviro
     }
     else if (pp.pathtype == "dynfind") {
         if (dataenv == null) {
-            throw sprintf("Cannot resolve array dyn-index in ResolvePath without DataEnvironment, path=%s", StringPath(path));
+            throw new Error(sprintf("Cannot resolve array dyn-index in ResolvePath without DataEnvironment, path=%s", StringPath(path)));
         }
         if (irData == null) {
             return null;
@@ -567,7 +558,7 @@ function internalResolvePath(path : PathType, irData : any, dataenv : DataEnviro
                 return null;
             }
             if (!mobx.isArrayLike(lvalArr)) {
-                throw sprintf("Cannot resolve array index (non-array) in ResolvePath, path=%s, level=%d", StringPath(path), level);
+                throw new Error(sprintf("Cannot resolve array index (non-array) in ResolvePath, path=%s, level=%d", StringPath(path), level));
             }
             let dynindex = resolveDynfind(lvalArr, pp.expr, dataenv);
             if (dynindex == null) {
@@ -576,7 +567,7 @@ function internalResolvePath(path : PathType, irData : any, dataenv : DataEnviro
             return internalResolvePath(path, irData.subArrayIndex(dynindex), dataenv, level+1);
         }
         if (!mobx.isArrayLike(irData)) {
-            throw sprintf("Cannot resolve array index (non-array) in ResolvePath, path=%s, level=%d", StringPath(path), level);
+            throw new Error(sprintf("Cannot resolve array index (non-array) in ResolvePath, path=%s, level=%d", StringPath(path), level));
         }
         let dynindex = resolveDynfind(irData, pp.expr, dataenv);
         if (dynindex == null) {
@@ -585,7 +576,7 @@ function internalResolvePath(path : PathType, irData : any, dataenv : DataEnviro
         return internalResolvePath(path, irData[dynindex], dataenv, level+1);
     }
     else {
-        throw sprintf("Bad PathPart in ResolvePath, path=%s, pathtype=%s, level=%d", StringPath(path), pp.pathtype, level)
+        throw new Error(sprintf("Bad PathPart in ResolvePath, path=%s, pathtype=%s, level=%d", StringPath(path), pp.pathtype, level));
     }
     return null;
 }
@@ -640,7 +631,7 @@ function appendData(path : PathType, curData : any, newData : any) : any {
     if (typeof(curData) == "string" && typeof(newData) == "string") {
         return curData + newData;
     }
-    throw sprintf("SetPath cannot append newData, path=%s, typeof=%s", StringPath(path), typeof(curData));
+    throw new Error(sprintf("SetPath cannot append newData, path=%s, typeof=%s", StringPath(path), typeof(curData)));
 }
 
 function appendArrData(path : PathType, curData : any, newData : any) : any {
@@ -660,17 +651,17 @@ function appendArrData(path : PathType, curData : any, newData : any) : any {
         return curData;
     }
     // TODO allow string appendarr
-    throw sprintf("SetPath cannot appendarr newData, path=%s, typeof=%s", StringPath(path), typeof(curData));
+    throw new Error(sprintf("SetPath cannot appendarr newData, path=%s, typeof=%s", StringPath(path), typeof(curData)));
 }
 
 function setPathWrapper(op : string, path : PathType, dataenv : DataEnvironment, setData : any, opts : {allowContext : boolean}) {
     let allowContext = opts.allowContext;
     if (path == null) {
-        throw sprintf("Invalid set path expression, null path");
+        throw new Error(sprintf("Invalid set path expression, null path"));
     }
     let rootpp = path[0];
     if (rootpp.pathtype != "root") {
-        throw sprintf("Invalid non-rooted path expression [[%s]]", StringPath(path));
+        throw new Error(sprintf("Invalid non-rooted path expression [[%s]]", StringPath(path)));
     }
     if ((rootpp.pathkey == "global") || (rootpp.pathkey == "data")) {
         if (path.length == 1 && op == "set") {
@@ -682,7 +673,7 @@ function setPathWrapper(op : string, path : PathType, dataenv : DataEnvironment,
         return;
     }
     if (path.length <= 1) {
-        throw sprintf("Invalid set path expression, cannot set raw root [[%s]] %s", StringPath(path), rootpp.pathkey);
+        throw new Error(sprintf("Invalid set path expression, cannot set raw root [[%s]] %s", StringPath(path), rootpp.pathkey));
     }
     else if (rootpp.pathkey == "state") {
         let irData = dataenv.resolveRoot("state");
@@ -711,10 +702,10 @@ function setPathWrapper(op : string, path : PathType, dataenv : DataEnvironment,
     }
     else {
         if (allowContext) {
-            throw sprintf("Cannot SetPath except $data ($), $state, $local (.), $c, or $context (@) roots, path=%s", StringPath(path));
+            throw new Error(sprintf("Cannot SetPath except $data ($), $state, $local (.), $c, or $context (@) roots, path=%s", StringPath(path)));
         }
         else {
-            throw sprintf("Cannot SetPath except $data ($), $state, $local (.), roots, path=%s", StringPath(path));
+            throw new Error(sprintf("Cannot SetPath except $data ($), $state, $local (.), roots, path=%s", StringPath(path)));
         }
     }
     
@@ -768,13 +759,13 @@ function quickObjectSetPath(path : PathType, localRoot : any, setData : any) : a
 
 function internalSetPath(dataenv : DataEnvironment, op : string, path : PathType, localRoot : any, setData : any, level : number, opts? : any) : any {
     if (mobx.isBoxedObservable(localRoot)) {
-        throw "Bad localRoot -- cannot be boxed observable.";
+        throw new Error("Bad localRoot -- cannot be boxed observable.");
     }
     opts = opts || {};
     if (level >= path.length) {
         if (localRoot instanceof LValue) {
             if (op != "set") {
-                throw sprintf("Invalid setPath op=%s for LValue bindpath", op);
+                throw new Error(sprintf("Invalid setPath op=%s for LValue bindpath", op));
             }
             localRoot.set(setData);
             return localRoot;
@@ -798,16 +789,16 @@ function internalSetPath(dataenv : DataEnvironment, op : string, path : PathType
             return blobExtDataPath(path, localRoot, setData);
         }
         else {
-            throw sprintf("Invalid setPath op=%s", op)
+            throw new Error(sprintf("Invalid setPath op=%s", op));
         }
     }
     let pp = path[level];
     if (pp.pathtype == "root") {
-        throw sprintf("Invalid path, root path not first part, path=%s, level=%d", StringPath(path), level);
+        throw new Error(sprintf("Invalid path, root path not first part, path=%s, level=%d", StringPath(path), level));
     }
     else if (pp.pathtype == "array") {
         if (pp.pathindex < 0 || pp.pathindex > MAX_ARRAY_SIZE) {
-            throw sprintf("SetPath bad array index=%d, path=%s, level=%d", pp.pathindex, StringPath(path), level);
+            throw new Error(sprintf("SetPath bad array index=%d, path=%s, level=%d", pp.pathindex, StringPath(path), level));
         }
         if (localRoot == null) {
             localRoot = [];
@@ -817,7 +808,7 @@ function internalSetPath(dataenv : DataEnvironment, op : string, path : PathType
             return localRoot;
         }
         if (!mobx.isArrayLike(localRoot)) {
-            throw sprintf("SetPath cannot resolve array index through non-array, path=%s, level=%d", StringPath(path), level);
+            throw new Error(sprintf("SetPath cannot resolve array index through non-array, path=%s, level=%d", StringPath(path), level));
         }
         if (localRoot.length < pp.pathindex + 1) {
             localRoot.length = pp.pathindex + 1;
@@ -828,7 +819,7 @@ function internalSetPath(dataenv : DataEnvironment, op : string, path : PathType
     }
     else if (pp.pathtype == "dynfind") {
         if (dataenv == null) {
-            throw sprintf("Cannot resolve array dyn-index in SetPath without DataEnvironment, path=%s", StringPath(path));
+            throw new Error(sprintf("Cannot resolve array dyn-index in SetPath without DataEnvironment, path=%s", StringPath(path)));
         }
         if (localRoot == null) {
             localRoot = [];
@@ -839,7 +830,7 @@ function internalSetPath(dataenv : DataEnvironment, op : string, path : PathType
                 lvalArr = [];
             }
             if (!mobx.isArrayLike(lvalArr)) {
-                throw sprintf("SetPath cannot resolve array dyn-index through non-array, path=%s, level=%d", StringPath(path), level);
+                throw new Error(sprintf("SetPath cannot resolve array dyn-index through non-array, path=%s, level=%d", StringPath(path), level));
             }
             let dynindex = resolveDynfind(lvalArr, pp.expr, dataenv);
             if (dynindex == null) {
@@ -850,7 +841,7 @@ function internalSetPath(dataenv : DataEnvironment, op : string, path : PathType
             return localRoot;
         }
         if (!mobx.isArrayLike(localRoot)) {
-            throw sprintf("SetPath cannot resolve array dyn-index through non-array, path=%s, level=%d", StringPath(path), level);
+            throw new Error(sprintf("SetPath cannot resolve array dyn-index through non-array, path=%s, level=%d", StringPath(path), level));
         }
         let dynindex = resolveDynfind(localRoot, pp.expr, dataenv);
         if (dynindex == null) {
@@ -871,7 +862,7 @@ function internalSetPath(dataenv : DataEnvironment, op : string, path : PathType
             }
         }
         if (typeof(localRoot) != "object") {
-            throw sprintf("SetPath cannot resolve map key through non-object, path=%s, level=%d", StringPath(path), level);
+            throw new Error(sprintf("SetPath cannot resolve map key through non-object, path=%s, level=%d", StringPath(path), level));
         }
         if (localRoot instanceof LValue) {
             internalSetPath(dataenv, op, path, localRoot.subMapKey(pp.pathkey), setData, level+1, opts);
@@ -887,7 +878,7 @@ function internalSetPath(dataenv : DataEnvironment, op : string, path : PathType
         return localRoot;
     }
     else {
-        throw sprintf("Bad PathPart in SetPath, path=%s, level=%d", StringPath(path), level);
+        throw new Error(sprintf("Bad PathPart in SetPath, path=%s, level=%d", StringPath(path), level));
     }
     return null;
 }
@@ -1120,277 +1111,17 @@ function JsonStringifyForCall(lvMap : any, v : any, space? : number) : string {
 }
 
 function evalFnAst(fnAst : any, dataenv : DataEnvironment) : any {
-    if (fnAst.fn == "deref") {
-        let e1 = evalExprAst(fnAst.exprs[0], dataenv);
-        if (e1 == null) {
-            return null;
-        }
-        e1 = String(e1);
-        let val = EvalSimpleExpr(e1, dataenv);
-        return val;
-    }
-    else if (fnAst.fn == "len") {
-        let e1 = evalExprAst(fnAst.exprs[0], dataenv);
-        if (e1 == null) {
-            return 0;
-        }
-        if (typeof(e1) == "string") {
-            return e1.length;
-        }
-        if (Array.isArray(e1) || mobx.isArrayLike(e1)) {
-            return e1.length;
-        }
-        if (typeof(e1) == "object") {
-            return Object.keys(e1).length;
-        }
-        return 1;
-    }
-    else if (fnAst.fn == "index") {
-        let e1 = evalExprAst(fnAst.exprs[0], dataenv);
-        let e2 = evalExprAst(fnAst.exprs[1], dataenv);
-        if (e1 == null || e2 == null) {
-            return -1;
-        }
-        e1 = String(e1);
-        e2 = String(e2);
-        return e1.indexOf(e2);
-    }
-    else if (fnAst.fn == "splice") {
+    let state = dataenv.dbstate;
+    let stateFn = state.JSFuncs[fnAst.fn.toLowerCase()];
+    if (stateFn != null) {
         let elist = evalExprArray(fnAst.exprs, dataenv);
-        if (elist.length == 0) {
-            return [];
+        if (!stateFn.native) {
+            elist = demobx(elist);
         }
-        if (elist.length == 1) {
-            return elist[0];
-        }
-        if (!mobx.isArrayLike(elist[0])) {
-            return null;
-        }
-        let newArr = [...elist[0]];
-        let [spliceStart, spliceDeleteCount, ...spliceItems] = elist.slice(1);
-        return newArr.splice(spliceStart, spliceDeleteCount, ...spliceItems);
-    }
-    else if (fnAst.fn == "slice") {
-        let e1 = evalExprAst(fnAst.exprs[0], dataenv);
-        let e2 = null;
-        let e3 = null;
-        if (fnAst.exprs.length >= 2) {
-            e2 = evalExprAst(fnAst.exprs[1], dataenv);
-        }
-        if (fnAst.exprs.length >= 3) {
-            e3 = evalExprAst(fnAst.exprs[2], dataenv);
-        }
-        if (e1 == null) {
-            return e1;
-        }
-        if (!mobx.isArrayLike(e1)) {
-            e1 = [e1];
-        }
-        if (e2 == null && e3 == null) {
-            return e1.slice();
-        }
-        if (e3 == null) {
-            return e1.slice(e2);
-        }
-        return e1.slice(e2, e3);
-    }
-    else if (fnAst.fn == "int") {
-        let e1 = evalExprAst(fnAst.exprs[0], dataenv);
-        return parseInt(e1);
-    }
-    else if (fnAst.fn == "float") {
-        let e1 = evalExprAst(fnAst.exprs[0], dataenv);
-        return parseFloat(e1);
-    }
-    else if (fnAst.fn == "str") {
-        let e1 = evalExprAst(fnAst.exprs[0], dataenv);
-        return String(e1);
-    }
-    else if (fnAst.fn == "bool") {
-        let e1 = evalExprAst(fnAst.exprs[0], dataenv);
-        return !!e1;
-    }
-    else if (fnAst.fn == "merge") {
-        if (fnAst.exprs == null || fnAst.exprs.length == 0) {
-            return null;
-        }
-        let rtn = evalExprAst(fnAst.exprs[0], dataenv);
-        for (let i=1; i<fnAst.exprs.length; i++) {
-            let expr = evalExprAst(fnAst.exprs[i], dataenv);
-            if (expr != null && isObject(expr)) {
-                rtn = {...rtn, ...expr};
-            }
-        }
-        return rtn;
-    }
-    else if (fnAst.fn == "jsonparse") {
-        let e1 = evalExprAst(fnAst.exprs[0], dataenv);
-        if (e1 == null || e1 == "") {
-            return null;
-        }
-        return JSON.parse(e1);
-    }
-    else if (fnAst.fn == "jseval") {
-        let e1 = evalExprAst(fnAst.exprs[0], dataenv);
-        if (e1 == null || e1 == "") {
-            return null;
-        }
-        let evalVal = eval("(" + e1 + ")");
-        if (typeof(evalVal) == "function") {
-            evalVal = evalVal();
-        }
-        return evalVal;
-    }
-    else if (fnAst.fn == "jsonstringify") {
-        let e1 = evalExprAst(fnAst.exprs[0], dataenv);
-        return JSON.stringify(e1)
-    }
-    else if (fnAst.fn == "split") {
-        let e1 = evalExprAst(fnAst.exprs[0], dataenv);
-        let e2 = evalExprAst(fnAst.exprs[1], dataenv);
-        return String(e1).split(e2);
-    }
-    else if (fnAst.fn == "js") {
-        let jsfn = evalExprAst(fnAst.exprs[0], dataenv);
-        if (typeof(jsfn) != "string") {
-            throw sprintf("fn:js first argument must be a string (the function to call)")
-        }
-        if (typeof(window[jsfn]) != "function") {
-            throw sprintf("fn:js no js window function '%s'", jsfn)
-        }
-        let args = [];
-        for (let i=1; i<fnAst.exprs.length; i++) {
-            let earg = evalExprAst(fnAst.exprs[i], dataenv);
-            args.push(earg);
-        }
-        args = demobx(args);
-        return window[jsfn].apply(null, args);
-    }
-    else if (fnAst.fn == "ts") {
-        return Date.now();
-    }
-    else if (fnAst.fn == "substr") {
-        if (fnAst.exprs.length == 0) {
-            return "";
-        }
-        let str = evalExprAst(fnAst.exprs[0], dataenv);
-        if (str == null) {
-            return "";
-        }
-        if (typeof(str) != "string") {
-            throw sprintf("fn:substr first argument must be a string")
-        }
-        let start = null;
-        let amt = null;
-        if (fnAst.exprs.length >= 2) {
-            start = evalExprAst(fnAst.exprs[1], dataenv);
-        }
-        if (fnAst.exprs.length >= 3) {
-            amt = evalExprAst(fnAst.exprs[2], dataenv);
-        }
-        return str.substr(start, amt);
-    }
-    else if (fnAst.fn == "sprintf") {
-        if (fnAst.exprs.length == 0) {
-            return "";
-        }
-        let formatStr = evalExprAst(fnAst.exprs[0], dataenv);
-        if (formatStr == null) {
-            return "";
-        }
-        if (typeof(formatStr) != "string") {
-            throw sprintf("fn:sprintf first argument must be a string")
-        }
-        let args = [];
-        for (let i=1; i<fnAst.exprs.length; i++) {
-            let arg = evalExprAst(fnAst.exprs[i], dataenv);
-            args.push(arg);
-        }
-        return sprintf(formatStr, ...args);
-    }
-    else if (fnAst.fn == "startsWith") {
-        if (fnAst.exprs.length == 0) {
-            return false;
-        }
-        if (fnAst.exprs.length == 1) {
-            return false;
-        }
-        let str = evalExprAst(fnAst.exprs[0], dataenv);
-        if (str == null) {
-            return false;
-        }
-        if (typeof(str) != "string") {
-            throw sprintf("fn:startsWith first argument must be a string")
-        }
-        let mstr = evalExprAst(fnAst.exprs[1], dataenv);
-        if (mstr == null) {
-            return true;
-        }
-        if (typeof(mstr) != "string") {
-            throw sprintf("fn:startsWith second argument must be a string")
-        }
-        return str.startsWith(mstr);
-    }
-    else if (fnAst.fn == "match") {
-        if (fnAst.exprs.length < 2) {
-            throw sprintf("fn:match takes at least two arguments (str, regexp)")
-        }
-        let str = evalExprAst(fnAst.exprs[0], dataenv);
-        if (str == null || typeof(str) != "string") {
-            throw sprintf("fn:match invalid str argument")
-        }
-        let reStr = evalExprAst(fnAst.exprs[1], dataenv);
-        if (reStr == null || typeof(reStr) != "string") {
-            throw sprintf("fn:match invalid regexp argument")
-        }
-        let opts = null;
-        if (fnAst.exprs.length >= 3) {
-            opts = evalExprAst(fnAst.exprs[2], dataenv);
-            if (opts != null && typeof(opts) != "string") {
-                throw sprintf("fn:match invalid third argument (must be a string)")
-            }
-        }
-        opts = (opts == null ? '' : opts);
-        let re = new RegExp(reStr, opts);
-        return str.match(re);
-    }
-    else if (fnAst.fn == "blobastext") {
-        let blob = evalExprAst(fnAst.exprs[0], dataenv);
-        if (blob == null || !(blob instanceof HibikiBlob)) {
-            return null;
-        }
-        if (!blob.mimetype.startsWith("text/")) {
-            return null;
-        }
-        return atob(blob.data);
-    }
-    else if (fnAst.fn == "blobasbase64") {
-        let blob = evalExprAst(fnAst.exprs[0], dataenv);
-        if (blob == null || !(blob instanceof HibikiBlob)) {
-            return null;
-        }
-        return blob.data;
-    }
-    else if (fnAst.fn == "blobmimetype") {
-        let blob = evalExprAst(fnAst.exprs[0], dataenv);
-        if (blob == null || !(blob instanceof HibikiBlob)) {
-            return null;
-        }
-        return blob.mimetype;
-    }
-    else if (fnAst.fn == "bloblen") {
-        let blob = evalExprAst(fnAst.exprs[0], dataenv);
-        if (blob == null || !(blob instanceof HibikiBlob)) {
-            return null;
-        }
-        let bloblen = 0;
-        if (blob.data != null) {
-            bloblen = blob.data.length;
-        }
-        return Math.ceil((bloblen/4)*3);
+        return stateFn.fn(...elist);
     }
     else {
-        throw sprintf("Invalid function: '%s'", fnAst.fn);
+        throw new Error(sprintf("Invalid function: '%s'", fnAst.fn));
     }
 }
 
@@ -1584,11 +1315,11 @@ function evalExprAst(exprAst : any, dataenv : DataEnvironment) : any {
             }
         }
         else {
-            throw sprintf("Invalid expression op type: '%s'", exprAst.op);
+            throw new Error(sprintf("Invalid expression op type: '%s'", exprAst.op));
         }
     }
     else {
-        throw sprintf("Invalid expression etype: '%s'", exprAst.etype);
+        throw new Error(sprintf("Invalid expression etype: '%s'", exprAst.etype));
     }
 }
 
@@ -1617,9 +1348,9 @@ let ExecuteStmtRaw = function ExecuteStmtRaw(stmtAst : Statement, dataenv : Data
     }
     if (opts.context) {
         if (stmtAst.stmt == "call") {
-            throw sprintf("Cannot call a handler in a context block");
+            throw new Error(sprintf("Cannot call a handler in a context block"));
         }
-        throw sprintf("Invalid statement/operation for context block, only conditionals and assignment is allowed");
+        throw new Error(sprintf("Invalid statement/operation for context block, only conditionals and assignment is allowed"));
     }
     if (stmtAst.stmt == "call") {
         let handler = evalExprAst(stmtAst.handler, dataenv);
@@ -1709,7 +1440,7 @@ let ExecuteStmtRaw = function ExecuteStmtRaw(stmtAst : Statement, dataenv : Data
             return null;
         }
         if (typeof(expr) != "object") {
-            throw sprintf("Invalid value passed to reportError, must be string or error object");
+            throw new Error(sprintf("Invalid value passed to reportError, must be string or error object"));
         }
         if (expr._type == "HibikiError") {
             dataenv.dbstate.reportErrorObj(expr as HibikiError);
@@ -1729,7 +1460,7 @@ let ExecuteStmtRaw = function ExecuteStmtRaw(stmtAst : Statement, dataenv : Data
         return null;
     }
     
-    throw sprintf("Invalid statement type: '%s'", stmtAst.stmt);
+    throw new Error(sprintf("Invalid statement type: '%s'", stmtAst.stmt));
     return null;
 }
 
@@ -1871,7 +1602,7 @@ function EvalSimpleExpr(exprStr : string, dataenv : DataEnvironment, rtContext? 
         let exprParser = new nearley.Parser(nearley.Grammar.fromCompiled(hibikiGrammar, "fullExpr"));
         exprParser.feed(exprStr);
         if (exprParser.results == null || exprParser.results.length == 0) {
-            throw "Error parsing expression, unterminated expression: + " + exprStr;
+            throw new Error("Error parsing expression, unterminated expression: + " + exprStr);
         }
         if (exprParser.results.length > 1) {
             console.log("ambiguious result", exprParser.results);
@@ -1914,14 +1645,14 @@ function BlobFromRRA(rra : any) : HibikiBlob {
 
 function ExtBlobFromRRA(blob : HibikiBlob, rra : any) {
     if (blob == null) {
-        throw sprintf("Cannot extend null HibikiBlob")
+        throw new Error(sprintf("Cannot extend null HibikiBlob"));
     }
     blob.data += rra.blobbase64;
 }
 
 function blobExtDataPath(path : PathType, curData : any, newData : any) : any {
     if (curData == null || !(curData instanceof HibikiBlob)) {
-        throw sprintf("SetPath cannot blobext a non-blob, path=%s, typeof=%s", StringPath(path), typeof(curData));
+        throw new Error(sprintf("SetPath cannot blobext a non-blob, path=%s, typeof=%s", StringPath(path), typeof(curData)));
     }
     curData.data += newData;
     return curData;
@@ -1943,10 +1674,10 @@ function ParseStaticCallStatement(str : string) : Statement {
     }
     catch (e) {
         let emsg = getShortEMsg(e);
-        throw emsg;
+        throw new Error(emsg);
     }
     if (parser.results == null || parser.results.length == null) {
-        throw "Error parsing staticCallStatement, unterminated expr";
+        throw new Error("Error parsing staticCallStatement, unterminated expr");
     }
     let callStmt = parser.results[0];
     if (parser.results.length > 1) {
@@ -1964,10 +1695,10 @@ function ParseLValuePathThrow(str : string, dataenv : DataEnvironment) {
     }
     catch (e) {
         let emsg = getShortEMsg(e);
-        throw emsg;
+        throw new Error(emsg);
     }
     if (parser.results == null || parser.results.length == null) {
-        throw "Error parsing lvalue, unterminated expr";
+        throw new Error("Error parsing lvalue, unterminated expr");
     }
     let lvalue = parser.results[0];
     if (parser.results.length > 1) {
@@ -1989,11 +1720,11 @@ function ParseLValuePath(str : string, dataenv : DataEnvironment) {
 function parseAssignLVThrow(lvalue : any, dataenv : DataEnvironment) {
     let lvaluePath = evalPath(lvalue.path, dataenv);
     if (lvaluePath == null || lvaluePath.length == 0) {
-        throw sprintf("Invalid lvalue-path in assignment (no terms)");
+        throw new Error(sprintf("Invalid lvalue-path in assignment (no terms)"));
     }
     let rootpp = lvaluePath[0];
     if (rootpp.pathtype != "root") {
-        throw sprintf("Invalid lvalue-path type %s", rootpp.pathtype)
+        throw new Error(sprintf("Invalid lvalue-path type %s", rootpp.pathtype));
     }
     return lvaluePath;
 }

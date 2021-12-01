@@ -11,13 +11,13 @@ const SYM_FLATTEN = Symbol("flatten");
 
 function jsonRespHandler(resp) {
     if (!resp.data) {
-        throw "No Data Returned";
+        throw new Error("No Data Returned");
     }
     if (resp.data && resp.data.error) {
-        throw resp.data.error;
+        throw new Error(resp.data.error);
     }
     if (!resp.data.success) {
-        throw "Internal Error";
+        throw new Error("Internal Error");
     }
     return resp.data;
 }
@@ -286,7 +286,7 @@ function evalDeepTextContent(node : HibikiNode, throwError : boolean) : any {
         }
         else {
             if (throwError) {
-                throw "Invalid 'format' attribute, must be 'json', 'jseval'";
+                throw new Error("Invalid 'format' attribute, must be 'json', 'jseval'");
             }
             return null;
         }

@@ -133,10 +133,10 @@ class DBCtx {
             this.uuid = uuidv4();
         }
         if (this.node == null) {
-            throw "DBCtx no node prop";
+            throw new Error("DBCtx no node prop");
         }
         if (this.dataenv == null) {
-            throw "DBCtx no dataenv prop";
+            throw new Error("DBCtx no dataenv prop");
         }
         let ldattr = this.resolveAttr("localdata");
         if (ldattr != null) {

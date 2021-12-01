@@ -350,12 +350,12 @@ function handleConvertType(ctx : DBCtx, value : string) : any {
             }
             if (subType == "array") {
                 if (value != null && !mobx.isArrayLike(value)) {
-                    throw "JSON value is not an array";
+                    throw new Error("JSON value is not an array");
                 }
             }
             if (subType == "map" || subType == "struct") {
                 if (value != null && !isObject(value)) {
-                    throw "JSON value is not an object";
+                    throw new Error("JSON value is not an object");
                 }
             }
         }
