@@ -26,7 +26,7 @@ function strEscValue(val) {
 // TODO - create 'path' lex token - /foo/bar, @local/wizard, /hello
 let lexer = moo.states({
     main: {
-        CALLPATH: { match: /(?:(?:\/@[a-zA-Z_][a-zA-Z0-9_]*\/?|(?:\/@[a-zA-Z_][a-zA-Z0-9_]*)?\/[a-zA-Z0-9._\/-]+)(?::@?[a-zA-Z][a-zA-Z0-9_-]*)?)/ },
+        CALLPATH: { match: /(?:(?:(?:\/@[a-zA-Z_][a-zA-Z0-9_]*)?\/[a-zA-Z0-9._\/-]+|\/@[a-zA-Z_][a-zA-Z0-9_]*\/?)(?::@?[a-zA-Z][a-zA-Z0-9_-]*)?)/ },
         LOGICAL_OR:  "||",
         LOGICAL_AND: "&&",
         GEQ:         ">=",
@@ -241,7 +241,7 @@ var grammar = {
             return rtn;
         } },
     {"name": "logStatement", "symbols": [(lexer.has("KW_LOG") ? {type: "KW_LOG"} : KW_LOG), "callParams"], "postprocess": (data) => ({stmt: "log", exprs: data[1]})},
-    {"name": "logStatement", "symbols": [(lexer.has("KW_DEBUG") ? {type: "KW_DEBUG"} : KW_DEBUG), "callParams"], "postprocess": (data) => ({stmt: "debug", exprs: data[1]})},
+    {"name": "debugStatement", "symbols": [(lexer.has("KW_DEBUG") ? {type: "KW_DEBUG"} : KW_DEBUG), "callParams"], "postprocess": (data) => ({stmt: "debug", exprs: data[1]})},
     {"name": "alertStatement", "symbols": [(lexer.has("KW_ALERT") ? {type: "KW_ALERT"} : KW_ALERT), "callParams"], "postprocess": (data) => ({stmt: "alert", exprs: data[1]})},
     {"name": "reportErrorStatement", "symbols": [(lexer.has("KW_REPORTERROR") ? {type: "KW_REPORTERROR"} : KW_REPORTERROR), "callParamsSingle"], "postprocess":  (data) => {
             return {stmt: "reporterror", expr: data[1]};

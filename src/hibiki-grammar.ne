@@ -22,7 +22,7 @@ function strEscValue(val) {
 // TODO - create 'path' lex token - /foo/bar, @local/wizard, /hello
 let lexer = moo.states({
     main: {
-        CALLPATH: { match: /(?:(?:\/@[a-zA-Z_][a-zA-Z0-9_]*\/?|(?:\/@[a-zA-Z_][a-zA-Z0-9_]*)?\/[a-zA-Z0-9._\/-]+)(?::@?[a-zA-Z][a-zA-Z0-9_-]*)?)/ },
+        CALLPATH: { match: /(?:(?:(?:\/@[a-zA-Z_][a-zA-Z0-9_]*)?\/[a-zA-Z0-9._\/-]+|\/@[a-zA-Z_][a-zA-Z0-9_]*\/?)(?::@?[a-zA-Z][a-zA-Z0-9_-]*)?)/ },
         LOGICAL_OR:  "||",
         LOGICAL_AND: "&&",
         GEQ:         ">=",
@@ -233,7 +233,7 @@ fireStatement ->
 
 logStatement -> %KW_LOG callParams {% (data) => ({stmt: "log", exprs: data[1]}) %}
 
-logStatement -> %KW_DEBUG callParams {% (data) => ({stmt: "debug", exprs: data[1]}) %}
+debugStatement -> %KW_DEBUG callParams {% (data) => ({stmt: "debug", exprs: data[1]}) %}
 
 alertStatement -> %KW_ALERT callParams {% (data) => ({stmt: "alert", exprs: data[1]}) %}
 
