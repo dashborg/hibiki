@@ -313,5 +313,22 @@ function nodeStr(node : HibikiNode) : string {
     return "<" + node.tag + ">";
 }
 
-export {jsonRespHandler, parseUrlParams, valToString, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, makeUrlParamsFromObject, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, rawAttr, evalDeepTextContent, jseval, nodeStr};
+function unpackPositionalArgs(data : Record<string, any>, posArgNames : string[]) : Record<string, any> {
+    if (data == null) {
+        return {};
+    }
+    let posArgs = data["*args"];
+    if (posArgs == null || posArgs.length == 0 || posArgNames == null || posArgNames.length == 0) {
+        return data;
+    }
+    let rtn = {...data};
+    for (let i=0; i<posArgs.length && i<posArgNames.length; i++) {
+        if (rtn[posArgNames[i]] == null) {
+            rtn[posArgNames[i]] = posArgs[i];
+        }
+    }
+    return rtn;
+}
+
+export {jsonRespHandler, parseUrlParams, valToString, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, makeUrlParamsFromObject, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, rawAttr, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs};
 

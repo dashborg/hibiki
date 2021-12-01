@@ -167,25 +167,18 @@ callStatementNoAssign ->
       staticCallStatement  {% id %}
     | dynCallStatement     {% id %}
 
-dynCallStatement -> %KW_CALL fullExpr (%LPAREN namedCallParams %RPAREN):? {% (data) => {
-          let dataExpr = null;
-          if (data[2] != null) {
-              dataExpr = {etype: "array", exprs: data[2][1]};
-          }
-          return {stmt: "call", handler: data[1], data: dataExpr};
+dynCallStatement -> %KW_CALL fullExpr namedCallParams {% (data) => {
+          return {stmt: "call", handler: data[1], data: data[2]};
       } %}
 
-staticCallStatement -> %CALLPATH (%LPAREN namedCallParams %RPAREN):?    {% (data) => {
-          let dataExpr = null;
-          if (data[1] != null) {
-              dataExpr = {etype: "array", exprs: data[1][1]};
-          }
+staticCallStatement -> %CALLPATH namedCallParams {% (data) => {
           let handler = {etype: "literal", val: data[0].value};
-          return {stmt: "call", handler: handler, data: dataExpr};
+          let rtn = {stmt: "call", handler: handler, data: data[1]};
+          return rtn;
       } %}
 
 kwExprPart -> literalMapKey %EQUAL fullExpr  {% (data) => {
-          return {etype: "kv", key: data[0], val: [2]};
+          return {etype: "kv", key: data[0], val: data[2]};
       } %}
 
 kwExprList -> kwExprPart (%COMMA kwExprPart):*   {% (data) => {
@@ -197,7 +190,22 @@ kwExprList -> kwExprPart (%COMMA kwExprPart):*   {% (data) => {
 
 namedCallParams -> 
       null                   {% (data) => { return null; } %}
-    | literalArrayElements   {% id %}
+    | %LPAREN %RPAREN        {% (data) => { return null; } %}
+    | %LPAREN literalArrayElements %RPAREN {% (data) => {
+          let arrData = {etype: "array", exprs: data[1]};
+          let argsExpr = {etype: "kv", key: {etype: "literal", val: "*args"}, val: arrData};
+          let mapData = {etype: "map", exprs: [argsExpr]};
+          return mapData;
+      } %}
+    | %LPAREN kwExprList %RPAREN {% (data) => { return data[1]; } %}
+    | %LPAREN literalArrayElementsNoComma %COMMA kwExprList %RPAREN {% (data) => {
+          let arrData = {etype: "array", exprs: data[1]};
+          let mapData = data[3];
+          let argsExpr = {etype: "kv", key: {etype: "literal", val: "*args"}, val: arrData};
+          mapData.exprs.push(argsExpr);
+          return mapData;
+      } %}
+
 #    | kwExprList
 #    | literalArrayElementsNoComma %COMMA kwExprList
 

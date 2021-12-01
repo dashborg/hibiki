@@ -172,29 +172,16 @@ var grammar = {
         } },
     {"name": "callStatementNoAssign", "symbols": ["staticCallStatement"], "postprocess": id},
     {"name": "callStatementNoAssign", "symbols": ["dynCallStatement"], "postprocess": id},
-    {"name": "dynCallStatement$ebnf$1$subexpression$1", "symbols": [(lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "namedCallParams", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)]},
-    {"name": "dynCallStatement$ebnf$1", "symbols": ["dynCallStatement$ebnf$1$subexpression$1"], "postprocess": id},
-    {"name": "dynCallStatement$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
-    {"name": "dynCallStatement", "symbols": [(lexer.has("KW_CALL") ? {type: "KW_CALL"} : KW_CALL), "fullExpr", "dynCallStatement$ebnf$1"], "postprocess":  (data) => {
-            let dataExpr = null;
-            if (data[2] != null) {
-                dataExpr = {etype: "array", exprs: data[2][1]};
-            }
-            return {stmt: "call", handler: data[1], data: dataExpr};
+    {"name": "dynCallStatement", "symbols": [(lexer.has("KW_CALL") ? {type: "KW_CALL"} : KW_CALL), "fullExpr", "namedCallParams"], "postprocess":  (data) => {
+            return {stmt: "call", handler: data[1], data: data[2]};
         } },
-    {"name": "staticCallStatement$ebnf$1$subexpression$1", "symbols": [(lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "namedCallParams", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)]},
-    {"name": "staticCallStatement$ebnf$1", "symbols": ["staticCallStatement$ebnf$1$subexpression$1"], "postprocess": id},
-    {"name": "staticCallStatement$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
-    {"name": "staticCallStatement", "symbols": [(lexer.has("CALLPATH") ? {type: "CALLPATH"} : CALLPATH), "staticCallStatement$ebnf$1"], "postprocess":  (data) => {
-            let dataExpr = null;
-            if (data[1] != null) {
-                dataExpr = {etype: "array", exprs: data[1][1]};
-            }
+    {"name": "staticCallStatement", "symbols": [(lexer.has("CALLPATH") ? {type: "CALLPATH"} : CALLPATH), "namedCallParams"], "postprocess":  (data) => {
             let handler = {etype: "literal", val: data[0].value};
-            return {stmt: "call", handler: handler, data: dataExpr};
+            let rtn = {stmt: "call", handler: handler, data: data[1]};
+            return rtn;
         } },
     {"name": "kwExprPart", "symbols": ["literalMapKey", (lexer.has("EQUAL") ? {type: "EQUAL"} : EQUAL), "fullExpr"], "postprocess":  (data) => {
-            return {etype: "kv", key: data[0], val: [2]};
+            return {etype: "kv", key: data[0], val: data[2]};
         } },
     {"name": "kwExprList$ebnf$1", "symbols": []},
     {"name": "kwExprList$ebnf$1$subexpression$1", "symbols": [(lexer.has("COMMA") ? {type: "COMMA"} : COMMA), "kwExprPart"]},
@@ -206,7 +193,21 @@ var grammar = {
             return {etype: "map", exprs: kwExprs};
         } },
     {"name": "namedCallParams", "symbols": [], "postprocess": (data) => { return null; }},
-    {"name": "namedCallParams", "symbols": ["literalArrayElements"], "postprocess": id},
+    {"name": "namedCallParams", "symbols": [(lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => { return null; }},
+    {"name": "namedCallParams", "symbols": [(lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "literalArrayElements", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess":  (data) => {
+            let arrData = {etype: "array", exprs: data[1]};
+            let argsExpr = {etype: "kv", key: {etype: "literal", val: "*args"}, val: arrData};
+            let mapData = {etype: "map", exprs: [argsExpr]};
+            return mapData;
+        } },
+    {"name": "namedCallParams", "symbols": [(lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "kwExprList", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => { return data[1]; }},
+    {"name": "namedCallParams", "symbols": [(lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "literalArrayElementsNoComma", (lexer.has("COMMA") ? {type: "COMMA"} : COMMA), "kwExprList", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess":  (data) => {
+            let arrData = {etype: "array", exprs: data[1]};
+            let mapData = data[3];
+            let argsExpr = {etype: "kv", key: {etype: "literal", val: "*args"}, val: arrData};
+            mapData.exprs.push(argsExpr);
+            return mapData;
+        } },
     {"name": "callParams$ebnf$1", "symbols": ["literalArrayElements"], "postprocess": id},
     {"name": "callParams$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
     {"name": "callParams", "symbols": [(lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "callParams$ebnf$1", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => data[1]},

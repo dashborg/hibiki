@@ -8,7 +8,7 @@ import * as DataCtx from "./datactx";
 import {isObject, textContent, SYM_PROXY, SYM_FLATTEN, nodeStr} from "./utils";
 import {RtContext, HibikiError} from "./error";
 import {DefaultJSFuncs} from "./jsfuncs";
-import {FetchModule} from "./modules";
+import {FetchModule, AppModule} from "./modules";
 
 import {parseHtml} from "./html-parser";
 
@@ -539,6 +539,7 @@ class HibikiState {
         this.DataRoots["state"] = mobx.observable.box({}, {name: "AppState"})
         this.ComponentLibrary = new ComponentLibrary();
         this.Modules["fetch"] = new FetchModule(this);
+        this.Modules["app"] = new AppModule(this, "http://localhost:5000");
         this.InitCallbacks = [];
         this.JSFuncs = DefaultJSFuncs;
     }

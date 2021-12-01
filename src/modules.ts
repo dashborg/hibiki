@@ -1,4 +1,4 @@
-import {isObject} from "./utils";
+import {isObject, unpackPositionalArgs} from "./utils";
 import {sprintf} from "sprintf-js";
 import type {HibikiState} from "./state";
 import type {RequestType} from "./types";
@@ -57,16 +57,17 @@ class FetchModule {
     }
     
     callHandler(req : RequestType) : Promise<any> {
-        let method = req.path.pathfrag;
+        let {url: urlStr, params, init: initParams, method} = unpackPositionalArgs(req.data, ["url", "params", "init"]);
+        if (method == null) {
+            method = req.path.pathfrag;
+        }
         if (method == null) {
             throw new Error(sprintf("Invalid null method passed to /@fetch:[method]"));
         }
-        // console.log("call-fetch", req.path, req.data);
         method = method.toUpperCase();
         if (!VALID_METHODS[method]) {
             throw new Error(sprintf("Invalid method passed to /@fetch:[method]: '%s'", method));
         }
-        let [urlStr, params, initParams] = (req.data ?? []);
         if (urlStr == null || typeof(urlStr) != "string") {
             throw new Error("Invalid call to /@fetch, first argument must be a string (the URL to fetch)");
         }
@@ -144,4 +145,19 @@ class FetchModule {
     }
 }
 
-export {FetchModule};
+class AppModule {
+    state : HibikiState;
+    rootPath : string;
+    
+    constructor(state : HibikiState, rootPath : string) {
+        this.state = state;
+        this.rootPath = rootPath;
+    }
+
+    callHandler(req : RequestType) : Promise<any> {
+        console.log("@app request", req);
+        return Promise.resolve(55);
+    }
+}
+
+export {FetchModule, AppModule};
