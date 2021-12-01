@@ -4,7 +4,7 @@ import nearley from "nearley";
 import hibikiGrammar from "./hibiki-grammar.js";
 import {DataEnvironment} from "./state";
 import {sprintf} from "sprintf-js";
-import {RtContext, ErrorObj, getShortEMsg} from "./error";
+import {RtContext, getShortEMsg, HibikiError} from "./error";
 import {makeUrlParamsFromObject, SYM_PROXY, SYM_FLATTEN} from "./utils";
 import {PathPart, PathType, PathUnionType, TCFBlock, StmtBlock, Statement, ExprType, DataCtxErrorObjType, EventType, HandlerValType} from "./types";
 
@@ -954,6 +954,9 @@ function MapReplacer(key : string, value : any) : any {
     else if (this[key] instanceof DataEnvironment) {
         return "[DataEnvironment]";
     }
+    else if (this[key] instanceof HibikiError) {
+        return this[key].toString();
+    }
     else {
         return value;
     }
@@ -1672,6 +1675,12 @@ let ExecuteStmtRaw = function ExecuteStmtRaw(stmtAst : Statement, dataenv : Data
     }
     if (stmtAst.stmt == "log" || stmtAst.stmt == "debug") {
         let exprs = demobx(evalExprArray(stmtAst.exprs, dataenv));
+        exprs = exprs.map((expr) => {
+            if (expr instanceof HibikiError) {
+                return expr.toString();
+            }
+            return expr;
+        });
         console.log("hibiki-log", ...exprs);
         if (stmtAst.stmt == "debug") {
             console.log("DataEnvironment Stack");
@@ -1703,7 +1712,7 @@ let ExecuteStmtRaw = function ExecuteStmtRaw(stmtAst : Statement, dataenv : Data
             throw sprintf("Invalid value passed to reportError, must be string or error object");
         }
         if (expr._type == "HibikiError") {
-            dataenv.dbstate.reportErrorObj({message: expr.message, rtctx: expr.rtctx, err: expr.err});
+            dataenv.dbstate.reportErrorObj(expr as HibikiError);
             return null;
         }
         else {
@@ -1753,7 +1762,8 @@ function ParseAndExecuteBlock(blockStr : string, errorHandler : ({blockStr : str
     }
     catch (e) {
         let msg = sprintf("Error parsing block: %s", e);
-        dataenv.dbstate.reportErrorObj({message: msg, rtctx: rtctx, err: e, blockStr: blockStr});
+        let errObj = new HibikiError(msg, e, rtctx, blockStr);
+        dataenv.dbstate.reportErrorObj(errObj);
         return null;
     }
     return ExecuteBlock({block: block, catchBlock: errorBlock, contextStr: errorContext}, dataenv, rtctx);
@@ -1764,13 +1774,9 @@ function makeErrorObj(e : any, rtctx : RtContext) : DataCtxErrorObjType {
     if (e != null) {
         message = e.toString();
     }
-    return {
-        _type: "HibikiError",
-        message: message,
-        context: rtctx.asString(),
-        rtctx: rtctx.makeCopy(),
-        err: e,
-    };
+    let rtnErr = new HibikiError(message, e, rtctx);
+    window.HibikiLastError = rtnErr;
+    return rtnErr;
 }
 
 async function ExecuteBlockPThrow(block : StmtBlock, dataenv : DataEnvironment, rtctx : RtContext) {
@@ -1794,7 +1800,7 @@ function ExecuteBlockP(block : TCFBlock, dataenv : DataEnvironment, rtctx : RtCo
     if (block.catchBlock != null) {
         prtn = prtn.catch((e) => {
             let errorObj = makeErrorObj(e, rtctx);
-            let htmlContext = "errorhandler";
+            let htmlContext = "catch-block";
             let errorEnv = dataenv.makeSpecialChildEnv({error: errorObj}, {htmlContext: htmlContext});
             rtctx.pushContext(block.contextStr || "error handler", {handlerEnv: errorEnv, handlerName: "error"});
             let ep = ExecuteBlockPThrow(block.catchBlock, errorEnv, rtctx);
@@ -1802,7 +1808,7 @@ function ExecuteBlockP(block : TCFBlock, dataenv : DataEnvironment, rtctx : RtCo
         });
     }
     else {
-        if (rtctx.stack.length > 10) {
+        if (rtctx.stack.length > 20) {
             return prtn;
         }
         let hctx = rtctx.getTopHandlerContext();
@@ -1814,12 +1820,8 @@ function ExecuteBlockP(block : TCFBlock, dataenv : DataEnvironment, rtctx : RtCo
             else {
                 handlerEnv = handlerEnv.getEventBoundary("*");
             }
-            // console.log("hctx", hctx);
-            // if (handlerEnv != null) {
-            //     handlerEnv.printStack();
-            // }
-            // console.log(rtctx.asString());
             prtn = prtn.catch((e) => {
+                rtctx.pushErrorContext(e);
                 let errorObj = makeErrorObj(e, rtctx);
                 handlerEnv.fireEvent({event: "error", bubble: true, datacontext: {error: errorObj}}, rtctx);
             });
@@ -1827,7 +1829,8 @@ function ExecuteBlockP(block : TCFBlock, dataenv : DataEnvironment, rtctx : RtCo
     }
     if (topLevelCatch) {
         prtn = prtn.catch((e) => {
-            dataenv.dbstate.reportErrorObj({message: e.toString(), rtctx: rtctx, err: e});
+            let errObj = new HibikiError(e.toString(), e, rtctx);
+            dataenv.dbstate.reportErrorObj(errObj);
         });
     }
     return prtn;
@@ -2016,7 +2019,7 @@ function convertSimpleType(typeName : string, value : string, defaultValue : any
     return value;
 }
 
-export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, ApplySingleRRA, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ParseBlock, ParseBlockThrow, ExecuteBlock, CreateContextThrow, ParseAndExecuteBlock, ObjectSetPath, DeepEqual, BoundValue, ParseLValuePath, ParseLValuePathThrow, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, ExecuteBlockP, ParseAsync};
+export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, ApplySingleRRA, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ParseBlock, ParseBlockThrow, ExecuteBlock, CreateContextThrow, ParseAndExecuteBlock, ObjectSetPath, DeepEqual, BoundValue, ParseLValuePath, ParseLValuePathThrow, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, ExecuteBlockP, ParseAsync, ExecuteBlockPThrow};
 
 export type {PathType};
 

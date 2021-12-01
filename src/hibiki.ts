@@ -4,28 +4,32 @@ import {parseHtml} from "./html-parser";
 import {HibikiState, DataEnvironment} from "./state";
 import * as ReactDOM from "react-dom";
 import {HibikiRootNode, CORE_LIBRARY} from "./nodes";
-import {evalDeepTextContent} from "./utils";
+import {deepTextContent, evalDeepTextContent} from "./utils";
 import merge from "lodash/merge";
 import type {HibikiNode, HibikiConfig, Hibiki, HibikiExtState} from "./types";
 
 declare var window : any;
 
-function readHibikiOptsFromHtml(htmlObj : HibikiNode) : {config : HibikiConfig, initialData : any} {
+function readHibikiOptsFromHtml(htmlObj : HibikiNode) : {config : HibikiConfig, initialData : any, initHandler : string} {
     let config : HibikiConfig = null;
     let initialData : any = null;
+    let initHandler : string = null;
     if (htmlObj == null || htmlObj.list == null) {
-        return {config, initialData};
+        return {config, initialData, initHandler};
     }
     for (let i=0; i<htmlObj.list.length; i++) {
         let subNode = htmlObj.list[i];
         if (config == null && subNode.tag == "hibiki-config") {
             config = evalDeepTextContent(subNode, true);
         }
-        if (initialData == null && subNode.tag == "hibiki-initialdata") {
+        if (initialData == null && subNode.tag == "hibiki-data") {
             initialData = evalDeepTextContent(subNode, true);
         }
+        if (initHandler == null && subNode.tag == "hibiki-init") {
+            initHandler = deepTextContent(subNode);
+        }
     }
-    return {config, initialData};
+    return {config, initialData, initHandler};
 }
 
 function readHibikiConfigFromOuterHtml(htmlElem : string | HTMLElement) : HibikiConfig {
@@ -33,7 +37,7 @@ function readHibikiConfigFromOuterHtml(htmlElem : string | HTMLElement) : Hibiki
     if (typeof(htmlElem) == "string") {
         return rtn;
     }
-    let initHandlerAttr = htmlElem.getAttribute("inithandler");
+    let initHandlerAttr = htmlElem.getAttribute("init.handler");
     if (initHandlerAttr != null) {
         rtn.initHandler = initHandlerAttr;
     }
@@ -70,6 +74,9 @@ let createState = function createState(config : HibikiConfig, html : string | HT
     let hibikiOpts = readHibikiOptsFromHtml(htmlObj);
     if (!config.noConfigMergeFromHtml) {
         config = merge((hibikiOpts.config ?? {}), config);
+        if (config.initHandler == null) {
+            config.initHandler = hibikiOpts.initHandler;
+        }
     }
     state.setConfig(config);
     if (!config.noDataMergeFromHtml) {
@@ -83,7 +90,10 @@ createState = mobx.action(createState);
 function render(elem : HTMLElement, state : HibikiExtState) {
     let props = {state: state};
     let reactElem = React.createElement(HibikiRootNode, props, null);
-    ReactDOM.render(reactElem, elem);
+    state.setInitCallback(() => {
+        ReactDOM.render(reactElem, elem);
+    });
+    state.initialize(false);
 }
 
 function loadTag(elem : HTMLElement) : HibikiExtState {
@@ -93,11 +103,19 @@ function loadTag(elem : HTMLElement) : HibikiExtState {
     }
     elem.setAttribute("loaded", "1");
     if (elem.tagName.toLowerCase() == "template") {
-        let siblingNode = document.createElement("div");
-        siblingNode.classList.add("hibiki-root");
-        elem.parentNode.insertBefore(siblingNode, elem.nextSibling); // insertAfter
+        let forElemId = elem.getAttribute("for");
+        let renderNode = null;
+        if (forElemId != null) {
+            renderNode = document.getElementById(forElemId);
+        }
+        if (renderNode == null) {
+            let siblingNode = document.createElement("div");
+            siblingNode.classList.add("hibiki-root");
+            elem.parentNode.insertBefore(siblingNode, elem.nextSibling); // insertAfter
+            renderNode = siblingNode;
+        }
         let state = createState({}, elem, null);
-        render(siblingNode, state);
+        render(renderNode, state);
         return state;
     }
     else {

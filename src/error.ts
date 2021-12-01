@@ -12,17 +12,10 @@ type RtContextOpts = {
     handlerEnv? : DataEnvironment,
 };
 
-type ErrorObj = {
-    message : string,
-    rtctx? : RtContext,
-    err? : Error,
-    blockStr? : string,
-};
-
 function rtItemAsString(rtci : RtContextItem) : string {
-    if (rtci.handlerName != null && rtci.handlerEnv != null) {
-        return sprintf("[%s %s] %s", rtci.handlerName, rtci.handlerEnv.getFullHtmlContext(), rtci.desc);
-    }
+    // if (rtci.handlerName != null && rtci.handlerEnv != null) {
+    //     return sprintf("[%s %s] %s", rtci.handlerName, rtci.handlerEnv.getFullHtmlContext(), rtci.desc);
+    // }
     return rtci.desc;
 }
 
@@ -60,6 +53,15 @@ class RtContext {
         opts = opts || {};
         // console.log("RT-PUSH", this.stack.length+1, desc);
         this.stack.push({desc: desc, handlerName: opts.handlerName, handlerEnv: opts.handlerEnv});
+    }
+
+    pushErrorContext(err : any) {
+        let emsg = err.toString();
+        emsg.replaceAll("\n", "\\n");
+        if (emsg.length > 80) {
+            emsg = emsg.substr(0, 77) + "...";
+        }
+        this.pushContext(sprintf("throw error: <<%s>>", emsg), null);
     }
 
     popContext() {
@@ -100,11 +102,44 @@ class RtContext {
     }
 }
 
+class HibikiError {
+    _type : "HibikiError";
+    message : string;
+    rtctx : RtContext;
+    err : any;
+    blockStr : string;
+    
+    constructor(msg : string, err? : any, rtctx? : RtContext, blockStr? : string) {
+        this._type = "HibikiError";
+        this.message = msg;
+        this.err = err;
+        this.rtctx = rtctx;
+        this.blockStr = blockStr;
+    }
+
+    get context() : string {
+        return this.rtctx.asString();
+    }
+
+    toString() : string {
+        let errStr = "Hibiki Error | " + this.message + "\n";
+        if (this.rtctx != null) {
+            errStr += this.rtctx.asString("> ") + "\n";
+        }
+        if (this.blockStr != null) {
+            errStr += "BLOCK: " + this.blockStr + "\n";
+        }
+        if (this.err != null && this.err.stack != null) {
+            errStr += "\nJavaScript Error: " + this.err.stack + "\n";
+        }
+        return errStr;
+    }
+}
+
 function getShortEMsg(e : any) {
     let emsg = e.toString();
     emsg = emsg.replace(/ Instead, I was(.|\n)*/, "");
     return emsg;
 }
 
-export {RtContext, getShortEMsg};
-export type {ErrorObj};
+export {RtContext, getShortEMsg, HibikiError};

@@ -21,7 +21,7 @@ import {HibikiState, DataEnvironment, getAttributes, getAttribute, getStyleMap} 
 import {valToString, valToInt, valToFloat, resolveNumber, isObject, textContent, SYM_PROXY, SYM_FLATTEN, jseval, nodeStr} from "./utils";
 import {parseHtml} from "./html-parser";
 import * as NodeUtils from "./nodeutils";
-import {RtContext} from "./error";
+import {RtContext, HibikiError} from "./error";
 
 declare var window : any;
 
@@ -256,7 +256,7 @@ class HtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnviron
         let component = dbstate.ComponentLibrary.findComponent(node.tag);
         if (component != null) {
             if (component.componentType == "react-custom") {
-                console.log("custom-react-copmp", component);
+                console.log("custom-react-comp", component);
                 this.nodeType = "react-component";
                 return <CustomReactNode component={component} node={node} dataenv={dataenv}/>;
             }
@@ -835,7 +835,8 @@ class DynNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironm
                 this.curHtmlObj = parseHtml(bindVal);
             }
             catch (e) {
-                ctx.dataenv.dbstate.reportErrorObj({message: "Error parsing HTML in d-dyn node: " + e.toString(), err: e});
+                let errObj = new HibikiError("Error parsing HTML in d-dyn node: " + e.toString(), e);
+                ctx.dataenv.dbstate.reportErrorObj(errObj);
             }
         }
         if (this.curHtmlObj == null) {
@@ -909,11 +910,13 @@ class SimpleQueryNode extends React.Component<{node : HibikiNode, dataenv : Data
                 let outputLV = ctx.resolveData("output", true);
                 outputLV.set(queryRtn);
             }).catch((e) => {
-                dbstate.reportErrorObj({message: e.toString(), err: e, rtctx: rtctx});
+                let errObj = new HibikiError(e.toString(), e, rtctx);
+                dbstate.reportErrorObj(errObj);
             });
         }
         catch (e) {
-            dbstate.reportErrorObj({message: e.toString(), err: e, rtctx: rtctx});
+            let errObj = new HibikiError(e.toString(), e, rtctx);
+            dbstate.reportErrorObj(errObj);
         }
     }
 

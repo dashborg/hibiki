@@ -1,5 +1,5 @@
 import type {HibikiState} from "./state";
-import type {RtContext} from "./error";
+import type {RtContext, HibikiError} from "./error";
 import * as mobx from "mobx";
 
 type HibikiNode = {
@@ -59,6 +59,7 @@ type HibikiConfig = {
     modules? : Record<string, HibikiHandlerModule>,
     noUsageImg? : boolean,
     noWelcomeMessage? : boolean,
+    errorCallback? : (HibikiError) => void,
 };
 
 type PathUnionType = string | PathType;
@@ -154,6 +155,8 @@ interface HibikiExtState {
     setLocalReactComponent(name : string, reactImpl : any);
     runActions(actions : HibikiAction[]) : any;
     setHtmlPage(htmlPage : string);
+    setInitCallback(fn : () => void);
+    initialize(force : boolean);
 };
 
 export type {HibikiNode, HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, TCFBlock, StmtBlock, Statement, ExprType, DataCtxErrorObjType, ComponentType, LibraryType, HandlerPathObj, RequestType, Hibiki, HibikiAction, HibikiExtState, EventType, HandlerValType};

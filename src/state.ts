@@ -7,8 +7,7 @@ import {v4 as uuidv4} from 'uuid';
 import {HibikiNode, ComponentType, LibraryType, HandlerPathObj, HibikiConfig, HibikiHandlerModule, RequestType, HibikiAction, TCFBlock, EventType, HandlerValType} from "./types";
 import * as DataCtx from "./datactx";
 import {isObject, textContent, SYM_PROXY, SYM_FLATTEN, nodeStr} from "./utils";
-import {RtContext} from "./error";
-import type {ErrorObj} from "./error";
+import {RtContext, HibikiError} from "./error";
 
 import {parseHtml} from "./html-parser";
 
@@ -260,7 +259,7 @@ class DataEnvironment {
         return eb1.parent.getEventBoundary(event);
     }
 
-    fireEvent(event : EventType, rtctx : RtContext) : Promise<any> {
+    fireEvent(event : EventType, rtctx : RtContext, throwErrors? : boolean) : Promise<any> {
         // if (event.event != "mount") {
         //     console.log("FIRE-EVENT", event.event, this.getFullHtmlContext());
         // }
@@ -285,7 +284,12 @@ class DataEnvironment {
         rtctx.popContext();
         ctxStr = sprintf("Running %s:%s.handler (in [[%s]])", nodeStr(hval.node), event.event, env.getFullHtmlContext());
         rtctx.pushContext(ctxStr, {handlerEnv: eventEnv, handlerName: event.event});
-        return DataCtx.ExecuteBlockP(tcfBlock, eventEnv, rtctx, false);;
+        if (throwErrors) {
+            return DataCtx.ExecuteBlockPThrow(tcfBlock.block, eventEnv, rtctx);
+        }
+        else {
+            return DataCtx.ExecuteBlockP(tcfBlock, eventEnv, rtctx, false);;
+        }
     }
 
     getContextKey(contextkey : string) : any {
@@ -522,11 +526,11 @@ class FetchModule {
         // console.log("call-fetch", req.path, req.data);
         method = method.toUpperCase();
         if (!VALID_METHODS[method]) {
-            throw sprintf("Invalid method passed to /@fetch:[method]: '%s'", method);
+            throw new Error(sprintf("Invalid method passed to /@fetch:[method]: '%s'", method));
         }
         let [urlStr, params, initParams] = (req.data ?? []);
         if (urlStr == null || typeof(urlStr) != "string") {
-            throw sprintf("Invalid call to /@fetch, first argument must be a string (the URL to fetch)");
+            throw new Error("Invalid call to /@fetch, first argument must be a string (the URL to fetch)");
         }
         let url : URL = null;
         try {
@@ -609,6 +613,10 @@ class HibikiExtState {
         this.state = state;
     }
 
+    initialize(force : boolean) {
+        this.state.initialize(force);
+    }
+
     setHtml(html : string | HTMLElement) {
         let htmlObj = parseHtml(html);
         this.state.setHtml(htmlObj);
@@ -635,15 +643,19 @@ class HibikiExtState {
     setHtmlPage(htmlPage : string) {
         this.state.setHtmlPage(htmlPage);
     }
+
+    setInitCallback(fn : () => void) {
+        this.state.setInitCallback(fn);
+    }
 }
 
 class HibikiState {
     FeClientId : string = null;
     Ui : string = null;
-    ErrorCallback : (any) => void;
+    ErrorCallback : (HibikiError) => void;
     HtmlObj : mobx.IObservableValue<any> = mobx.observable.box(null, {name: "HtmlObj", deep: false});
     ComponentLibrary : ComponentLibrary;
-    Loading : mobx.IObservableValue<boolean> = mobx.observable.box(true, {name: "Loading"});
+    Initialized : mobx.IObservableValue<boolean> = mobx.observable.box(false, {name: "Initialized"});
     RenderVersion : mobx.IObservableValue<number> = mobx.observable.box(0, {name: "RenderVersion"});
     DataNodeStates = {};
     ScriptCache = {};
@@ -654,6 +666,7 @@ class HibikiState {
     ExtHtmlObj : mobx.ObservableMap<string,any> = mobx.observable.map({}, {name: "ExtHtmlObj", deep: false});
     Config : HibikiConfig = {};
     HtmlPage : mobx.IObservableValue<string> = mobx.observable.box("default", {name: "HtmlPage"});
+    InitCallbacks : (() => void)[];
     
     Modules : Record<string, HibikiHandlerModule> = {};
     DataRoots : Record<string, mobx.IObservableValue<any>>;
@@ -664,6 +677,48 @@ class HibikiState {
         this.DataRoots["state"] = mobx.observable.box({}, {name: "AppState"})
         this.ComponentLibrary = new ComponentLibrary();
         this.Modules["fetch"] = new FetchModule(this);
+        this.InitCallbacks = [];
+    }
+
+    setInitCallback(fn : () => void) {
+        if (this.Initialized.get()) {
+            fn();
+        }
+        else {
+            this.InitCallbacks.push(fn);
+        }
+    }
+
+    @mobx.action
+    setInitialized() {
+        this.Initialized.set(true);
+        for (let i=0; i<this.InitCallbacks.length; i++) {
+            try {
+                this.InitCallbacks[i]();
+            }
+            catch (e) {
+                console.log("Hibiki Error running InitCallback", e);
+            }
+        }
+    }
+
+    initialize(force : boolean) {
+        if (this.Initialized.get()) {
+            console.log("Hibiki State is already initialized");
+        }
+        if (force || this.Config.initHandler == null) {
+            this.setInitialized();
+            return;
+        }
+        let rtctx = new RtContext();
+        let p = this.initDataenv().fireEvent({event: "init", bubble: false, datacontext: {}}, rtctx, true);
+        p.then(() => {
+            this.setInitialized();
+        }).catch((e) => {
+            rtctx.pushErrorContext(e);
+            let errObj = new HibikiError(e.toString(), e, rtctx);
+            this.reportErrorObj(errObj);
+        });
     }
 
     getExtState() : HibikiExtState {
@@ -677,6 +732,9 @@ class HibikiState {
     @mobx.action setConfig(config : HibikiConfig) {
         config = config ?? {};
         this.Config = config;
+        if (config.errorCallback != null) {
+            this.ErrorCallback = config.errorCallback;
+        }
     }
 
     @mobx.action setGlobalData(globalData : any) {
@@ -698,11 +756,30 @@ class HibikiState {
     }
 
     unhandledEvent(event : EventType, rtctx : RtContext) {
-        console.log("unhandled event", event.event, event.datacontext, rtctx);
+        if (event.event == "error" && event.datacontext != null && event.datacontext.error != null) {
+            this.reportErrorObj(event.datacontext.error);
+        }
+        else {
+            console.log("unhandled event", event.event, event.datacontext, rtctx);
+        }
     }
 
     rootDataenv() : DataEnvironment {
-        return new DataEnvironment(this, null, {htmlContext: "<root>"});
+        let opts = {htmlContext: "<root>"};
+        return new DataEnvironment(this, null, opts);
+    }
+
+    initDataenv() : DataEnvironment {
+        let env = this.rootDataenv();
+        if (this.Config.initHandler != null) {
+            let opts = {eventBoundary: "hard", handlers: {}};
+            opts.handlers["init"] = {
+                handlerStr: this.Config.initHandler,
+                node: {tag: "hibiki-root"},
+            };
+            env = env.makeChildEnv(null, null, opts);
+        }
+        return env;
     }
 
     @mobx.action fireScriptsLoaded() {
@@ -927,12 +1004,8 @@ class HibikiState {
         let self = this;
         let handlerP = this.callHandlerInternalAsync(handlerPath, handlerData, false);
         let prtn = handlerP.catch((e) => {
-            self.reportErrorObj({
-                message: sprintf("Error calling handler %s", handlerPath),
-                err: e,
-                rtctx: opts.rtContext,
-            });
-            console.log(e);
+            let errObj = new HibikiError(sprintf("Error calling handler %s", handlerPath), e, opts.rtContext);
+            self.reportErrorObj(errObj);
         });
         return prtn;
     }
@@ -941,38 +1014,20 @@ class HibikiState {
         let self = this;
         let handlerP = this.callHandlerInternalAsync(handlerPath, handlerData, true);
         let prtn = handlerP.catch((e) => {
-            self.reportErrorObj({
-                message: sprintf("Error calling data handler %s", handlerPath),
-                err: e,
-                rtctx: opts.rtContext,
-            });
-            console.log(e);
+            let errObj = new HibikiError(sprintf("Error calling data handler %s", handlerPath), e, opts.rtContext);
+            self.reportErrorObj(errObj);
         });
         return prtn;
     }
 
     reportError(errorMessage : string, rtctx? : RtContext) {
-        if (this.ErrorCallback == null) {
-            console.log("Hibiki Error |", errorMessage);
-            return;
-        }
-        let msg : ErrorObj = {message: errorMessage, rtctx: rtctx};
-        this.ErrorCallback(msg);
+        let err = new HibikiError(errorMessage, null, rtctx);
+        this.reportErrorObj(err);
     }
 
-    reportErrorObj(errorObj : ErrorObj) {
+    reportErrorObj(errorObj : HibikiError) {
         if (this.ErrorCallback == null) {
-            let errStr = "Hibiki Error | " + errorObj.message + "\n";
-            if (errorObj.rtctx != null) {
-                errStr += errorObj.rtctx.asString("> ") + "\n";
-            }
-            if (errorObj.blockStr != null) {
-                errStr += "BLOCK: " + errorObj.blockStr + "\n";
-            }
-            if (errorObj.err != null) {
-                errStr += "\nJavaScript Error: " + errorObj.err.stack + "\n";
-            }
-            console.log(errStr);
+            console.log(errorObj.toString());
             return;
         }
         this.ErrorCallback(errorObj);
