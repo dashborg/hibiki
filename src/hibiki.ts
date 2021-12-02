@@ -1,3 +1,5 @@
+// Copyright 2021 Dashborg Inc
+
 import * as React from "react";
 import * as mobx from "mobx";
 import {parseHtml} from "./html-parser";

@@ -1,3 +1,5 @@
+// Copyright 2021 Dashborg Inc
+
 import * as mobx from "mobx";
 import md5 from "md5";
 import {sprintf} from "sprintf-js";

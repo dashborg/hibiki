@@ -1,3 +1,5 @@
+// Copyright 2021 Dashborg Inc
+
 import {isObject, unpackPositionalArgs, stripAtKeys} from "./utils";
 import {sprintf} from "sprintf-js";
 import type {HibikiState} from "./state";

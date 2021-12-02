@@ -1,4 +1,4 @@
-// utils
+// Copyright 2021 Dashborg Inc
 
 import * as mobx from "mobx";
 import {HibikiNode} from "./types";

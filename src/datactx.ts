@@ -1,3 +1,5 @@
+// Copyright 2021 Dashborg Inc
+
 import * as mobx from "mobx";
 import {v4 as uuidv4} from 'uuid';
 import nearley from "nearley";

@@ -1,3 +1,5 @@
+// Copyright 2021 Dashborg Inc
+
 import camelCase from "camelcase";
 import type {HibikiNode} from "./types";
 

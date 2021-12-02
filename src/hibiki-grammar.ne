@@ -1,3 +1,5 @@
+# Copyright 2021 Dashborg Inc
+
 @{%
 
 let moo = require("moo");

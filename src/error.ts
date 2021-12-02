@@ -1,3 +1,5 @@
+// Copyright 2021 Dashborg Inc
+
 import type {DataEnvironment} from "./state";
 import {sprintf} from "sprintf-js";
 

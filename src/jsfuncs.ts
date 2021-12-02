@@ -1,3 +1,5 @@
+// Copyright 2021 Dashborg Inc
+
 import * as mobx from "mobx";
 import type {JSFuncType} from "./types";
 import {sprintf} from "sprintf-js";

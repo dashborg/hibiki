@@ -1,3 +1,5 @@
+// Copyright 2021 Dashborg Inc
+
 import type {HibikiState} from "./state";
 import type {RtContext, HibikiError} from "./error";
 import * as mobx from "mobx";
