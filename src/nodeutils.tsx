@@ -444,4 +444,29 @@ function makeHandlers(node : HibikiNode) : Record<string, HandlerValType> {
     return handlers;
 }
 
-export {BLOCKED_ELEMS, INLINE_ELEMS, SUBMIT_ELEMS, ONCHANGE_ELEMS, BINDVALUE_ONCHANGE_ELEMS, GETVALUE_ELEMS, renderTextSpan, renderTextData, makeNodeVar, makeChildrenVar, parseArgsDecl, makeIterator, getKV, parseAutomerge, handleConvertType, automerge, makeHandlers};
+function subNodesByTag(node : HibikiNode, tag : string) : HibikiNode[] {
+    if (node == null || node.list == null) {
+        return [];
+    }
+    let rtn = [];
+    for (let i=0; i<node.list.length; i++) {
+        if (node.list[i].tag == tag) {
+            rtn.push(node.list[i]);
+        }
+    }
+    return rtn;
+}
+
+function firstSubNodeByTag(node : HibikiNode, tag : string) : HibikiNode {
+    if (node == null || node.list == null) {
+        return null;
+    }
+    for (let i=0; i<node.list.length; i++) {
+        if (node.list[i].tag == tag) {
+            return node.list[i];
+        }
+    }
+    return null;
+}
+
+export {BLOCKED_ELEMS, INLINE_ELEMS, SUBMIT_ELEMS, ONCHANGE_ELEMS, BINDVALUE_ONCHANGE_ELEMS, GETVALUE_ELEMS, renderTextSpan, renderTextData, makeNodeVar, makeChildrenVar, parseArgsDecl, makeIterator, getKV, parseAutomerge, handleConvertType, automerge, makeHandlers, subNodesByTag, firstSubNodeByTag};

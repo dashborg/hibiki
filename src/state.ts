@@ -8,6 +8,7 @@ import {v4 as uuidv4} from 'uuid';
 import type {HibikiNode, ComponentType, LibraryType, HandlerPathObj, HibikiConfig, HibikiHandlerModule, HibikiAction, TCFBlock, EventType, HandlerValType, JSFuncType, CsrfHookFn, FetchHookFn, Hibiki} from "./types";
 import * as DataCtx from "./datactx";
 import {isObject, textContent, SYM_PROXY, SYM_FLATTEN, nodeStr, callHook, getHibiki} from "./utils";
+import {subNodesByTag, firstSubNodeByTag} from "./nodeutils";
 import {RtContext, HibikiError} from "./error";
 import {HibikiRequest} from "./request";
 
@@ -385,11 +386,63 @@ class DataEnvironment {
 }
 
 class ComponentLibrary {
-    libs : Record<string, LibraryType> = {};          // name -> library
-    components : Record<string, ComponentType> = {};  // name -> component
+    libs : Record<string, LibraryType>;               // name -> library
+    components : Record<string, ComponentType>;       // tag-name -> component
+    importedUrls : Record<string, boolean>;
+
+    constructor() {
+        this.libs = {};
+        this.components = {};
+        this.importedUrls = {};
+    }
 
     addLibrary(libObj : LibraryType) {
         this.libs[libObj.name] = libObj;
+    }
+
+    importLibrary(srcUrl : string, prefix : string) : Promise<boolean> {
+        if (srcUrl == null || srcUrl == "") {
+            return null;
+        }
+        if (this.importedUrls[srcUrl]) {
+            return null;
+        }
+        this.importedUrls[srcUrl] = true;
+        let p = fetch(srcUrl).then((resp) => {
+            if (!resp.ok) {
+                throw new Error(sprintf("Bad fetch response: %d %s", resp.status, resp.statusText));
+            }
+            let ctype = resp.headers.get("Content-Type");
+            if (!ctype.startsWith("text/")) {
+                throw new Error(sprintf("Bad fetch response, non-text mime-type: '%s'", ctype));
+            }
+            return resp.text();
+        })
+        .then((rtext) => {
+            let defNode = parseHtml(rtext);
+            let libNode = firstSubNodeByTag(defNode, "define-library");
+            if (libNode == null) {
+                throw new Error(sprintf("No top-level <define-library> found"));
+            }
+            let libName = "url:"+srcUrl;
+            this.buildLib(libName, libNode, true);
+            this.importLib(libName, prefix);
+            return true;
+        })
+        .then(() => {
+            let libName = "url:"+srcUrl;
+            let numComps = 0;
+            if (this.libs[libName] != null) {
+                numComps = Object.keys(this.libs[libName].components).length;
+            }
+            console.log(sprintf("Hibiki Imported Library '%s' to prefix '%s', defined %d component(s)", libName, prefix, numComps));
+            return true;
+        })
+        .catch((e) => {
+            console.log(sprintf("Error importing library '%s'", srcUrl), e);
+            return true;
+        });
+        return p;
     }
 
     buildLib(libName : string, htmlobj : HibikiNode, clear : boolean) {
@@ -587,8 +640,10 @@ class HibikiState {
             return;
         }
         let rtctx = new RtContext();
-        let p = this.initDataenv().fireEvent({event: "init", bubble: false, datacontext: {}}, rtctx, true);
-        p.then(() => {
+        let pinit = this.initDataenv().fireEvent({event: "init", bubble: false, datacontext: {}}, rtctx, true);
+        let pimport = this.runImports();
+        let pall = Promise.all([pinit, pimport]);
+        pall.then(() => {
             this.setInitialized();
         }).catch((e) => {
             rtctx.pushErrorContext(e);
@@ -651,6 +706,30 @@ class HibikiState {
 
     @mobx.action setGlobalData(globalData : any) {
         this.DataRoots["global"].set(globalData);
+    }
+
+    runImports() : Promise<any> {
+        let importTags = subNodesByTag(this.HtmlObj.get(), "import-library");
+        let parr : Promise<any>[] = [];
+        for (let i=0; i<importTags.length; i++) {
+            let itag = importTags[i];
+            if (itag.attrs == null || itag.attrs.src == null || itag.attrs.src == "") {
+                console.log("Invalid <import-library> tag, no src attribute");
+                continue;
+            }
+            if (itag.attrs == null || itag.attrs.prefix == null || itag.attrs.prefix == "") {
+                console.log(sprintf("Invalid <import-library> tag src[%s], no prefix attribute", itag.attrs.src));
+                continue;
+            }
+            let p = this.ComponentLibrary.importLibrary(itag.attrs.src, itag.attrs.prefix);
+            if (p != null) {
+                parr.push(p);
+            }
+        }
+        if (parr.length == 0) {
+            return Promise.resolve(true);
+        }
+        return Promise.all(parr);
     }
 
     @mobx.action setHtml(htmlobj : HibikiNode) {

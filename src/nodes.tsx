@@ -1297,6 +1297,7 @@ let CORE_LIBRARY : LibraryType = {
         "define-vars": {componentType: "hibiki-native", impl: NopNode},
         "define-handler": {componentType: "hibiki-native", impl: NopNode},
         "define-component": {componentType: "hibiki-native", impl: NopNode},
+        "import-library": {componentType: "hibiki-native", impl: NopNode},
         
         "h-if": {componentType: "hibiki-native", impl: IfNode},
         "h-if-break": {componentType: "hibiki-native", impl: IfNode},
