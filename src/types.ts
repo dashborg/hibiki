@@ -163,6 +163,7 @@ interface Hibiki {
     createState(config : HibikiConfig, html : string | HTMLElement, initialData : any) : HibikiExtState;
     HibikiReact : new(props : any) => React.Component<{hibikiState : HibikiExtState}, {}>;
     ModuleRegistry : Record<string, (new(HibikiState, ModuleConfig) => HibikiHandlerModule)>;
+    JSFuncs : Record<string, JSFuncType>;
 };
 
 interface HibikiExtState {

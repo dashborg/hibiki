@@ -3,11 +3,10 @@ import md5 from "md5";
 import {sprintf} from "sprintf-js";
 import {boundMethod} from 'autobind-decorator'
 import {v4 as uuidv4} from 'uuid';
-import type {HibikiNode, ComponentType, LibraryType, HandlerPathObj, HibikiConfig, HibikiHandlerModule, RequestType, HibikiAction, TCFBlock, EventType, HandlerValType, JSFuncType, CsrfHookFn, FetchHookFn} from "./types";
+import type {HibikiNode, ComponentType, LibraryType, HandlerPathObj, HibikiConfig, HibikiHandlerModule, RequestType, HibikiAction, TCFBlock, EventType, HandlerValType, JSFuncType, CsrfHookFn, FetchHookFn, Hibiki} from "./types";
 import * as DataCtx from "./datactx";
 import {isObject, textContent, SYM_PROXY, SYM_FLATTEN, nodeStr, callHook} from "./utils";
 import {RtContext, HibikiError} from "./error";
-import {DefaultJSFuncs} from "./jsfuncs";
 
 import {parseHtml} from "./html-parser";
 
@@ -26,6 +25,10 @@ function unbox(data : any) : any {
         return data.get();
     }
     return data;
+}
+
+function getHibiki() : Hibiki {
+    return (window as any).Hibiki;
 }
 
 type DataEnvironmentOpts = {
@@ -558,7 +561,8 @@ class HibikiState {
         this.DataRoots["state"] = mobx.observable.box({}, {name: "AppState"})
         this.ComponentLibrary = new ComponentLibrary();
         this.InitCallbacks = [];
-        this.JSFuncs = DefaultJSFuncs;
+        let hibiki = getHibiki();
+        this.JSFuncs = hibiki.JSFuncs;
         this.CsrfHook = DefaultCsrfHook;
     }
 
@@ -636,7 +640,8 @@ class HibikiState {
                 this.FetchHook = config.hooks.fetchHook;
             }
         }
-        let mreg : Record<string, (new(HibikiState, ModuleConfig) => HibikiHandlerModule)> = (window as any).Hibiki.ModuleRegistry;
+        let hibiki = getHibiki();
+        let mreg : Record<string, (new(HibikiState, ModuleConfig) => HibikiHandlerModule)> = hibiki.ModuleRegistry;
         if (config.modules != null) {
             for (let moduleName in config.modules) {
                 let mconfig = config.modules[moduleName];

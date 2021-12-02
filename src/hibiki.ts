@@ -8,6 +8,7 @@ import {deepTextContent, evalDeepTextContent} from "./utils";
 import merge from "lodash/merge";
 import type {HibikiNode, HibikiConfig, Hibiki, HibikiExtState} from "./types";
 import {FetchModule, AppModule} from "./modules";
+import {DefaultJSFuncs} from "./jsfuncs";
 
 declare var window : any;
 
@@ -147,6 +148,7 @@ let hibiki : Hibiki = {
         "fetch": FetchModule,
         "app": AppModule,
     },
+    JSFuncs: DefaultJSFuncs,
 };
 
 window.Hibiki = hibiki;
