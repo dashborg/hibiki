@@ -9,6 +9,7 @@ import {sprintf} from "sprintf-js";
 import {RtContext, getShortEMsg, HibikiError} from "./error";
 import {makeUrlParamsFromObject, SYM_PROXY, SYM_FLATTEN, isObject} from "./utils";
 import {PathPart, PathType, PathUnionType, TCFBlock, StmtBlock, Statement, ExprType, DataCtxErrorObjType, EventType, HandlerValType} from "./types";
+import {HibikiRequest} from "./request";
 
 declare var window : any;
 
@@ -950,6 +951,9 @@ function MapReplacer(key : string, value : any) : any {
     else if (this[key] instanceof HibikiError) {
         return this[key].toString();
     }
+    else if (this[key] instanceof HibikiRequest) {
+        return "[HibikiRequest]";
+    }
     else {
         return value;
     }
@@ -1635,6 +1639,26 @@ function ApplySingleRRA(dataenv : DataEnvironment, rra : any) {
     }
 }
 
+function BlobFromBlob(blob : Blob) : Promise<HibikiBlob> {
+    return new Promise((resolve, reject) => {
+        let reader = new FileReader();
+        reader.onloadend = () => {
+            let mimetype = blob.type;
+            let semiIdx = (reader.result as string).indexOf(";");
+            if (semiIdx == -1 || mimetype == null || mimetype == "") {
+                reject(new Error("Invalid BLOB returned from fetch, bad mimetype or encoding"));
+                return;
+            }
+            let dbblob = new HibikiBlob();
+            dbblob.mimetype = blob.type;
+            // extra 7 bytes for "base64," ... e.g. data:image/jpeg;base64,[base64data]
+            dbblob.data = (reader.result as string).substr(semiIdx+1+7);
+            resolve(dbblob);
+        };
+        reader.readAsDataURL(blob);
+    });
+}
+
 function BlobFromRRA(rra : any) : HibikiBlob {
     if (rra.type != "blob") {
         return null;
@@ -1752,7 +1776,7 @@ function convertSimpleType(typeName : string, value : string, defaultValue : any
     return value;
 }
 
-export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, ApplySingleRRA, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ParseBlock, ParseBlockThrow, ExecuteBlock, CreateContextThrow, ParseAndExecuteBlock, ObjectSetPath, DeepEqual, BoundValue, ParseLValuePath, ParseLValuePathThrow, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, ExecuteBlockP, ParseAsync, ExecuteBlockPThrow};
+export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, ApplySingleRRA, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ParseBlock, ParseBlockThrow, ExecuteBlock, CreateContextThrow, ParseAndExecuteBlock, ObjectSetPath, DeepEqual, BoundValue, ParseLValuePath, ParseLValuePathThrow, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, ExecuteBlockP, ParseAsync, ExecuteBlockPThrow, BlobFromBlob};
 
 export type {PathType};
 

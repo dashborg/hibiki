@@ -3,8 +3,9 @@
 import {isObject, unpackPositionalArgs, stripAtKeys, getHibiki} from "./utils";
 import {sprintf} from "sprintf-js";
 import type {HibikiState} from "./state";
-import type {RequestType, AppModuleConfig, FetchHookFn, Hibiki, HibikiAction} from "./types";
+import type {AppModuleConfig, FetchHookFn, Hibiki, HibikiAction} from "./types";
 import * as DataCtx from "./datactx";
+import type {HibikiRequest} from "./request";
 
 let VALID_METHODS = {"GET": true, "POST": true, "PUT": true, "PATCH": true, "DELETE": true};
 
@@ -17,24 +18,7 @@ function handleFetchResponse(url : URL, resp : any) : Promise<any> {
         return resp.json();
     }
     let blobp = resp.blob();
-    return blobp.then((blob) => {
-        return new Promise((resolve, _) => {
-            let reader = new FileReader();
-            reader.onloadend = () => {
-                let mimetype = blob.type;
-                let semiIdx = (reader.result as string).indexOf(";");
-                if (semiIdx == -1 || mimetype == null || mimetype == "") {
-                    throw new Error("Invalid BLOB returned from fetch, bad mimetype or encoding");
-                }
-                let dbblob = new DataCtx.HibikiBlob();
-                dbblob.mimetype = blob.type;
-                // extra 7 bytes for "base64," ... e.g. data:image/jpeg;base64,[base64data]
-                dbblob.data = (reader.result as string).substr(semiIdx+1+7);
-                resolve(dbblob);
-            };
-            reader.readAsDataURL(blob);
-        });
-    });
+    return blobp.then((blob) => DataCtx.BlobFromBlob(blob));
 }
 
 function convertHeaders(headersObj : any) : Headers {
@@ -79,7 +63,7 @@ class FetchModule {
         this.state = state;
     }
     
-    callHandler(req : RequestType) : Promise<any> {
+    callHandler(req : HibikiRequest) : Promise<any> {
         let {url: urlStr, params, init: fetchInit, method} = unpackPositionalArgs(req.data, ["url", "params", "init"]);
         if (method == null) {
             method = req.path.pathfrag;
@@ -134,7 +118,7 @@ class AppModule {
         this.defaultMethod = config.defaultMethod ?? "GET";
     }
 
-    callHandler(req : RequestType) : Promise<any> {
+    callHandler(req : HibikiRequest) : Promise<any> {
         let url : URL = null;
         try {
             url = new URL(this.rootPath + req.path.path);
@@ -166,7 +150,7 @@ class LocalModule {
         this.state = state;
     }
 
-    callHandler(req : RequestType) : Promise<any> {
+    callHandler(req : HibikiRequest) : Promise<any> {
         let handler = getHibiki().LocalHandlers[req.path.path];
         if (handler == null) {
             throw new Error(sprintf("Local handler '%s' not found", req.path.path));
@@ -174,13 +158,7 @@ class LocalModule {
         let rtn = handler(req);
         let p = Promise.resolve(rtn).then((rtnVal) => {
             if (rtnVal != null) {
-                let rtnAction : HibikiAction = {
-                    type: "setdata",
-                    ts: Date.now(),
-                    selector: "@rtn",
-                    data: rtn,
-                };
-                req.actions.push(rtnAction);
+                req.setData("@rtn", rtnVal);
             }
             return {hibikiactions: req.actions};
         });

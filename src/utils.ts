@@ -1,7 +1,7 @@
 // Copyright 2021 Dashborg Inc
 
 import * as mobx from "mobx";
-import {HibikiNode} from "./types";
+import {HibikiNode, Hibiki} from "./types";
 import {sprintf} from "sprintf-js";
 
 declare var window : any;

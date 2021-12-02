@@ -2,6 +2,7 @@
 
 import type {HibikiState} from "./state";
 import type {RtContext, HibikiError} from "./error";
+import type {HibikiRequest} from "./request";
 import * as mobx from "mobx";
 
 type HibikiNode = {
@@ -18,18 +19,7 @@ type JSFuncType = {
     native : boolean,
 };
 
-type RequestType = {
-    path : {
-        module : string,
-        path : string,
-        pathfrag : string,
-    },
-    data : Record<string, any>,
-    rtContext : RtContext,
-    state : HibikiExtState,
-    pure : boolean,
-    actions : HibikiAction[],
-};
+type HandlerPathType = {module : string, path : string, pathfrag : string};
 
 type EventType = {
     event : string,
@@ -53,7 +43,7 @@ type HibikiAction = {
 };
 
 type HibikiHandlerModule = {
-    callHandler : (req : RequestType) => Promise<any>;
+    callHandler : (req : HibikiRequest) => Promise<any>;
 };
 
 type AppModuleConfig = {
@@ -185,4 +175,4 @@ interface HibikiExtState {
     initialize(force : boolean);
 };
 
-export type {HibikiNode, HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, TCFBlock, StmtBlock, Statement, ExprType, DataCtxErrorObjType, ComponentType, LibraryType, HandlerPathObj, RequestType, Hibiki, HibikiAction, HibikiExtState, EventType, HandlerValType, JSFuncType, AppModuleConfig, FetchHookFn, CsrfHookFn, ReactClass};
+export type {HibikiNode, HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, TCFBlock, StmtBlock, Statement, ExprType, DataCtxErrorObjType, ComponentType, LibraryType, HandlerPathObj, HibikiRequest, Hibiki, HibikiAction, HibikiExtState, EventType, HandlerValType, JSFuncType, AppModuleConfig, FetchHookFn, CsrfHookFn, ReactClass, HandlerPathType};

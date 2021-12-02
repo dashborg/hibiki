@@ -5,10 +5,11 @@ import md5 from "md5";
 import {sprintf} from "sprintf-js";
 import {boundMethod} from 'autobind-decorator'
 import {v4 as uuidv4} from 'uuid';
-import type {HibikiNode, ComponentType, LibraryType, HandlerPathObj, HibikiConfig, HibikiHandlerModule, RequestType, HibikiAction, TCFBlock, EventType, HandlerValType, JSFuncType, CsrfHookFn, FetchHookFn, Hibiki} from "./types";
+import type {HibikiNode, ComponentType, LibraryType, HandlerPathObj, HibikiConfig, HibikiHandlerModule, HibikiAction, TCFBlock, EventType, HandlerValType, JSFuncType, CsrfHookFn, FetchHookFn, Hibiki} from "./types";
 import * as DataCtx from "./datactx";
 import {isObject, textContent, SYM_PROXY, SYM_FLATTEN, nodeStr, callHook, getHibiki} from "./utils";
 import {RtContext, HibikiError} from "./error";
+import {HibikiRequest} from "./request";
 
 import {parseHtml} from "./html-parser";
 
@@ -473,10 +474,6 @@ class HibikiExtState {
         return dataenv.resolvePath(path, false);
     }
 
-    setLocalReactComponent(name : string, reactImpl : any) {
-        this.state.ComponentLibrary.setLocalReactComponent(name, reactImpl);
-    }
-
     runActions(actions : HibikiAction[]) : any {
         return this.state.runActions(actions);
     }
@@ -487,6 +484,10 @@ class HibikiExtState {
 
     setInitCallback(fn : () => void) {
         this.state.setInitCallback(fn);
+    }
+
+    makeHibikiBlob(blob : Blob) : Promise<DataCtx.HibikiBlob> {
+        return this.state.blobFromBlob(blob);
     }
 }
 
@@ -832,6 +833,10 @@ class HibikiState {
         return this.processActions(rra, false);
     }
 
+    blobFromBlob(blob : Blob) : Promise<DataCtx.HibikiBlob> {
+        return DataCtx.BlobFromBlob(blob);
+    }
+
     @mobx.action processActions(rra : any, pureRequest : boolean) : any {
         if (rra == null) {
             return null;
@@ -888,18 +893,15 @@ class HibikiState {
         if (module == null) {
             throw new Error(sprintf("Invalid handler, no module '%s' found for path: %s", moduleName, handlerPath));
         }
-        let req : RequestType = {
-            path: {
-                module: moduleName,
-                path: hpath.path,
-                pathfrag: hpath.pathfrag,
-            },
-            data: handlerData,
-            rtContext: opts.rtContext,
-            state: this.getExtState(),
-            pure: pureRequest,
-            actions: [],
+        let req = new HibikiRequest(this.getExtState());
+        req.path = {
+            module: moduleName,
+            path: hpath.path,
+            pathfrag: hpath.pathfrag,
         };
+        req.data = handlerData;
+        req.rtContext = opts.rtContext;
+        req.pure = pureRequest;
         let self = this;
         let rtnp = module.callHandler(req);
         return rtnp.then((data) => {
@@ -963,6 +965,10 @@ class HibikiState {
     }
 
     @mobx.action invalidateRegex(queryReStr : string) {
+        if (queryReStr == null || queryReStr == "") {
+            this.invalidateAll();
+            return;
+        }
         let queryRe = new RegExp(queryReStr);
         for (let uuid in this.DataNodeStates) {
             let dnq = this.DataNodeStates[uuid];
