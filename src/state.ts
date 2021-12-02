@@ -836,7 +836,7 @@ class HibikiState {
             return null;
         }
         for (let h of htmlobj.list) {
-            if ((h.tag == "script" || h.tag == "d-script") && h.attrs != null && h.attrs["name"] == scriptName) {
+            if ((h.tag == "script" || h.tag == "h-script") && h.attrs != null && h.attrs["name"] == scriptName) {
                 return h;
             }
         }

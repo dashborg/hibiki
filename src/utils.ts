@@ -234,8 +234,6 @@ function smartEncodeParams(paramsObj : {[e : string] : any}) : string {
     return usp.toString();
 }
 
-// TODO evaluate <d-text> nodes
-// TODO should we recurse?
 function textContent(node : HibikiNode) : string {
     if (node == null || node.list == null) {
         return "";

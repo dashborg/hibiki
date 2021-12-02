@@ -16,9 +16,15 @@
     <template hibiki>
       <hibiki-config><script type="application/js-literal">
           {
-              "approot": "http://localhost:5000",
-              "appurls": {
-                  "/api/test-handler2": {"method": "POST"}
+              "modules": {
+                  "app": {
+                      "type": "app",
+                      "rootPath": "http://localhost:5000"
+                  },
+                  "app2": {
+                      "type": "app",
+                      "rootPath": "http://localhost:5000/api/"
+                  }
               }
           }
       </script></hibiki-config>
@@ -44,19 +50,19 @@
           </div>
         </section>
         <img src="https://static.dashborg.net/static/logo.png">
-        <d-data query="/@fetch:get('http://localhost:5000/api/test-handler')" output.bindpath="$.apitest"></d-data>
+        <h-data query="/@fetch:get('http://localhost:5000/api/test-handler', {x:55})" output.bindpath="$.apitest"></h-data>
         <div class="section">
           <div class="content">
             <html-ul>
-              <d-foreach bind="$.test">
+              <h-foreach bind="$.test">
                 <li class="level">
                   <div class="level-left">
-                    <d-text bind="." format="[%d]" style="font-weight: bold; color: *$.color"></d-text>
+                    <h-text bind="." format="[%d]" style="font-weight: bold; color: *$.color"></h-text>
                     <a click.handler="$.modalopen = true;" href="#" class="ml-4">Open Modal</a>
                     <button click.handler="$.test[@index] = $.test[@index]+1;" class="button is-info ml-4">+1</button>
                   </div>
                 </li>
-              </d-foreach>
+              </h-foreach>
             </html-ul>
           </div>
         </div>
@@ -64,10 +70,19 @@
           <define-vars context="@x = 55;"></define-vars>
           <local-btn foo.handler="log(28); bubble->foo();" click.handler="$.output = /@fetch:get('http://localhost:5000/api/test'); log(5); bubble->foo()" y="*55"></local-btn>
           <button class="button is-info block" click.handler="$.output = /@fetch:get('http://localhost:5000/api/test-handler', {x: 22})">Run @fetch /api/test-handler</button>
+          
+          <button class="button is-warning block" click.handler="$.output = /@app2/test-handler(88, 'hello', x=5, y=10, @method='get', ($.output == 55 ? 'color-blue' : 'color-green')=[1,2,3])">
+            Run /@app/api/test-handler
+          </button>
+
+          <button class="button is-danger block" click.handler="$.output = call ('/@app/api/test-' + 'handler')({y: 28})">
+            Run /@app/api/test-handler
+          </button>
+          
           <button class="button is-info block" click.handler="$.output = /@fetch:post('http://localhost:5000/api/test-handler2', {name: 'mike'})">Run @fetch /api/test-handler2</button>
           <button class="button is-info block" click.handler="/@fetch:get('http://localhost:5000/api/page2')">Page 2</button>
           <div class="block">
-            <pre><d-text bind="$" format="json"></d-text></pre>
+            <pre><h-text bind="$" format="json"></h-text></pre>
           </div>
         </section>
         <div class="modal" class.is-active="*$.modalopen">
@@ -82,23 +97,23 @@
           </div>
           <button click.handler="$.modalopen = false;" class="modal-close is-large" aria-label="close"></button>
         </div>
-        <d-inlinedata output.bindpath="$.foo">
+        <h-inlinedata output.bindpath="$.foo">
           [8, 22, 1, 32]
-        </d-inlinedata>
-        <d-datasorter bind="$.foo" output.bindpath="$.foo_sorted"></d-datasorter>
+        </h-inlinedata>
+        <h-datasorter bind="$.foo" output.bindpath="$.foo_sorted"></h-datasorter>
         <section class="section">
-          <d-dyn bind="'<h1 class=title>dyn-hello</h1>'"></d-dyn>
-          <div class="block"><d-dateformat bind="1636423085938" format="hh:mm a"></d-dateformat></div>
-          <div class="block"><d-dateformat bind="1636423085938" relative></d-dateformat></div>
-          <div class="block"><d-dateformat bind="2502" duration format="mm:ss.SSS"></d-dateformat></div>
+          <h-dyn bind="'<h1 class=title>dyn-hello</h1>'"></h-dyn>
+          <div class="block"><h-dateformat bind="1636423085938" format="hh:mm a"></h-dateformat></div>
+          <div class="block"><h-dateformat bind="1636423085938" relative></h-dateformat></div>
+          <div class="block"><h-dateformat bind="2502" duration format="mm:ss.SSS"></h-dateformat></div>
         </section>
         <section class="section" style="margin-bottom: 50px;">
-          <d-foreach bind="$.foo_sorted">
-            <d-withcontext context="@x = $local+100">
+          <h-foreach bind="$.foo_sorted">
+            <h-withcontext context="@x = $local+100">
               <define-vars context="@y = @x+2000"></define-vars>
-              <p><d-text bind="@y"></d-text></p>
-            </d-withcontext>
-          </d-foreach>
+              <p><h-text bind="@y"></h-text></p>
+            </h-withcontext>
+          </h-foreach>
         </section>
         
       </page>
@@ -122,7 +137,7 @@
                 </figure>
               </div>
               <div class="media-content">
-                <p class="title is-4"><d-text bind="$.name || 'John Smith - x'"></d-text></p>
+                <p class="title is-4"><h-text bind="$.name || 'John Smith - x'"></h-text></p>
                 <p class="subtitle is-6">@johnsmith</p>
               </div>
             </div>

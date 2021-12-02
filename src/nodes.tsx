@@ -641,7 +641,7 @@ class ForEachNode extends React.Component<{node : HibikiNode, dataenv : DataEnvi
             if (key != null) {
                 ctxVars["key"] = key;
             }
-            let htmlContext = sprintf("<d-foreach %d>", index);
+            let htmlContext = sprintf("<%s %d>", ctx.node.tag, index);
             let childEnv = ctx.dataenv.makeChildEnv(val, ctxVars, {htmlContext: htmlContext});
             let childElements = renderHtmlChildren(ctx.node, childEnv);
             if (childElements != null) {
@@ -774,14 +774,14 @@ class WithContextNode extends React.Component<{node : HibikiNode, dataenv : Data
         let ctx = new DBCtx(this);
         let contextattr = ctx.resolveAttr("context");
         if (contextattr == null) {
-            return <ErrorMsg message="<d-withcontext> no context attribute"/>;
+            return <ErrorMsg message={sprintf("<%s> no context attribute", nodeStr(ctx.node))}/>;
         }
         try {
-            let ctxDataenv = DataCtx.ParseAndCreateContextThrow(contextattr, ctx.childDataenv, "<d-withcontext>");
+            let ctxDataenv = DataCtx.ParseAndCreateContextThrow(contextattr, ctx.childDataenv, nodeStr(ctx.node));
             return ctxRenderHtmlChildren(ctx, ctxDataenv);
         }
         catch (e) {
-            return <ErrorMsg message={"<d-withcontext> Error parsing/executing context block: " + e}/>;
+            return <ErrorMsg message={nodeStr(ctx.node) + " Error parsing/executing context block: " + e}/>;
         }
     }
 }
@@ -805,7 +805,7 @@ class ChildrenNode extends React.Component<{node : HibikiNode, dataenv : DataEnv
         for (let i=0; i<children.length; i++) {
             let c = children[i];
             if (c == null || c.tag == null) {
-                return <ErrorMsg message={sprintf("<d-children> bad child node @ index:%d", i)}/>;
+                return <ErrorMsg message={sprintf("%s bad child node @ index:%d", nodeStr(ctx.node), i)}/>;
             }
         }
         let rtnElems = renderHtmlChildren({list: children}, ctx.childDataenv);
@@ -835,7 +835,7 @@ class DynNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironm
                 this.curHtmlObj = parseHtml(bindVal);
             }
             catch (e) {
-                let errObj = new HibikiError("Error parsing HTML in d-dyn node: " + e.toString(), e);
+                let errObj = new HibikiError(sprintf("Error parsing HTML in %s node: %s", nodeStr(ctx.node), e.toString()), e);
                 ctx.dataenv.dbstate.reportErrorObj(errObj);
             }
         }
@@ -904,7 +904,7 @@ class SimpleQueryNode extends React.Component<{node : HibikiNode, dataenv : Data
             let qrtn = dbstate.callHandlerInternalAsync(handler, handlerData, true, {rtContext: rtctx, dataenv: ctx.dataenv});
             qrtn.then((queryRtn) => {
                 if (curCallNum != this.callNum) {
-                    console.log("<d-data> not setting stale data return");
+                    console.log(sprintf("%s not setting stale data return", nodeStr(ctx.node)));
                     return;
                 }
                 let outputLV = ctx.resolveData("output", true);
@@ -951,13 +951,13 @@ class SimpleQueryNode extends React.Component<{node : HibikiNode, dataenv : Data
         let ctx = new DBCtx(this);
         let queryStr = ctx.resolveAttr("query");
         if (queryStr == null) {
-            return <ErrorMsg message="<d-data> without query attribute"/>;
+            return <ErrorMsg message={sprintf("%s without query attribute", nodeStr(ctx.node))}/>;
         }
         try {
             DataCtx.ParseStaticCallStatement(queryStr);
         }
         catch (e) {
-            return <ErrorMsg message="<d-data> error parsing query attribute"/>;
+            return <ErrorMsg message={sprintf("%s error parsing query attribute", nodeStr(ctx.node))}/>;
         }
         return null;
     }
@@ -979,7 +979,7 @@ class InlineDataNode extends React.Component<{node : HibikiNode, dataenv : DataE
             format = "json";
         }
         if (format != "json" && format != "jseval") {
-            console.log("<d-inlinedata> invalid 'format' attribute");
+            console.log(sprintf("%s invalid format attribute: '%s'", nodeStr(ctx.node), format));
             return null;
         }
         let text = textContent(ctx.node);
@@ -995,7 +995,7 @@ class InlineDataNode extends React.Component<{node : HibikiNode, dataenv : DataE
             let outputLV = ctx.resolveData("output", true);
             outputLV.set(setData);
         } catch (e) {
-            console.log("ERROR parsing <d-inlinedata> value", e);
+            console.log(sprintf("ERROR parsing %s value", nodeStr(ctx.node)), e);
         }
     }
     
@@ -1057,7 +1057,7 @@ class DataSorterNode extends React.Component<{node : HibikiNode, dataenv : DataE
                 return;
             }
             if (!mobx.isObservableArray(data)) {
-                console.log("d-datasorter value is not an array lvalue");
+                console.log(sprintf("%s value is not an array lvalue", nodeStr(ctx.node)));
                 return;
             }
         }
@@ -1286,27 +1286,30 @@ let CORE_LIBRARY : LibraryType = {
     name: "@hibiki/core",
     components: {
         "if": {componentType: "hibiki-native", impl: IfNode},
-        "d-if": {componentType: "hibiki-native", impl: IfNode},
         "if-break": {componentType: "hibiki-native", impl: IfNode},
         "foreach": {componentType: "hibiki-native", impl: ForEachNode},
-        "d-foreach": {componentType: "hibiki-native", impl: ForEachNode},
-        "d-text": {componentType: "hibiki-native", impl: TextNode},
-        "script": {componentType: "hibiki-native", impl: ScriptNode},
-        "d-script": {componentType: "hibiki-native", impl: ScriptNode},
-        "d-dateformat": {componentType: "hibiki-native", impl: DateFormatNode},
+        
         "define-vars": {componentType: "hibiki-native", impl: NopNode},
         "define-handler": {componentType: "hibiki-native", impl: NopNode},
         "define-component": {componentType: "hibiki-native", impl: NopNode},
-        "d-dyn": {componentType: "hibiki-native", impl: DynNode},
-        "d-runhandler": {componentType: "hibiki-native", impl: RunHandlerNode},
-        "d-withcontext": {componentType: "hibiki-native", impl: WithContextNode},
-        "d-children": {componentType: "hibiki-native", impl: ChildrenNode},
-        "d-data": {componentType: "hibiki-native", impl: SimpleQueryNode},
-        "d-inlinedata": {componentType: "hibiki-native", impl: InlineDataNode},
-        "d-renderlog": {componentType: "hibiki-native", impl: RenderLogNode},
-        "d-datasorter": {componentType: "hibiki-native", impl: DataSorterNode},
-        "d-datapager": {componentType: "hibiki-native", impl: DataPagerNode},
-        "d-table": {componentType: "hibiki-native", impl: SimpleTableNode},
+        
+        "h-if": {componentType: "hibiki-native", impl: IfNode},
+        "h-if-break": {componentType: "hibiki-native", impl: IfNode},
+        "h-foreach": {componentType: "hibiki-native", impl: ForEachNode},
+        "h-text": {componentType: "hibiki-native", impl: TextNode},
+        "script": {componentType: "hibiki-native", impl: ScriptNode},
+        "h-script": {componentType: "hibiki-native", impl: ScriptNode},
+        "h-dateformat": {componentType: "hibiki-native", impl: DateFormatNode},
+        "h-dyn": {componentType: "hibiki-native", impl: DynNode},
+        "h-runhandler": {componentType: "hibiki-native", impl: RunHandlerNode},
+        "h-withcontext": {componentType: "hibiki-native", impl: WithContextNode},
+        "h-children": {componentType: "hibiki-native", impl: ChildrenNode},
+        "h-data": {componentType: "hibiki-native", impl: SimpleQueryNode},
+        "h-inlinedata": {componentType: "hibiki-native", impl: InlineDataNode},
+        "h-renderlog": {componentType: "hibiki-native", impl: RenderLogNode},
+        "h-datasorter": {componentType: "hibiki-native", impl: DataSorterNode},
+        "h-datapager": {componentType: "hibiki-native", impl: DataPagerNode},
+        "h-table": {componentType: "hibiki-native", impl: SimpleTableNode},
     },
 };
 

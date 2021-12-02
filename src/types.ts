@@ -22,7 +22,7 @@ type RequestType = {
         path : string,
         pathfrag : string,
     },
-    data : any[],
+    data : Record<string, any>,
     rtContext : RtContext,
     state : HibikiExtState,
     pure : boolean,
