@@ -28,6 +28,7 @@ type RequestType = {
     rtContext : RtContext,
     state : HibikiExtState,
     pure : boolean,
+    actions : HibikiAction[],
 };
 
 type EventType = {
@@ -163,9 +164,11 @@ interface Hibiki {
     loadTag(elem: HTMLElement) : HibikiExtState;
     render(elem : HTMLElement, state : HibikiExtState);
     createState(config : HibikiConfig, html : string | HTMLElement, initialData : any) : HibikiExtState;
+    registerLocalHandler(path : string, fn : (HibikiRequest) => any);
     HibikiReact : new(props : any) => React.Component<{hibikiState : HibikiExtState}, {}>;
     ModuleRegistry : Record<string, (new(HibikiState, ModuleConfig) => HibikiHandlerModule)>;
     JSFuncs : Record<string, JSFuncType>;
+    LocalHandlers : Record<string, (HibikiRequest) => any>;
 };
 
 interface HibikiExtState {

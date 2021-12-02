@@ -3,10 +3,14 @@
 import {isObject, unpackPositionalArgs, stripAtKeys} from "./utils";
 import {sprintf} from "sprintf-js";
 import type {HibikiState} from "./state";
-import type {RequestType, AppModuleConfig, FetchHookFn} from "./types";
+import type {RequestType, AppModuleConfig, FetchHookFn, Hibiki, HibikiAction} from "./types";
 import * as DataCtx from "./datactx";
 
 let VALID_METHODS = {"GET": true, "POST": true, "PUT": true, "PATCH": true, "DELETE": true};
+
+function getHibiki() : Hibiki {
+    return (window as any).Hibiki;
+}
 
 function handleFetchResponse(url : URL, resp : any) : Promise<any> {
     if (!resp.ok) {
@@ -159,4 +163,33 @@ class AppModule {
     }
 }
 
-export {FetchModule, AppModule};
+class LocalModule {
+    state : HibikiState;
+    
+    constructor(state : HibikiState, config : any) {
+        this.state = state;
+    }
+
+    callHandler(req : RequestType) : Promise<any> {
+        let handler = getHibiki().LocalHandlers[req.path.path];
+        if (handler == null) {
+            throw new Error(sprintf("Local handler '%s' not found", req.path.path));
+        }
+        let rtn = handler(req);
+        let p = Promise.resolve(rtn).then((rtnVal) => {
+            if (rtnVal != null) {
+                let rtnAction : HibikiAction = {
+                    type: "setdata",
+                    ts: Date.now(),
+                    selector: "@rtn",
+                    data: rtn,
+                };
+                req.actions.push(rtnAction);
+            }
+            return {hibikiactions: req.actions};
+        });
+        return p;
+    }
+}
+
+export {FetchModule, AppModule, LocalModule};

@@ -252,6 +252,7 @@ class DBCtx {
     @boundMethod handleOnClick(e : any) {
         if (e != null) {
             e.preventDefault();
+            e.stopPropagation();
         }
         this.handleEvent("click");
     }

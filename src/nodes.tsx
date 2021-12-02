@@ -911,6 +911,7 @@ class SimpleQueryNode extends React.Component<{node : HibikiNode, dataenv : Data
                 }
                 let outputLV = ctx.resolveData("output", true);
                 outputLV.set(queryRtn);
+                setTimeout(() => ctx.handleEvent("load", queryRtn), 10);
             }).catch((e) => {
                 let errObj = new HibikiError(e.toString(), e, rtctx);
                 dbstate.reportErrorObj(errObj);

@@ -667,6 +667,9 @@ class HibikiState {
         if (config.modules == null || !("fetch" in config.modules)) {
             this.Modules["fetch"] = new mreg["fetch"](this, {});
         }
+        if (config.modules == null || !("local" in config.modules)) {
+            this.Modules["local"] = new mreg["local"](this, {});
+        }
     }
 
     @mobx.action setGlobalData(globalData : any) {
@@ -918,7 +921,8 @@ class HibikiState {
             data: handlerData,
             rtContext: opts.rtContext,
             state: this.getExtState(),
-            pure : pureRequest,
+            pure: pureRequest,
+            actions: [],
         };
         let self = this;
         let rtnp = module.callHandler(req);

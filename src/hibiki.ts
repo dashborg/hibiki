@@ -9,7 +9,7 @@ import {HibikiRootNode, CORE_LIBRARY} from "./nodes";
 import {deepTextContent, evalDeepTextContent} from "./utils";
 import merge from "lodash/merge";
 import type {HibikiNode, HibikiConfig, Hibiki, HibikiExtState} from "./types";
-import {FetchModule, AppModule} from "./modules";
+import {FetchModule, AppModule, LocalModule} from "./modules";
 import {DefaultJSFuncs} from "./jsfuncs";
 
 declare var window : any;
@@ -140,17 +140,26 @@ function autoloadTags() {
     }
 }
 
+let LocalHandlers : Record<string, (HibikiRequest) => any> = {};
+
+function registerLocalHandler(path : string, fn : (HibikiRequest) => any) {
+    LocalHandlers[path] = fn;
+}
+
 let hibiki : Hibiki = {
     autoloadTags: autoloadTags,
     loadTag: loadTag,
     render: render,
     createState: createState,
+    registerLocalHandler: registerLocalHandler,
     HibikiReact: HibikiRootNode,
     ModuleRegistry: {
+        "local": LocalModule,
         "fetch": FetchModule,
         "app": AppModule,
     },
     JSFuncs: DefaultJSFuncs,
+    LocalHandlers: LocalHandlers,
 };
 
 window.Hibiki = hibiki;
