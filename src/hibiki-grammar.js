@@ -39,6 +39,7 @@ let lexer = moo.states({
         LT:          "<",
         GT:          ">",
         DOLLAR:   "$",
+        ATID:     { match: /@[a-zA-Z][a-zA-Z_0-9]*/, value: (v) => v.substr(1) },
         ATSIGN:   "@",
         FN:       { match: /fn:[a-zA-Z_][a-zA-Z_0-9]*/, value: (v) => v.substr(3) },
         ID:       { match: /[a-zA-Z][a-zA-Z_0-9]*/,
@@ -87,7 +88,6 @@ let lexer = moo.states({
         HASH:     "#",
         SEMI:     ";",
         EQUAL:    "=",
-        UNDERSCORE: "_",
         JSNUM:       { match: /[0-9]*\.?[0-9]+/, value: (v) => parseFloat(v) },
         DOT:      ".",
         STRSTART_DQ: {match: "\"", push: "dqstring"},
@@ -180,13 +180,17 @@ var grammar = {
             let rtn = {stmt: "call", handler: handler, data: data[1]};
             return rtn;
         } },
-    {"name": "kwExprPart", "symbols": ["literalMapKey", (lexer.has("EQUAL") ? {type: "EQUAL"} : EQUAL), "fullExpr"], "postprocess":  (data) => {
+    {"name": "namedParamKey", "symbols": ["idOrKeyword"], "postprocess": (data) => ({etype: "literal", val: data[0].value})},
+    {"name": "namedParamKey", "symbols": ["stringLit"], "postprocess": (data) => ({etype: "literal", val: data[0]})},
+    {"name": "namedParamKey", "symbols": [(lexer.has("ATID") ? {type: "ATID"} : ATID)], "postprocess": (data) => ({etype: "literal", val: "@" + data[0].value})},
+    {"name": "namedParamKey", "symbols": [(lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "fullExpr", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => data[1]},
+    {"name": "namedParamPart", "symbols": ["namedParamKey", (lexer.has("EQUAL") ? {type: "EQUAL"} : EQUAL), "fullExpr"], "postprocess":  (data) => {
             return {etype: "kv", key: data[0], val: data[2]};
         } },
-    {"name": "kwExprList$ebnf$1", "symbols": []},
-    {"name": "kwExprList$ebnf$1$subexpression$1", "symbols": [(lexer.has("COMMA") ? {type: "COMMA"} : COMMA), "kwExprPart"]},
-    {"name": "kwExprList$ebnf$1", "symbols": ["kwExprList$ebnf$1", "kwExprList$ebnf$1$subexpression$1"], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
-    {"name": "kwExprList", "symbols": ["kwExprPart", "kwExprList$ebnf$1"], "postprocess":  (data) => {
+    {"name": "namedParamList$ebnf$1", "symbols": []},
+    {"name": "namedParamList$ebnf$1$subexpression$1", "symbols": [(lexer.has("COMMA") ? {type: "COMMA"} : COMMA), "namedParamPart"]},
+    {"name": "namedParamList$ebnf$1", "symbols": ["namedParamList$ebnf$1", "namedParamList$ebnf$1$subexpression$1"], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
+    {"name": "namedParamList", "symbols": ["namedParamPart", "namedParamList$ebnf$1"], "postprocess":  (data) => {
             let kwExprs = [];
             kwExprs.push(data[0]);
             kwExprs.push(...data[1].map((v) => v[1]));
@@ -200,8 +204,8 @@ var grammar = {
             let mapData = {etype: "map", exprs: [argsExpr]};
             return mapData;
         } },
-    {"name": "namedCallParams", "symbols": [(lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "kwExprList", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => { return data[1]; }},
-    {"name": "namedCallParams", "symbols": [(lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "literalArrayElementsNoComma", (lexer.has("COMMA") ? {type: "COMMA"} : COMMA), "kwExprList", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess":  (data) => {
+    {"name": "namedCallParams", "symbols": [(lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "namedParamList", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => { return data[1]; }},
+    {"name": "namedCallParams", "symbols": [(lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "literalArrayElementsNoComma", (lexer.has("COMMA") ? {type: "COMMA"} : COMMA), "namedParamList", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess":  (data) => {
             let arrData = {etype: "array", exprs: data[1]};
             let mapData = data[3];
             let argsExpr = {etype: "kv", key: {etype: "literal", val: "*args"}, val: arrData};
@@ -389,11 +393,11 @@ var grammar = {
         } },
     {"name": "contextPathExpr$ebnf$1", "symbols": []},
     {"name": "contextPathExpr$ebnf$1", "symbols": ["contextPathExpr$ebnf$1", "pathPartAny"], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
-    {"name": "contextPathExpr", "symbols": [(lexer.has("ATSIGN") ? {type: "ATSIGN"} : ATSIGN), "pathPartBareMap", "contextPathExpr$ebnf$1"], "postprocess":  (data) => {
+    {"name": "contextPathExpr", "symbols": [(lexer.has("ATID") ? {type: "ATID"} : ATID), "contextPathExpr$ebnf$1"], "postprocess":  (data) => {
             let rtn = [];
             rtn.push({pathtype: "root", pathkey: "context"});
-            rtn.push(data[1]);
-            rtn.push(...data[2]);
+            rtn.push({pathtype: "map", pathkey: data[0].value});
+            rtn.push(...data[1]);
             return {etype: "path", path: rtn};
         } },
     {"name": "pathPartAny", "symbols": ["pathPartDot"], "postprocess": id},

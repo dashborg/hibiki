@@ -35,6 +35,7 @@ let lexer = moo.states({
         LT:          "<",
         GT:          ">",
         DOLLAR:   "$",
+        ATID:     { match: /@[a-zA-Z][a-zA-Z_0-9]*/, value: (v) => v.substr(1) },
         ATSIGN:   "@",
         FN:       { match: /fn:[a-zA-Z_][a-zA-Z_0-9]*/, value: (v) => v.substr(3) },
         ID:       { match: /[a-zA-Z][a-zA-Z_0-9]*/,
@@ -83,7 +84,6 @@ let lexer = moo.states({
         HASH:     "#",
         SEMI:     ";",
         EQUAL:    "=",
-        UNDERSCORE: "_",
         JSNUM:       { match: /[0-9]*\.?[0-9]+/, value: (v) => parseFloat(v) },
         DOT:      ".",
         STRSTART_DQ: {match: "\"", push: "dqstring"},
@@ -177,11 +177,17 @@ staticCallStatement -> %CALLPATH namedCallParams {% (data) => {
           return rtn;
       } %}
 
-kwExprPart -> literalMapKey %EQUAL fullExpr  {% (data) => {
+namedParamKey -> 
+      idOrKeyword {% (data) => ({etype: "literal", val: data[0].value}) %}
+    | stringLit   {% (data) => ({etype: "literal", val: data[0]}) %}
+    | %ATID       {% (data) => ({etype: "literal", val: "@" + data[0].value}) %}
+    | %LPAREN fullExpr %RPAREN {% (data) => data[1] %}
+
+namedParamPart -> namedParamKey %EQUAL fullExpr {% (data) => {
           return {etype: "kv", key: data[0], val: data[2]};
       } %}
 
-kwExprList -> kwExprPart (%COMMA kwExprPart):*   {% (data) => {
+namedParamList -> namedParamPart (%COMMA namedParamPart):*   {% (data) => {
           let kwExprs = [];
           kwExprs.push(data[0]);
           kwExprs.push(...data[1].map((v) => v[1]));
@@ -197,17 +203,14 @@ namedCallParams ->
           let mapData = {etype: "map", exprs: [argsExpr]};
           return mapData;
       } %}
-    | %LPAREN kwExprList %RPAREN {% (data) => { return data[1]; } %}
-    | %LPAREN literalArrayElementsNoComma %COMMA kwExprList %RPAREN {% (data) => {
+    | %LPAREN namedParamList %RPAREN {% (data) => { return data[1]; } %}
+    | %LPAREN literalArrayElementsNoComma %COMMA namedParamList %RPAREN {% (data) => {
           let arrData = {etype: "array", exprs: data[1]};
           let mapData = data[3];
           let argsExpr = {etype: "kv", key: {etype: "literal", val: "*args"}, val: arrData};
           mapData.exprs.push(argsExpr);
           return mapData;
       } %}
-
-#    | kwExprList
-#    | literalArrayElementsNoComma %COMMA kwExprList
 
 callParams -> %LPAREN literalArrayElements:? %RPAREN {% (data) => data[1] %}
 
@@ -411,11 +414,11 @@ localPathExpr -> %DOT ((pathPartDyn | pathPartBareMap) pathPartAny:*):? {% (data
           return {etype: "path", path: rtn};
       } %}
 
-contextPathExpr -> %ATSIGN pathPartBareMap pathPartAny:* {% (data) => {
+contextPathExpr -> %ATID pathPartAny:* {% (data) => {
           let rtn = [];
           rtn.push({pathtype: "root", pathkey: "context"});
-          rtn.push(data[1]);
-          rtn.push(...data[2]);
+          rtn.push({pathtype: "map", pathkey: data[0].value});
+          rtn.push(...data[1]);
           return {etype: "path", path: rtn};
       } %}
 

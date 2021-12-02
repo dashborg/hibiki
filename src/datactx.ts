@@ -1454,7 +1454,7 @@ let ExecuteStmtRaw = function ExecuteStmtRaw(stmtAst : Statement, dataenv : Data
     }
     if (stmtAst.stmt == "throw") {
         let e1 = evalExprAst(stmtAst.expr, dataenv);
-        return Promise.reject(e1);
+        return Promise.reject(new Error(e1));
     }
     if (stmtAst.stmt == "nop") {
         return null;
