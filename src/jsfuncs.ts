@@ -4,6 +4,7 @@ import * as mobx from "mobx";
 import type {JSFuncType} from "./types";
 import {sprintf} from "sprintf-js";
 import {isObject} from "./utils";
+import {v4 as uuidv4} from 'uuid';
 
 let DefaultJSFuncs : Record<string, JSFuncType> = {};
 
@@ -212,6 +213,10 @@ function jsBlobLen(blob : any) : number {
     return Math.ceil((bloblen/4)*3);
 }
 
+function jsUuid() : string {
+    return uuidv4();
+}
+
 reg("len", jsLen, true);
 reg("indexof", jsIndexOf, true);
 reg("splice", jsSplice, true);
@@ -237,6 +242,7 @@ reg("blobastext", jsBlobAsText, true);
 reg("blobasbase64", jsBlobAsBase64, true);
 reg("blobmimetype", jsBlobMimeType, true);
 reg("bloblen", jsBlobLen, true);
+reg("uuid", jsUuid, true);
 
 function reg(name : string, fn : any, native : boolean) {
     DefaultJSFuncs[name] = {fn, native};

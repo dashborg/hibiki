@@ -20,7 +20,7 @@ import type {HibikiNode, ComponentType, LibraryType, HibikiExtState} from "./typ
 import {DBCtx} from "./dbctx";
 import * as DataCtx from "./datactx";
 import {HibikiState, DataEnvironment, getAttributes, getAttribute, getStyleMap} from "./state";
-import {valToString, valToInt, valToFloat, resolveNumber, isObject, textContent, SYM_PROXY, SYM_FLATTEN, jseval, nodeStr} from "./utils";
+import {valToString, valToInt, valToFloat, resolveNumber, isObject, textContent, SYM_PROXY, SYM_FLATTEN, jseval, nodeStr, getHibiki} from "./utils";
 import {parseHtml} from "./html-parser";
 import * as NodeUtils from "./nodeutils";
 import {RtContext, HibikiError} from "./error";
@@ -258,7 +258,6 @@ class HtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnviron
         let component = dbstate.ComponentLibrary.findComponent(node.tag);
         if (component != null) {
             if (component.componentType == "react-custom") {
-                console.log("custom-react-comp", component);
                 this.nodeType = "react-component";
                 return <CustomReactNode component={component} node={node} dataenv={dataenv}/>;
             }
@@ -298,6 +297,9 @@ class CustomReactNode extends React.Component<{node : HibikiNode, component : Co
         let component = this.props.component;
         let implBox = component.reactimpl;
         let reactImpl = implBox.get();
+        if (reactImpl == null && component.libName == "local") {
+            reactImpl = getHibiki().LocalReactComponents.get(component.name);
+        }
         if (reactImpl == null) {
             return null;
         }

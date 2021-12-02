@@ -8,7 +8,7 @@ import * as ReactDOM from "react-dom";
 import {HibikiRootNode, CORE_LIBRARY} from "./nodes";
 import {deepTextContent, evalDeepTextContent} from "./utils";
 import merge from "lodash/merge";
-import type {HibikiNode, HibikiConfig, Hibiki, HibikiExtState} from "./types";
+import type {HibikiNode, HibikiConfig, Hibiki, HibikiExtState, ReactClass} from "./types";
 import {FetchModule, AppModule, LocalModule} from "./modules";
 import {DefaultJSFuncs} from "./jsfuncs";
 
@@ -141,9 +141,14 @@ function autoloadTags() {
 }
 
 let LocalHandlers : Record<string, (HibikiRequest) => any> = {};
+let LocalReactComponents : mobx.ObservableMap<string, ReactClass> = mobx.observable.map({}, {name: "LocalReactComponents", deep: false});
 
 function registerLocalHandler(path : string, fn : (HibikiRequest) => any) {
     LocalHandlers[path] = fn;
+}
+
+function registerLocalReactComponent(name : string, comp : ReactClass) {
+    mobx.action(() => LocalReactComponents.set(name, comp))();
 }
 
 let hibiki : Hibiki = {
@@ -152,6 +157,7 @@ let hibiki : Hibiki = {
     render: render,
     createState: createState,
     registerLocalHandler: registerLocalHandler,
+    registerLocalReactComponent: registerLocalReactComponent,
     HibikiReact: HibikiRootNode,
     ModuleRegistry: {
         "local": LocalModule,
@@ -160,6 +166,7 @@ let hibiki : Hibiki = {
     },
     JSFuncs: DefaultJSFuncs,
     LocalHandlers: LocalHandlers,
+    LocalReactComponents: LocalReactComponents,
 };
 
 window.Hibiki = hibiki;

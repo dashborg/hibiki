@@ -1,16 +1,12 @@
 // Copyright 2021 Dashborg Inc
 
-import {isObject, unpackPositionalArgs, stripAtKeys} from "./utils";
+import {isObject, unpackPositionalArgs, stripAtKeys, getHibiki} from "./utils";
 import {sprintf} from "sprintf-js";
 import type {HibikiState} from "./state";
 import type {RequestType, AppModuleConfig, FetchHookFn, Hibiki, HibikiAction} from "./types";
 import * as DataCtx from "./datactx";
 
 let VALID_METHODS = {"GET": true, "POST": true, "PUT": true, "PATCH": true, "DELETE": true};
-
-function getHibiki() : Hibiki {
-    return (window as any).Hibiki;
-}
 
 function handleFetchResponse(url : URL, resp : any) : Promise<any> {
     if (!resp.ok) {

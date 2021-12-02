@@ -159,27 +159,30 @@ type HandlerPathObj = {
     pathfrag : string,
 };
 
+type ReactClass = new(props : any) => React.Component<any, any>;
+
 interface Hibiki {
     autoloadTags();
     loadTag(elem: HTMLElement) : HibikiExtState;
     render(elem : HTMLElement, state : HibikiExtState);
     createState(config : HibikiConfig, html : string | HTMLElement, initialData : any) : HibikiExtState;
     registerLocalHandler(path : string, fn : (HibikiRequest) => any);
+    registerLocalReactComponent(name : string, reactImpl : ReactClass);
     HibikiReact : new(props : any) => React.Component<{hibikiState : HibikiExtState}, {}>;
     ModuleRegistry : Record<string, (new(HibikiState, ModuleConfig) => HibikiHandlerModule)>;
     JSFuncs : Record<string, JSFuncType>;
     LocalHandlers : Record<string, (HibikiRequest) => any>;
+    LocalReactComponents : mobx.ObservableMap<string, ReactClass>;
 };
 
 interface HibikiExtState {
     setHtml(html : string | HTMLElement);
     setData(path : string, data : any);
     getData(path : string) : any;
-    setLocalReactComponent(name : string, reactImpl : any);
     runActions(actions : HibikiAction[]) : any;
     setHtmlPage(htmlPage : string);
     setInitCallback(fn : () => void);
     initialize(force : boolean);
 };
 
-export type {HibikiNode, HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, TCFBlock, StmtBlock, Statement, ExprType, DataCtxErrorObjType, ComponentType, LibraryType, HandlerPathObj, RequestType, Hibiki, HibikiAction, HibikiExtState, EventType, HandlerValType, JSFuncType, AppModuleConfig, FetchHookFn, CsrfHookFn};
+export type {HibikiNode, HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, TCFBlock, StmtBlock, Statement, ExprType, DataCtxErrorObjType, ComponentType, LibraryType, HandlerPathObj, RequestType, Hibiki, HibikiAction, HibikiExtState, EventType, HandlerValType, JSFuncType, AppModuleConfig, FetchHookFn, CsrfHookFn, ReactClass};

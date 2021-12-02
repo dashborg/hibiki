@@ -7,7 +7,7 @@ import {boundMethod} from 'autobind-decorator'
 import {v4 as uuidv4} from 'uuid';
 import type {HibikiNode, ComponentType, LibraryType, HandlerPathObj, HibikiConfig, HibikiHandlerModule, RequestType, HibikiAction, TCFBlock, EventType, HandlerValType, JSFuncType, CsrfHookFn, FetchHookFn, Hibiki} from "./types";
 import * as DataCtx from "./datactx";
-import {isObject, textContent, SYM_PROXY, SYM_FLATTEN, nodeStr, callHook} from "./utils";
+import {isObject, textContent, SYM_PROXY, SYM_FLATTEN, nodeStr, callHook, getHibiki} from "./utils";
 import {RtContext, HibikiError} from "./error";
 
 import {parseHtml} from "./html-parser";
@@ -27,10 +27,6 @@ function unbox(data : any) : any {
         return data.get();
     }
     return data;
-}
-
-function getHibiki() : Hibiki {
-    return (window as any).Hibiki;
 }
 
 type DataEnvironmentOpts = {
@@ -448,26 +444,6 @@ class ComponentLibrary {
 
     findComponent(tagName : string) : ComponentType {
         return this.components[tagName];
-    }
-
-    setLocalReactComponent(name : string, reactImpl : any) {
-        let component : ComponentType = {
-            componentType: "react-custom",
-            libName: "local",
-            name: name,
-            reactimpl: mobx.observable.box(reactImpl),
-        };
-        let cname = "local-" + name;
-        if (this.components[cname] == null) {
-            this.components[cname] = component;
-        }
-        else {
-            let ecomp = this.components[cname];
-            if (ecomp.componentType != "react-custom" || ecomp.reactimpl.get() != null) {
-                throw new Error(sprintf("Cannot redefine component %s (existing %s/%s)", cname, ecomp.libName, ecomp.name));
-            }
-            ecomp.reactimpl.set(reactImpl);
-        }
     }
 }
 
