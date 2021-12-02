@@ -53,18 +53,28 @@ type HibikiHandlerModule = {
     callHandler : (req : RequestType) => Promise<any>;
 };
 
+type AppModuleConfig = {
+    rootPath : string,
+    defaultMethod? : string,
+};
+
+type FetchHookFn = string | ((url : URL, fetchInit : Record<string, any>) => void);
+type CsrfHookFn = string | ((url : URL) => Record<string, string>);
+
+type ModuleConfig = Record<string, any>;
+
 type HibikiConfig = {
     initHandler?           : string,
     noConfigMergeFromHtml? : boolean,
     noDataMergeFromHtml?   : boolean,
     hooks? : {
-        csrfHook?  : () => Record<string, string>,
-        fetchInitHook? : (url : string, init : Record<string, any>) => void,
+        csrfHook?  : CsrfHookFn,
+        fetchHook? : FetchHookFn,
     },
-    modules? : Record<string, HibikiHandlerModule>,
     noUsageImg? : boolean,
     noWelcomeMessage? : boolean,
     errorCallback? : (HibikiError) => void,
+    modules? : Record<string, ModuleConfig>,
 };
 
 type PathUnionType = string | PathType;
@@ -152,6 +162,7 @@ interface Hibiki {
     render(elem : HTMLElement, state : HibikiExtState);
     createState(config : HibikiConfig, html : string | HTMLElement, initialData : any) : HibikiExtState;
     HibikiReact : new(props : any) => React.Component<{hibikiState : HibikiExtState}, {}>;
+    ModuleRegistry : Record<string, (new(HibikiState, ModuleConfig) => HibikiHandlerModule)>;
 };
 
 interface HibikiExtState {
@@ -165,4 +176,4 @@ interface HibikiExtState {
     initialize(force : boolean);
 };
 
-export type {HibikiNode, HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, TCFBlock, StmtBlock, Statement, ExprType, DataCtxErrorObjType, ComponentType, LibraryType, HandlerPathObj, RequestType, Hibiki, HibikiAction, HibikiExtState, EventType, HandlerValType, JSFuncType};
+export type {HibikiNode, HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, TCFBlock, StmtBlock, Statement, ExprType, DataCtxErrorObjType, ComponentType, LibraryType, HandlerPathObj, RequestType, Hibiki, HibikiAction, HibikiExtState, EventType, HandlerValType, JSFuncType, AppModuleConfig, FetchHookFn, CsrfHookFn};

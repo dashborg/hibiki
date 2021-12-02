@@ -3,12 +3,11 @@ import md5 from "md5";
 import {sprintf} from "sprintf-js";
 import {boundMethod} from 'autobind-decorator'
 import {v4 as uuidv4} from 'uuid';
-import type {HibikiNode, ComponentType, LibraryType, HandlerPathObj, HibikiConfig, HibikiHandlerModule, RequestType, HibikiAction, TCFBlock, EventType, HandlerValType, JSFuncType} from "./types";
+import type {HibikiNode, ComponentType, LibraryType, HandlerPathObj, HibikiConfig, HibikiHandlerModule, RequestType, HibikiAction, TCFBlock, EventType, HandlerValType, JSFuncType, CsrfHookFn, FetchHookFn} from "./types";
 import * as DataCtx from "./datactx";
-import {isObject, textContent, SYM_PROXY, SYM_FLATTEN, nodeStr} from "./utils";
+import {isObject, textContent, SYM_PROXY, SYM_FLATTEN, nodeStr, callHook} from "./utils";
 import {RtContext, HibikiError} from "./error";
 import {DefaultJSFuncs} from "./jsfuncs";
-import {FetchModule, AppModule} from "./modules";
 
 import {parseHtml} from "./html-parser";
 
@@ -510,6 +509,24 @@ class HibikiExtState {
     }
 }
 
+function DefaultCsrfHook() {
+    let csrfToken = null;
+    let csrfMwElem = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (csrfMwElem != null) {
+        csrfToken = (csrfMwElem as any).value;
+    }
+    let csrfMetaElem = document.querySelector("meta[name=csrf-token]");
+    if (csrfMetaElem != null) {
+        csrfToken = (csrfMetaElem as any).content;
+    }
+    if (csrfToken != null) {
+        return {
+            "X-Csrf-Token": csrfToken,
+            "X-CSRFToken": csrfToken,
+        };
+    }
+}
+
 class HibikiState {
     FeClientId : string = null;
     Ui : string = null;
@@ -529,6 +546,8 @@ class HibikiState {
     HtmlPage : mobx.IObservableValue<string> = mobx.observable.box("default", {name: "HtmlPage"});
     InitCallbacks : (() => void)[];
     JSFuncs : Record<string, JSFuncType>;
+    CsrfHook : CsrfHookFn;
+    FetchHook : FetchHookFn;
     
     Modules : Record<string, HibikiHandlerModule> = {};
     DataRoots : Record<string, mobx.IObservableValue<any>>;
@@ -538,10 +557,20 @@ class HibikiState {
         this.DataRoots["global"] = mobx.observable.box({}, {name: "GlobalData"})
         this.DataRoots["state"] = mobx.observable.box({}, {name: "AppState"})
         this.ComponentLibrary = new ComponentLibrary();
-        this.Modules["fetch"] = new FetchModule(this);
-        this.Modules["app"] = new AppModule(this, "http://localhost:5000");
         this.InitCallbacks = [];
         this.JSFuncs = DefaultJSFuncs;
+        this.CsrfHook = DefaultCsrfHook;
+    }
+
+    runFetchHooks(url : URL, fetchInit : any) {
+        fetchInit.headers = fetchInit.headers || new Headers();
+        let csrfHeaders = callHook("CsrfHook", this.CsrfHook, url);
+        if (csrfHeaders != null) {
+            for (let h in csrfHeaders) {
+                fetchInit.headers.set(h, csrfHeaders[h]);
+            }
+        }
+        callHook("FetchHook", this.FetchHook, url, fetchInit);
     }
 
     setInitCallback(fn : () => void) {
@@ -598,6 +627,38 @@ class HibikiState {
         this.Config = config;
         if (config.errorCallback != null) {
             this.ErrorCallback = config.errorCallback;
+        }
+        if (config.hooks != null) {
+            if (config.hooks.csrfHook != null) {
+                this.CsrfHook = config.hooks.csrfHook;
+            }
+            if (config.hooks.fetchHook != null) {
+                this.FetchHook = config.hooks.fetchHook;
+            }
+        }
+        let mreg : Record<string, (new(HibikiState, ModuleConfig) => HibikiHandlerModule)> = (window as any).Hibiki.ModuleRegistry;
+        if (config.modules != null) {
+            for (let moduleName in config.modules) {
+                let mconfig = config.modules[moduleName];
+                if (mconfig.remove) {
+                    continue;
+                }
+                let mtype = mconfig["type"] ?? moduleName;
+                try {
+                    let mctor = mreg[mtype];
+                    if (mctor == null) {
+                        console.log(sprintf("Hibiki Config Error, while configuring module '%s', module type '%s' not found", moduleName, mtype));
+                        continue;
+                    }
+                    this.Modules[moduleName] = new mctor(this, mconfig);
+                }
+                catch (e) {
+                    console.log(sprintf("Hibiki Config, error initializing module '%s' (type '%s')", moduleName, mtype), e);
+                }
+            }
+        }
+        if (config.modules == null || !("fetch" in config.modules)) {
+            this.Modules["fetch"] = new mreg["fetch"](this, {});
         }
     }
 

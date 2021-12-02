@@ -2,6 +2,7 @@
 
 import * as mobx from "mobx";
 import {HibikiNode} from "./types";
+import {sprintf} from "sprintf-js";
 
 declare var window : any;
 
@@ -330,5 +331,37 @@ function unpackPositionalArgs(data : Record<string, any>, posArgNames : string[]
     return rtn;
 }
 
-export {jsonRespHandler, parseUrlParams, valToString, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, makeUrlParamsFromObject, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, rawAttr, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs};
+function callHook(hookName : string, hookFn : string | Function, ...rest : any[]) : any {
+    if (hookFn == null || hookFn == "") {
+        return null;
+    }
+    let realHookFn : Function = null;
+    if (typeof(hookFn) == "function") {
+        realHookFn = hookFn;
+    }
+    else {
+        realHookFn = window[hookFn];
+        if (realHookFn == null || typeof(realHookFn) != "function") {
+            console.log(sprintf("Hibiki hook[%s], function '%s' could not be resolved", hookName, hookFn));
+            return null;
+        }
+    }
+    return realHookFn(...rest);
+}
+
+function stripAtKeys(obj : Record<string, any>) : Record<string, any> {
+    if (obj == null) {
+        return null;
+    }
+    let rtn : Record<string, any> = {};
+    for (let key in obj) {
+        if (key.startsWith("@")) {
+            continue;
+        }
+        rtn[key] = obj[key];
+    }
+    return rtn;
+}
+
+export {jsonRespHandler, parseUrlParams, valToString, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, makeUrlParamsFromObject, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, rawAttr, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys};
 

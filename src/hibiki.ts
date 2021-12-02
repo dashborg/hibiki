@@ -7,6 +7,7 @@ import {HibikiRootNode, CORE_LIBRARY} from "./nodes";
 import {deepTextContent, evalDeepTextContent} from "./utils";
 import merge from "lodash/merge";
 import type {HibikiNode, HibikiConfig, Hibiki, HibikiExtState} from "./types";
+import {FetchModule, AppModule} from "./modules";
 
 declare var window : any;
 
@@ -141,7 +142,11 @@ let hibiki : Hibiki = {
     loadTag: loadTag,
     render: render,
     createState: createState,
-    HibikiReact : HibikiRootNode,
+    HibikiReact: HibikiRootNode,
+    ModuleRegistry: {
+        "fetch": FetchModule,
+        "app": AppModule,
+    },
 };
 
 window.Hibiki = hibiki;
