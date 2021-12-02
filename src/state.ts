@@ -5,7 +5,7 @@ import md5 from "md5";
 import {sprintf} from "sprintf-js";
 import {boundMethod} from 'autobind-decorator'
 import {v4 as uuidv4} from 'uuid';
-import type {HibikiNode, ComponentType, LibraryType, HandlerPathObj, HibikiConfig, HibikiHandlerModule, HibikiAction, TCFBlock, EventType, HandlerValType, JSFuncType, CsrfHookFn, FetchHookFn, Hibiki} from "./types";
+import type {HibikiNode, ComponentType, LibraryType, HandlerPathObj, HibikiConfig, HibikiHandlerModule, HibikiAction, TCFBlock, EventType, HandlerValType, JSFuncType, CsrfHookFn, FetchHookFn, Hibiki, ErrorCallbackFn} from "./types";
 import * as DataCtx from "./datactx";
 import {isObject, textContent, SYM_PROXY, SYM_FLATTEN, nodeStr, callHook, getHibiki} from "./utils";
 import {subNodesByTag, firstSubNodeByTag} from "./nodeutils";
@@ -565,7 +565,7 @@ function DefaultCsrfHook() {
 class HibikiState {
     FeClientId : string = null;
     Ui : string = null;
-    ErrorCallback : (HibikiError) => void;
+    ErrorCallback : ErrorCallbackFn;
     HtmlObj : mobx.IObservableValue<any> = mobx.observable.box(null, {name: "HtmlObj", deep: false});
     ComponentLibrary : ComponentLibrary;
     Initialized : mobx.IObservableValue<boolean> = mobx.observable.box(false, {name: "Initialized"});
@@ -751,7 +751,12 @@ class HibikiState {
             this.reportErrorObj(event.datacontext.error);
         }
         else {
-            console.log("unhandled event", event.event, event.datacontext, rtctx);
+            if (this.Config.eventCallback != null) {
+                callHook("EventCallback", this.Config.eventCallback, event);
+            }
+            else {
+                console.log(sprintf("Hibiki unhandled event %s", event.event), event.datacontext, rtctx);
+            }
         }
     }
 
@@ -1022,7 +1027,7 @@ class HibikiState {
             console.log(errorObj.toString());
             return;
         }
-        this.ErrorCallback(errorObj);
+        callHook("ErrorCallback", this.ErrorCallback, errorObj);
     }
 
     registerDataNodeState(uuid : string, query : string, dnstate : any) {

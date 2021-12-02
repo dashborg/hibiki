@@ -53,6 +53,8 @@ type AppModuleConfig = {
 
 type FetchHookFn = string | ((url : URL, fetchInit : Record<string, any>) => void);
 type CsrfHookFn = string | ((url : URL) => Record<string, string>);
+type ErrorCallbackFn = string | ((HibikiError) => void);
+type EventCallbackFn = string | ((EventType) => void);
 
 type ModuleConfig = Record<string, any>;
 
@@ -66,7 +68,8 @@ type HibikiConfig = {
     },
     noUsageImg? : boolean,
     noWelcomeMessage? : boolean,
-    errorCallback? : (HibikiError) => void,
+    errorCallback? : ErrorCallbackFn,
+    eventCallback? : EventCallbackFn,
     modules? : Record<string, ModuleConfig>,
 };
 
@@ -175,4 +178,4 @@ interface HibikiExtState {
     initialize(force : boolean);
 };
 
-export type {HibikiNode, HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, TCFBlock, StmtBlock, Statement, ExprType, DataCtxErrorObjType, ComponentType, LibraryType, HandlerPathObj, HibikiRequest, Hibiki, HibikiAction, HibikiExtState, EventType, HandlerValType, JSFuncType, AppModuleConfig, FetchHookFn, CsrfHookFn, ReactClass, HandlerPathType};
+export type {HibikiNode, HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, TCFBlock, StmtBlock, Statement, ExprType, DataCtxErrorObjType, ComponentType, LibraryType, HandlerPathObj, HibikiRequest, Hibiki, HibikiAction, HibikiExtState, EventType, HandlerValType, JSFuncType, AppModuleConfig, FetchHookFn, CsrfHookFn, ReactClass, HandlerPathType, ErrorCallbackFn, EventCallbackFn};
