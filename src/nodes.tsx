@@ -64,7 +64,7 @@ class HibikiRootNode extends React.Component<{hibikiState : HibikiExtState}, {}>
         let state = this.getHibikiState();
         let rde = state.rootDataenv();
         let htmlContext = sprintf("<page %s>", state.HtmlPage.get());
-        let dataenv = rde.makeChildEnv(null, null, {htmlContext: htmlContext, eventBoundary: "hard"});
+        let dataenv = rde.makeChildEnv(null, {htmlContext: htmlContext, eventBoundary: "hard"});
         return dataenv;
     }
     
@@ -254,7 +254,7 @@ class AnyNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironm
                 ctxVars["key"] = key;
             }
             let htmlContext = sprintf("<%s foreach-%d>", ctx.node.tag, index);
-            let childEnv = ctx.dataenv.makeChildEnv(val, ctxVars, {htmlContext: htmlContext});
+            let childEnv = ctx.dataenv.makeChildEnv(ctxVars, {htmlContext: htmlContext, localData: val});
             let childCtx = new DBCtx(null, node, childEnv);
             let content = this.renderInner(childCtx, true);
             if (content != null) {
@@ -334,7 +334,7 @@ class CustomReactNode extends React.Component<{node : HibikiNode, component : Co
         let attrs = ctx.resolveAttrs({raw: true});
         let nodeVar = NodeUtils.makeNodeVar(ctx);
         let htmlContext = sprintf("react:<%s>", ctx.node.tag);
-        let childEnv = ctx.childDataenv.makeSpecialChildEnv({node: nodeVar}, {htmlContext: htmlContext});
+        let childEnv = ctx.childDataenv.makeChildEnv({node: nodeVar}, {htmlContext: htmlContext});
         let rtnElems = renderHtmlChildren(ctx.node, childEnv)
         let reactElem = React.createElement(reactImpl, attrs, rtnElems);
         return reactElem;
@@ -408,7 +408,7 @@ class RawHtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnvi
             cnMap: cnMap,
             disabled: null,
         };
-        if (attrs.automerge != null) { // ?? TODO
+        if (attrs.automerge != null) {
             let automergeArr = NodeUtils.parseAutomerge(attrs.automerge);
             for (let i=0; i<automergeArr.length; i++) {
                 let amParams = automergeArr[i];
@@ -510,10 +510,10 @@ class RawHtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnvi
 class CustomNode extends React.Component<{node : HibikiNode, component : ComponentType, dataenv : DataEnvironment}, {}> {
     constructor(props : any) {
         super(props);
-        this.makeChildEnv(true);
+        this.makeCustomChildEnv(true);
     }
     
-    makeChildEnv(initialize : boolean) : DataEnvironment {
+    makeCustomChildEnv(initialize : boolean) : DataEnvironment {
         let ctx = new DBCtx(this);
         let component = this.props.component;
         let implNode = component.node;
@@ -530,7 +530,7 @@ class CustomNode extends React.Component<{node : HibikiNode, component : Compone
         }
         let ctxHandlers = NodeUtils.makeHandlers(ctx.node);
         let eventCtx = sprintf("<%s>", ctx.node.tag);
-        let eventDE = ctx.childDataenv.makeSpecialChildEnv(null, {eventBoundary: "hard", handlers: ctxHandlers, htmlContext: eventCtx});
+        let eventDE = ctx.childDataenv.makeChildEnv(null, {eventBoundary: "hard", handlers: ctxHandlers, htmlContext: eventCtx});
         let nodeDataLV = new DataCtx.ObjectLValue(null, nodeDataBox);
         let specials : Record<string, any> = {};
         specials.children = childrenVar;
@@ -544,7 +544,7 @@ class CustomNode extends React.Component<{node : HibikiNode, component : Compone
             htmlContext: sprintf("<define-component %s>", componentName),
             eventBoundary: "soft",
         };
-        let childEnv = eventDE.makeSpecialChildEnv(specials, envOpts);
+        let childEnv = eventDE.makeChildEnv(specials, envOpts);
         if (initialize && rawImplAttrs.defaults != null) {
             try {
                 let block = DataCtx.ParseBlockThrow(rawImplAttrs.defaults);
@@ -571,7 +571,7 @@ class CustomNode extends React.Component<{node : HibikiNode, component : Compone
         let ctx = new DBCtx(this);
         let component = this.props.component;
         let implNode = component.node;
-        let childEnv = this.makeChildEnv(false);
+        let childEnv = this.makeCustomChildEnv(false);
         let rtnElems = renderHtmlChildren(implNode, childEnv)
         if (implNode.attrs && implNode.attrs["dashelem"]) {
             return <DashElemNode ctx={ctx}>{rtnElems}</DashElemNode>
@@ -674,7 +674,7 @@ class ForEachNode extends React.Component<{node : HibikiNode, dataenv : DataEnvi
                 ctxVars["key"] = key;
             }
             let htmlContext = sprintf("<%s %d>", ctx.node.tag, index);
-            let childEnv = ctx.dataenv.makeChildEnv(val, ctxVars, {htmlContext: htmlContext});
+            let childEnv = ctx.dataenv.makeChildEnv(ctxVars, {htmlContext: htmlContext, localData: val});
             let childElements = renderHtmlChildren(ctx.node, childEnv);
             if (childElements != null) {
                 rtnElems.push(...childElements);

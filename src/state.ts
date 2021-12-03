@@ -37,27 +37,27 @@ type DataEnvironmentOpts = {
     handlers? : Record<string, HandlerValType>,
     htmlContext? : string,
     eventBoundary? : string, // "soft" | "hard",
+    localData? : any,
 };
 
 class DataEnvironment {
     parent : DataEnvironment | null;
     dbstate : HibikiState;
-    data : any;
     specials : Record<string, any>;
     handlers : Record<string, HandlerValType>;
-    onlySpecials : boolean;
     componentRoot : Record<string, any>;
     htmlContext : string;
     description : string;
     eventBoundary : "soft" | "hard";
+    localData : any;
+    hasLocalData : boolean;
 
-    constructor(dbstate : HibikiState, data : any, opts? : DataEnvironmentOpts) {
+    constructor(dbstate : HibikiState, opts? : DataEnvironmentOpts) {
         this.parent = null;
         this.dbstate = dbstate;
-        this.data = data;
+        this.hasLocalData = false;
         this.specials = {};
         this.handlers = {};
-        this.onlySpecials = false;
         this.eventBoundary = null;
         if (opts != null) {
             this.componentRoot = opts.componentRoot;
@@ -66,6 +66,10 @@ class DataEnvironment {
             this.htmlContext = opts.htmlContext;
             if (opts.eventBoundary == "soft" || opts.eventBoundary == "hard") {
                 this.eventBoundary = opts.eventBoundary;
+            }
+            if ("localData" in opts) {
+                this.hasLocalData = true;
+                this.localData = opts.localData;
             }
         }
     }
@@ -110,6 +114,16 @@ class DataEnvironment {
         return rtn;
     }
 
+    resolveLocalData() : any {
+        if (this.hasLocalData) {
+            return this.localData;
+        }
+        if (this.parent == null) {
+            return null;
+        }
+        return this.parent.resolveLocalData();
+    }
+
     resolveRoot(rootName : string, opts?: {caret? : number}) : any {
         opts = opts || {};
         if (opts.caret != null && opts.caret < 0 || opts.caret > 1) {
@@ -129,7 +143,7 @@ class DataEnvironment {
                 }
                 return localstack[opts.caret];
             }
-            return this.data;
+            return this.resolveLocalData();
         }
         if (rootName == "null") {
             return null;
@@ -277,7 +291,7 @@ class DataEnvironment {
         }
         let hval = env.handlers[event.event];
         let htmlContext = sprintf("event%s(%s)", (event.bubble ? "-bubble" : ""), event.event);
-        let eventEnv = env.makeSpecialChildEnv(event.datacontext, {htmlContext: htmlContext});
+        let eventEnv = env.makeChildEnv(event.datacontext, {htmlContext: htmlContext});
         let tcfBlock : TCFBlock = {block: null};
         let ctxStr = sprintf("Parsing %s:%s.handler (in [[%s]])", nodeStr(hval.node), event.event, env.getFullHtmlContext());
         rtctx.pushContext(ctxStr, {handlerEnv: eventEnv, handlerName: event.event});
@@ -325,8 +339,8 @@ class DataEnvironment {
             if (dataenv == null) {
                 break;
             }
-            if (!dataenv.onlySpecials) {
-                rtn.push(dataenv.data);
+            if (this.hasLocalData) {
+                rtn.push(dataenv.localData);
             }
             dataenv = dataenv.parent;
         }
@@ -346,18 +360,12 @@ class DataEnvironment {
         return rtn;
     }
 
-    makeChildEnv(data : any, specials? : any, opts? : DataEnvironmentOpts) : DataEnvironment {
+    makeChildEnv(specials : any, opts : DataEnvironmentOpts) : DataEnvironment {
         specials = specials || {};
-        let rtn = new DataEnvironment(this.dbstate, data, opts);
+        let rtn = new DataEnvironment(this.dbstate, opts);
         rtn.parent = this;
         let copiedSpecials = Object.assign({}, specials || {});
         rtn.specials = copiedSpecials;
-        return rtn;
-    }
-
-    makeSpecialChildEnv(specials : any, opts? : DataEnvironmentOpts) : DataEnvironment {
-        let rtn = this.makeChildEnv(this.data, specials, opts);
-        rtn.onlySpecials = true;
         return rtn;
     }
 
@@ -762,7 +770,7 @@ class HibikiState {
 
     rootDataenv() : DataEnvironment {
         let opts = {htmlContext: "<root>"};
-        return new DataEnvironment(this, null, opts);
+        return new DataEnvironment(this, opts);
     }
 
     initDataenv() : DataEnvironment {
@@ -773,7 +781,7 @@ class HibikiState {
                 handlerStr: this.Config.initHandler,
                 node: {tag: "hibiki-root"},
             };
-            env = env.makeChildEnv(null, null, opts);
+            env = env.makeChildEnv(null, opts);
         }
         return env;
     }
@@ -889,7 +897,7 @@ class HibikiState {
             dataenv = this.rootDataenv();
         }
         let htmlContext = sprintf("@local:%s", handlerHtml.attrs.name)
-        let contextDataenv = dataenv.makeSpecialChildEnv({params: handlerData}, {htmlContext: htmlContext});
+        let contextDataenv = dataenv.makeChildEnv({params: handlerData}, {htmlContext: htmlContext});
         rtctx.pushContext(sprintf("Running @local handler '%s'", handlerHtml.attrs.name));
         // TODO - use ParseBlockThrow / ExecuteBlockP to return a promise that can throw errors
         let p = DataCtx.ParseAndExecuteBlock(handlerText, null, contextDataenv, rtctx);

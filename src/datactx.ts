@@ -587,7 +587,7 @@ function internalResolvePath(path : PathType, irData : any, dataenv : DataEnviro
 function resolveDynfind(arr : any[], expr : any, dataenv : DataEnvironment) : number {
     for (let i=0; i<arr.length; i++) {
         let htmlContext = sprintf("dynfind[%d]", i);
-        let childEnv = dataenv.makeChildEnv(arr[i], {"index": i}, {htmlContext: htmlContext});
+        let childEnv = dataenv.makeChildEnv({"index": i}, {htmlContext: htmlContext, localData: arr[i]});
         let e1 = evalExprAst(expr, childEnv);
         if (!!e1) {
             return i;
@@ -617,7 +617,7 @@ function ResolvePathThrow(pathUnion : PathUnionType, dataenv : DataEnvironment) 
     if (path == null) {
         return null;
     }
-    return internalResolvePath(path, dataenv.data, dataenv, 0);
+    return internalResolvePath(path, null, dataenv, 0);
 }
 
 function appendData(path : PathType, curData : any, newData : any) : any {
@@ -653,7 +653,6 @@ function appendArrData(path : PathType, curData : any, newData : any) : any {
         }
         return curData;
     }
-    // TODO allow string appendarr
     throw new Error(sprintf("SetPath cannot appendarr newData, path=%s, typeof=%s", StringPath(path), typeof(curData)));
 }
 
@@ -1175,7 +1174,7 @@ function evalExprArray(exprArray : any[], dataenv : DataEnvironment) : any[] {
 function evalExprAst(exprAst : any, dataenv : DataEnvironment) : any {
     if (exprAst.etype == "path") {
         let staticPath = evalPath(exprAst.path, dataenv);
-        let val = internalResolvePath(staticPath, dataenv.data, dataenv, 0);
+        let val = internalResolvePath(staticPath, null, dataenv, 0);
         if (val instanceof LValue) {
             return val.get();
         }
@@ -1538,7 +1537,7 @@ function ExecuteBlockP(block : TCFBlock, dataenv : DataEnvironment, rtctx : RtCo
         prtn = prtn.catch((e) => {
             let errorObj = makeErrorObj(e, rtctx);
             let htmlContext = "catch-block";
-            let errorEnv = dataenv.makeSpecialChildEnv({error: errorObj}, {htmlContext: htmlContext});
+            let errorEnv = dataenv.makeChildEnv({error: errorObj}, {htmlContext: htmlContext});
             rtctx.pushContext(block.contextStr || "error handler", {handlerEnv: errorEnv, handlerName: "error"});
             let ep = ExecuteBlockPThrow(block.catchBlock, errorEnv, rtctx);
             return ep;
@@ -1593,7 +1592,7 @@ function CreateContextThrow(block : any,  dataenv : DataEnvironment, rtContext? 
 }
 
 function ParseAndCreateContextThrow(ctxStr : string, dataenv : DataEnvironment, htmlContext : string) : DataEnvironment {
-    let ctxDataenv = dataenv.makeSpecialChildEnv({}, {htmlContext: htmlContext});
+    let ctxDataenv = dataenv.makeChildEnv({}, {htmlContext: htmlContext});
     let block = ParseBlockThrow(ctxStr);
     CreateContextThrow(block, ctxDataenv, htmlContext);
     return ctxDataenv;

@@ -144,7 +144,7 @@ class DBCtx {
         if (ldattr != null) {
             let newData = this.evalExpr(ldattr);
             let htmlContext = sprintf("localdata:<%s>", this.node.tag);
-            this.childDataenv = this.dataenv.makeChildEnv(newData, null, {htmlContext: htmlContext});
+            this.childDataenv = this.dataenv.makeChildEnv(null, {htmlContext: htmlContext, localData: newData});
         }
         else {
             this.childDataenv = this.dataenv;
@@ -236,7 +236,7 @@ class DBCtx {
             handlers: handlers,
             eventBoundary: "hard",
         };
-        let execDataenv = this.dataenv.makeSpecialChildEnv(null, envOpts);
+        let execDataenv = this.dataenv.makeChildEnv(null, envOpts);
         let rtctx = new RtContext();
         rtctx.pushContext(sprintf("event <%s>:*%s (in %s)", this.node.tag, event, this.dataenv.getHtmlContext()), null);
         execDataenv.fireEvent({event: event, bubble: false, datacontext: datacontext}, rtctx);

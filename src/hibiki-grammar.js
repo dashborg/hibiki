@@ -23,7 +23,6 @@ function strEscValue(val) {
     return ch;
 }
 
-// TODO - create 'path' lex token - /foo/bar, @local/wizard, /hello
 let lexer = moo.states({
     main: {
         CALLPATH: { match: /(?:(?:(?:\/@[a-zA-Z_][a-zA-Z0-9_]*)?\/[a-zA-Z0-9._\/-]+|\/@[a-zA-Z_][a-zA-Z0-9_]*\/?)(?::@?[a-zA-Z][a-zA-Z0-9_-]*)?)/ },
