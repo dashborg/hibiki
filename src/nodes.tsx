@@ -183,7 +183,7 @@ function baseRenderHtmlChildren(list : HibikiNode[], dataenv : DataEnvironment) 
             if (!condition) {
                 continue;
             }
-            rtn.push(<HtmlNode node={child} dataenv={dataenv}/>);
+            rtn.push(<AnyNode node={child} dataenv={dataenv}/>);
             break;
         }
         else if (child.tag == "define-vars") {
@@ -218,7 +218,7 @@ function baseRenderHtmlChildren(list : HibikiNode[], dataenv : DataEnvironment) 
             continue;
         }
         else {
-            rtn.push(<HtmlNode node={child} dataenv={dataenv}/>);
+            rtn.push(<AnyNode node={child} dataenv={dataenv}/>);
         }
     }
     return rtn;
@@ -237,14 +237,42 @@ class NodeList extends React.Component<{list : HibikiNode[], ctx : DBCtx}> {
 }
 
 @mobxReact.observer
-class HtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
+class AnyNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
     nodeType : string = "unknown";
+
+    renderForeach(ctx : DBCtx) : any {
+        let node = ctx.node;
+        let foreachText = ctx.resolveAttr("foreach");
+        let foreachExpr = ctx.evalExpr(foreachText);
+        let [iterator, isMap] = NodeUtils.makeIterator(foreachExpr);
+        let index = 0;
+        let rtnContent = [];
+        for (let rawVal of iterator) {
+            let ctxVars = {"index": index};
+            let [key, val] = NodeUtils.getKV(rawVal, isMap);
+            if (key != null) {
+                ctxVars["key"] = key;
+            }
+            let htmlContext = sprintf("<%s foreach-%d>", ctx.node.tag, index);
+            let childEnv = ctx.dataenv.makeChildEnv(val, ctxVars, {htmlContext: htmlContext});
+            let childCtx = new DBCtx(null, node, childEnv);
+            let content = this.renderInner(childCtx, true);
+            if (content != null) {
+                rtnContent.push(content);
+            }
+            index++;
+        }
+        return rtnContent;
+    }
     
-    renderInner(ctx : DBCtx) : any {
+    renderInner(ctx : DBCtx, iterating : boolean) : any {
         let node = ctx.node;
         let nodeName = node.tag;
         if (nodeName.startsWith("hibiki-")) {
             return null;
+        }
+        if (!iterating && !ctx.isEditMode() && ctx.hasAttr("foreach")) {
+            return this.renderForeach(ctx);
         }
         if (!ctx.isEditMode() && ctx.hasAttr("if")) {
             let ifText = ctx.resolveAttr("if");
@@ -253,7 +281,7 @@ class HtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnviron
                 return null;
             }
         }
-        let dataenv = this.props.dataenv;
+        let dataenv = ctx.dataenv;
         let dbstate = dataenv.dbstate;
         let component = dbstate.ComponentLibrary.findComponent(node.tag);
         if (component != null) {
@@ -284,7 +312,7 @@ class HtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnviron
 
     render() {
         let ctx = new DBCtx(this);
-        let content = this.renderInner(ctx)
+        let content = this.renderInner(ctx, false)
         return content;
     }
 }
