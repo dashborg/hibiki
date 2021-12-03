@@ -5,8 +5,6 @@ import * as mobxReact from "mobx-react";
 import * as mobx from "mobx";
 import * as cn from "classnames/dedupe";
 import {sprintf} from "sprintf-js";
-import debounce from "lodash/debounce";
-import throttle from "lodash/throttle";
 import {boundMethod} from 'autobind-decorator'
 import {If, For, When, Otherwise, Choose} from "tsx-control-statements/components";
 import {v4 as uuidv4} from 'uuid';

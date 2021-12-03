@@ -8,7 +8,6 @@ import {sprintf} from "sprintf-js";
 import {boundMethod} from 'autobind-decorator'
 import {ParseAndExecuteBlock} from "./datactx";
 import {HibikiNode} from "./types";
-import debounce from "lodash/debounce";
 import * as NodeUtils from "./nodeutils";
 import {RtContext} from "./error";
 
@@ -148,21 +147,6 @@ class DBCtx {
         }
         else {
             this.childDataenv = this.dataenv;
-        }
-    }
-
-    setupDebounce<T>(attr : string, method : T, setter : (T) => void) {
-        let debounceMs = this.resolveAttr(attr + ".debounce");
-        if (debounceMs == null) {
-            debounceMs = "1000";
-        }
-        let debounceInt = parseInt(debounceMs);
-        if (isNaN(debounceInt) || debounceInt <= 0) {
-            setter(method);
-        }
-        else {
-            let fn = debounce(method, debounceInt, {leading: true, trailing: false}).bind(this);
-            setter(fn);
         }
     }
 
