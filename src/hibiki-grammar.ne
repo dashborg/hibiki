@@ -85,6 +85,7 @@ let lexer = moo.states({
         HASH:     "#",
         SEMI:     ";",
         EQUAL:    "=",
+        PIPE:     "|",
         JSNUM:       { match: /[0-9]*\.?[0-9]+/, value: (v) => parseFloat(v) },
         DOT:      ".",
         STRSTART_DQ: {match: "\"", push: "dqstring"},
@@ -117,7 +118,7 @@ lexer.next = () => {
 
 @lexer lexer
 
-fullExpr -> ternaryExpr {% id %}
+fullExpr -> filterExpr {% id %}
 
 statementBlock -> statement (%SEMI statement):* %SEMI:?  {% (data) => {
         let rtn = [data[0]];
@@ -266,6 +267,12 @@ lvalue ->
     } %}
 
 lvaluePath -> pathExprNonTerm {% id %}
+
+filterExpr -> 
+      ternaryExpr {% id %}
+    | ternaryExpr %PIPE idOrKeyword namedCallParams {% (data) => {
+          return {etype: "filter", filter: data[2].value, exprs: [data[0], data[3]]};
+      } %}
 
 ternaryExpr ->
       qqExpr {% id %}

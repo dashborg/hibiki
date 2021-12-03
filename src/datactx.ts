@@ -7,7 +7,7 @@ import hibikiGrammar from "./hibiki-grammar.js";
 import {DataEnvironment} from "./state";
 import {sprintf} from "sprintf-js";
 import {RtContext, getShortEMsg, HibikiError} from "./error";
-import {makeUrlParamsFromObject, SYM_PROXY, SYM_FLATTEN, isObject} from "./utils";
+import {makeUrlParamsFromObject, SYM_PROXY, SYM_FLATTEN, isObject, unpackPositionalArgs} from "./utils";
 import {PathPart, PathType, PathUnionType, TCFBlock, StmtBlock, Statement, ExprType, DataCtxErrorObjType, EventType, HandlerValType} from "./types";
 import {HibikiRequest} from "./request";
 
@@ -23,6 +23,35 @@ class HibikiBlob {
     makeDataUrl() : string {
         return "data:" + this.mimetype + ";base64," + this.data;
     }
+}
+
+function formatVal(val : any, format : string) : string {
+    let rtn = null;
+    try {
+        if (format == null || format == "") {
+            rtn = String(val);
+        }
+        else if (format == "json") {
+            rtn = JsonStringify(val, 2);
+        }
+        else if (format == "json-compact") {
+            rtn = JsonStringify(val);
+        }
+        else if (mobx.isArrayLike(val)) {
+            rtn = sprintf(format, ...val);
+        }
+        else {
+            rtn = sprintf(format, val);
+        }
+    } catch (e) {
+        rtn = "format-error[" + e + "]";
+    }
+    return rtn;
+}
+
+function formatFilter(val : any, args : Record<string, any>) {
+    let {format} = unpackPositionalArgs(args, ["format"]);
+    return formatVal(val, format);
 }
 
 function rtnIfType(v : any, itype : string) : any {
@@ -1219,6 +1248,17 @@ function evalExprAst(exprAst : any, dataenv : DataEnvironment) : any {
     else if (exprAst.etype == "fn") {
         return evalFnAst(exprAst, dataenv);
     }
+    else if (exprAst.etype == "filter") {
+        let filter = exprAst.filter;
+        if (filter == "format") {
+            let e1 = evalExprAst(exprAst.exprs[0], dataenv);
+            let args = evalExprAst(exprAst.exprs[1], dataenv);
+            return formatFilter(e1, args);
+        }
+        else {
+            throw new Error(sprintf("Invalid filter '%s' (only format is allowed)", exprAst.filter));
+        }
+    }
     else if (exprAst.etype == "op") {
         if (exprAst.op == "&&") {
             let e1 = evalExprAst(exprAst.exprs[0], dataenv);
@@ -1775,7 +1815,7 @@ function convertSimpleType(typeName : string, value : string, defaultValue : any
     return value;
 }
 
-export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, ApplySingleRRA, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ParseBlock, ParseBlockThrow, ExecuteBlock, CreateContextThrow, ParseAndExecuteBlock, ObjectSetPath, DeepEqual, BoundValue, ParseLValuePath, ParseLValuePathThrow, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, ExecuteBlockP, ParseAsync, ExecuteBlockPThrow, BlobFromBlob};
+export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, ApplySingleRRA, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ParseBlock, ParseBlockThrow, ExecuteBlock, CreateContextThrow, ParseAndExecuteBlock, ObjectSetPath, DeepEqual, BoundValue, ParseLValuePath, ParseLValuePathThrow, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, ExecuteBlockP, ParseAsync, ExecuteBlockPThrow, BlobFromBlob, formatVal};
 
 export type {PathType};
 

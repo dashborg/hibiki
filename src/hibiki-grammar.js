@@ -87,6 +87,7 @@ let lexer = moo.states({
         HASH:     "#",
         SEMI:     ";",
         EQUAL:    "=",
+        PIPE:     "|",
         JSNUM:       { match: /[0-9]*\.?[0-9]+/, value: (v) => parseFloat(v) },
         DOT:      ".",
         STRSTART_DQ: {match: "\"", push: "dqstring"},
@@ -118,7 +119,7 @@ lexer.next = () => {
 var grammar = {
     Lexer: lexer,
     ParserRules: [
-    {"name": "fullExpr", "symbols": ["ternaryExpr"], "postprocess": id},
+    {"name": "fullExpr", "symbols": ["filterExpr"], "postprocess": id},
     {"name": "statementBlock$ebnf$1", "symbols": []},
     {"name": "statementBlock$ebnf$1$subexpression$1", "symbols": [(lexer.has("SEMI") ? {type: "SEMI"} : SEMI), "statement"]},
     {"name": "statementBlock$ebnf$1", "symbols": ["statementBlock$ebnf$1", "statementBlock$ebnf$1$subexpression$1"], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
@@ -259,6 +260,10 @@ var grammar = {
             return [setop, data[1]];
         } },
     {"name": "lvaluePath", "symbols": ["pathExprNonTerm"], "postprocess": id},
+    {"name": "filterExpr", "symbols": ["ternaryExpr"], "postprocess": id},
+    {"name": "filterExpr", "symbols": ["ternaryExpr", (lexer.has("PIPE") ? {type: "PIPE"} : PIPE), "idOrKeyword", "namedCallParams"], "postprocess":  (data) => {
+            return {etype: "filter", filter: data[2].value, exprs: [data[0], data[3]]};
+        } },
     {"name": "ternaryExpr", "symbols": ["qqExpr"], "postprocess": id},
     {"name": "ternaryExpr", "symbols": ["qqExpr", (lexer.has("QUESTION") ? {type: "QUESTION"} : QUESTION), "fullExpr", (lexer.has("COLON") ? {type: "COLON"} : COLON), "ternaryExpr"], "postprocess": (data) => ({etype: "op", op: "?:", exprs: [data[0], data[2], data[4]]})},
     {"name": "qqExpr", "symbols": ["logicalOrExpr"], "postprocess": id},

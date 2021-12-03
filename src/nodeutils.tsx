@@ -136,32 +136,11 @@ function renderTextData(node : HibikiNode, dataenv : DataEnvironment) : any {
     let bindVal = DataCtx.demobx(dataLV.get());
     if (bindVal == null && ctx.hasAttr("nulltext")) {
         let nullText = ctx.resolveAttr("nulltext");
-        let rtn = formatVal(nullText, null);
+        let rtn = DataCtx.formatVal(nullText, null);
         return renderTextSpan(rtn, style);
     }
-    let rtn = formatVal(bindVal, ctx.resolveAttr("format"));
+    let rtn = DataCtx.formatVal(bindVal, ctx.resolveAttr("format"));
     return renderTextSpan(rtn, style);
-}
-
-function formatVal(val : any, format : string) : string {
-    let rtn = null;
-    try {
-        if (format == null || format == "") {
-            rtn = String(val);
-        }
-        else if (format == "json") {
-            rtn = DataCtx.JsonStringify(val, 2);
-        }
-        else if (mobx.isArrayLike(val)) {
-            rtn = sprintf(format, ...val);
-        }
-        else {
-            rtn = sprintf(format, val);
-        }
-    } catch (e) {
-        rtn = "ERR[" + e + "]";
-    }
-    return rtn;
 }
 
 function makeNodeVar(ctx : DBCtx) : any {

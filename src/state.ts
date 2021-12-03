@@ -5,7 +5,7 @@ import md5 from "md5";
 import {sprintf} from "sprintf-js";
 import {boundMethod} from 'autobind-decorator'
 import {v4 as uuidv4} from 'uuid';
-import type {HibikiNode, ComponentType, LibraryType, HandlerPathObj, HibikiConfig, HibikiHandlerModule, HibikiAction, TCFBlock, EventType, HandlerValType, JSFuncType, CsrfHookFn, FetchHookFn, Hibiki, ErrorCallbackFn} from "./types";
+import type {HibikiNode, ComponentType, LibraryType, HandlerPathObj, HibikiConfig, HibikiHandlerModule, HibikiAction, TCFBlock, EventType, HandlerValType, JSFuncType, CsrfHookFn, FetchHookFn, Hibiki, ErrorCallbackFn, HtmlParserOpts} from "./types";
 import * as DataCtx from "./datactx";
 import {isObject, textContent, SYM_PROXY, SYM_FLATTEN, nodeStr, callHook, getHibiki} from "./utils";
 import {subNodesByTag, firstSubNodeByTag} from "./nodeutils";
@@ -427,7 +427,7 @@ class ComponentLibrary {
             return resp.text();
         })
         .then((rtext) => {
-            let defNode = parseHtml(rtext);
+            let defNode = parseHtml(rtext, {});
             let libNode = firstSubNodeByTag(defNode, "define-library");
             if (libNode == null) {
                 throw new Error(sprintf("No top-level <define-library> found"));
