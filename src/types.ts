@@ -165,12 +165,14 @@ interface Hibiki {
     render(elem : HTMLElement, state : HibikiExtState);
     createState(config : HibikiConfig, html : string | HTMLElement, initialData : any) : HibikiExtState;
     registerLocalHandler(path : string, fn : (HibikiRequest) => any);
-    registerLocalReactComponent(name : string, reactImpl : ReactClass);
+    registerLocalReactComponentImpl(name : string, reactImpl : ReactClass);
+    registerLocalNativeComponentImpl(name : string, reactImpl : ReactClass);
     HibikiReact : new(props : any) => React.Component<{hibikiState : HibikiExtState}, {}>;
     ModuleRegistry : Record<string, (new(HibikiState, ModuleConfig) => HibikiHandlerModule)>;
     JSFuncs : Record<string, JSFuncType>;
     LocalHandlers : Record<string, (HibikiRequest) => any>;
     LocalReactComponents : mobx.ObservableMap<string, ReactClass>;
+    LocalNativeComponents : mobx.ObservableMap<string, ReactClass>;
     ImportLibs : Record<string, any>;
     LibraryCallbacks : Record<string, any>;
     States : Record<string, HibikiExtState>;

@@ -290,6 +290,9 @@ class AnyNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironm
             else if (component.componentType == "hibiki-native") {
                 this.nodeType = "component";
                 let ImplNode = component.impl.get();
+                if (ImplNode == null && component.libName == "@main") {
+                    ImplNode = getHibiki().LocalNativeComponents.get(component.name);
+                }
                 if (ImplNode == null) {
                     return null;
                 }

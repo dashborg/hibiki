@@ -477,7 +477,7 @@ class ComponentLibrary {
             return null;
         }
         this.importedUrls[srcUrl] = true;
-        let fetchInit = {};
+        let fetchInit : any = {};
         if (srcUrl.startsWith("http")) {
             fetchInit.mode = "cors";
         }
@@ -518,12 +518,12 @@ class ComponentLibrary {
                 if (stag.attrs.src == null) {
                     continue;
                 }
-                let p = this.state.queueScriptSrc(stag.attrs.src, stag.attrs.sync).then(() => console.log("loaded", stag.attrs.src));
+                let p = this.state.queueScriptSrc(stag.attrs.src, !!stag.attrs.sync).then(() => console.log("loaded", stag.attrs.src));
                 parr.push(p);
                 scriptSrcs.push(stag.attrs.src);
             }
             console.log(sprintf("Hibiki Library '%s' loading scripts %s", this.fullLibName(libName), JSON.stringify(scriptSrcs)));
-            return Promise.all(parr);
+            return Promise.all(parr).then(() => true);
         })
         .then(() => {
             let hibiki = getHibiki();
@@ -549,7 +549,7 @@ class ComponentLibrary {
 
     buildLib(libName : string, htmlobj : HibikiNode, clear : boolean, url? : string) {
         if (this.libs[libName] == null || clear) {
-            let lib = {name: libName, components: {}};
+            let lib : LibraryType = {name: libName, components: {}};
             if (url != null) {
                 lib.url = url;
             }
@@ -1221,7 +1221,7 @@ class HibikiState {
         if (!sync) {
             return Promise.resolve(true);
         }
-        return prtn;
+        return prtn.then(() => true);
     }
 
     queueScriptText(text : string, sync : boolean) {

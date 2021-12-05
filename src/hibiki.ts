@@ -147,13 +147,18 @@ function autoloadTags() {
 
 let LocalHandlers : Record<string, (HibikiRequest) => any> = {};
 let LocalReactComponents : mobx.ObservableMap<string, ReactClass> = mobx.observable.map({}, {name: "LocalReactComponents", deep: false});
+let LocalNativeComponents : mobx.ObservableMap<string, ReactClass> = mobx.observable.map({}, {name: "LocalNativeComponents", deep: false});
 
 function registerLocalHandler(path : string, fn : (HibikiRequest) => any) {
     LocalHandlers[path] = fn;
 }
 
-function registerLocalReactComponent(name : string, comp : ReactClass) {
+function registerLocalReactComponentImpl(name : string, comp : ReactClass) {
     mobx.action(() => LocalReactComponents.set(name, comp))();
+}
+
+function registerLocalNativeComponentImpl(name : string, comp : ReactClass) {
+    mobx.action(() => LocalNativeComponents.set(name, comp))();
 }
 
 let hibiki : Hibiki = {
@@ -162,7 +167,8 @@ let hibiki : Hibiki = {
     render: render,
     createState: createState,
     registerLocalHandler: registerLocalHandler,
-    registerLocalReactComponent: registerLocalReactComponent,
+    registerLocalReactComponentImpl: registerLocalReactComponentImpl,
+    registerLocalNativeComponentImpl: registerLocalNativeComponentImpl,
     HibikiReact: HibikiRootNode,
     ModuleRegistry: {
         "local": LocalModule,
@@ -172,6 +178,7 @@ let hibiki : Hibiki = {
     JSFuncs: DefaultJSFuncs,
     LocalHandlers: LocalHandlers,
     LocalReactComponents: LocalReactComponents,
+    LocalNativeComponents: LocalNativeComponents,
     ImportLibs: {
         React: React,
         ReactDOM: ReactDOM,
