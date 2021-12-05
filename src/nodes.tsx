@@ -62,7 +62,7 @@ class HibikiRootNode extends React.Component<{hibikiState : HibikiExtState}, {}>
         let state = this.getHibikiState();
         let rde = state.rootDataenv();
         let htmlContext = sprintf("<page %s>", state.HtmlPage.get());
-        let dataenv = rde.makeChildEnv(null, {htmlContext: htmlContext, eventBoundary: "hard"});
+        let dataenv = rde.makeChildEnv(null, {htmlContext: htmlContext, libContext: "@main", eventBoundary: "hard"});
         return dataenv;
     }
     
@@ -281,7 +281,7 @@ class AnyNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironm
         }
         let dataenv = ctx.dataenv;
         let dbstate = dataenv.dbstate;
-        let component = dbstate.ComponentLibrary.findComponent(node.tag);
+        let component = dbstate.ComponentLibrary.findComponent(node.tag, dataenv.getLibContext());
         if (component != null) {
             if (component.componentType == "react-custom") {
                 this.nodeType = "react-component";
@@ -327,7 +327,7 @@ class CustomReactNode extends React.Component<{node : HibikiNode, component : Co
         let component = this.props.component;
         let implBox = component.reactimpl;
         let reactImpl = implBox.get();
-        if (reactImpl == null && component.libName == "local") {
+        if (reactImpl == null && component.libName == "@main") {
             reactImpl = getHibiki().LocalReactComponents.get(component.name);
         }
         if (reactImpl == null) {
@@ -336,7 +336,7 @@ class CustomReactNode extends React.Component<{node : HibikiNode, component : Co
         let attrs = ctx.resolveAttrs({raw: true});
         let nodeVar = NodeUtils.makeNodeVar(ctx);
         let htmlContext = sprintf("react:<%s>", ctx.node.tag);
-        let childEnv = ctx.childDataenv.makeChildEnv({node: nodeVar}, {htmlContext: htmlContext});
+        let childEnv = ctx.childDataenv.makeChildEnv({node: nodeVar}, {htmlContext: htmlContext, libContext: component.libName});
         let rtnElems = renderHtmlChildren(ctx.node, childEnv)
         let reactElem = React.createElement(reactImpl, attrs, rtnElems);
         return reactElem;
@@ -544,6 +544,7 @@ class CustomNode extends React.Component<{node : HibikiNode, component : Compone
             componentRoot: crootProxy,
             handlers: handlers,
             htmlContext: sprintf("<define-component %s>", componentName),
+            libContext: component.libName,
             eventBoundary: "soft",
         };
         let childEnv = eventDE.makeChildEnv(specials, envOpts);

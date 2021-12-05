@@ -36,6 +36,7 @@ type DataEnvironmentOpts = {
     description? : string,
     handlers? : Record<string, HandlerValType>,
     htmlContext? : string,
+    libContext? : string,
     eventBoundary? : string, // "soft" | "hard",
     localData? : any,
 };
@@ -47,6 +48,7 @@ class DataEnvironment {
     handlers : Record<string, HandlerValType>;
     componentRoot : Record<string, any>;
     htmlContext : string;
+    libContext : string;
     description : string;
     eventBoundary : "soft" | "hard";
     localData : any;
@@ -59,11 +61,14 @@ class DataEnvironment {
         this.specials = {};
         this.handlers = {};
         this.eventBoundary = null;
+        this.htmlContext = null;
+        this.libContext = null;
         if (opts != null) {
             this.componentRoot = opts.componentRoot;
             this.description = opts.description;
             this.handlers = opts.handlers || {};
             this.htmlContext = opts.htmlContext;
+            this.libContext = opts.libContext;
             if (opts.eventBoundary == "soft" || opts.eventBoundary == "hard") {
                 this.eventBoundary = opts.eventBoundary;
             }
@@ -82,6 +87,16 @@ class DataEnvironment {
             return "none";
         }
         return this.parent.getHtmlContext();
+    }
+
+    getLibContext() : string {
+        if (this.libContext != null) {
+            return this.libContext;
+        }
+        if (this.parent == null) {
+            return null;
+        }
+        return this.parent.getLibContext();
     }
 
     getFullHtmlContext() : string {
@@ -570,6 +585,9 @@ class ComponentLibrary {
     }
 
     importLib(libName : string, prefix : string) {
+        if (prefix == "local") {
+            throw new Error("Cannot import library with reserved 'local' prefix");
+        }
         let libObj = this.libs[libName];
         if (libObj == null) {
             console.log("ERROR invalid component library", libName);
@@ -591,7 +609,23 @@ class ComponentLibrary {
         }
     }
 
-    findComponent(tagName : string) : ComponentType {
+    findComponent(tagName : string, libContext : string) : ComponentType {
+        if (tagName.startsWith("local-")) {
+            let localTagName = tagName.substr(6);
+            let libObj = this.libs[libContext];
+            if (libObj == null) {
+                return null;
+            }
+            let comp = libObj.components[localTagName];
+            return {
+                componentType: comp.componentType,
+                libName: libContext,
+                name: localTagName,
+                impl: comp.impl,
+                reactimpl: comp.reactimpl,
+                node: comp.node,
+            };
+        }
         return this.components[tagName];
     }
 }
@@ -829,8 +863,7 @@ class HibikiState {
 
     @mobx.action setHtml(htmlobj : HibikiNode) {
         this.HtmlObj.set(htmlobj);
-        this.ComponentLibrary.buildLib("local", htmlobj, true);
-        this.ComponentLibrary.importLib("local", "local");
+        this.ComponentLibrary.buildLib("@main", htmlobj, true);
     }
 
     allowUsageImg() : boolean {

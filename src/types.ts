@@ -173,6 +173,7 @@ interface Hibiki {
     LocalReactComponents : mobx.ObservableMap<string, ReactClass>;
     ImportLibs : Record<string, any>;
     LibraryCallbacks : Record<string, any>;
+    States : Record<string, HibikiExtState>;
 };
 
 interface HibikiExtState {

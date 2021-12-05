@@ -137,7 +137,11 @@ function autoloadTags() {
         if (elem.hasAttribute("noautoload")) {
             continue;
         }
-        window.HibikiState = loadTag(elem);
+        let state = loadTag(elem);
+        if (elem.hasAttribute("name")) {
+            window.Hibiki.States[elem.getAttribute("name")] = state;
+        }
+        window.HibikiState = state;
     }
 }
 
@@ -175,6 +179,7 @@ let hibiki : Hibiki = {
         mobxReact: mobxReact,
     },
     LibraryCallbacks: {},
+    States: {},
 };
 
 window.Hibiki = hibiki;
