@@ -147,6 +147,7 @@ type LibComponentType = {
 
 type LibraryType = {
     name: string,
+    url?: string,
     components: Record<string, LibComponentType>;
 };
 
@@ -171,6 +172,7 @@ interface Hibiki {
     LocalHandlers : Record<string, (HibikiRequest) => any>;
     LocalReactComponents : mobx.ObservableMap<string, ReactClass>;
     ImportLibs : Record<string, any>;
+    LibraryCallbacks : Record<string, any>;
 };
 
 interface HibikiExtState {

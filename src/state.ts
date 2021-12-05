@@ -397,8 +397,10 @@ class ComponentLibrary {
     libs : Record<string, LibraryType>;               // name -> library
     components : Record<string, ComponentType>;       // tag-name -> component
     importedUrls : Record<string, boolean>;
+    state : HibikiState;
 
-    constructor() {
+    constructor(state : HibikiState) {
+        this.state = state;
         this.libs = {};
         this.components = {};
         this.importedUrls = {};
@@ -406,6 +408,50 @@ class ComponentLibrary {
 
     addLibrary(libObj : LibraryType) {
         this.libs[libObj.name] = libObj;
+    }
+
+    fullLibName(libName : string) : string {
+        let libObj = this.libs[libName];
+        if (libObj == null || libObj.url == null) {
+            return libName;
+        }
+        return sprintf("%s(%s)", libName, libObj.url);
+    }
+
+    registerReactComponentImpl(libName : string, componentName : string, impl : any) {
+        let libObj = this.libs[libName];
+        if (libObj == null) {
+            console.log("Hibiki registerReactComponentImpl library '%s' not found", libName);
+            return;
+        }
+        let ctype = libObj.components[componentName];
+        if (ctype == null) {
+            console.log("Hibiki registerReactComponentImpl component '%s/%s' not found", libName, componentName);
+            return;
+        }
+        if (ctype.componentType != "react-custom") {
+            console.log("Hibiki registerReactComponentImpl component '%s/%s' is type 'react'", libName, componentName);
+            return;
+        }
+        ctype.reactimpl.set(impl);
+    }
+
+    registerNativeComponentImpl(libName : string, componentName : string, impl : any) {
+        let libObj = this.libs[libName];
+        if (libObj == null) {
+            console.log("Hibiki registerNativeComponentImpl library '%s' not found", libName);
+            return;
+        }
+        let ctype = libObj.components[componentName];
+        if (ctype == null) {
+            console.log("Hibiki registerNativeComponentImpl component '%s/%s' not found", libName, componentName);
+            return;
+        }
+        if (ctype.componentType != "hibiki-native") {
+            console.log("Hibiki registerNativeComponentImpl component '%s/%s' is type 'native'", libName, componentName);
+            return;
+        }
+        ctype.impl.set(impl);
     }
 
     importLibrary(srcUrl : string, prefix : string) : Promise<boolean> {
@@ -416,6 +462,11 @@ class ComponentLibrary {
             return null;
         }
         this.importedUrls[srcUrl] = true;
+        let fetchInit = {};
+        if (srcUrl.startsWith("http")) {
+            fetchInit.mode = "cors";
+        }
+        let libName = null;
         let p = fetch(srcUrl).then((resp) => {
             if (!resp.ok) {
                 throw new Error(sprintf("Bad fetch response: %d %s", resp.status, resp.statusText));
@@ -432,18 +483,46 @@ class ComponentLibrary {
             if (libNode == null) {
                 throw new Error(sprintf("No top-level <define-library> found"));
             }
-            let libName = "url:"+srcUrl;
-            this.buildLib(libName, libNode, true);
+            if (libNode.attrs == null || libNode.attrs.name == null) {
+                throw new Error(sprintf("<define-library> must have 'name' attribute"));
+            }
+            libName = libNode.attrs.name;
+            this.buildLib(libName, libNode, true, srcUrl);
             this.importLib(libName, prefix);
+            let scriptTags = subNodesByTag(libNode, "script");
+            if (scriptTags.length == 0) {
+                return true;
+            }
+            let parr = [];
+            let scriptSrcs = [];
+            for (let i=0; i<scriptTags.length; i++) {
+                let stag = scriptTags[i];
+                if (stag.attrs == null) {
+                    continue;
+                }
+                if (stag.attrs.src == null) {
+                    continue;
+                }
+                let p = this.state.queueScriptSrc(stag.attrs.src, stag.attrs.sync).then(() => console.log("loaded", stag.attrs.src));
+                parr.push(p);
+                scriptSrcs.push(stag.attrs.src);
+            }
+            console.log(sprintf("Hibiki Library '%s' loading scripts %s", this.fullLibName(libName), JSON.stringify(scriptSrcs)));
+            return Promise.all(parr);
+        })
+        .then(() => {
+            let hibiki = getHibiki();
+            if (hibiki.LibraryCallbacks[libName] != null) {
+                return Promise.resolve(hibiki.LibraryCallbacks[libName](this.state, this));
+            }
             return true;
         })
         .then(() => {
-            let libName = "url:"+srcUrl;
             let numComps = 0;
             if (this.libs[libName] != null) {
                 numComps = Object.keys(this.libs[libName].components).length;
             }
-            console.log(sprintf("Hibiki Imported Library '%s' to prefix '%s', defined %d component(s)", libName, prefix, numComps));
+            console.log(sprintf("Hibiki Imported Library '%s' to prefix '%s', defined %d component(s)", this.fullLibName(libName), prefix, numComps));
             return true;
         })
         .catch((e) => {
@@ -453,9 +532,13 @@ class ComponentLibrary {
         return p;
     }
 
-    buildLib(libName : string, htmlobj : HibikiNode, clear : boolean) {
+    buildLib(libName : string, htmlobj : HibikiNode, clear : boolean, url? : string) {
         if (this.libs[libName] == null || clear) {
-            this.libs[libName] = {name: libName, components: {}};
+            let lib = {name: libName, components: {}};
+            if (url != null) {
+                lib.url = url;
+            }
+            this.libs[libName] = lib ;
         }
         let libObj = this.libs[libName];
         if (htmlobj == null || htmlobj.list == null) {
@@ -603,7 +686,7 @@ class HibikiState {
         this.DataRoots = {};
         this.DataRoots["global"] = mobx.observable.box({}, {name: "GlobalData"})
         this.DataRoots["state"] = mobx.observable.box({}, {name: "AppState"})
-        this.ComponentLibrary = new ComponentLibrary();
+        this.ComponentLibrary = new ComponentLibrary(this);
         this.InitCallbacks = [];
         let hibiki = getHibiki();
         this.JSFuncs = hibiki.JSFuncs;
@@ -1082,19 +1165,30 @@ class HibikiState {
         }
     }
 
-    queueScriptSrc(scriptSrc : string, sync : boolean) {
+    queueScriptSrc(scriptSrc : string, sync : boolean) : Promise<boolean> {
         // console.log("queue script src", scriptSrc);
         let srcMd5 = md5(scriptSrc);
         if (this.ScriptCache[srcMd5]) {
-            return;
+            return Promise.resolve(true);
         }
         this.ScriptCache[srcMd5] = true;
         let scriptElem = document.createElement("script");
         if (sync) {
             scriptElem.async = false;
         }
+        let presolve = null;
+        let prtn = new Promise((resolve, reject) => {
+            presolve = resolve;
+        });
         scriptElem.src = scriptSrc;
+        scriptElem.addEventListener("load", () => {
+            presolve(true);
+        });
         document.querySelector("body").appendChild(scriptElem);
+        if (!sync) {
+            return Promise.resolve(true);
+        }
+        return prtn;
     }
 
     queueScriptText(text : string, sync : boolean) {

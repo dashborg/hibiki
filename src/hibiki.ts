@@ -174,6 +174,7 @@ let hibiki : Hibiki = {
         mobx: mobx,
         mobxReact: mobxReact,
     },
+    LibraryCallbacks: {},
 };
 
 window.Hibiki = hibiki;
