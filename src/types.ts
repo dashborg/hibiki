@@ -133,14 +133,14 @@ type ComponentType = {
     componentType : "hibiki-html" | "hibiki-native" | "react-custom",
     libName : string,
     name : string,
-    impl? : any,
+    impl? : mobx.IObservableValue<any>,
     reactimpl? : mobx.IObservableValue<any>,
     node? : HibikiNode,
 }
 
 type LibComponentType = {
     componentType : "hibiki-html" | "hibiki-native" | "react-custom",
-    impl? : any,
+    impl? : mobx.IObservableValue<any>,
     reactimpl? : mobx.IObservableValue<any>,
     node? : HibikiNode,
 }
@@ -170,6 +170,7 @@ interface Hibiki {
     JSFuncs : Record<string, JSFuncType>;
     LocalHandlers : Record<string, (HibikiRequest) => any>;
     LocalReactComponents : mobx.ObservableMap<string, ReactClass>;
+    ImportLibs : Record<string, any>;
 };
 
 interface HibikiExtState {
@@ -182,4 +183,4 @@ interface HibikiExtState {
     initialize(force : boolean);
 };
 
-export type {HibikiNode, HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, TCFBlock, StmtBlock, Statement, ExprType, DataCtxErrorObjType, ComponentType, LibraryType, HandlerPathObj, HibikiRequest, Hibiki, HibikiAction, HibikiExtState, EventType, HandlerValType, JSFuncType, AppModuleConfig, FetchHookFn, CsrfHookFn, ReactClass, HandlerPathType, ErrorCallbackFn, EventCallbackFn, HtmlParserOpts};
+export type {HibikiNode, HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, TCFBlock, StmtBlock, Statement, ExprType, DataCtxErrorObjType, ComponentType, LibraryType, HandlerPathObj, HibikiRequest, Hibiki, HibikiAction, HibikiExtState, EventType, HandlerValType, JSFuncType, AppModuleConfig, FetchHookFn, CsrfHookFn, ReactClass, HandlerPathType, ErrorCallbackFn, EventCallbackFn, HtmlParserOpts, LibComponentType};

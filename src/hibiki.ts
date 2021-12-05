@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import * as mobx from "mobx";
+import * as mobxReact from "mobx-react";
 import {parseHtml} from "./html-parser";
 import {HibikiState, DataEnvironment} from "./state";
 import * as ReactDOM from "react-dom";
@@ -167,6 +168,12 @@ let hibiki : Hibiki = {
     JSFuncs: DefaultJSFuncs,
     LocalHandlers: LocalHandlers,
     LocalReactComponents: LocalReactComponents,
+    ImportLibs: {
+        React: React,
+        ReactDOM: ReactDOM,
+        mobx: mobx,
+        mobxReact: mobxReact,
+    },
 };
 
 window.Hibiki = hibiki;

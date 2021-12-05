@@ -478,6 +478,10 @@ class ComponentLibrary {
                 libObj.components[name] = {componentType: "react-custom", reactimpl: mobx.observable.box(null)};
                 continue;
             }
+            if (h.attrs.native) {
+                libObj.components[name] = {componentType: "hibiki-native", impl: mobx.observable.box(null)};
+                continue;
+            }
             libObj.components[name] = {componentType: "hibiki-html", node: h};
         }
     }

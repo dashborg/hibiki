@@ -14,7 +14,7 @@ import dayjsRelativeTime from "dayjs/plugin/relativeTime";
 import dayjsUtc from "dayjs/plugin/utc";
 import dayjsRelative from "dayjs/plugin/relativeTime";
 
-import type {HibikiNode, ComponentType, LibraryType, HibikiExtState} from "./types";
+import type {HibikiNode, ComponentType, LibraryType, HibikiExtState, LibComponentType} from "./types";
 import {DBCtx} from "./dbctx";
 import * as DataCtx from "./datactx";
 import {HibikiState, DataEnvironment, getAttributes, getAttribute, getStyleMap} from "./state";
@@ -289,7 +289,11 @@ class AnyNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironm
             }
             else if (component.componentType == "hibiki-native") {
                 this.nodeType = "component";
-                return <component.impl node={node} dataenv={dataenv}/>;
+                let ImplNode = component.impl.get();
+                if (ImplNode == null) {
+                    return null;
+                }
+                return <ImplNode node={node} dataenv={dataenv}/>;
             }
             else if (component.componentType == "hibiki-html") {
                 this.nodeType = "hibiki-html-component";
@@ -1313,36 +1317,42 @@ class DashElemNode extends React.Component<{ctx : DBCtx, extClass? : string, ext
     }
 }
 
+function addCoreComponent(name : string, impl : any) {
+    let comp : LibComponentType = {componentType: "hibiki-native"};
+    comp.impl = mobx.observable.box(impl, {name: "@hibiki/core/" + name});
+    CORE_LIBRARY.components[name] = comp;
+}
+
 let CORE_LIBRARY : LibraryType = {
     name: "@hibiki/core",
-    components: {
-        "if": {componentType: "hibiki-native", impl: IfNode},
-        "if-break": {componentType: "hibiki-native", impl: IfNode},
-        "foreach": {componentType: "hibiki-native", impl: ForEachNode},
-        
-        "define-vars": {componentType: "hibiki-native", impl: NopNode},
-        "define-handler": {componentType: "hibiki-native", impl: NopNode},
-        "define-component": {componentType: "hibiki-native", impl: NopNode},
-        "import-library": {componentType: "hibiki-native", impl: NopNode},
-        
-        "h-if": {componentType: "hibiki-native", impl: IfNode},
-        "h-if-break": {componentType: "hibiki-native", impl: IfNode},
-        "h-foreach": {componentType: "hibiki-native", impl: ForEachNode},
-        "h-text": {componentType: "hibiki-native", impl: TextNode},
-        "script": {componentType: "hibiki-native", impl: ScriptNode},
-        "h-script": {componentType: "hibiki-native", impl: ScriptNode},
-        "h-dateformat": {componentType: "hibiki-native", impl: DateFormatNode},
-        "h-dyn": {componentType: "hibiki-native", impl: DynNode},
-        "h-runhandler": {componentType: "hibiki-native", impl: RunHandlerNode},
-        "h-withcontext": {componentType: "hibiki-native", impl: WithContextNode},
-        "h-children": {componentType: "hibiki-native", impl: ChildrenNode},
-        "h-data": {componentType: "hibiki-native", impl: SimpleQueryNode},
-        "h-inlinedata": {componentType: "hibiki-native", impl: InlineDataNode},
-        "h-renderlog": {componentType: "hibiki-native", impl: RenderLogNode},
-        "h-datasorter": {componentType: "hibiki-native", impl: DataSorterNode},
-        "h-datapager": {componentType: "hibiki-native", impl: DataPagerNode},
-        "h-table": {componentType: "hibiki-native", impl: SimpleTableNode},
-    },
+    components: {},
 };
+
+addCoreComponent("if", IfNode);
+addCoreComponent("if-break", IfNode);
+addCoreComponent("foreach", ForEachNode);
+addCoreComponent("script", ScriptNode);
+
+addCoreComponent("define-vars", NopNode);
+addCoreComponent("define-handler", NopNode);
+addCoreComponent("define-component", NopNode);
+addCoreComponent("import-library", NopNode);
+
+addCoreComponent("h-if", IfNode);
+addCoreComponent("h-if-break", IfNode);
+addCoreComponent("h-foreach", ForEachNode);
+addCoreComponent("h-text", TextNode);
+addCoreComponent("h-script", ScriptNode);
+addCoreComponent("h-dateformat", DateFormatNode);
+addCoreComponent("h-dyn", DynNode);
+addCoreComponent("h-runhandler", RunHandlerNode);
+addCoreComponent("h-withcontext", WithContextNode);
+addCoreComponent("h-children", ChildrenNode);
+addCoreComponent("h-data", SimpleQueryNode);
+addCoreComponent("h-inlinedata", InlineDataNode);
+addCoreComponent("h-renderlog", RenderLogNode);
+addCoreComponent("h-datasorter", DataSorterNode);
+addCoreComponent("h-datapager", DataPagerNode);
+addCoreComponent("h-table", SimpleTableNode);
 
 export {HibikiRootNode, CORE_LIBRARY};

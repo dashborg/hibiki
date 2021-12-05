@@ -63,6 +63,8 @@ let SUBMIT_ELEMS = {
 
 let ONCHANGE_ELEMS = {
     "select": true,
+    "input": true,
+    "textarea": true,
     // and checkbox
 };
 
