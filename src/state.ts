@@ -504,25 +504,48 @@ class ComponentLibrary {
             libName = libNode.attrs.name;
             this.buildLib(libName, libNode, true, srcUrl);
             this.importLib(libName, prefix);
-            let scriptTags = subNodesByTag(libNode, "script");
-            if (scriptTags.length == 0) {
-                return true;
-            }
+            
             let parr = [];
-            let scriptSrcs = [];
+            let scriptTags = subNodesByTag(libNode, "script");
+            let srcs = [];
             for (let i=0; i<scriptTags.length; i++) {
                 let stag = scriptTags[i];
-                if (stag.attrs == null) {
+                let attrs = stag.attrs || {};
+                if (attrs.type != null && attrs.type != "text/javascript") {
                     continue;
                 }
-                if (stag.attrs.src == null) {
+                if (attrs.src == null) {
+                    let p = this.state.queueScriptText(textContent(stag), !!attrs.sync);
+                    parr.push(p);
                     continue;
                 }
-                let p = this.state.queueScriptSrc(stag.attrs.src, !!stag.attrs.sync).then(() => console.log("loaded", stag.attrs.src));
+                let scriptSrc = attrs.src;
+                if (attrs.relative) {
+                    scriptSrc = new URL(scriptSrc, srcUrl).toString();
+                }
+                let p = this.state.queueScriptSrc(scriptSrc, !!attrs.sync);
                 parr.push(p);
-                scriptSrcs.push(stag.attrs.src);
+                srcs.push(scriptSrc);
             }
-            console.log(sprintf("Hibiki Library '%s' loading scripts %s", this.fullLibName(libName), JSON.stringify(scriptSrcs)));
+            let linkTags = subNodesByTag(libNode, "link");
+            for (let i=0; i<linkTags.length; i++) {
+                let ltag = linkTags[i];
+                if (ltag.attrs == null || ltag.attrs.rel != "stylesheet" || ltag.attrs.href == null) {
+                    continue;
+                }
+                let cssUrl = ltag.attrs.href;
+                if (ltag.attrs.relative) {
+                    cssUrl = new URL(cssUrl, srcUrl).toString();
+                }
+                let p = this.state.loadCssLink(cssUrl, !!ltag.attrs.sync);
+                parr.push(p);
+                srcs.push(cssUrl);
+            }
+            let styleTags = subNodesByTag(libNode, "style");
+            for (let i=0; i<styleTags.length; i++) {
+                this.state.loadStyleText(textContent(styleTags[i]));
+            }
+            console.log(sprintf("Hibiki Library '%s' loading scripts/css %s", this.fullLibName(libName), JSON.stringify(srcs)));
             return Promise.all(parr).then(() => true);
         })
         .then(() => {
@@ -700,7 +723,7 @@ class HibikiState {
     Initialized : mobx.IObservableValue<boolean> = mobx.observable.box(false, {name: "Initialized"});
     RenderVersion : mobx.IObservableValue<number> = mobx.observable.box(0, {name: "RenderVersion"});
     DataNodeStates = {};
-    ScriptCache = {};
+    ResourceCache = {};
     PostScriptRunQueue : any[] = [];
     HasRendered = false;
     ScriptsLoaded : mobx.IObservableValue<boolean> = mobx.observable.box(false, {name: "ScriptsLoaded"});
@@ -1201,10 +1224,10 @@ class HibikiState {
     queueScriptSrc(scriptSrc : string, sync : boolean) : Promise<boolean> {
         // console.log("queue script src", scriptSrc);
         let srcMd5 = md5(scriptSrc);
-        if (this.ScriptCache[srcMd5]) {
+        if (this.ResourceCache[srcMd5]) {
             return Promise.resolve(true);
         }
-        this.ScriptCache[srcMd5] = true;
+        this.ResourceCache[srcMd5] = true;
         let scriptElem = document.createElement("script");
         if (sync) {
             scriptElem.async = false;
@@ -1224,15 +1247,51 @@ class HibikiState {
         return prtn.then(() => true);
     }
 
-    queueScriptText(text : string, sync : boolean) {
+    queueScriptText(text : string, sync : boolean) : Promise<boolean> {
         // console.log("queue script", text);
         let textMd5 = md5(text);
-        if (this.ScriptCache[textMd5]) {
+        if (this.ResourceCache[textMd5]) {
             return;
         }
-        this.ScriptCache[textMd5] = true;
+        this.ResourceCache[textMd5] = true;
         let dataUri = "data:text/javascript;base64," + btoa(text);
-        this.queueScriptSrc(dataUri, sync);
+        return this.queueScriptSrc(dataUri, sync);
+    }
+
+    loadCssLink(cssUrl : string, sync : boolean) : Promise<boolean> {
+        let srcMd5 = md5(cssUrl);
+        if (this.ResourceCache[srcMd5]) {
+            return Promise.resolve(true);
+        }
+        this.ResourceCache[srcMd5] = true;
+        let linkElem = document.createElement("link");
+        let presolve = null;
+        let prtn = new Promise((resolve, reject) => {
+            presolve = resolve;
+        });
+        linkElem.rel = "stylesheet";
+        linkElem.href = cssUrl;
+        linkElem.addEventListener("load", () => {
+            presolve(true);
+        });
+        document.querySelector("body").appendChild(linkElem);
+        if (!sync) {
+            return Promise.resolve(true);
+        }
+        return prtn.then(() => true);
+    }
+
+    loadStyleText(styleText : string) {
+        let srcMd5 = md5(styleText);
+        if (this.ResourceCache[srcMd5]) {
+            return;
+        }
+        this.ResourceCache[srcMd5] = true;
+        let styleElem = document.createElement("style");
+        styleElem.type = "text/css";
+        styleElem.appendChild(document.createTextNode(styleText));
+        document.querySelector("body").appendChild(styleElem);
+        return;
     }
 }
 
