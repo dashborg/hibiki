@@ -145,13 +145,17 @@ class AppModule {
 
 class LocalModule {
     state : HibikiState;
+    libContext : string;
     
     constructor(state : HibikiState, config : any) {
+        config = config ?? {};
         this.state = state;
+        this.libContext = config.libContext;
     }
 
     callHandler(req : HibikiRequest) : Promise<any> {
-        let handler = getHibiki().LocalHandlers[req.path.path];
+        let libContext = this.libContext ?? req.libContext;
+        let handler = this.state.ComponentLibrary.findLocalHandler(req.path.path, libContext);
         if (handler == null) {
             throw new Error(sprintf("Local handler '%s' not found", req.path.path));
         }

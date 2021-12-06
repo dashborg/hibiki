@@ -10,6 +10,7 @@ class HibikiRequest {
     state : HibikiExtState;
     pure : boolean;
     actions : HibikiAction[];
+    libContext : string;
 
     constructor(state : HibikiExtState) {
         this.state = state;

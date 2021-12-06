@@ -9,7 +9,7 @@ import * as ReactDOM from "react-dom";
 import {HibikiRootNode, CORE_LIBRARY} from "./nodes";
 import {deepTextContent, evalDeepTextContent} from "./utils";
 import merge from "lodash/merge";
-import type {HibikiNode, HibikiConfig, Hibiki, HibikiExtState, ReactClass} from "./types";
+import type {HibikiNode, HibikiConfig, Hibiki, HibikiExtState, ReactClass, LibraryType} from "./types";
 import {FetchModule, AppModule, LocalModule} from "./modules";
 import {DefaultJSFuncs} from "./jsfuncs";
 

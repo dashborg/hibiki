@@ -66,41 +66,7 @@ class HibikiRootNode extends React.Component<{hibikiState : HibikiExtState}, {}>
         return dataenv;
     }
     
-    queueOnLoadCheck() {
-        if (this.renderingDBState == null || this.renderingDBState.HasRendered) {
-            return;
-        }
-        if (!window.HibikiLoaded) {
-            window.HibikiLoaded = {};
-        }
-        this.loadUuid = uuidv4();
-        let runJS = "window.HibikiLoaded['" + this.loadUuid + "'] = true;";
-        let dbstate = this.getHibikiState();
-        dbstate.queueScriptText(runJS, true);
-        setTimeout(() => this.checkLoaded(1), 100);
-    }
-
-    checkLoaded(iterNum : number) {
-        // console.log("check loaded", iterNum, window["HibikiLoaded"], window.d3);
-        if (!window.HibikiLoaded[this.loadUuid]) {
-            if (iterNum > 100) {
-                console.log("Script Queue Never finished after 10s (Panel checkLoaded)");
-            }
-            else {
-                setTimeout(() => this.checkLoaded(iterNum+1), 100);
-                return;
-            }
-        }
-        let node = this.getHibikiNode();
-        let dbstate = this.getHibikiState();
-        let dataenv = this.getDataenv();
-        let ctx = new DBCtx(null, node, dataenv);
-        setTimeout(() => ctx.dataenv.dbstate.fireScriptsLoaded(), 1);
-        ctx.handleEvent("load");
-    }
-
     componentDidMount() {
-        this.queueOnLoadCheck();
         let dbstate = this.getHibikiState();
         let flowerEmoji = String.fromCodePoint(0x1F338);
         if (dbstate.allowUsageImg() && !usageFired) {
@@ -113,10 +79,6 @@ class HibikiRootNode extends React.Component<{hibikiState : HibikiExtState}, {}>
             welcomeMessage = true;
             console.log(flowerEmoji + " Hibiki HTML https://github.com/dashborg/hibiki | Developed by Dashborg Inc https://dashborg.net");
         }
-    }
-
-    componentDidUpdate() {
-        this.queueOnLoadCheck();
     }
 
     getHibikiNode() : HibikiNode {
@@ -329,7 +291,7 @@ class CustomReactNode extends React.Component<{node : HibikiNode, component : Co
         if (ctx.isEditMode()) {
             return;
         }
-        ctx.dataenv.dbstate.queuePostScriptRunFn(() => ctx.handleEvent("mount"));
+        ctx.handleEvent("mount");
     }
     
     render() {
@@ -371,7 +333,7 @@ class RawHtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnvi
         if (ctx.isEditMode()) {
             return;
         }
-        ctx.dataenv.dbstate.queuePostScriptRunFn(() => ctx.handleEvent("mount"));
+        ctx.handleEvent("mount");
     }
     
     @boundMethod handleBindValueOnChange(e) {
@@ -1339,6 +1301,8 @@ let CORE_LIBRARY : LibraryType = {
     name: "@hibiki/core",
     libComponents: {},
     importedComponents: {},
+    localHandlers: {},
+    modules: {},
 };
 
 addCoreComponent("if", IfNode);

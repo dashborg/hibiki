@@ -14,6 +14,11 @@ import {HibikiRequest} from "./request";
 
 import {parseHtml} from "./html-parser";
 
+type CallHandlerOptsType = {
+    dataenv? : DataEnvironment,
+    rtContext? : RtContext,
+};
+
 function eventBubbles(event : string) : boolean {
     if (event == "load") {
         return false;
@@ -499,6 +504,24 @@ class ComponentLibrary {
         return sprintf("%s(%s)", libName, libObj.url);
     }
 
+    registerLocalHandler(libName : string, handlerName : string, fn : (HibikiRequest) => any) {
+        let libObj = this.libs[libName];
+        if (libObj == null) {
+            console.log("Hibiki registerLocalHandler library '%s' not found", libName);
+            return;
+        }
+        libObj.localHandlers[handlerName] = fn;
+    }
+
+    registerModule(libName : string, moduleName : string, module : HibikiHandlerModule) {
+        let libObj = this.libs[libName];
+        if (libObj == null) {
+            console.log("Hibiki registerModule library '%s' not found", libName);
+            return;
+        }
+        libObj.modules[moduleName] = module;
+    }
+
     registerReactComponentImpl(libName : string, componentName : string, impl : any) {
         let libObj = this.libs[libName];
         if (libObj == null) {
@@ -585,8 +608,11 @@ class ComponentLibrary {
         .then(() => {
             let numComps = 0;
             if (this.libs[libName] != null) {
-                numComps = Object.keys(this.libs[libName].libComponents).length;
+                let libObj = this.libs[libName];
+                numComps = Object.keys(libObj.libComponents).length;
+                this.state.makeLocalModule(libContext, prefix, libName);
             }
+            
             console.log(sprintf("Hibiki Imported Library '%s' to prefix '%s', defined %d component(s)", this.fullLibName(libName), prefix, numComps));
             return true;
         })
@@ -602,11 +628,15 @@ class ComponentLibrary {
 
     buildLib(libName : string, htmlobj : HibikiNode, clear : boolean, url? : string) {
         if (this.libs[libName] == null || clear) {
-            let lib : LibraryType = {name: libName, libComponents: {}, importedComponents: {}};
+            let lib : LibraryType = {name: libName, libComponents: {}, importedComponents: {}, localHandlers: {}, modules: {}};
             if (url != null) {
                 lib.url = url;
             }
-            this.libs[libName] = lib ;
+            let hibiki = getHibiki();
+            let mreg = hibiki.ModuleRegistry;
+            lib.modules["fetch"] = new mreg["fetch"](this.state, {});
+            lib.modules["local"] = new mreg["local"](this.state, {});
+            this.libs[libName] = lib;
         }
         let libObj = this.libs[libName];
         if (htmlobj == null || htmlobj.list == null) {
@@ -672,6 +702,17 @@ class ComponentLibrary {
         }
     }
 
+    findLocalHandler(handlerName : string, libContext : string) : (req : HibikiRequest) => Promise<any> {
+        if (libContext == null || libContext == "@main") {
+            return getHibiki().LocalHandlers[handlerName];
+        }
+        let libObj = this.libs[libContext];
+        if (libObj == null) {
+            return null;
+        }
+        return libObj.localHandlers[handlerName];
+    }
+
     findComponent(tagName : string, libContext : string) : ComponentType {
         if (tagName.startsWith("local-")) {
             let localTagName = tagName.substr(6);
@@ -697,6 +738,14 @@ class ComponentLibrary {
             return null;
         }
         return libObj.importedComponents[tagName];
+    }
+
+    getModule(moduleName : string, libContext : string) : HibikiHandlerModule {
+        let libObj = this.libs[libContext];
+        if (libObj == null) {
+            return null;
+        }
+        return libObj.modules[moduleName];
     }
 }
 
@@ -771,9 +820,7 @@ class HibikiState {
     RenderVersion : mobx.IObservableValue<number> = mobx.observable.box(0, {name: "RenderVersion"});
     DataNodeStates = {};
     ResourceCache = {};
-    PostScriptRunQueue : any[] = [];
     HasRendered = false;
-    ScriptsLoaded : mobx.IObservableValue<boolean> = mobx.observable.box(false, {name: "ScriptsLoaded"});
     NodeDataMap : Map<string, mobx.IObservableValue<any>> = new Map();  // TODO clear on unmount
     ExtHtmlObj : mobx.ObservableMap<string,any> = mobx.observable.map({}, {name: "ExtHtmlObj", deep: false});
     Config : HibikiConfig = {};
@@ -834,7 +881,7 @@ class HibikiState {
         if (this.Initialized.get()) {
             console.log("Hibiki State is already initialized");
         }
-        if (force || this.Config.initHandler == null) {
+        if (force) {
             this.setInitialized();
             return;
         }
@@ -876,7 +923,7 @@ class HibikiState {
             }
         }
         let hibiki = getHibiki();
-        let mreg : Record<string, (new(HibikiState, ModuleConfig) => HibikiHandlerModule)> = hibiki.ModuleRegistry;
+        let mreg = hibiki.ModuleRegistry;
         if (config.modules != null) {
             for (let moduleName in config.modules) {
                 let mconfig = config.modules[moduleName];
@@ -905,32 +952,26 @@ class HibikiState {
         }
     }
 
-    @mobx.action setGlobalData(globalData : any) {
-        this.DataRoots["global"].set(globalData);
+    makeLocalModule(libContext : string, prefix : string, libName : string) {
+        if (prefix == null || libName == null) {
+            return;
+        }
+        if (("lib-" + prefix) in this.Modules) {
+            return;
+        }
+        let hibiki = getHibiki();
+        let mreg = hibiki.ModuleRegistry;
+        if (libContext == null || libContext == "@main") {
+            this.Modules["lib-" + prefix] = new mreg["local"](this, {libContext: libName});
+        }
+        else {
+            let mod = new mreg["local"](this, {libContext: libName});
+            this.ComponentLibrary.registerModule(libContext, "lib-" + prefix, mod);
+        }
     }
 
-    runImports() : Promise<any> {
-        let importTags = subNodesByTag(this.HtmlObj.get(), "import-library");
-        let parr : Promise<any>[] = [];
-        for (let i=0; i<importTags.length; i++) {
-            let itag = importTags[i];
-            if (itag.attrs == null || itag.attrs.src == null || itag.attrs.src == "") {
-                console.log("Invalid <import-library> tag, no src attribute");
-                continue;
-            }
-            if (itag.attrs == null || itag.attrs.prefix == null || itag.attrs.prefix == "") {
-                console.log(sprintf("Invalid <import-library> tag src[%s], no prefix attribute", itag.attrs.src));
-                continue;
-            }
-            let p = this.ComponentLibrary.importLibrary("@main", itag.attrs.src, itag.attrs.prefix, !itag.attrs.async);
-            if (p != null) {
-                parr.push(p);
-            }
-        }
-        if (parr.length == 0) {
-            return Promise.resolve(true);
-        }
-        return Promise.all(parr);
+    @mobx.action setGlobalData(globalData : any) {
+        this.DataRoots["global"].set(globalData);
     }
 
     @mobx.action setHtml(htmlobj : HibikiNode) {
@@ -955,7 +996,9 @@ class HibikiState {
                 callHook("EventCallback", this.Config.eventCallback, event);
             }
             else {
-                console.log(sprintf("Hibiki unhandled event %s", event.event), event.datacontext, rtctx);
+                if (event.event != "init") {
+                    console.log(sprintf("Hibiki unhandled event %s", event.event), event.datacontext, rtctx);
+                }
             }
         }
     }
@@ -976,29 +1019,6 @@ class HibikiState {
             env = env.makeChildEnv(null, opts);
         }
         return env;
-    }
-
-    @mobx.action fireScriptsLoaded() {
-        let dataenv = this.rootDataenv();
-        this.ScriptsLoaded.set(true);
-        DataCtx.SetPath("$state.hibiki.scriptsloaded", dataenv, true);
-        while (this.PostScriptRunQueue.length > 0) {
-            let fn = this.PostScriptRunQueue.shift();
-            try {
-                fn();
-            }
-            catch (e) {
-                console.log("ERROR in PostScriptRunQueue", e);
-            }
-        }
-    }
-
-    queuePostScriptRunFn(fn : any) {
-        if (this.ScriptsLoaded.get()) {
-            setTimeout(fn, 1);
-            return;
-        }
-        this.PostScriptRunQueue.push(fn);
     }
 
     destroyPanel() {
@@ -1149,8 +1169,7 @@ class HibikiState {
         return rtnval;
     }
 
-    // opts: rtContext, dataenv
-    async callHandlerInternalAsync(handlerPath : string, handlerData : any[], pureRequest : boolean, opts? : any) : Promise<any> {
+    async callHandlerInternalAsync(handlerPath : string, handlerData : any[], pureRequest : boolean, opts? : CallHandlerOptsType) : Promise<any> {
         opts = opts || {};
         if (handlerPath == null || handlerPath == "") {
             throw new Error("Invalid handler path");
@@ -1159,8 +1178,15 @@ class HibikiState {
         if (hpath == null) {
             throw new Error("Invalid handler path: " + handlerPath);
         }
+        let libContext = (opts.dataenv != null ? opts.dataenv.getLibContext() : null);
         let moduleName = hpath.ns ?? "default";
-        let module = this.Modules[moduleName];
+        let module : HibikiHandlerModule;
+        if (libContext == null || libContext == "@main") {
+            module = this.Modules[moduleName];
+        }
+        else {
+            module = this.ComponentLibrary.getModule(moduleName, libContext);
+        }
         if (module == null) {
             throw new Error(sprintf("Invalid handler, no module '%s' found for path: %s", moduleName, handlerPath));
         }
@@ -1173,6 +1199,7 @@ class HibikiState {
         req.data = handlerData;
         req.rtContext = opts.rtContext;
         req.pure = pureRequest;
+        req.libContext = libContext;
         let self = this;
         let rtnp = module.callHandler(req);
         return rtnp.then((data) => {
@@ -1503,7 +1530,7 @@ function parseHandler(handlerPath : string) : HandlerPathObj {
     if (handlerPath == null || handlerPath == "" || handlerPath[0] != '/') {
         return null;
     }
-    let match = handlerPath.match("^(?:/@([a-zA-Z_][a-zA-Z0-9_]*))?(/[a-zA-Z0-9._/-]*)?(?:[:](@?[a-zA-Z][a-zA-Z0-9_-]*))?$")
+    let match = handlerPath.match("^(?:/@([a-zA-Z_][a-zA-Z0-9_-]*))?(/[a-zA-Z0-9._/-]*)?(?:[:](@?[a-zA-Z][a-zA-Z0-9_-]*))?$")
     if (match == null) {
         return null;
     }

@@ -1419,7 +1419,6 @@ let ExecuteStmtRaw = function ExecuteStmtRaw(stmtAst : Statement, dataenv : Data
     }
     if (stmtAst.stmt == "invalidate") {
         if (stmtAst.expr == null) {
-            console.log("invalidate-stmt all");
             dataenv.dbstate.invalidateAll();
             return null;
         }

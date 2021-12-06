@@ -150,6 +150,8 @@ type LibraryType = {
     url?: string,
     libComponents: Record<string, LibComponentType>;
     importedComponents : Record<string, ComponentType>;
+    localHandlers : Record<string, (HibikiRequest) => any>;
+    modules : Record<string, HibikiHandlerModule>;
 };
 
 type HandlerPathObj = {
