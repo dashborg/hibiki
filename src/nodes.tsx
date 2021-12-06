@@ -324,6 +324,14 @@ class AnyNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironm
 
 @mobxReact.observer
 class CustomReactNode extends React.Component<{node : HibikiNode, component : ComponentType, dataenv : DataEnvironment}, {}> {
+    componentDidMount() {
+        let ctx = new DBCtx(this);
+        if (ctx.isEditMode()) {
+            return;
+        }
+        ctx.dataenv.dbstate.queuePostScriptRunFn(() => ctx.handleEvent("mount"));
+    }
+    
     render() {
         let ctx = new DBCtx(this);
         let dataenv = ctx.dataenv;
@@ -1324,12 +1332,13 @@ class DashElemNode extends React.Component<{ctx : DBCtx, extClass? : string, ext
 function addCoreComponent(name : string, impl : any) {
     let comp : LibComponentType = {componentType: "hibiki-native"};
     comp.impl = mobx.observable.box(impl, {name: "@hibiki/core/" + name});
-    CORE_LIBRARY.components[name] = comp;
+    CORE_LIBRARY.libComponents[name] = comp;
 }
 
 let CORE_LIBRARY : LibraryType = {
     name: "@hibiki/core",
-    components: {},
+    libComponents: {},
+    importedComponents: {},
 };
 
 addCoreComponent("if", IfNode);

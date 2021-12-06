@@ -148,7 +148,8 @@ type LibComponentType = {
 type LibraryType = {
     name: string,
     url?: string,
-    components: Record<string, LibComponentType>;
+    libComponents: Record<string, LibComponentType>;
+    importedComponents : Record<string, ComponentType>;
 };
 
 type HandlerPathObj = {
@@ -183,7 +184,7 @@ interface HibikiExtState {
     setData(path : string, data : any);
     getData(path : string) : any;
     runActions(actions : HibikiAction[]) : any;
-    setHtmlPage(htmlPage : string);
+    setPage(htmlPage : string);
     setInitCallback(fn : () => void);
     initialize(force : boolean);
 };
