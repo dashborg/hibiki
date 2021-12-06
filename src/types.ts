@@ -170,6 +170,7 @@ interface Hibiki {
     registerLocalHandler(path : string, fn : (HibikiRequest) => any);
     registerLocalReactComponentImpl(name : string, reactImpl : ReactClass);
     registerLocalNativeComponentImpl(name : string, reactImpl : ReactClass);
+    addLibraryCallback(libName : string, fn : Function);
     HibikiReact : new(props : any) => React.Component<{hibikiState : HibikiExtState}, {}>;
     ModuleRegistry : Record<string, (new(HibikiState, ModuleConfig) => HibikiHandlerModule)>;
     JSFuncs : Record<string, JSFuncType>;
@@ -177,7 +178,7 @@ interface Hibiki {
     LocalReactComponents : mobx.ObservableMap<string, ReactClass>;
     LocalNativeComponents : mobx.ObservableMap<string, ReactClass>;
     ImportLibs : Record<string, any>;
-    LibraryCallbacks : Record<string, any>;
+    LibraryCallbacks : Record<string, any[]>;
     States : Record<string, HibikiExtState>;
 };
 

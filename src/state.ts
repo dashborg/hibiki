@@ -600,10 +600,14 @@ class ComponentLibrary {
         })
         .then(() => {
             let hibiki = getHibiki();
+            let cbparr = [];
             if (hibiki.LibraryCallbacks[libName] != null) {
-                return Promise.resolve(hibiki.LibraryCallbacks[libName](this.state, this));
+                for (let i=0; i<hibiki.LibraryCallbacks[libName].length; i++) {
+                    let cbfn = hibiki.LibraryCallbacks[libName][i];
+                    cbparr.push(Promise.resolve(cbfn(this.state, this)));
+                }
             }
-            return true;
+            return Promise.all(cbparr);
         })
         .then(() => {
             let numComps = 0;

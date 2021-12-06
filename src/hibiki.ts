@@ -161,6 +161,13 @@ function registerLocalNativeComponentImpl(name : string, comp : ReactClass) {
     mobx.action(() => LocalNativeComponents.set(name, comp))();
 }
 
+function addLibraryCallback(libName : string, fn : Function) {
+    if (window.Hibiki.LibraryCallbacks[libName] == null) {
+        window.Hibiki.LibraryCallbacks[libName] = [];
+    }
+    window.Hibiki.LibraryCallbacks[libName].push(fn);
+}
+
 let hibiki : Hibiki = {
     autoloadTags: autoloadTags,
     loadTag: loadTag,
@@ -169,6 +176,7 @@ let hibiki : Hibiki = {
     registerLocalHandler: registerLocalHandler,
     registerLocalReactComponentImpl: registerLocalReactComponentImpl,
     registerLocalNativeComponentImpl: registerLocalNativeComponentImpl,
+    addLibraryCallback: addLibraryCallback,
     HibikiReact: HibikiRootNode,
     ModuleRegistry: {
         "local": LocalModule,
