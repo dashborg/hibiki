@@ -725,6 +725,9 @@ class ComponentLibrary {
                 return null;
             }
             let comp = libObj.libComponents[localTagName];
+            if (comp == null) {
+                return null;
+            }
             return {
                 componentType: comp.componentType,
                 libName: libContext,
@@ -1200,7 +1203,7 @@ class HibikiState {
             path: hpath.path,
             pathfrag: hpath.pathfrag,
         };
-        req.data = handlerData;
+        req.data = handlerData ?? {};
         req.rtContext = opts.rtContext;
         req.pure = pureRequest;
         req.libContext = libContext;

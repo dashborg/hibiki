@@ -41,7 +41,7 @@ let lexer = moo.states({
         ATID:     { match: /@[a-zA-Z][a-zA-Z_0-9]*/, value: (v) => v.substr(1) },
         ATSIGN:   "@",
         FN:       { match: /fn:[a-zA-Z_][a-zA-Z_0-9]*/, value: (v) => v.substr(3) },
-        ID:       { match: /[a-zA-Z][a-zA-Z_0-9]*/,
+        ID:       { match: /[a-zA-Z_][a-zA-Z_0-9]*/,
                     type: moo.keywords({
                         KW_TRUE: "true",
                         KW_FALSE: "false",
@@ -236,11 +236,11 @@ var grammar = {
     {"name": "nopStatement$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
     {"name": "nopStatement", "symbols": [(lexer.has("KW_NOP") ? {type: "KW_NOP"} : KW_NOP), "nopStatement$ebnf$1"], "postprocess": (data) => ({stmt: "nop"})},
     {"name": "bubbleStatement", "symbols": [(lexer.has("KW_BUBBLE") ? {type: "KW_BUBBLE"} : KW_BUBBLE), (lexer.has("DASHGT") ? {type: "DASHGT"} : DASHGT), "idOrKeyword", "optCallParamsSingle"], "postprocess":  (data) => {
-            let rtn = {stmt: "bubble", event: {etype: "literal", val: data[2].value, context: data[3]}};
+            let rtn = {stmt: "bubble", event: {etype: "literal", val: data[2].value}, context: data[3]};
             return rtn;
         } },
     {"name": "fireStatement", "symbols": [(lexer.has("KW_FIRE") ? {type: "KW_FIRE"} : KW_FIRE), (lexer.has("DASHGT") ? {type: "DASHGT"} : DASHGT), "idOrKeyword", "optCallParamsSingle"], "postprocess":  (data) => {
-            let rtn = {stmt: "fire", event: {etype: "literal", val: data[2].value, context: data[3]}};
+            let rtn = {stmt: "fire", event: {etype: "literal", val: data[2].value}, context: data[3]};
             return rtn;
         } },
     {"name": "logStatement", "symbols": [(lexer.has("KW_LOG") ? {type: "KW_LOG"} : KW_LOG), "callParams"], "postprocess": (data) => ({stmt: "log", exprs: data[1]})},

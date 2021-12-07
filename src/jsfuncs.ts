@@ -29,6 +29,34 @@ function jsIndexOf(str : string, ...rest : any[]) {
     return str.indexOf(...rest);
 }
 
+function jsMin(...rest : any[]) {
+    if (rest == null || rest.length == 0) {
+        return 0;
+    }
+    let rtn = rest[0] ?? 0;
+    for (let i=1; i<rest.length; i++) {
+        let v = rest[i] ?? 0;
+        if (v < rtn) {
+            rtn = v;
+        }
+    }
+    return rtn;
+}
+
+function jsMax(...rest : any[]) {
+    if (rest == null || rest.length == 0) {
+        return 0;
+    }
+    let rtn = rest[0] ?? 0;
+    for (let i=1; i<rest.length; i++) {
+        let v = rest[i] ?? 0;
+        if (v > rtn) {
+            rtn = v;
+        }
+    }
+    return rtn;
+}
+
 function jsSplice(arr : any[], ...rest : any[]) {
     if (arr == null || !mobx.isArrayLike(arr)) {
         return null;
@@ -217,8 +245,12 @@ function jsUuid() : string {
     return uuidv4();
 }
 
+
+
 reg("len", jsLen, true);
 reg("indexof", jsIndexOf, true);
+reg("min", jsMin, false);
+reg("max", jsMax, false);
 reg("splice", jsSplice, true);
 reg("slice", jsSlice, true);
 reg("int", jsInt, true);

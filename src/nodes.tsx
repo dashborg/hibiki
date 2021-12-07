@@ -541,6 +541,10 @@ class CustomNode extends React.Component<{node : HibikiNode, component : Compone
 
     componentDidMount() {
         let ctx = new DBCtx(this);
+        if (ctx.isEditMode()) {
+            return;
+        }
+        ctx.handleEvent("mount");
     }
 
     render() {

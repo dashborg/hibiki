@@ -1282,23 +1282,23 @@ function evalExprAst(exprAst : any, dataenv : DataEnvironment) : any {
             return evalExprAst(exprAst.exprs[1], dataenv);
         }
         else if (exprAst.op == "*") {
-            let e1 = evalExprAst(exprAst.exprs[0], dataenv);
-            let e2 = evalExprAst(exprAst.exprs[1], dataenv);
+            let e1 = evalExprAst(exprAst.exprs[0], dataenv) ?? 0;
+            let e2 = evalExprAst(exprAst.exprs[1], dataenv) ?? 0;
             return e1 * e2;
         }
         else if (exprAst.op == "+") {
-            let e1 = evalExprAst(exprAst.exprs[0], dataenv);
-            let e2 = evalExprAst(exprAst.exprs[1], dataenv);
+            let e1 = evalExprAst(exprAst.exprs[0], dataenv) ?? 0;
+            let e2 = evalExprAst(exprAst.exprs[1], dataenv) ?? 0;
             return e1 + e2;
         }
         else if (exprAst.op == "/") {
-            let e1 = evalExprAst(exprAst.exprs[0], dataenv);
-            let e2 = evalExprAst(exprAst.exprs[1], dataenv);
+            let e1 = evalExprAst(exprAst.exprs[0], dataenv) ?? 0;
+            let e2 = evalExprAst(exprAst.exprs[1], dataenv) ?? 0;
             return e1 / e2;
         }
         else if (exprAst.op == "%") {
-            let e1 = evalExprAst(exprAst.exprs[0], dataenv);
-            let e2 = evalExprAst(exprAst.exprs[1], dataenv);
+            let e1 = evalExprAst(exprAst.exprs[0], dataenv) ?? 0;
+            let e2 = evalExprAst(exprAst.exprs[1], dataenv) ?? 0;
             return e1 % e2;
         }
         else if (exprAst.op == ">=") {
@@ -1337,17 +1337,18 @@ function evalExprAst(exprAst : any, dataenv : DataEnvironment) : any {
         }
         else if (exprAst.op == "-") {
             if (exprAst.exprs.length == 1) {
-                let e1 = evalExprAst(exprAst.exprs[0], dataenv);
+                let e1 = evalExprAst(exprAst.exprs[0], dataenv) ?? 0;
                 return -e1;
             }
             else {
-                let e1 = evalExprAst(exprAst.exprs[0], dataenv);
-                let e2 = evalExprAst(exprAst.exprs[1], dataenv);
+                let e1 = evalExprAst(exprAst.exprs[0], dataenv) ?? 0;
+                let e2 = evalExprAst(exprAst.exprs[1], dataenv) ?? 0;
+                console.log("minus", e1, e2);
                 return e1 - e2;
             }
         }
         else if (exprAst.op == "+") {
-            let e1 = evalExprAst(exprAst.exprs[0], dataenv);
+            let e1 = evalExprAst(exprAst.exprs[0], dataenv) ?? 0;
             return +e1;
         }
         else if (exprAst.op == "?:") {
@@ -1438,6 +1439,9 @@ let ExecuteStmtRaw = function ExecuteStmtRaw(stmtAst : Statement, dataenv : Data
         let context = null;
         if (stmtAst.context != null) {
             context = evalExprAst(stmtAst.context, dataenv);
+        }
+        if (context != null && !isObject(context)) {
+            context = {value: context};
         }
         let bubble = (stmtAst.stmt == "bubble");
         let eventDE = dataenv.getParentEventBoundary("*");
@@ -1817,6 +1821,7 @@ function convertSimpleType(typeName : string, value : string, defaultValue : any
 export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, ApplySingleRRA, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ParseBlock, ParseBlockThrow, ExecuteBlock, CreateContextThrow, ParseAndExecuteBlock, ObjectSetPath, DeepEqual, BoundValue, ParseLValuePath, ParseLValuePathThrow, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, ExecuteBlockP, ParseAsync, ExecuteBlockPThrow, BlobFromBlob, formatVal};
 
 export type {PathType};
+
 
 
 

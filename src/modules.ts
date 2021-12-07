@@ -80,7 +80,7 @@ class FetchModule {
         }
         let url : URL = null;
         try {
-            url = new URL(urlStr);
+            url = new URL(urlStr, window.location.href);
         }
         catch (e) {
             throw new Error(sprintf("Invalid URL passed to fetch '%s': %s", urlStr, e.toString()));

@@ -39,7 +39,7 @@ let lexer = moo.states({
         ATID:     { match: /@[a-zA-Z][a-zA-Z_0-9]*/, value: (v) => v.substr(1) },
         ATSIGN:   "@",
         FN:       { match: /fn:[a-zA-Z_][a-zA-Z_0-9]*/, value: (v) => v.substr(3) },
-        ID:       { match: /[a-zA-Z][a-zA-Z_0-9]*/,
+        ID:       { match: /[a-zA-Z_][a-zA-Z_0-9]*/,
                     type: moo.keywords({
                         KW_TRUE: "true",
                         KW_FALSE: "false",
@@ -237,13 +237,13 @@ nopStatement -> %KW_NOP (%LPAREN %RPAREN):? {% (data) => ({stmt: "nop"}) %}
 
 bubbleStatement ->
     %KW_BUBBLE %DASHGT idOrKeyword optCallParamsSingle {% (data) => {
-        let rtn = {stmt: "bubble", event: {etype: "literal", val: data[2].value, context: data[3]}};
+        let rtn = {stmt: "bubble", event: {etype: "literal", val: data[2].value}, context: data[3]};
         return rtn;
     } %}
 
 fireStatement ->
     %KW_FIRE %DASHGT idOrKeyword optCallParamsSingle {% (data) => {
-        let rtn = {stmt: "fire", event: {etype: "literal", val: data[2].value, context: data[3]}};
+        let rtn = {stmt: "fire", event: {etype: "literal", val: data[2].value}, context: data[3]};
         return rtn;
     } %}
 
