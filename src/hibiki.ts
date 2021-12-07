@@ -7,7 +7,7 @@ import {parseHtml} from "./html-parser";
 import {HibikiState, DataEnvironment} from "./state";
 import * as ReactDOM from "react-dom";
 import {HibikiRootNode, CORE_LIBRARY} from "./nodes";
-import {deepTextContent, evalDeepTextContent} from "./utils";
+import {deepTextContent, evalDeepTextContent, isObject} from "./utils";
 import merge from "lodash/merge";
 import type {HibikiNode, HibikiConfig, Hibiki, HibikiExtState, ReactClass, LibraryType} from "./types";
 import {FetchModule, AppModule, LocalModule} from "./modules";
@@ -29,6 +29,9 @@ function readHibikiOptsFromHtml(htmlObj : HibikiNode) : {config : HibikiConfig, 
         }
         if (initialData == null && subNode.tag == "hibiki-data") {
             initialData = evalDeepTextContent(subNode, true);
+            if (initialData != null && !isObject(initialData)) {
+                initialData = {data: initialData};
+            }
         }
         if (initHandler == null && subNode.tag == "hibiki-init") {
             initHandler = deepTextContent(subNode);
