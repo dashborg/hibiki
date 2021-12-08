@@ -131,7 +131,7 @@ function renderTextSpan(text : string, style : any) : any {
     return text;
 }
 
-function renderTextData(node : HibikiNode, dataenv : DataEnvironment) : any {
+function renderTextData(node : HibikiNode, dataenv : DataEnvironment, onlyText? : boolean) : any {
     let ctx = new DBCtx(null, node, dataenv);
     let style = ctx.resolveStyleMap("style");
     let dataLV = ctx.resolveData("data", false);
@@ -142,6 +142,9 @@ function renderTextData(node : HibikiNode, dataenv : DataEnvironment) : any {
         return renderTextSpan(rtn, style);
     }
     let rtn = DataCtx.formatVal(bindVal, ctx.resolveAttr("format"));
+    if (onlyText) {
+        return rtn;
+    }
     return renderTextSpan(rtn, style);
 }
 

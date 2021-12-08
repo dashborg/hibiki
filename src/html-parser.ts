@@ -6,6 +6,22 @@ import merge from "lodash/merge";
 
 const styleAttrPartRe = new RegExp("^(style(?:-[a-z][a-z0-9-])?)\\.(.*)");
 
+function escapeBrackets(text : string) {
+    let lbpos = text.indexOf("{\\{");
+    let rbpos = text.indexOf("}\\}");
+    if (lbpos != -1) {
+        text = text.replaceAll(/{(\\{)+/g, (t) => {
+            return t.replaceAll("\\", "");
+        });
+    }
+    if (rbpos != -1) {
+        text = text.replaceAll(/}(\\})+/g, (t) => {
+            return t.replaceAll("\\", "");
+        });
+    }
+    return text;
+}
+
 class HtmlParser {
     opts : HtmlParserOpts;
 
@@ -57,8 +73,11 @@ class HtmlParser {
         if (text == null || text == "") {
             return null;
         }
-        if (this.opts.noInlineText || text.indexOf("{{") == -1) {
+        if (this.opts.noInlineText) {
             return {tag: "#text", text: text};
+        }
+        if (text.indexOf("{{") == -1) {
+            return {tag: "#text", text: escapeBrackets(text)};
         }
         let parts : HibikiNode[] = [];
         let textPos = 0;
@@ -70,11 +89,13 @@ class HtmlParser {
                 endPos = text.indexOf("}}", startPos);
             }
             if (startPos == -1 || endPos == -1) {
-                parts.push({tag: "#text", text: text.substr(textPos)});
+                let tval = escapeBrackets(text.substr(textPos));
+                parts.push({tag: "#text", text: tval});
                 break;
             }
             if (startPos > textPos) {
-                parts.push({tag: "#text", text: text.substr(textPos, startPos-textPos)});
+                let tval = escapeBrackets(text.substr(textPos, startPos-textPos));
+                parts.push({tag: "#text", text: tval});
             }
             let bindText = text.substr(startPos+2, endPos-startPos-2).trim();
             parts.push({

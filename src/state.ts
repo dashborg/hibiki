@@ -595,7 +595,9 @@ class ComponentLibrary {
             this.rawImportLib(libName, "@hibiki/core", null);
             this.rawImportLib(libContext, libName, prefix);
             let [depPromise, srcs] = createDepPromise(libName, srcUrl, this.state, libNode);
-            console.log(sprintf("Hibiki Library '%s' dependencies: %s", this.fullLibName(libName), JSON.stringify(srcs)));
+            if (srcs.length > 0) {
+                console.log(sprintf("Hibiki Library '%s' dependencies: %s", this.fullLibName(libName), JSON.stringify(srcs)));
+            }
             return depPromise;
         })
         .then(() => {

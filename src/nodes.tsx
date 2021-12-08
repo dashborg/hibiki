@@ -105,11 +105,29 @@ class HibikiRootNode extends React.Component<{hibikiState : HibikiExtState}, {}>
     }
 }
 
+function evalOptionChildren(node : HibikiNode, dataenv : DataEnvironment) : string {
+    if (node.list == null) {
+        return null;
+    }
+    let textRtn = null;
+    for (let i=0; i<node.list.length; i++) {
+        let text = staticEvalTextNode(node.list[i], dataenv);
+        if (text != null) {
+            textRtn = (textRtn ?? "") + text;
+        }
+    }
+    return textRtn;
+}
+
 function ctxRenderHtmlChildren(ctx : DBCtx, dataenv? : DataEnvironment) : Element[] {
     if (dataenv == null) {
         dataenv = ctx.childDataenv;
     }
-    return baseRenderHtmlChildren(ctx.node.list, dataenv);
+    if (ctx.node.tag == "option") {
+        return [evalOptionChildren(ctx.node, dataenv)];
+    }
+    let rtn = baseRenderHtmlChildren(ctx.node.list, dataenv);
+    return rtn;
 }
 
 function renderHtmlChildren(node : {list? : HibikiNode[]}, dataenv : DataEnvironment) : Element[] {
@@ -194,6 +212,26 @@ class NodeList extends React.Component<{list : HibikiNode[], ctx : DBCtx}> {
         }
         return <React.Fragment>{rtn}</React.Fragment>;
     }
+}
+
+function staticEvalTextNode(node : HibikiNode, dataenv : DataEnvironment) : string {
+    if (node.tag == "#text") {
+        return node.text;
+    }
+    if (node.tag != "h-text") {
+        return nodeStr(node);
+    }
+    let ctx = new DBCtx(null, node, dataenv);
+    if (!ctx.isEditMode() && ctx.hasAttr("if")) {
+        let ifText = ctx.resolveAttr("if");
+        let ifExpr = ctx.evalExpr(ifText);
+        if (!ifExpr) {
+            return null;
+        }
+    }
+    // TODO foreach
+    let rtn = NodeUtils.renderTextData(node, dataenv, true);
+    return rtn;
 }
 
 @mobxReact.observer
