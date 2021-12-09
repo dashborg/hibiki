@@ -119,7 +119,7 @@ function evalOptionChildren(node : HibikiNode, dataenv : DataEnvironment) : stri
     return textRtn;
 }
 
-function ctxRenderHtmlChildren(ctx : DBCtx, dataenv? : DataEnvironment) : Element[] {
+function ctxRenderHtmlChildren(ctx : DBCtx, dataenv? : DataEnvironment) : (Element | string)[] {
     if (dataenv == null) {
         dataenv = ctx.childDataenv;
     }

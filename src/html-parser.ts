@@ -10,13 +10,13 @@ function escapeBrackets(text : string) {
     let lbpos = text.indexOf("{\\{");
     let rbpos = text.indexOf("}\\}");
     if (lbpos != -1) {
-        text = text.replaceAll(/{(\\{)+/g, (t) => {
-            return t.replaceAll("\\", "");
+        text = text.replace(/{(\\{)+/g, (t) => {
+            return t.replace(/\\/g, "");
         });
     }
     if (rbpos != -1) {
-        text = text.replaceAll(/}(\\})+/g, (t) => {
-            return t.replaceAll("\\", "");
+        text = text.replace(/}(\\})+/g, (t) => {
+            return t.replace(/\\/g, "");
         });
     }
     return text;
