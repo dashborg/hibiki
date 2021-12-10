@@ -384,7 +384,8 @@ class DataEnvironment {
             return env.parent.resolveEventHandler(event, false);
         }
         let hval = env.handlers[event.event];
-        return {handler: {hibikihandler: hval.handlerStr}, node: hval.node, dataenv: this};
+        let blockAction = {actiontype: "block", blockstr: hval.handlerStr};
+        return {handler: [blockAction], node: hval.node, dataenv: this};
     }
 
     fireEvent(event : EventType, rtctx : RtContext, throwErrors? : boolean) : Promise<any> {
@@ -1155,7 +1156,7 @@ class HibikiState {
         return null;
     }
 
-    returnValueFromActions(rra : any) : any {
+    returnValueFromActions(rra : HibikiAction[]) : any {
         return this.processActions(rra, true);
     }
 
@@ -1167,26 +1168,25 @@ class HibikiState {
         return DataCtx.BlobFromBlob(blob);
     }
 
-    @mobx.action processActions(rra : any, pureRequest : boolean) : any {
+    @mobx.action processActions(rra : HibikiAction[], pureRequest : boolean) : any {
         if (rra == null) {
             return null;
         }
         let rtnval = null;
         let dataenv = this.rootDataenv();
         for (let rr of rra) {
-            let selector = rr.selector ?? rr.path;
-            if (rr.type == "setreturn") {
+            if (rr.actiontype == "setreturn") {
                 rtnval = rr.data;
                 continue;
             }
             if (pureRequest) {
                 continue;
             }
-            if (rr.type == "invalidate") {
-                this.invalidateRegex(selector);
+            if (rr.actiontype == "invalidate") {
+                this.invalidateRegex(rr.data);
             }
-            else if (rr.type == "html") {
-                let htmlObj = parseHtml(rr.data);
+            else if (rr.actiontype == "html") {
+                let htmlObj = parseHtml(rr.html);
                 if (htmlObj != null) {
                     this.HtmlObj.set(htmlObj);
                 }
@@ -1236,10 +1236,7 @@ class HibikiState {
             if (isObject(data) && ("hibikiactions" in data) && Array.isArray(data.hibikiactions)) {
                 return {hibikiactions: data.hibikiactions};
             }
-            if (isObject(data) && ("hibikihandler" in data) && typeof(data.hibikihandler) == "string") {
-                return {hibikihandler: data.hibikihandler, ctxstr: data.ctxstr};
-            }
-            return {hibikiactions: [{type: "setreturn", ts: Date.now(), data: data}]};
+            return {hibikiactions: [{actiontype: "setreturn", data: data}]};
         });
     }
 
@@ -1280,7 +1277,8 @@ class HibikiState {
             if (data == null || typeof(data) != "object" || !("hibikiactions" in data) || !Array.isArray(data.hibikiactions)) {
                 return data;
             }
-            return self.processActions(data.hibikiactions, pureRequest);
+            let rtn = self.processActions(data.hibikiactions, pureRequest);
+            return rtn;
         });
     }
 

@@ -32,12 +32,21 @@ type HandlerValType = {
     node : HibikiNode,
 };
 
+type HibikiActionValue = {hibikiexpr : string} | any;
+type HibikiActionStr   = string | {hibikiexpr : string};
+
 type HibikiAction = {
-    type          : string,   // "setdata", "invalidate", "html", "error", "blob", "blobext"
-    ts?           : number,
-    selector?     : string,
-    data?         : any,
-    err?          : string,
+    actiontype    : string,
+    subtype?      : string,
+    event?        : HibikiActionStr,
+    setop?        : string,
+    setpath?      : string,
+    callpath?     : HibikiActionStr,
+    data?         : HibikiActionValue,
+    html?         : string,
+    actions?      : Record<string, HibikiAction[]>,
+    blockstr?     : string,
+    blockctx?     : string,
     blobbase64?   : string,
     blobmimetype? : string,
 };

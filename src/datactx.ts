@@ -28,17 +28,19 @@ type HExpr = {
 };
 
 type HAction = {
-    type      : string,
-    subtype?  : string,
-    event?    : HExpr,
-    setop?    : string,
-    lvalue?   : PathType,
-    callpath? : HExpr,
-    data?     : HExpr,
-    actions?  : Record<string, HAction[]>,
+    actiontype : string,
+    subtype?   : string,
+    event?     : HExpr,
+    setop?     : string,
+    setpath?   : PathType,
+    callpath?  : HExpr,
+    data?      : HExpr,
+    actions?   : Record<string, HAction[]>,
+    blockstr?  : string,
+    blockctx?  : string,
 };
 
-type HandlerBlock = {hibikihandler: string, ctxstr? : string} | {hibikiactions: HibikiAction[]} | HAction[];
+type HandlerBlock = {hibikiactions: HibikiAction[]} | HAction[];
 
 type StmtBlock = Statement[];
 
@@ -1422,15 +1424,15 @@ function evalExprAst(exprAst : HExpr, dataenv : DataEnvironment) : any {
 }
 
 async function ExecuteHAction(action : HAction, dataenv : DataEnvironment, rtctx : RtContext) : Promise<any> {
-    rtctx.pushContext(sprintf("%s action", action.type), null);
-    if (action.type == "setdata") {
-        let lvaluePath = evalAssignLVThrow(action.lvalue, dataenv);
+    rtctx.pushContext(sprintf("%s action", action.actiontype), null);
+    if (action.actiontype == "setdata") {
+        let lvaluePath = evalAssignLVThrow(action.setpath, dataenv);
         let expr = evalExprAst(action.data, dataenv);
         let setop = action.setop ?? "set";
         setPathWrapper(setop, lvaluePath, dataenv, expr, {allowContext: true});
         return null;
     }
-    if (action.type == "if") {
+    if (action.actiontype == "if") {
         let condVal = evalExprAst(action.data, dataenv);
         let actions = action.actions ?? {};
         if (condVal) {
@@ -1443,11 +1445,11 @@ async function ExecuteHAction(action : HAction, dataenv : DataEnvironment, rtctx
         }
         return null;
     }
-    if (action.type == "setreturn") {
+    if (action.actiontype == "setreturn") {
         let val = evalExprAst(action.data, dataenv);
         return val;
     }
-    if (action.type == "callhandler") {
+    if (action.actiontype == "callhandler") {
         let callPath = evalExprAst(action.callpath, dataenv);
         let data = demobx(evalExprAst(action.data, dataenv));
         rtctx.replaceContext(sprintf("Calling handler %s", callPath), null);
@@ -1455,14 +1457,14 @@ async function ExecuteHAction(action : HAction, dataenv : DataEnvironment, rtctx
         let actions = await pactions;
         let handlerEnv = dataenv.makeChildEnv(null, {blockLocalData: true});
         let rtnVal = await ExecuteHandlerBlock(actions, handlerEnv, rtctx);
-        if (action.lvalue != null) {
-            let lvaluePath = evalAssignLVThrow(action.lvalue, dataenv);
+        if (action.setpath != null) {
+            let lvaluePath = evalAssignLVThrow(action.setpath, dataenv);
             let setop = action.setop ?? "set";
             setPathWrapper(setop, lvaluePath, dataenv, rtnVal, {allowContext: true});
         }
         return rtnVal;
     }
-    if (action.type == "invalidate") {
+    if (action.actiontype == "invalidate") {
         let ivVal = evalExprAst(action.data, dataenv);
         if (ivVal == null) {
             dataenv.dbstate.invalidateAll();
@@ -1478,7 +1480,7 @@ async function ExecuteHAction(action : HAction, dataenv : DataEnvironment, rtctx
         }
         return null;
     }
-    if (action.type == "fire") {
+    if (action.actiontype == "fire") {
         let eventStr = evalExprAst(action.event, dataenv);
         if (eventStr == null || eventStr == "") {
             return null;
@@ -1502,13 +1504,13 @@ async function ExecuteHAction(action : HAction, dataenv : DataEnvironment, rtctx
         rtctx.pushContext(ctxStr, {handlerEnv: eventEnv, handlerName: event.event});
         return ExecuteHandlerBlock(ehandler.handler, eventEnv, rtctx);
     }
-    if (action.type == "log") {
+    if (action.actiontype == "log") {
     }
-    if (action.type == "throw") {
+    if (action.actiontype == "throw") {
     }
-    if (action.type == "context") {
+    if (action.actiontype == "context") {
     }
-    if (action.type == "nop") {
+    if (action.actiontype == "nop") {
         return null;
     }
     return null;
@@ -1519,15 +1521,7 @@ async function ExecuteHandlerBlock(actions : HandlerBlock, dataenv : DataEnviron
         return null;
     }
     let actionArr : HAction[] = null;
-    if ("hibikihandler" in actions) {
-        let ctxstr = actions.ctxstr ?? "handler";
-        rtctx.pushContext(sprintf("Parsing %s", ctxstr), null);
-        let block = ParseBlockThrow(actions.hibikihandler);
-        rtctx.popContext();
-        // TODO set actionArr from block
-        actionArr = [];
-    }
-    else if ("hibikiactions" in actions) {
+    if ("hibikiactions" in actions) {
         // TODO set actionArr from HibikiAction[]
         actionArr = [];
     }
@@ -1538,7 +1532,7 @@ async function ExecuteHandlerBlock(actions : HandlerBlock, dataenv : DataEnviron
     for (let i=0; i<actionArr.length; i++) {
         let action = actionArr[i];
         let actionRtn = await ExecuteHAction(action, dataenv, rtctx);
-        if (action.type == "setreturn") {
+        if (action.actiontype == "setreturn") {
             rtn = actionRtn;
         }
     }
@@ -1843,17 +1837,16 @@ function EvalSimpleExpr(exprStr : string, dataenv : DataEnvironment, rtContext? 
     }
 }
 
-function ApplySingleRRA(dataenv : DataEnvironment, rra : any) {
-    let selector = rra.selector ?? rra.path;
-    if (rra.type == "setdata") {
-        SetPath(selector, dataenv, rra.data);
+function ApplySingleRRA(dataenv : DataEnvironment, rra : HibikiAction) {
+    if (rra.actiontype == "setdata") {
+        SetPath(rra.setpath, dataenv, rra.data);
     }
-    else if (rra.type == "blob") {
+    else if (rra.actiontype == "blob") {
         let blob = BlobFromRRA(rra);
-        SetPath(selector, dataenv, blob);
+        SetPath(rra.setpath, dataenv, blob);
     }
-    else if (rra.type == "blobext") {
-        SetPath("blobext:" + selector, dataenv, rra.blobbase64);
+    else if (rra.actiontype == "blobext") {
+        SetPath("blobext:" + rra.setpath, dataenv, rra.blobbase64);
     }
 }
 
@@ -1877,8 +1870,8 @@ function BlobFromBlob(blob : Blob) : Promise<HibikiBlob> {
     });
 }
 
-function BlobFromRRA(rra : any) : HibikiBlob {
-    if (rra.type != "blob") {
+function BlobFromRRA(rra : HibikiAction) : HibikiBlob {
+    if (rra.actiontype != "blob") {
         return null;
     }
     let blob = new HibikiBlob();
@@ -1887,7 +1880,7 @@ function BlobFromRRA(rra : any) : HibikiBlob {
     return blob;
 }
 
-function ExtBlobFromRRA(blob : HibikiBlob, rra : any) {
+function ExtBlobFromRRA(blob : HibikiBlob, rra : HibikiAction) {
     if (blob == null) {
         throw new Error(sprintf("Cannot extend null HibikiBlob"));
     }
@@ -1948,7 +1941,7 @@ function ParseLValuePathThrow(str : string, dataenv : DataEnvironment) {
     if (parser.results.length > 1) {
         console.log("Ambiguous parse of lvalue: ", str, parser.results);
     }
-    return new BoundLValue(lvalue.path, dataenv);
+    return new BoundLValue(lvalue, dataenv);
 }
 
 function ParseLValuePath(str : string, dataenv : DataEnvironment) {

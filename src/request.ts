@@ -17,35 +17,36 @@ class HibikiRequest {
         this.actions = [];
     }
 
-    setData(path : string, data : any) {
+    setData(setpath : string, data : any) {
         this.actions.push({
-            type: "setdata",
-            ts: Date.now(),
-            selector: path,
+            actiontype: "setdata",
+            setpath: setpath,
             data: data,
         });
     }
 
-    invalidate(regex? : string) {
-        this.actions.push({
-            type: "invalidate",
-            ts: Date.now(),
-            selector: regex,
-        });
+    invalidate(...regexArr : string[]) {
+        if (regexArr == null || regexArr.length == 0) {
+            this.actions.push({actiontype: "invalidate"});
+        }
+        else {
+            this.actions.push({
+                actiontype: "invalidate",
+                data: regexArr,
+            });
+        }
     }
 
     setHtml(html : string) {
         this.actions.push({
-            type: "html",
-            ts: Date.now(),
+            actiontype: "html",
             data: html,
         });
     }
 
     setReturn(rtnVal : any) {
         this.actions.push({
-            type: "setreturn",
-            ts: Date.now(),
+            actiontype: "setreturn",
             data: rtnVal,
         });
     }
