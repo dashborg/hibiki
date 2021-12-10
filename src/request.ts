@@ -41,6 +41,14 @@ class HibikiRequest {
             data: html,
         });
     }
+
+    setReturn(rtnVal : any) {
+        this.actions.push({
+            type: "setreturn",
+            ts: Date.now(),
+            data: rtnVal,
+        });
+    }
 }
 
 export {HibikiRequest};

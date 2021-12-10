@@ -162,7 +162,7 @@ class LocalModule {
         let rtn = handler(req);
         let p = Promise.resolve(rtn).then((rtnVal) => {
             if (rtnVal != null) {
-                req.setData("@rtn", rtnVal);
+                req.setReturn(rtnVal);
             }
             return {hibikiactions: req.actions};
         });
