@@ -91,36 +91,6 @@ type PathPart = {
 
 type PathType = PathPart[];
 
-type TCFBlock = {
-    block : StmtBlock,
-    catchBlock? : StmtBlock,
-    finallyBlock? : StmtBlock,
-    contextStr? : string,
-};
-
-type StmtBlock = Statement[];
-
-type Statement = {
-    stmt : string,
-    data? : any,
-    handler? : string,
-    lvalue? : any,
-    expr? : ExprType,
-    exprs? : ExprType[],
-    setop? : string,
-    target? : any,
-    event? : string,
-    context : any,
-    condExpr : ExprType,
-    thenBlock? : StmtBlock,
-    elseBlock? : StmtBlock,
-    appexpr?: ExprType,
-    pageexpr? : ExprType,
-    params?: ExprType,
-};
-
-type ExprType = any;
-
 type DataCtxErrorObjType = {
     _type : "HibikiError",
     message : string,
@@ -192,4 +162,4 @@ interface HibikiExtState {
     initialize(force : boolean);
 };
 
-export type {HibikiNode, HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, TCFBlock, StmtBlock, Statement, ExprType, DataCtxErrorObjType, ComponentType, LibraryType, HandlerPathObj, HibikiRequest, Hibiki, HibikiAction, HibikiExtState, EventType, HandlerValType, JSFuncType, AppModuleConfig, FetchHookFn, CsrfHookFn, ReactClass, HandlerPathType, ErrorCallbackFn, EventCallbackFn, HtmlParserOpts, LibComponentType};
+export type {HibikiNode, HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, DataCtxErrorObjType, ComponentType, LibraryType, HandlerPathObj, HibikiRequest, Hibiki, HibikiAction, HibikiExtState, EventType, HandlerValType, JSFuncType, AppModuleConfig, FetchHookFn, CsrfHookFn, ReactClass, HandlerPathType, ErrorCallbackFn, EventCallbackFn, HtmlParserOpts, LibComponentType};

@@ -5,12 +5,13 @@ import md5 from "md5";
 import {sprintf} from "sprintf-js";
 import {boundMethod} from 'autobind-decorator'
 import {v4 as uuidv4} from 'uuid';
-import type {HibikiNode, ComponentType, LibraryType, HandlerPathObj, HibikiConfig, HibikiHandlerModule, HibikiAction, TCFBlock, EventType, HandlerValType, JSFuncType, CsrfHookFn, FetchHookFn, Hibiki, ErrorCallbackFn, HtmlParserOpts} from "./types";
+import type {HibikiNode, ComponentType, LibraryType, HandlerPathObj, HibikiConfig, HibikiHandlerModule, HibikiAction, EventType, HandlerValType, JSFuncType, CsrfHookFn, FetchHookFn, Hibiki, ErrorCallbackFn, HtmlParserOpts} from "./types";
 import * as DataCtx from "./datactx";
 import {isObject, textContent, SYM_PROXY, SYM_FLATTEN, nodeStr, callHook, getHibiki} from "./utils";
 import {subNodesByTag, firstSubNodeByTag} from "./nodeutils";
 import {RtContext, HibikiError} from "./error";
 import {HibikiRequest} from "./request";
+import type {TCFBlock} from "./datactx";
 
 import {parseHtml} from "./html-parser";
 
@@ -110,6 +111,7 @@ type DataEnvironmentOpts = {
     libContext? : string,
     eventBoundary? : string, // "soft" | "hard",
     localData? : any,
+    blockLocalData? : boolean,
 };
 
 class DataEnvironment {
@@ -124,6 +126,7 @@ class DataEnvironment {
     eventBoundary : "soft" | "hard";
     localData : any;
     hasLocalData : boolean;
+    blockLocalData : boolean;
 
     constructor(dbstate : HibikiState, opts? : DataEnvironmentOpts) {
         this.parent = null;
@@ -134,6 +137,7 @@ class DataEnvironment {
         this.eventBoundary = null;
         this.htmlContext = null;
         this.libContext = null;
+        this.blockLocalData = false;
         if (opts != null) {
             this.componentRoot = opts.componentRoot;
             this.description = opts.description;
@@ -147,6 +151,7 @@ class DataEnvironment {
                 this.hasLocalData = true;
                 this.localData = opts.localData;
             }
+            this.blockLocalData = opts.blockLocalData;
         }
     }
 
@@ -204,7 +209,7 @@ class DataEnvironment {
         if (this.hasLocalData) {
             return this.localData;
         }
-        if (this.parent == null) {
+        if (this.parent == null || this.blockLocalData) {
             return null;
         }
         return this.parent.resolveLocalData();
@@ -397,7 +402,7 @@ class DataEnvironment {
         if (contextkey in this.specials) {
             return this.specials[contextkey];
         }
-        if (this.parent == null) {
+        if (this.parent == null || this.blockLocalData) {
             return null;
         }
         return this.parent.getContextKey(contextkey);
@@ -428,6 +433,9 @@ class DataEnvironment {
             if (this.hasLocalData) {
                 rtn.push(dataenv.localData);
             }
+            if (this.blockLocalData) {
+                break;
+            }
             dataenv = dataenv.parent;
         }
         return rtn;
@@ -441,6 +449,9 @@ class DataEnvironment {
                 break;
             }
             rtn.push(dataenv.specials);
+            if (dataenv.blockLocalData) {
+                break;
+            }
             dataenv = dataenv.parent;
         }
         return rtn;
@@ -1176,6 +1187,10 @@ class HibikiState {
             DataCtx.ApplySingleRRA(dataenv, rr);
         }
         return rtnval;
+    }
+
+    async callHandlerRtnActions(handlerPath : string, handlerData : object, pureRequest : boolean, opts? : CallHandlerOptsType) : Promise<any> {
+        return null;
     }
 
     async callHandlerInternalAsync(handlerPath : string, handlerData : any[], pureRequest : boolean, opts? : CallHandlerOptsType) : Promise<any> {

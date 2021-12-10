@@ -185,7 +185,7 @@ var grammar = {
     {"name": "namedParamKey", "symbols": [(lexer.has("ATID") ? {type: "ATID"} : ATID)], "postprocess": (data) => ({etype: "literal", val: "@" + data[0].value})},
     {"name": "namedParamKey", "symbols": [(lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "fullExpr", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => data[1]},
     {"name": "namedParamPart", "symbols": ["namedParamKey", (lexer.has("EQUAL") ? {type: "EQUAL"} : EQUAL), "fullExpr"], "postprocess":  (data) => {
-            return {etype: "kv", key: data[0], val: data[2]};
+            return {etype: "kv", key: data[0], valexpr: data[2]};
         } },
     {"name": "namedParamList$ebnf$1", "symbols": []},
     {"name": "namedParamList$ebnf$1$subexpression$1", "symbols": [(lexer.has("COMMA") ? {type: "COMMA"} : COMMA), "namedParamPart"]},
@@ -200,7 +200,7 @@ var grammar = {
     {"name": "namedCallParams", "symbols": [(lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => { return null; }},
     {"name": "namedCallParams", "symbols": [(lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "literalArrayElements", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess":  (data) => {
             let arrData = {etype: "array", exprs: data[1]};
-            let argsExpr = {etype: "kv", key: {etype: "literal", val: "*args"}, val: arrData};
+            let argsExpr = {etype: "kv", key: {etype: "literal", val: "*args"}, valexpr: arrData};
             let mapData = {etype: "map", exprs: [argsExpr]};
             return mapData;
         } },
@@ -208,7 +208,7 @@ var grammar = {
     {"name": "namedCallParams", "symbols": [(lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "literalArrayElementsNoComma", (lexer.has("COMMA") ? {type: "COMMA"} : COMMA), "namedParamList", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess":  (data) => {
             let arrData = {etype: "array", exprs: data[1]};
             let mapData = data[3];
-            let argsExpr = {etype: "kv", key: {etype: "literal", val: "*args"}, val: arrData};
+            let argsExpr = {etype: "kv", key: {etype: "literal", val: "*args"}, valexpr: arrData};
             mapData.exprs.push(argsExpr);
             return mapData;
         } },
@@ -301,7 +301,7 @@ var grammar = {
     {"name": "fnExpr", "symbols": [(lexer.has("FN") ? {type: "FN"} : FN), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "optionalLiteralArrayElements", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess":  (data) => {
             return {etype: "fn", fn: data[0].value, exprs: data[2]};
         } },
-    {"name": "fnExpr", "symbols": [(lexer.has("KW_REF") ? {type: "KW_REF"} : KW_REF), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "lvaluePath", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => ({etype: "ref", path: data[2]})},
+    {"name": "fnExpr", "symbols": [(lexer.has("KW_REF") ? {type: "KW_REF"} : KW_REF), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "lvaluePath", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => ({etype: "ref", path: data[2].path})},
     {"name": "literalArray", "symbols": [(lexer.has("LBRACK") ? {type: "LBRACK"} : LBRACK), "optionalLiteralArrayElements", (lexer.has("RBRACK") ? {type: "RBRACK"} : RBRACK)], "postprocess":  (data) => {
             return {etype: "array", exprs: data[1]};
         } },
@@ -342,7 +342,7 @@ var grammar = {
             rtn.push(...data[1].map((v) => v[1]));
             return rtn;
         } },
-    {"name": "literalMapElement", "symbols": ["literalMapKey", (lexer.has("COLON") ? {type: "COLON"} : COLON), "fullExpr"], "postprocess": (data) => ({etype: "kv", key: data[0], val: data[2]})},
+    {"name": "literalMapElement", "symbols": ["literalMapKey", (lexer.has("COLON") ? {type: "COLON"} : COLON), "fullExpr"], "postprocess": (data) => ({etype: "kv", key: data[0], valexpr: data[2]})},
     {"name": "literalMapKey", "symbols": ["idOrKeyword"], "postprocess": (data) => ({etype: "literal", val: data[0].value})},
     {"name": "literalMapKey", "symbols": ["stringLit"], "postprocess": (data) => ({etype: "literal", val: data[0]})},
     {"name": "literalVal", "symbols": ["stringLit"], "postprocess": (data) => ({etype: "literal", val: data[0]})},

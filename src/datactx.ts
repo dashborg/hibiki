@@ -8,12 +8,67 @@ import {DataEnvironment} from "./state";
 import {sprintf} from "sprintf-js";
 import {RtContext, getShortEMsg, HibikiError} from "./error";
 import {makeUrlParamsFromObject, SYM_PROXY, SYM_FLATTEN, isObject, unpackPositionalArgs} from "./utils";
-import {PathPart, PathType, PathUnionType, TCFBlock, StmtBlock, Statement, ExprType, DataCtxErrorObjType, EventType, HandlerValType} from "./types";
+import {PathPart, PathType, PathUnionType, DataCtxErrorObjType, EventType, HandlerValType} from "./types";
 import {HibikiRequest} from "./request";
 
 declare var window : any;
 
 const MAX_ARRAY_SIZE = 10000;
+
+type HExpr = {
+    etype    : string,
+    filter?  : string,
+    exprs?   : HExpr[],
+    op?      : string,
+    fn?      : string,
+    val?     : any,
+    key?     : HExpr,
+    path?    : PathType,
+    valexpr? : HExpr,
+};
+
+type HPath = { hibikipath : string } | { patharr : PathType };
+
+type HAction = {
+    type      : string,
+    subtype?  : string,
+    event?    : HExpr,
+    path?     : HPath,
+    setop?    : string,
+    callpath? : HExpr,
+    data?     : HExpr,
+    actions?  : Record<string, HAction[]>,
+    blobmimetype? : string,
+    blobbase64?   : string,
+};
+
+type StmtBlock = Statement[];
+
+type Statement = {
+    stmt : string,
+    data? : any,
+    handler? : HExpr,
+    lvalue? : any,
+    expr? : HExpr,
+    exprs? : HExpr[],
+    setop? : string,
+    target? : any,
+    event? : HExpr,
+    context : any,
+    condExpr : HExpr,
+    thenBlock? : StmtBlock,
+    elseBlock? : StmtBlock,
+    appexpr?: HExpr,
+    pageexpr? : HExpr,
+    params?: HExpr,
+};
+
+type TCFBlock = {
+    block : StmtBlock,
+    catchBlock? : StmtBlock,
+    finallyBlock? : StmtBlock,
+    contextStr? : string,
+};
 
 class HibikiBlob {
     mimetype : string = null;
@@ -1159,7 +1214,7 @@ function evalFnAst(fnAst : any, dataenv : DataEnvironment) : any {
     }
 }
 
-function evalPath(path : any[], dataenv : DataEnvironment) : any {
+function evalPath(path : PathType, dataenv : DataEnvironment) : any {
     let staticPath = [];
     for (let i=0; i<path.length; i++) {
         let pp = path[i];
@@ -1188,7 +1243,7 @@ function evalPath(path : any[], dataenv : DataEnvironment) : any {
     return staticPath;
 }
 
-function evalExprArray(exprArray : any[], dataenv : DataEnvironment) : any[] {
+function evalExprArray(exprArray : HExpr[], dataenv : DataEnvironment) : any[] {
     if (exprArray == null || exprArray.length == 0) {
         return [];
     }
@@ -1200,7 +1255,10 @@ function evalExprArray(exprArray : any[], dataenv : DataEnvironment) : any[] {
     return rtn;
 }
 
-function evalExprAst(exprAst : any, dataenv : DataEnvironment) : any {
+function evalExprAst(exprAst : HExpr, dataenv : DataEnvironment) : any {
+    if (exprAst == null) {
+        return null;
+    }
     if (exprAst.etype == "path") {
         let staticPath = evalPath(exprAst.path, dataenv);
         let val = internalResolvePath(staticPath, null, dataenv, 0);
@@ -1236,13 +1294,13 @@ function evalExprAst(exprAst : any, dataenv : DataEnvironment) : any {
         }
         for (let i=0; i<exprAst.exprs.length; i++) {
             let k = evalExprAst(exprAst.exprs[i].key, dataenv);
-            let v = evalExprAst(exprAst.exprs[i].val, dataenv);
+            let v = evalExprAst(exprAst.exprs[i].valexpr, dataenv);
             rtn[k] = v;
         }
         return rtn;
     }
     else if (exprAst.etype == "ref") {
-        let lv = new BoundLValue(exprAst.path.path, dataenv);
+        let lv = new BoundLValue(exprAst.path, dataenv);
         return lv;
     }
     else if (exprAst.etype == "fn") {
@@ -1369,11 +1427,107 @@ function evalExprAst(exprAst : any, dataenv : DataEnvironment) : any {
     }
 }
 
+async function ExecuteHAction(action : HAction, dataenv : DataEnvironment, rtctx : RtContext) : Promise<any> {
+    rtctx.pushContext(sprintf("%s action", action.type), null);
+    if (action.type == "setdata") {
+        let lvaluePath = evalAssignLVThrow(action.path, dataenv);
+        let expr = evalExprAst(action.data, dataenv);
+        let setop = action.setop ?? "set";
+        setPathWrapper(setop, lvaluePath, dataenv, expr, {allowContext: true});
+        return null;
+    }
+    if (action.type == "if") {
+        let condVal = evalExprAst(action.data, dataenv);
+        let actions = action.actions ?? {};
+        if (condVal) {
+            rtctx.pushContext("then clause", null);
+            await ExecuteHActionArr(actions["then"], dataenv, rtctx);
+        }
+        else {
+            rtctx.pushContext("else clause", null);
+            await ExecuteHActionArr(actions["else"], dataenv, rtctx);
+        }
+        return null;
+    }
+    if (action.type == "setreturn") {
+        let val = evalExprAst(action.data, dataenv);
+        return val;
+    }
+    if (action.type == "callhandler") {
+        let callPath = evalExprAst(action.callpath, dataenv);
+        let data = demobx(evalExprAst(action.data, dataenv));
+        rtctx.replaceContext(sprintf("Calling handler %s", callPath), null);
+        let pactions = dataenv.dbstate.callHandlerRtnActions(callPath, data, false, {rtContext: rtctx, dataenv: dataenv});
+        let actions = await pactions;
+        let handlerEnv = dataenv.makeChildEnv(null, {blockLocalData: true});
+        return await ExecuteHActionArr(actions, handlerEnv, rtctx);
+    }
+    if (action.type == "invalidate") {
+        let ivVal = evalExprAst(action.data, dataenv);
+        if (ivVal == null) {
+            dataenv.dbstate.invalidateAll();
+        }
+        else {
+            let ivArr = (mobx.isArrayLike(ivVal) ? ivVal : [ivVal]);
+            for (let i=0; i<ivArr.length; i++) {
+                let iv = ivArr[i];
+                if (iv != null) {
+                    dataenv.dbstate.invalidateRegex(String(iv));
+                }
+            }
+        }
+        return null;
+    }
+    if (action.type == "fire") {
+        let event = evalExprAst(action.event, dataenv);
+        if (event == null || event == "") {
+            return null;
+        }
+        let bubble = (action.subtype == "bubble");
+        let datacontext = evalExprAst(action.data, dataenv);
+        if (datacontext != null && !isObject(datacontext)) {
+            datacontext = {value: datacontext};
+        }
+        let eventDE = dataenv.getParentEventBoundary("*");
+        if (eventDE == null) {
+            dataenv.dbstate.unhandledEvent({event, datacontext, bubble}, rtctx);
+            return null;
+        }
+        rtctx.replaceContext(sprintf("%s->%s", (bubble ? "bubble" : "fire"), event), null);
+        return eventDE.fireEvent({event, bubble, datacontext}, rtctx);
+    }
+    if (action.type == "log") {
+    }
+    if (action.type == "throw") {
+    }
+    if (action.type == "context") {
+    }
+    if (action.type == "nop") {
+        return null;
+    }
+    return null;
+}
+
+async function ExecuteHActionArr(actions : HAction[], dataenv : DataEnvironment, rtctx : RtContext) : Promise<any> {
+    if (actions == null || actions.length == 0) {
+        return null;
+    }
+    let rtn = null;
+    for (let i=0; i<actions.length; i++) {
+        let action = actions[i];
+        let actionRtn = await ExecuteHAction(action, dataenv, rtctx);
+        if (action.type == "setreturn") {
+            rtn = actionRtn;
+        }
+    }
+    return rtn;
+}
+
 let ExecuteStmtRaw = function ExecuteStmtRaw(stmtAst : Statement, dataenv : DataEnvironment, rtctx : RtContext, opts : any) : Promise<any> {
     opts = opts || {};
     rtctx.pushContext(stmtAst.stmt + " stmt", null);
     if (stmtAst.stmt == "assign") {
-        let lvaluePath = parseAssignLVThrow(stmtAst.lvalue, dataenv);
+        let lvaluePath = evalAssignLVThrow(stmtAst.lvalue, dataenv);
         let expr = evalExprAst(stmtAst.expr, dataenv);
         setPathWrapper((stmtAst.setop || "set"), lvaluePath, dataenv, expr, {allowContext: true});
         return null;
@@ -1408,7 +1562,7 @@ let ExecuteStmtRaw = function ExecuteStmtRaw(stmtAst : Statement, dataenv : Data
         rtctx.replaceContext(sprintf("Calling handler %s", handler), null);
         let p = dataenv.dbstate.callHandlerInternalAsync(handler, data, false, {rtContext: rtctx, dataenv: dataenv});
         if (stmtAst.lvalue) {
-            let lvaluePath = parseAssignLVThrow(stmtAst.lvalue, dataenv);
+            let lvaluePath = evalAssignLVThrow(stmtAst.lvalue, dataenv);
             return p.then((rtnVal) => {
                 setPathWrapper((stmtAst.setop || "set"), lvaluePath, dataenv, rtnVal, {allowContext: true});
                 return null;
@@ -1785,7 +1939,7 @@ function ParseLValuePath(str : string, dataenv : DataEnvironment) {
     }
 }
 
-function parseAssignLVThrow(lvalue : any, dataenv : DataEnvironment) {
+function evalAssignLVThrow(lvalue : any, dataenv : DataEnvironment) {
     let lvaluePath = evalPath(lvalue.path, dataenv);
     if (lvaluePath == null || lvaluePath.length == 0) {
         throw new Error(sprintf("Invalid lvalue-path in assignment (no terms)"));
@@ -1820,7 +1974,7 @@ function convertSimpleType(typeName : string, value : string, defaultValue : any
 
 export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, ApplySingleRRA, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ParseBlock, ParseBlockThrow, ExecuteBlock, CreateContextThrow, ParseAndExecuteBlock, ObjectSetPath, DeepEqual, BoundValue, ParseLValuePath, ParseLValuePathThrow, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, ExecuteBlockP, ParseAsync, ExecuteBlockPThrow, BlobFromBlob, formatVal};
 
-export type {PathType};
+export type {PathType, TCFBlock};
 
 
 

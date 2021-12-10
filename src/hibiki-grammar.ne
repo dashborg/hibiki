@@ -186,7 +186,7 @@ namedParamKey ->
     | %LPAREN fullExpr %RPAREN {% (data) => data[1] %}
 
 namedParamPart -> namedParamKey %EQUAL fullExpr {% (data) => {
-          return {etype: "kv", key: data[0], val: data[2]};
+          return {etype: "kv", key: data[0], valexpr: data[2]};
       } %}
 
 namedParamList -> namedParamPart (%COMMA namedParamPart):*   {% (data) => {
@@ -201,7 +201,7 @@ namedCallParams ->
     | %LPAREN %RPAREN        {% (data) => { return null; } %}
     | %LPAREN literalArrayElements %RPAREN {% (data) => {
           let arrData = {etype: "array", exprs: data[1]};
-          let argsExpr = {etype: "kv", key: {etype: "literal", val: "*args"}, val: arrData};
+          let argsExpr = {etype: "kv", key: {etype: "literal", val: "*args"}, valexpr: arrData};
           let mapData = {etype: "map", exprs: [argsExpr]};
           return mapData;
       } %}
@@ -209,7 +209,7 @@ namedCallParams ->
     | %LPAREN literalArrayElementsNoComma %COMMA namedParamList %RPAREN {% (data) => {
           let arrData = {etype: "array", exprs: data[1]};
           let mapData = data[3];
-          let argsExpr = {etype: "kv", key: {etype: "literal", val: "*args"}, val: arrData};
+          let argsExpr = {etype: "kv", key: {etype: "literal", val: "*args"}, valexpr: arrData};
           mapData.exprs.push(argsExpr);
           return mapData;
       } %}
@@ -335,7 +335,7 @@ fnExpr ->
       %FN %LPAREN optionalLiteralArrayElements %RPAREN {% (data) => {
           return {etype: "fn", fn: data[0].value, exprs: data[2]};
       } %}
-    | %KW_REF %LPAREN lvaluePath %RPAREN {% (data) => ({etype: "ref", path: data[2]}) %}
+    | %KW_REF %LPAREN lvaluePath %RPAREN {% (data) => ({etype: "ref", path: data[2].path}) %}
 
 literalArray ->
       %LBRACK optionalLiteralArrayElements %RBRACK {% (data) => {
@@ -370,7 +370,7 @@ literalMapElements -> literalMapElement (%COMMA literalMapElement):* %COMMA:? {%
         return rtn;
     } %}
 
-literalMapElement -> literalMapKey %COLON fullExpr {% (data) => ({etype: "kv", key: data[0], val: data[2]}) %}
+literalMapElement -> literalMapKey %COLON fullExpr {% (data) => ({etype: "kv", key: data[0], valexpr: data[2]}) %}
 
 literalMapKey -> 
       idOrKeyword {% (data) => ({etype: "literal", val: data[0].value}) %}
