@@ -27,13 +27,11 @@ type HExpr = {
     valexpr? : HExpr,
 };
 
-type HPath = { hibikipath : string } | { patharr : PathType };
-
 type HAction = {
     type      : string,
     subtype?  : string,
     event?    : HExpr,
-    path?     : HPath,
+    path?     : PathType,
     setop?    : string,
     callpath? : HExpr,
     data?     : HExpr,
@@ -48,7 +46,7 @@ type Statement = {
     stmt : string,
     data? : any,
     handler? : HExpr,
-    lvalue? : any,
+    lvalue? : PathType,
     expr? : HExpr,
     exprs? : HExpr[],
     setop? : string,
@@ -1939,8 +1937,8 @@ function ParseLValuePath(str : string, dataenv : DataEnvironment) {
     }
 }
 
-function evalAssignLVThrow(lvalue : any, dataenv : DataEnvironment) {
-    let lvaluePath = evalPath(lvalue.path, dataenv);
+function evalAssignLVThrow(lvalue : PathType, dataenv : DataEnvironment) {
+    let lvaluePath = evalPath(lvalue, dataenv);
     if (lvaluePath == null || lvaluePath.length == 0) {
         throw new Error(sprintf("Invalid lvalue-path in assignment (no terms)"));
     }

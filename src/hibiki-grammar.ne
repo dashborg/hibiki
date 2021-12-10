@@ -257,6 +257,7 @@ reportErrorStatement -> %KW_REPORTERROR callParamsSingle {% (data) => {
         return {stmt: "reporterror", expr: data[1]};
     } %}
 
+# [setop : string, PathType]
 lvalue ->
     (idOrKeyword %COLON):? lvaluePath {% (data) => {
         let setop = "set";
@@ -266,7 +267,8 @@ lvalue ->
         return [setop, data[1]];
     } %}
 
-lvaluePath -> pathExprNonTerm {% id %}
+# PathType
+lvaluePath -> pathExprNonTerm {% (data) => { return data[0].path } %}
 
 filterExpr -> 
       ternaryExpr {% id %}
@@ -335,7 +337,7 @@ fnExpr ->
       %FN %LPAREN optionalLiteralArrayElements %RPAREN {% (data) => {
           return {etype: "fn", fn: data[0].value, exprs: data[2]};
       } %}
-    | %KW_REF %LPAREN lvaluePath %RPAREN {% (data) => ({etype: "ref", path: data[2].path}) %}
+    | %KW_REF %LPAREN lvaluePath %RPAREN {% (data) => ({etype: "ref", path: data[2]}) %}
 
 literalArray ->
       %LBRACK optionalLiteralArrayElements %RBRACK {% (data) => {

@@ -259,7 +259,7 @@ var grammar = {
             }
             return [setop, data[1]];
         } },
-    {"name": "lvaluePath", "symbols": ["pathExprNonTerm"], "postprocess": id},
+    {"name": "lvaluePath", "symbols": ["pathExprNonTerm"], "postprocess": (data) => { return data[0].path }},
     {"name": "filterExpr", "symbols": ["ternaryExpr"], "postprocess": id},
     {"name": "filterExpr", "symbols": ["ternaryExpr", (lexer.has("PIPE") ? {type: "PIPE"} : PIPE), "idOrKeyword", "namedCallParams"], "postprocess":  (data) => {
             return {etype: "filter", filter: data[2].value, exprs: [data[0], data[3]]};
@@ -301,7 +301,7 @@ var grammar = {
     {"name": "fnExpr", "symbols": [(lexer.has("FN") ? {type: "FN"} : FN), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "optionalLiteralArrayElements", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess":  (data) => {
             return {etype: "fn", fn: data[0].value, exprs: data[2]};
         } },
-    {"name": "fnExpr", "symbols": [(lexer.has("KW_REF") ? {type: "KW_REF"} : KW_REF), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "lvaluePath", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => ({etype: "ref", path: data[2].path})},
+    {"name": "fnExpr", "symbols": [(lexer.has("KW_REF") ? {type: "KW_REF"} : KW_REF), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "lvaluePath", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => ({etype: "ref", path: data[2]})},
     {"name": "literalArray", "symbols": [(lexer.has("LBRACK") ? {type: "LBRACK"} : LBRACK), "optionalLiteralArrayElements", (lexer.has("RBRACK") ? {type: "RBRACK"} : RBRACK)], "postprocess":  (data) => {
             return {etype: "array", exprs: data[1]};
         } },
