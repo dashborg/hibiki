@@ -8,7 +8,7 @@ import {DataEnvironment} from "./state";
 import {sprintf} from "sprintf-js";
 import {RtContext, getShortEMsg, HibikiError} from "./error";
 import {makeUrlParamsFromObject, SYM_PROXY, SYM_FLATTEN, isObject, unpackPositionalArgs, nodeStr} from "./utils";
-import {PathPart, PathType, PathUnionType, DataCtxErrorObjType, EventType, HandlerValType, HibikiAction} from "./types";
+import {PathPart, PathType, PathUnionType, DataCtxErrorObjType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue} from "./types";
 import {HibikiRequest} from "./request";
 
 declare var window : any;
@@ -35,12 +35,13 @@ type HAction = {
     setpath?   : PathType,
     callpath?  : HExpr,
     data?      : HExpr,
+    html?      : string,
     actions?   : Record<string, HAction[]>,
     blockstr?  : string,
     blockctx?  : string,
 };
 
-type HandlerBlock = {hibikiactions: HibikiAction[]} | HAction[];
+type HandlerBlock = {hibikihandler: string, ctxstr? : string} | {hibikiactions: HibikiAction[]} | HAction[];
 
 type StmtBlock = Statement[];
 
@@ -526,7 +527,7 @@ function ParsePath(path : string) : PathType {
     }
 }
 
-function ParsePathThrow(pathStr : string) : PathType {
+function ParsePathThrow(pathStr : string, allowDynamic? : boolean) : PathType {
     let g = nearley.Grammar.fromCompiled(hibikiGrammar, "pathExprNonTerm");
     g.ParserStart = g.start = "pathExprNonTerm";
     let exprParser = new nearley.Parser(nearley.Grammar.fromCompiled(hibikiGrammar));
@@ -541,12 +542,14 @@ function ParsePathThrow(pathStr : string) : PathType {
         throw new Error("Error parsing path, unterminated expression: + " + pathStr);
     }
     let path = exprParser.results[0].path;
-    for (let i=0; i<path.length; i++) {
-        if (path[i].pathtype == "dyn") {
-            throw new Error("Error parsing path, path must be static (no dynamic references allowed): + " + pathStr);
-        }
-        if (path[i].pathtype == "deref") {
-            throw new Error("Error parsing path, path must be static (no dereferencing allowed): + " + pathStr);
+    if (!allowDynamic) {
+        for (let i=0; i<path.length; i++) {
+            if (path[i].pathtype == "dyn") {
+                throw new Error("Error parsing path, path must be static (no dynamic references allowed): + " + pathStr);
+            }
+            if (path[i].pathtype == "deref") {
+                throw new Error("Error parsing path, path must be static (no dereferencing allowed): + " + pathStr);
+            }
         }
     }
     return path;
@@ -1210,7 +1213,13 @@ function evalFnAst(fnAst : any, dataenv : DataEnvironment) : any {
     }
 }
 
-function evalPath(path : PathType, dataenv : DataEnvironment) : any {
+function evalPath(path : PathType, dataenv : DataEnvironment, depth? : number) : any {
+    if (depth == null) {
+        depth = 0;
+    }
+    if (depth > 5) {
+        throw new Error("evalPath depth exceeded, cannot evaluate path:" + path);
+    }
     let staticPath = [];
     for (let i=0; i<path.length; i++) {
         let pp = path[i];
@@ -1229,7 +1238,8 @@ function evalPath(path : PathType, dataenv : DataEnvironment) : any {
                 staticPath.push({pathtype: "root", pathkey: "null"});
                 continue;
             }
-            let newpath = ParsePathThrow(e);
+            let newpath = ParsePathThrow(e, true);
+            newpath = evalPath(newpath, dataenv, depth+1);
             staticPath.push(...newpath);
         }
         else {
@@ -1516,13 +1526,124 @@ async function ExecuteHAction(action : HAction, dataenv : DataEnvironment, rtctx
     return null;
 }
 
+function evalActionStr(astr : HibikiActionString) : HExpr {
+    if (astr == null) {
+        return null;
+    }
+    if (typeof(astr) == "string") {
+        return {etype: "literal", val: astr};
+    }
+    if (isObject(astr) && "hibikiexpr" in astr) {
+        return ParseSimpleExprThrow(astr.hibikiexpr);
+    }
+    return null;
+}
+
+function evalActionVal(aval : HibikiActionValue) : HExpr {
+    if (aval == null) {
+        return null;
+    }
+    if (isObject(aval) && "hibikiexpr" in aval) {
+        return ParseSimpleExprThrow(aval.hibikiexpr);
+    }
+    return {etype: "literal", val: aval};
+}
+
+function validateAction(action : HAction) : string {
+    if (action.actiontype == "setdata") {
+        if (action.setpath == null) {
+            return "Invalid 'setdata' action, no 'setpath' specified";
+        }
+        return null;
+    }
+    if (action.actiontype == "callhandler") {
+        if (action.callpath == null) {
+            return "Invalid 'callhandler' action, no 'callpath' specified";
+        }
+    }
+    return null;
+}
+
+function convertAction(action : HibikiAction) : HAction {
+    if (action.actiontype == null) {
+        throw new Error("Invalid HibikiAction, no actiontype field | " + JSON.stringify(action));
+    }
+    let rtn : HAction = {actiontype: action.actiontype};
+    if (action.subtype != null) rtn.subtype = action.subtype;
+    if (action.event != null) {
+        rtn.event = evalActionStr(action.event);
+    }
+    if (action.setop != null) rtn.setop = action.setop;
+    if (action.setpath != null) {
+        let path = ParsePathThrow(action.setpath, true);
+        rtn.setpath = path;
+    }
+    if (action.callpath != null) {
+        let pathExpr = evalActionStr(action.callpath);
+        if (pathExpr != null) {
+            let path : PathType = [{pathtype: "deref", expr: pathExpr}];
+            rtn.callpath = {etype: "path", path: path};
+        }
+    }
+    if (action.data != null) {
+        rtn.data = evalActionVal(action.data);
+    }
+    if (action.html != null) rtn.html = action.html;
+    if (action.actions != null) {
+        if (!isObject(action.actions)) {
+            throw new Error("Invalid HibikiAction, 'actions' field should be Record<string, HibikiAction[]> | " + JSON.stringify(action));
+        }
+        rtn.actions = {};
+        for (let key in action.actions) {
+            rtn.actions[key] = convertActions(action.actions[key]);
+        }
+    }
+    if (action.blockstr != null) rtn.blockstr = action.blockstr;
+    if (action.blockctx != null) rtn.blockctx = action.blockctx;
+    if (action.blobbase64 != null) {
+        if (action.actiontype == "blob") {
+            rtn.actiontype = "setdata";
+        }
+        let blob = new HibikiBlob();
+        blob.mimetype = action.blobmimetype;
+        blob.data = action.blobbase64;
+        rtn.data = {etype: "literal", val: blob};
+    }
+    let err = validateAction(rtn);
+    if (err != null) {
+        throw new Error(err + " | " + JSON.stringify(action));
+    }
+    return rtn;
+}
+
+function convertActions(actions : HibikiAction[]) : HAction[] {
+    if (actions == null || actions.length == 0) {
+        return [];
+    }
+    let rtn : HAction[] = [];
+    for (let i=0; i<actions.length; i++) {
+        let haction = convertAction(actions[i]);
+        if (haction != null) {
+            rtn.push(haction);
+        }
+    }
+    return rtn;
+}
+
 async function ExecuteHandlerBlock(actions : HandlerBlock, dataenv : DataEnvironment, rtctx : RtContext) : Promise<any> {
     if (actions == null) {
         return null;
     }
     let actionArr : HAction[] = null;
     if ("hibikiactions" in actions) {
-        // TODO set actionArr from HibikiAction[]
+        actionArr = convertActions(actions.hibikiactions);
+    }
+    else if ("hibikihandler" in actions) {
+        let ctxstr = actions.ctxstr ?? "handler";
+        rtctx.pushContext(sprintf("Parsing %s", ctxstr), null);
+        let block = ParseBlockThrow(actions.hibikihandler);
+        rtctx.popContext();
+        // TODO deal with block
         actionArr = [];
     }
     else {
@@ -1811,23 +1932,9 @@ function ParseAndCreateContextThrow(ctxStr : string, dataenv : DataEnvironment, 
     return ctxDataenv;
 }
 
-// function EvalSimpleExpr(exprStr : string, localRoot : any, globalRoot : any, specials? : any) : any {
 function EvalSimpleExpr(exprStr : string, dataenv : DataEnvironment, rtContext? : string) : any {
-    if (exprStr == null || exprStr == "") {
-        return null;
-    }
     try {
-        let exprParser = new nearley.Parser(nearley.Grammar.fromCompiled(hibikiGrammar, "fullExpr"));
-        exprParser.feed(exprStr);
-        if (exprParser.results == null || exprParser.results.length == 0) {
-            throw new Error("Error parsing expression, unterminated expression: + " + exprStr);
-        }
-        if (exprParser.results.length > 1) {
-            console.log("ambiguious result", exprParser.results);
-        }
-        let exprAst = exprParser.results[0];
-        // console.log("eval-simple-expr", exprStr, exprAst);
-        let val = evalExprAst(exprAst, dataenv);
+        let val = EvalSimpleExprThrow(exprStr, dataenv, rtContext);
         return val;
     }
     catch (e) {
@@ -1835,6 +1942,29 @@ function EvalSimpleExpr(exprStr : string, dataenv : DataEnvironment, rtContext? 
         console.log("ERROR evaluating expression", "[[", exprStr, "]]", emsg, rtContext);
         return null;
     }
+}
+
+function ParseSimpleExprThrow(exprStr : string) : HExpr {
+    let exprParser = new nearley.Parser(nearley.Grammar.fromCompiled(hibikiGrammar, "fullExpr"));
+    exprParser.feed(exprStr);
+    if (exprParser.results == null || exprParser.results.length == 0) {
+        throw new Error("Error parsing expression, unterminated expression: + " + exprStr);
+    }
+    if (exprParser.results.length > 1) {
+        console.log("Hibiki Parser: ambiguious result", exprParser.results);
+    }
+    let exprAst = exprParser.results[0];
+    return exprAst;
+}
+
+// function EvalSimpleExpr(exprStr : string, localRoot : any, globalRoot : any, specials? : any) : any {
+function EvalSimpleExprThrow(exprStr : string, dataenv : DataEnvironment, rtContext? : string) : any {
+    if (exprStr == null || exprStr == "") {
+        return null;
+    }
+    let exprAst = ParseSimpleExprThrow(exprStr);
+    let val = evalExprAst(exprAst, dataenv);
+    return val;
 }
 
 function ApplySingleRRA(dataenv : DataEnvironment, rra : HibikiAction) {

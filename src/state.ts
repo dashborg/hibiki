@@ -384,8 +384,7 @@ class DataEnvironment {
             return env.parent.resolveEventHandler(event, false);
         }
         let hval = env.handlers[event.event];
-        let blockAction = {actiontype: "block", blockstr: hval.handlerStr};
-        return {handler: [blockAction], node: hval.node, dataenv: this};
+        return {handler: {hibikihandler: hval.handlerStr}, node: hval.node, dataenv: this};
     }
 
     fireEvent(event : EventType, rtctx : RtContext, throwErrors? : boolean) : Promise<any> {
@@ -1232,6 +1231,9 @@ class HibikiState {
         return rtnp.then((data) => {
             if (data == null) {
                 return null;
+            }
+            if (isObject(data) && ("hibikihandler" in data)) {
+                return {hibikihandler: data.hibikihandler, ctxstr: data.ctxstr};
             }
             if (isObject(data) && ("hibikiactions" in data) && Array.isArray(data.hibikiactions)) {
                 return {hibikiactions: data.hibikiactions};
