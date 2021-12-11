@@ -1524,7 +1524,7 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
             datacontext = {value: datacontext};
         }
         let event = {event: eventStr, datacontext, bubble};
-        let ehandler = dataenv.resolveEventHandler(event, !action.native);
+        let ehandler = dataenv.resolveEventHandler(event, rtctx);
         if (ehandler == null) {
             if (bubble) {
                 dataenv.dbstate.unhandledEvent(event, rtctx);
@@ -1534,7 +1534,7 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
         let htmlContext = sprintf("event%s(%s)", (event.bubble ? "-bubble" : ""), event.event);
         let eventEnv = ehandler.dataenv.makeChildEnv(event.datacontext, {htmlContext: htmlContext});
         let ctxStr = sprintf("Running %s:%s.handler (in [[%s]])", nodeStr(ehandler.node), event.event, ehandler.dataenv.getFullHtmlContext());
-        rtctx.pushContext(ctxStr, {handlerEnv: eventEnv, handlerName: event.event});
+        rtctx.pushContext(ctxStr, {handlerEnv: ehandler.dataenv, handlerName: event.event});
         return ExecuteHandlerBlock(ehandler.handler, pure, eventEnv, rtctx, false);
     }
     else if (action.actiontype == "log" || action.actiontype == "debug" || action.actiontype == "alert") {

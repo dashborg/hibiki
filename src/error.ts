@@ -44,6 +44,19 @@ class RtContext {
         return null;
     }
 
+    isHandlerInStack(env : DataEnvironment, handlerName : string) : boolean {
+        for (let i=this.stack.length-1; i>=0; i--) {
+            let item = this.stack[i];
+            if (item.handlerEnv == null) {
+                continue;
+            }
+            if (item.handlerEnv == env && item.handlerName == handlerName) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     getLastContext() : string {
         if (this.stack.length == 0) {
             return null;

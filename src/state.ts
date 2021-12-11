@@ -365,26 +365,29 @@ class DataEnvironment {
         return eb1.parent.getEventBoundary(event);
     }
 
-    resolveEventHandler(event : EventType, parent : boolean) : {handler : HandlerBlock, node : HibikiNode, dataenv : DataEnvironment} {
-        if (parent) {
-            let eventDE = this.getParentEventBoundary("*");
-            if (eventDE == null) {
-                return null;
-            }
-            return eventDE.resolveEventHandler(event, false);
-        }
+    resolveEventHandler(event : EventType, rtctx : RtContext, parent? : boolean) : {handler : HandlerBlock, node : HibikiNode, dataenv : DataEnvironment} {
         let env = this.getEventBoundary(event.event);
         if (env == null) {
             return null;
         }
-        if (!(event.event in env.handlers)) {
-            if (!event.bubble || env.parent == null) {
-                return null;
-            }
-            return env.parent.resolveEventHandler(event, false);
+        if ((event.event in env.handlers) && !rtctx.isHandlerInStack(env, event.event)) {
+            let hval = env.handlers[event.event];
+            return {handler: {hibikihandler: hval.handlerStr}, node: hval.node, dataenv: env};
         }
-        let hval = env.handlers[event.event];
-        return {handler: {hibikihandler: hval.handlerStr}, node: hval.node, dataenv: env};
+        if (env.parent == null) {
+            return null;
+        }
+        if (event.bubble) {
+            return env.parent.resolveEventHandler(event, rtctx);
+        }
+        if (parent) {
+            return null;
+        }
+        let parentEnv = this.getParentEventBoundary("*");
+        if (parentEnv == null) {
+            return null;
+        }
+        return parentEnv.resolveEventHandler(event, rtctx, true);
     }
 
     getContextKey(contextkey : string) : any {
