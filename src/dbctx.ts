@@ -224,7 +224,6 @@ class DBCtx {
         rtctx.pushContext(sprintf("event <%s>:*%s (in %s)", this.node.tag, event, this.dataenv.getHtmlContext()), null);
         let action = {
             actiontype: "fire",
-            subtype: "fire",
             native: true,
             event: {etype: "literal", val: event},
             data: {etype: "literal", val: datacontext},

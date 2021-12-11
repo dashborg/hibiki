@@ -900,7 +900,6 @@ class HibikiState {
         deps.then(() => {
             let action = {
                 actiontype: "fire",
-                subtype: "fire",
                 native: true,
                 event: {etype: "literal", val: "init"},
             };

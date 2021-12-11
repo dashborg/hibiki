@@ -37,7 +37,6 @@ type HibikiActionString   = string | {hibikiexpr : string};
 
 type HibikiAction = {
     actiontype    : string,
-    subtype?      : string,
     event?        : HibikiActionString,
     setop?        : string,
     setpath?      : string,

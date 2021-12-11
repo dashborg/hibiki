@@ -30,7 +30,6 @@ type HExpr = {
 
 type HAction = {
     actiontype : string,
-    subtype?   : string,
     event?     : HExpr,
     native?    : boolean,
     setop?     : string,
@@ -1468,11 +1467,11 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
         let val = evalExprAst(action.data, dataenv);
         return val;
     }
-    else if (action.actiontype == "callhandler") {
+    else if (action.actiontype == "callhandler" || action.actiontype == "datahandler") {
         let callPath = evalExprAst(action.callpath, dataenv);
         let data = demobx(evalExprAst(action.data, dataenv));
         rtctx.replaceContext(sprintf("Calling handler %s", callPath), null);
-        let pureCall = pure || (action.subtype == "data");
+        let pureCall = pure || (action.actiontype == "datahandler");
         let pactions = dataenv.dbstate.callHandlerRtnBlock(callPath, data, pureCall, {rtContext: rtctx, dataenv: dataenv});
         let actions = await pactions;
         let handlerEnv = dataenv.makeChildEnv(null, {blockLocalData: true});
@@ -1505,7 +1504,7 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
         }
         return null;
     }
-    else if (action.actiontype == "fire") {
+    else if (action.actiontype == "fire" || action.actiontype == "bubble") {
         if (pure) {
             return null;
         }
@@ -1516,7 +1515,7 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
         if (eventStr == null || eventStr == "") {
             return null;
         }
-        let bubble = (action.subtype == "bubble");
+        let bubble = (action.actiontype == "bubble");
         if (!action.native) {
             rtctx.replaceContext(sprintf("%s->%s", (bubble ? "bubble" : "fire"), eventStr), null);
         }
@@ -1538,7 +1537,7 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
         rtctx.pushContext(ctxStr, {handlerEnv: eventEnv, handlerName: event.event});
         return ExecuteHandlerBlock(ehandler.handler, pure, eventEnv, rtctx, false);
     }
-    else if (action.actiontype == "log") {
+    else if (action.actiontype == "log" || action.actiontype == "debug" || action.actiontype == "alert") {
         let dataValArr = forceAsArray(demobx(evalExprAst(action.data, dataenv)));
         dataValArr = dataValArr.map((val) => {
             if (val instanceof HibikiError) {
@@ -1546,13 +1545,13 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
             }
             return val;
         });
-        if (action.subtype == "alert") {
+        if (action.actiontype == "alert") {
             let alertStr = dataValArr.map((v) => String(v)).join(", ");
             alert(alertStr);
         }
         else {
             console.log("hibiki-log", ...dataValArr);
-            if (action.subtype == "debug") {
+            if (action.actiontype == "debug") {
                 console.log("DataEnvironment Stack");
                 dataenv.printStack();
                 console.log("Runtime Context", rtctx);
@@ -1624,7 +1623,6 @@ function convertAction(action : HibikiAction) : HAction {
         throw new Error("Invalid HibikiAction, no actiontype field | " + JSON.stringify(action));
     }
     let rtn : HAction = {actiontype: action.actiontype};
-    if (action.subtype != null) rtn.subtype = action.subtype;
     if (action.event != null) {
         rtn.event = evalActionStr(action.event);
     }
@@ -1737,8 +1735,7 @@ function ExecuteHandlerBlock(actions : HandlerBlock, pure : boolean, dataenv : D
                 return;
             }
             let errAction = {
-                actiontype: "fire",
-                subtype: "bubble",
+                actiontype: "bubble",
                 native: true,
                 event: {etype: "literal", val: "error"},
                 data: {etype: "literal", val: {"error": errorObj}},
