@@ -106,6 +106,13 @@ function formatFilter(val : any, args : Record<string, any>) {
     return formatVal(val, format);
 }
 
+function forceAsArray(val : any) : any[] {
+    if (mobx.isArrayLike(val)) {
+        return val;
+    }
+    return [val];
+}
+
 function rtnIfType(v : any, itype : string) : any {
     if (v == null) {
         return null;
@@ -1515,10 +1522,31 @@ async function ExecuteHAction(action : HAction, dataenv : DataEnvironment, rtctx
         return ExecuteHandlerBlock(ehandler.handler, eventEnv, rtctx);
     }
     if (action.actiontype == "log") {
+        let dataValArr = forceAsArray(demobx(evalExprAst(action.data, dataenv)));
+        dataValArr = dataValArr.map((val) => {
+            if (val instanceof HibikiError) {
+                return val.toString();
+            }
+            return val;
+        });
+        if (action.subtype == "alert") {
+            let alertStr = dataValArr.map((v) => String(v)).join(", ");
+            alert(alertStr);
+        }
+        else {
+            console.log("hibiki-log", ...dataValArr);
+            if (action.subtype == "debug") {
+                console.log("DataEnvironment Stack");
+                dataenv.printStack();
+                console.log("Runtime Context", rtctx);
+                console.log(rtctx.asString());
+            }
+        }
+        return null;
     }
     if (action.actiontype == "throw") {
-    }
-    if (action.actiontype == "context") {
+        let errVal = evalExprAst(action.data, dataenv);
+        return Promise.reject(new Error(errVal));
     }
     if (action.actiontype == "nop") {
         return null;
