@@ -173,7 +173,7 @@ function baseRenderHtmlChildren(list : HibikiNode[], dataenv : DataEnvironment) 
                 continue;
             }
             try {
-                let ctxDataenv = DataCtx.ParseAndCreateContextThrow(contextAttr, dataenv, "<define-vars>");
+                let ctxDataenv = DataCtx.ParseAndCreateContextThrow(contextAttr, "context", dataenv, "<define-vars>");
                 dataenv = ctxDataenv;
             }
             catch (e) {
@@ -562,8 +562,7 @@ class CustomNode extends React.Component<{node : HibikiNode, component : Compone
         let childEnv = eventDE.makeChildEnv(specials, envOpts);
         if (initialize && rawImplAttrs.defaults != null) {
             try {
-                let block = DataCtx.ParseBlockThrow(rawImplAttrs.defaults);
-                DataCtx.CreateContextThrow(block, childEnv, sprintf("<define-component %s>:defaults", componentName));
+                DataCtx.ParseAndCreateContextThrow(rawImplAttrs.defaults, "c", childEnv, sprintf("<define-component %s>:defaults", componentName));
             }
             catch (e) {
                 console.log(sprintf("ERROR parsing/executing 'defaults' in <define-component %s>", componentName), e);
@@ -828,7 +827,7 @@ class WithContextNode extends React.Component<{node : HibikiNode, dataenv : Data
             return <ErrorMsg message={sprintf("<%s> no context attribute", nodeStr(ctx.node))}/>;
         }
         try {
-            let ctxDataenv = DataCtx.ParseAndCreateContextThrow(contextattr, ctx.childDataenv, nodeStr(ctx.node));
+            let ctxDataenv = DataCtx.ParseAndCreateContextThrow(contextattr, "context", ctx.childDataenv, nodeStr(ctx.node));
             return ctxRenderHtmlChildren(ctx, ctxDataenv);
         }
         catch (e) {
@@ -957,7 +956,7 @@ class SimpleQueryNode extends React.Component<{node : HibikiNode, dataenv : Data
             rtctx.pushContext("Parsing 'query' attribute (must be a data handler expression)", null);
             let callAction = DataCtx.ParseStaticCallStatement(queryStr);
             rtctx.popContext();
-            let qrtn = DataCtx.ExecuteHandlerBlock([callAction], true, ctx.dataenv, rtctx);
+            let qrtn = DataCtx.ExecuteHandlerBlock([callAction], true, ctx.dataenv, rtctx, false);
             qrtn.then((queryRtn) => {
                 if (curCallNum != this.callNum) {
                     console.log(sprintf("%s not setting stale data return", nodeStr(ctx.node)));

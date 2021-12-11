@@ -181,6 +181,24 @@ staticCallStatement -> %CALLPATH namedCallParams {% (data) => {
           return rtn;
       } %}
 
+contextAssignKey ->
+      idOrKeyword {% (data) => data[0].value %}
+    | stringLit   {% (data) => data[0] %}
+    | %ATID       {% (data) => data[0].value %}
+
+contextAssignPart -> contextAssignKey %EQUAL fullExpr {% (data) => {
+          return {key: data[0], expr: data[2]};
+    } %}
+
+commaOrSemi -> %COMMA | %SEMI
+
+# {key, expr}[]
+contextAssignList -> contextAssignPart (commaOrSemi contextAssignPart):* commaOrSemi:? {% (data) => {
+          let rtn = [data[0]];
+          rtn.push(...data[1].map((v) => v[1]));
+          return rtn;
+    } %}
+
 namedParamKey -> 
       idOrKeyword {% (data) => ({etype: "literal", val: data[0].value}) %}
     | stringLit   {% (data) => ({etype: "literal", val: data[0]}) %}

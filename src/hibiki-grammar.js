@@ -180,6 +180,24 @@ var grammar = {
             let rtn = {actiontype: "callhandler", callpath: callpath, data: data[1]};
             return rtn;
         } },
+    {"name": "contextAssignKey", "symbols": ["idOrKeyword"], "postprocess": (data) => data[0].value},
+    {"name": "contextAssignKey", "symbols": ["stringLit"], "postprocess": (data) => data[0]},
+    {"name": "contextAssignKey", "symbols": [(lexer.has("ATID") ? {type: "ATID"} : ATID)], "postprocess": (data) => data[0].value},
+    {"name": "contextAssignPart", "symbols": ["contextAssignKey", (lexer.has("EQUAL") ? {type: "EQUAL"} : EQUAL), "fullExpr"], "postprocess":  (data) => {
+              return {key: data[0], expr: data[2]};
+        } },
+    {"name": "commaOrSemi", "symbols": [(lexer.has("COMMA") ? {type: "COMMA"} : COMMA)]},
+    {"name": "commaOrSemi", "symbols": [(lexer.has("SEMI") ? {type: "SEMI"} : SEMI)]},
+    {"name": "contextAssignList$ebnf$1", "symbols": []},
+    {"name": "contextAssignList$ebnf$1$subexpression$1", "symbols": ["commaOrSemi", "contextAssignPart"]},
+    {"name": "contextAssignList$ebnf$1", "symbols": ["contextAssignList$ebnf$1", "contextAssignList$ebnf$1$subexpression$1"], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
+    {"name": "contextAssignList$ebnf$2", "symbols": ["commaOrSemi"], "postprocess": id},
+    {"name": "contextAssignList$ebnf$2", "symbols": [], "postprocess": function(d) {return null;}},
+    {"name": "contextAssignList", "symbols": ["contextAssignPart", "contextAssignList$ebnf$1", "contextAssignList$ebnf$2"], "postprocess":  (data) => {
+              let rtn = [data[0]];
+              rtn.push(...data[1].map((v) => v[1]));
+              return rtn;
+        } },
     {"name": "namedParamKey", "symbols": ["idOrKeyword"], "postprocess": (data) => ({etype: "literal", val: data[0].value})},
     {"name": "namedParamKey", "symbols": ["stringLit"], "postprocess": (data) => ({etype: "literal", val: data[0]})},
     {"name": "namedParamKey", "symbols": [(lexer.has("ATID") ? {type: "ATID"} : ATID)], "postprocess": (data) => ({etype: "literal", val: "@" + data[0].value})},
@@ -237,15 +255,13 @@ var grammar = {
     {"name": "nopStatement$ebnf$1$subexpression$1", "symbols": [(lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)]},
     {"name": "nopStatement$ebnf$1", "symbols": ["nopStatement$ebnf$1$subexpression$1"], "postprocess": id},
     {"name": "nopStatement$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
-    {"name": "nopStatement", "symbols": [(lexer.has("KW_NOP") ? {type: "KW_NOP"} : KW_NOP), "nopStatement$ebnf$1"], "postprocess": (data) => ({stmt: "nop"})},
+    {"name": "nopStatement", "symbols": [(lexer.has("KW_NOP") ? {type: "KW_NOP"} : KW_NOP), "nopStatement$ebnf$1"], "postprocess": (data) => ({actiontype: "nop"})},
     {"name": "bubbleStatement", "symbols": [(lexer.has("KW_BUBBLE") ? {type: "KW_BUBBLE"} : KW_BUBBLE), (lexer.has("DASHGT") ? {type: "DASHGT"} : DASHGT), "idOrKeyword", "optCallParamsSingle"], "postprocess":  (data) => {
             let rtn = {actiontype: "fire", subtype: "bubble", event: {etype: "literal", val: data[2].value}, data: data[3]};
-            // let rtn = {stmt: "bubble", event: {etype: "literal", val: data[2].value}, context: data[3]};
             return rtn;
         } },
     {"name": "fireStatement", "symbols": [(lexer.has("KW_FIRE") ? {type: "KW_FIRE"} : KW_FIRE), (lexer.has("DASHGT") ? {type: "DASHGT"} : DASHGT), "idOrKeyword", "optCallParamsSingle"], "postprocess":  (data) => {
             let rtn = {actiontype: "fire", subtype: "fire", event: {etype: "literal", val: data[2].value}, data: data[3]};
-            // let rtn = {stmt: "fire", event: {etype: "literal", val: data[2].value}, context: data[3]};
             return rtn;
         } },
     {"name": "logStatement", "symbols": [(lexer.has("KW_LOG") ? {type: "KW_LOG"} : KW_LOG), "callParams"], "postprocess": (data) => ({actiontype: "log", subtype: "log", data: {etype: "array", exprs: data[1]}})},

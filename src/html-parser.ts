@@ -183,7 +183,10 @@ class HtmlParser {
     }
 }
 
-function parseHtml(input : string | HTMLElement, opts? : HtmlParserOpts) {
+function parseHtml(input : string | HTMLElement, opts? : HtmlParserOpts) : HibikiNode {
+    if (input == null) {
+        return null;
+    }
     if (opts == null) {
         if ((window as any).HibikiParserOpts != null) {
             opts = (window as any).HibikiParserOpts;

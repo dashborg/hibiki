@@ -11,7 +11,7 @@ import {isObject, textContent, SYM_PROXY, SYM_FLATTEN, nodeStr, callHook, getHib
 import {subNodesByTag, firstSubNodeByTag} from "./nodeutils";
 import {RtContext, HibikiError} from "./error";
 import {HibikiRequest} from "./request";
-import type {TCFBlock, HandlerBlock} from "./datactx";
+import type {HandlerBlock} from "./datactx";
 
 import {parseHtml} from "./html-parser";
 
@@ -366,7 +366,6 @@ class DataEnvironment {
     }
 
     resolveEventHandler(event : EventType, parent : boolean) : {handler : HandlerBlock, node : HibikiNode, dataenv : DataEnvironment} {
-        console.log("resolveEventHandler", this.getFullHtmlContext(), this);
         if (parent) {
             let eventDE = this.getParentEventBoundary("*");
             if (eventDE == null) {
@@ -380,44 +379,12 @@ class DataEnvironment {
         }
         if (!(event.event in env.handlers)) {
             if (!event.bubble || env.parent == null) {
-                console.log("no bubble", this.getFullHtmlContext(), env.getFullHtmlContext());
-                console.log("no bubble", this, env);
                 return null;
             }
             return env.parent.resolveEventHandler(event, false);
         }
         let hval = env.handlers[event.event];
         return {handler: {hibikihandler: hval.handlerStr}, node: hval.node, dataenv: env};
-    }
-
-    fireEvent(event : EventType, rtctx : RtContext, throwErrors? : boolean) : Promise<any> {
-        let env = this.getEventBoundary(event.event);
-        if (env == null) {
-            this.dbstate.unhandledEvent(event, rtctx);
-            return null;
-        }
-        if (!(event.event in env.handlers)) {
-            if (!event.bubble || env.parent == null) {
-                return null;
-            }
-            return env.parent.fireEvent(event, rtctx);
-        }
-        let hval = env.handlers[event.event];
-        let htmlContext = sprintf("event%s(%s)", (event.bubble ? "-bubble" : ""), event.event);
-        let eventEnv = env.makeChildEnv(event.datacontext, {htmlContext: htmlContext});
-        let tcfBlock : TCFBlock = {block: null};
-        let ctxStr = sprintf("Parsing %s:%s.handler (in [[%s]])", nodeStr(hval.node), event.event, env.getFullHtmlContext());
-        rtctx.pushContext(ctxStr, {handlerEnv: eventEnv, handlerName: event.event});
-        tcfBlock.block = DataCtx.ParseBlockThrow(hval.handlerStr);
-        rtctx.popContext();
-        ctxStr = sprintf("Running %s:%s.handler (in [[%s]])", nodeStr(hval.node), event.event, env.getFullHtmlContext());
-        rtctx.pushContext(ctxStr, {handlerEnv: eventEnv, handlerName: event.event});
-        if (throwErrors) {
-            return DataCtx.ExecuteBlockPThrow(tcfBlock.block, eventEnv, rtctx);
-        }
-        else {
-            return DataCtx.ExecuteBlockP(tcfBlock, eventEnv, rtctx, false);;
-        }
     }
 
     getContextKey(contextkey : string) : any {
@@ -937,8 +904,7 @@ class HibikiState {
                 native: true,
                 event: {etype: "literal", val: "init"},
             };
-            let pinit = DataCtx.ExecuteHandlerBlock([action], false, this.initDataenv(), rtctx);
-            // let pinit = this.initDataenv().fireEvent({event: "init", bubble: false, datacontext: {}}, rtctx, true);
+            let pinit = DataCtx.ExecuteHandlerBlock([action], false, this.initDataenv(), rtctx, true);
             return pinit;
         }).then(() => {
             this.setInitialized();

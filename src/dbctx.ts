@@ -205,9 +205,6 @@ class DBCtx {
     }
 
     @boundMethod handleEvent(event : string, val? : any) {
-        if (event == "mount") {
-            return;
-        }
         if (this.isEditMode()) {
             return false;
         }
@@ -232,9 +229,7 @@ class DBCtx {
             event: {etype: "literal", val: event},
             data: {etype: "literal", val: datacontext},
         };
-        console.log("execute action", action);
-        DataCtx.ExecuteHandlerBlock([action], false, execDataenv, rtctx);
-        // execDataenv.fireEvent({event: event, bubble: false, datacontext: datacontext}, rtctx);
+        DataCtx.ExecuteHandlerBlock([action], false, execDataenv, rtctx, false);
         return false;
     }
 
