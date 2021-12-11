@@ -146,16 +146,16 @@ var grammar = {
     {"name": "statement", "symbols": ["exprStatement"], "postprocess": id},
     {"name": "statement", "symbols": ["ifStatement"], "postprocess": id},
     {"name": "statement", "symbols": ["throwStatement"], "postprocess": id},
-    {"name": "statement", "symbols": ["reportErrorStatement"], "postprocess": id},
     {"name": "statement", "symbols": ["nopStatement"], "postprocess": id},
-    {"name": "throwStatement", "symbols": [(lexer.has("KW_THROW") ? {type: "KW_THROW"} : KW_THROW), "callParamsSingle"], "postprocess": (data) => ({stmt: "throw", expr: data[1]})},
+    {"name": "throwStatement", "symbols": [(lexer.has("KW_THROW") ? {type: "KW_THROW"} : KW_THROW), "callParamsSingle"], "postprocess": (data) => ({actiontype: "throw", data: data[1]})},
     {"name": "ifStatement$ebnf$1$subexpression$1", "symbols": [(lexer.has("KW_ELSE") ? {type: "KW_ELSE"} : KW_ELSE), (lexer.has("LBRACE") ? {type: "LBRACE"} : LBRACE), "statementBlock", (lexer.has("RBRACE") ? {type: "RBRACE"} : RBRACE)]},
     {"name": "ifStatement$ebnf$1", "symbols": ["ifStatement$ebnf$1$subexpression$1"], "postprocess": id},
     {"name": "ifStatement$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
     {"name": "ifStatement", "symbols": [(lexer.has("KW_IF") ? {type: "KW_IF"} : KW_IF), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "fullExpr", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN), (lexer.has("LBRACE") ? {type: "LBRACE"} : LBRACE), "statementBlock", (lexer.has("RBRACE") ? {type: "RBRACE"} : RBRACE), "ifStatement$ebnf$1"], "postprocess":  (data) => {
-            let rtn = {stmt: "if", condExpr: data[2], thenBlock: data[5]};
+            let rtn = {actiontype: "if", data: data[2], actions: {}};
+            rtn.actions["then"] = data[5];
             if (data[7] != null) {
-                rtn.elseBlock = data[7][2];
+                rtn.actions["else"] = data[7][2];
             }
             return rtn;
         } },
@@ -165,7 +165,7 @@ var grammar = {
     {"name": "callStatement", "symbols": ["callStatement$ebnf$1", "callStatementNoAssign"], "postprocess":  (data) => {
             if (data[0]) {
                 let lvalueArr = data[0][0];
-                data[1].lvalue = lvalueArr[1];
+                data[1].setpath = lvalueArr[1];
                 data[1].setop = lvalueArr[0];
             }
             return data[1];
@@ -173,11 +173,11 @@ var grammar = {
     {"name": "callStatementNoAssign", "symbols": ["staticCallStatement"], "postprocess": id},
     {"name": "callStatementNoAssign", "symbols": ["dynCallStatement"], "postprocess": id},
     {"name": "dynCallStatement", "symbols": [(lexer.has("KW_CALL") ? {type: "KW_CALL"} : KW_CALL), "fullExpr", "namedCallParams"], "postprocess":  (data) => {
-            return {stmt: "call", handler: data[1], data: data[2]};
+            return {actiontype: "callhandler", callpath: data[1], data: data[2]};
         } },
     {"name": "staticCallStatement", "symbols": [(lexer.has("CALLPATH") ? {type: "CALLPATH"} : CALLPATH), "namedCallParams"], "postprocess":  (data) => {
-            let handler = {etype: "literal", val: data[0].value};
-            let rtn = {stmt: "call", handler: handler, data: data[1]};
+            let callpath = {etype: "literal", val: data[0].value};
+            let rtn = {actiontype: "callhandler", callpath: callpath, data: data[1]};
             return rtn;
         } },
     {"name": "namedParamKey", "symbols": ["idOrKeyword"], "postprocess": (data) => ({etype: "literal", val: data[0].value})},
@@ -225,30 +225,32 @@ var grammar = {
     {"name": "optCallParamsSingle$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
     {"name": "optCallParamsSingle", "symbols": ["optCallParamsSingle$ebnf$1"], "postprocess": (data) => data[0]},
     {"name": "assignmentStatement", "symbols": ["lvalue", (lexer.has("EQUAL") ? {type: "EQUAL"} : EQUAL), "fullExpr"], "postprocess":  (data) => {
-            return {stmt: "assign", lvalue: data[0][1], setop: data[0][0], expr: data[2]};
+            return {actiontype: "setdata", setpath: data[0][1], setop: data[0][0], data: data[2]};
         } },
-    {"name": "exprStatement", "symbols": [(lexer.has("KW_EXPR") ? {type: "KW_EXPR"} : KW_EXPR), "fullExpr"], "postprocess": (data) => ({stmt: "expr", expr: data[1]})},
+    {"name": "exprStatement", "symbols": [(lexer.has("KW_EXPR") ? {type: "KW_EXPR"} : KW_EXPR), "fullExpr"], "postprocess": (data) => ({actiontype: "setdata", data: data[1]})},
     {"name": "invalidateStatement", "symbols": [(lexer.has("KW_INVALIDATE") ? {type: "KW_INVALIDATE"} : KW_INVALIDATE), "optCallParams"], "postprocess":  (data) => {
-            return {stmt: "invalidate", exprs: data[1]};
+            if (data[1] == null) {
+                return {actiontype: "invalidate"};
+            }
+            return {actiontype: "invalidate", data: {etype: "array", exprs: data[1]}};
         } },
     {"name": "nopStatement$ebnf$1$subexpression$1", "symbols": [(lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)]},
     {"name": "nopStatement$ebnf$1", "symbols": ["nopStatement$ebnf$1$subexpression$1"], "postprocess": id},
     {"name": "nopStatement$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
     {"name": "nopStatement", "symbols": [(lexer.has("KW_NOP") ? {type: "KW_NOP"} : KW_NOP), "nopStatement$ebnf$1"], "postprocess": (data) => ({stmt: "nop"})},
     {"name": "bubbleStatement", "symbols": [(lexer.has("KW_BUBBLE") ? {type: "KW_BUBBLE"} : KW_BUBBLE), (lexer.has("DASHGT") ? {type: "DASHGT"} : DASHGT), "idOrKeyword", "optCallParamsSingle"], "postprocess":  (data) => {
-            let rtn = {stmt: "bubble", event: {etype: "literal", val: data[2].value}, context: data[3]};
+            let rtn = {actiontype: "fire", subtype: "bubble", event: {etype: "literal", val: data[2].value}, data: data[3]};
+            // let rtn = {stmt: "bubble", event: {etype: "literal", val: data[2].value}, context: data[3]};
             return rtn;
         } },
     {"name": "fireStatement", "symbols": [(lexer.has("KW_FIRE") ? {type: "KW_FIRE"} : KW_FIRE), (lexer.has("DASHGT") ? {type: "DASHGT"} : DASHGT), "idOrKeyword", "optCallParamsSingle"], "postprocess":  (data) => {
-            let rtn = {stmt: "fire", event: {etype: "literal", val: data[2].value}, context: data[3]};
+            let rtn = {actiontype: "fire", subtype: "fire", event: {etype: "literal", val: data[2].value}, data: data[3]};
+            // let rtn = {stmt: "fire", event: {etype: "literal", val: data[2].value}, context: data[3]};
             return rtn;
         } },
-    {"name": "logStatement", "symbols": [(lexer.has("KW_LOG") ? {type: "KW_LOG"} : KW_LOG), "callParams"], "postprocess": (data) => ({stmt: "log", exprs: data[1]})},
-    {"name": "debugStatement", "symbols": [(lexer.has("KW_DEBUG") ? {type: "KW_DEBUG"} : KW_DEBUG), "callParams"], "postprocess": (data) => ({stmt: "debug", exprs: data[1]})},
-    {"name": "alertStatement", "symbols": [(lexer.has("KW_ALERT") ? {type: "KW_ALERT"} : KW_ALERT), "callParams"], "postprocess": (data) => ({stmt: "alert", exprs: data[1]})},
-    {"name": "reportErrorStatement", "symbols": [(lexer.has("KW_REPORTERROR") ? {type: "KW_REPORTERROR"} : KW_REPORTERROR), "callParamsSingle"], "postprocess":  (data) => {
-            return {stmt: "reporterror", expr: data[1]};
-        } },
+    {"name": "logStatement", "symbols": [(lexer.has("KW_LOG") ? {type: "KW_LOG"} : KW_LOG), "callParams"], "postprocess": (data) => ({actiontype: "log", subtype: "log", data: {etype: "array", exprs: data[1]}})},
+    {"name": "debugStatement", "symbols": [(lexer.has("KW_DEBUG") ? {type: "KW_DEBUG"} : KW_DEBUG), "callParams"], "postprocess": (data) => ({actiontype: "log", subtype: "debug", data: {etype: "array", exprs: data[1]}})},
+    {"name": "alertStatement", "symbols": [(lexer.has("KW_ALERT") ? {type: "KW_ALERT"} : KW_ALERT), "callParams"], "postprocess": (data) => ({actiontype: "log", subtype: "alert", data: {etype: "array", exprs: data[1]}})},
     {"name": "lvalue$ebnf$1$subexpression$1", "symbols": ["idOrKeyword", (lexer.has("COLON") ? {type: "COLON"} : COLON)]},
     {"name": "lvalue$ebnf$1", "symbols": ["lvalue$ebnf$1$subexpression$1"], "postprocess": id},
     {"name": "lvalue$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},

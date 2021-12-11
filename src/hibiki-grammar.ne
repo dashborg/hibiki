@@ -120,6 +120,7 @@ lexer.next = () => {
 
 fullExpr -> filterExpr {% id %}
 
+# returns HAction[]
 statementBlock -> statement (%SEMI statement):* %SEMI:?  {% (data) => {
         let rtn = [data[0]];
         if (data[1] != null && data[1].length > 0) {
@@ -131,27 +132,28 @@ statementBlock -> statement (%SEMI statement):* %SEMI:?  {% (data) => {
         return rtn;
     } %}
 
+# returns HAction
 statement ->
-      callStatement         {% id %}
-    | assignmentStatement   {% id %}
-    | invalidateStatement   {% id %}
-    | fireStatement         {% id %}
-    | bubbleStatement       {% id %}
-    | logStatement          {% id %}
-    | debugStatement        {% id %}
-    | alertStatement        {% id %}
-    | exprStatement         {% id %}
-    | ifStatement           {% id %}
-    | throwStatement        {% id %}
-    | reportErrorStatement  {% id %}
-    | nopStatement          {% id %}
+      callStatement         {% id %}   #
+    | assignmentStatement   {% id %}   #
+    | invalidateStatement   {% id %}   #
+    | fireStatement         {% id %}   #
+    | bubbleStatement       {% id %}   #
+    | logStatement          {% id %}   #
+    | debugStatement        {% id %}   #
+    | alertStatement        {% id %}   #
+    | exprStatement         {% id %}   #
+    | ifStatement           {% id %}   #
+    | throwStatement        {% id %}   #
+    | nopStatement          {% id %}   #
 
-throwStatement -> %KW_THROW callParamsSingle {% (data) => ({stmt: "throw", expr: data[1]}) %}
+throwStatement -> %KW_THROW callParamsSingle {% (data) => ({actiontype: "throw", data: data[1]}) %}
 
 ifStatement -> %KW_IF %LPAREN fullExpr %RPAREN %LBRACE statementBlock %RBRACE (%KW_ELSE %LBRACE statementBlock %RBRACE):? {% (data) => {
-        let rtn = {stmt: "if", condExpr: data[2], thenBlock: data[5]};
+        let rtn = {actiontype: "if", data: data[2], actions: {}};
+        rtn.actions["then"] = data[5];
         if (data[7] != null) {
-            rtn.elseBlock = data[7][2];
+            rtn.actions["else"] = data[7][2];
         }
         return rtn;
     } %}
@@ -159,7 +161,7 @@ ifStatement -> %KW_IF %LPAREN fullExpr %RPAREN %LBRACE statementBlock %RBRACE (%
 callStatement -> (lvalue %EQUAL):? callStatementNoAssign {% (data) => {
         if (data[0]) {
             let lvalueArr = data[0][0];
-            data[1].lvalue = lvalueArr[1];
+            data[1].setpath = lvalueArr[1];
             data[1].setop = lvalueArr[0];
         }
         return data[1];
@@ -170,12 +172,12 @@ callStatementNoAssign ->
     | dynCallStatement     {% id %}
 
 dynCallStatement -> %KW_CALL fullExpr namedCallParams {% (data) => {
-          return {stmt: "call", handler: data[1], data: data[2]};
+          return {actiontype: "callhandler", callpath: data[1], data: data[2]};
       } %}
 
 staticCallStatement -> %CALLPATH namedCallParams {% (data) => {
-          let handler = {etype: "literal", val: data[0].value};
-          let rtn = {stmt: "call", handler: handler, data: data[1]};
+          let callpath = {etype: "literal", val: data[0].value};
+          let rtn = {actiontype: "callhandler", callpath: callpath, data: data[1]};
           return rtn;
       } %}
 
@@ -224,38 +226,37 @@ optCallParamsSingle -> callParamsSingle:? {% (data) => data[0] %}
 
 assignmentStatement ->
       lvalue %EQUAL fullExpr {% (data) => {
-          return {stmt: "assign", lvalue: data[0][1], setop: data[0][0], expr: data[2]};
+          return {actiontype: "setdata", setpath: data[0][1], setop: data[0][0], data: data[2]};
       } %}
 
-exprStatement -> %KW_EXPR fullExpr {% (data) => ({stmt: "expr", expr: data[1]}) %}
+exprStatement -> %KW_EXPR fullExpr {% (data) => ({actiontype: "setdata", data: data[1]}) %}
 
 invalidateStatement -> %KW_INVALIDATE optCallParams {% (data) => {
-        return {stmt: "invalidate", exprs: data[1]};
+        if (data[1] == null) {
+            return {actiontype: "invalidate"};
+        }
+        return {actiontype: "invalidate", data: {etype: "array", exprs: data[1]}};
     } %}
 
-nopStatement -> %KW_NOP (%LPAREN %RPAREN):? {% (data) => ({stmt: "nop"}) %}
+nopStatement -> %KW_NOP (%LPAREN %RPAREN):? {% (data) => ({actiontype: "nop"}) %}
 
 bubbleStatement ->
     %KW_BUBBLE %DASHGT idOrKeyword optCallParamsSingle {% (data) => {
-        let rtn = {stmt: "bubble", event: {etype: "literal", val: data[2].value}, context: data[3]};
+        let rtn = {actiontype: "fire", subtype: "bubble", event: {etype: "literal", val: data[2].value}, data: data[3]};
         return rtn;
     } %}
 
 fireStatement ->
     %KW_FIRE %DASHGT idOrKeyword optCallParamsSingle {% (data) => {
-        let rtn = {stmt: "fire", event: {etype: "literal", val: data[2].value}, context: data[3]};
+        let rtn = {actiontype: "fire", subtype: "fire", event: {etype: "literal", val: data[2].value}, data: data[3]};
         return rtn;
     } %}
 
-logStatement -> %KW_LOG callParams {% (data) => ({stmt: "log", exprs: data[1]}) %}
+logStatement -> %KW_LOG callParams {% (data) => ({actiontype: "log", subtype: "log", data: {etype: "array", exprs: data[1]}}) %}
 
-debugStatement -> %KW_DEBUG callParams {% (data) => ({stmt: "debug", exprs: data[1]}) %}
+debugStatement -> %KW_DEBUG callParams {% (data) => ({actiontype: "log", subtype: "debug", data: {etype: "array", exprs: data[1]}}) %}
 
-alertStatement -> %KW_ALERT callParams {% (data) => ({stmt: "alert", exprs: data[1]}) %}
-
-reportErrorStatement -> %KW_REPORTERROR callParamsSingle {% (data) => {
-        return {stmt: "reporterror", expr: data[1]};
-    } %}
+alertStatement -> %KW_ALERT callParams {% (data) => ({actiontype: "log", subtype: "alert", data: {etype: "array", exprs: data[1]}}) %}
 
 # [setop : string, PathType]
 lvalue ->

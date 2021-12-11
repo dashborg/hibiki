@@ -100,14 +100,6 @@ type PathPart = {
 
 type PathType = PathPart[];
 
-type DataCtxErrorObjType = {
-    _type : "HibikiError",
-    message : string,
-    context: string,
-    rtctx : RtContext,
-    err : Error,
-};
-
 type ComponentType = {
     componentType : "hibiki-html" | "hibiki-native" | "react-custom",
     libName : string,
@@ -171,4 +163,4 @@ interface HibikiExtState {
     initialize(force : boolean);
 };
 
-export type {HibikiNode, HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, DataCtxErrorObjType, ComponentType, LibraryType, HandlerPathObj, HibikiRequest, Hibiki, HibikiAction, HibikiActionString, HibikiActionValue, HibikiExtState, EventType, HandlerValType, JSFuncType, AppModuleConfig, FetchHookFn, CsrfHookFn, ReactClass, HandlerPathType, ErrorCallbackFn, EventCallbackFn, HtmlParserOpts, LibComponentType};
+export type {HibikiNode, HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, ComponentType, LibraryType, HandlerPathObj, HibikiRequest, Hibiki, HibikiAction, HibikiActionString, HibikiActionValue, HibikiExtState, EventType, HandlerValType, JSFuncType, AppModuleConfig, FetchHookFn, CsrfHookFn, ReactClass, HandlerPathType, ErrorCallbackFn, EventCallbackFn, HtmlParserOpts, LibComponentType};

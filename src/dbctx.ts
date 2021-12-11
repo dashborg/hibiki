@@ -205,6 +205,9 @@ class DBCtx {
     }
 
     @boundMethod handleEvent(event : string, val? : any) {
+        if (event == "mount") {
+            return;
+        }
         if (this.isEditMode()) {
             return false;
         }
@@ -222,7 +225,16 @@ class DBCtx {
         let execDataenv = this.dataenv.makeChildEnv(null, envOpts);
         let rtctx = new RtContext();
         rtctx.pushContext(sprintf("event <%s>:*%s (in %s)", this.node.tag, event, this.dataenv.getHtmlContext()), null);
-        execDataenv.fireEvent({event: event, bubble: false, datacontext: datacontext}, rtctx);
+        let action = {
+            actiontype: "fire",
+            subtype: "fire",
+            native: true,
+            event: {etype: "literal", val: event},
+            data: {etype: "literal", val: datacontext},
+        };
+        console.log("execute action", action);
+        DataCtx.ExecuteHandlerBlock([action], false, execDataenv, rtctx);
+        // execDataenv.fireEvent({event: event, bubble: false, datacontext: datacontext}, rtctx);
         return false;
     }
 

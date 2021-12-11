@@ -366,6 +366,7 @@ class DataEnvironment {
     }
 
     resolveEventHandler(event : EventType, parent : boolean) : {handler : HandlerBlock, node : HibikiNode, dataenv : DataEnvironment} {
+        console.log("resolveEventHandler", this.getFullHtmlContext(), this);
         if (parent) {
             let eventDE = this.getParentEventBoundary("*");
             if (eventDE == null) {
@@ -379,12 +380,14 @@ class DataEnvironment {
         }
         if (!(event.event in env.handlers)) {
             if (!event.bubble || env.parent == null) {
+                console.log("no bubble", this.getFullHtmlContext(), env.getFullHtmlContext());
+                console.log("no bubble", this, env);
                 return null;
             }
             return env.parent.resolveEventHandler(event, false);
         }
         let hval = env.handlers[event.event];
-        return {handler: {hibikihandler: hval.handlerStr}, node: hval.node, dataenv: this};
+        return {handler: {hibikihandler: hval.handlerStr}, node: hval.node, dataenv: env};
     }
 
     fireEvent(event : EventType, rtctx : RtContext, throwErrors? : boolean) : Promise<any> {
@@ -928,7 +931,14 @@ class HibikiState {
         let [deps, srcs] = createDepPromise("@main", null, this, this.HtmlObj.get());
         console.log(sprintf("Hibiki root dependencies: %s", JSON.stringify(srcs)));
         deps.then(() => {
-            let pinit = this.initDataenv().fireEvent({event: "init", bubble: false, datacontext: {}}, rtctx, true);
+            let action = {
+                actiontype: "fire",
+                subtype: "fire",
+                native: true,
+                event: {etype: "literal", val: "init"},
+            };
+            let pinit = DataCtx.ExecuteHandlerBlock([action], false, this.initDataenv(), rtctx);
+            // let pinit = this.initDataenv().fireEvent({event: "init", bubble: false, datacontext: {}}, rtctx, true);
             return pinit;
         }).then(() => {
             this.setInitialized();
@@ -1175,7 +1185,7 @@ class HibikiState {
             module = this.ComponentLibrary.getModule(moduleName, libContext);
         }
         if (module == null) {
-            throw new Error(sprintf("Invalid handler, no module '%s' found for path: %s", moduleName, handlerPath));
+            throw new Error(sprintf("Invalid handler, no module '%s' found for path: %s, lib-context '%s'", moduleName, handlerPath, libContext));
         }
         let req = new HibikiRequest(this.getExtState());
         req.path = {
