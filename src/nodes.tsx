@@ -22,6 +22,7 @@ import {valToString, valToInt, valToFloat, resolveNumber, isObject, textContent,
 import {parseHtml} from "./html-parser";
 import * as NodeUtils from "./nodeutils";
 import {RtContext, HibikiError} from "./error";
+import type {HAction} from "./datactx";
 
 declare var window : any;
 
@@ -919,8 +920,8 @@ class SimpleQueryNode extends React.Component<{node : HibikiNode, dataenv : Data
             try {
                 let ctx = new DBCtx(self);
                 let queryStr = ctx.resolveAttr("query");
-                let callStmt = DataCtx.ParseStaticCallStatement(queryStr);
-                let handler = DataCtx.evalExprAst(callStmt.handler, ctx.dataenv);
+                let callAction = DataCtx.ParseStaticCallStatement(queryStr);
+                let handler = DataCtx.evalExprAst(callAction.callpath, ctx.dataenv);
                 return handler || "invalid-query";
             }
             catch (e) {
@@ -940,18 +941,23 @@ class SimpleQueryNode extends React.Component<{node : HibikiNode, dataenv : Data
             if (queryStr == null) {
                 return;
             }
+            /* rtctx.pushContext("Parsing 'query' attribute (must be a data handler expression)", null);
+             * let callStmt = DataCtx.ParseStaticCallStatement(queryStr);
+             * let handler = DataCtx.evalExprAst(callStmt.handler, ctx.dataenv);
+             * rtctx.popContext();
+             * rtctx.pushContext("Evaluating 'query' parameters", null);
+             * let handlerData = null;
+             * if (callStmt.data != null) {
+             *     handlerData = DataCtx.evalExprAst(callStmt.data, ctx.dataenv);
+             * }
+             * rtctx.popContext();
+             * rtctx.pushContext(sprintf("Calling data handler '%s'", handler), null);
+             * let qrtn = dbstate.callHandlerInternalAsync(handler, handlerData, true, {rtContext: rtctx, dataenv: ctx.dataenv});
+             */
             rtctx.pushContext("Parsing 'query' attribute (must be a data handler expression)", null);
-            let callStmt = DataCtx.ParseStaticCallStatement(queryStr);
-            let handler = DataCtx.evalExprAst(callStmt.handler, ctx.dataenv);
+            let callAction = DataCtx.ParseStaticCallStatement(queryStr);
             rtctx.popContext();
-            rtctx.pushContext("Evaluating 'query' parameters", null);
-            let handlerData = null;
-            if (callStmt.data != null) {
-                handlerData = DataCtx.evalExprAst(callStmt.data, ctx.dataenv);
-            }
-            rtctx.popContext();
-            rtctx.pushContext(sprintf("Calling data handler '%s'", handler), null);
-            let qrtn = dbstate.callHandlerInternalAsync(handler, handlerData, true, {rtContext: rtctx, dataenv: ctx.dataenv});
+            let qrtn = DataCtx.ExecuteHAction(callAction, true, ctx.dataenv, rtctx);
             qrtn.then((queryRtn) => {
                 if (curCallNum != this.callNum) {
                     console.log(sprintf("%s not setting stale data return", nodeStr(ctx.node)));
