@@ -1103,45 +1103,6 @@ class HibikiState {
         return null;
     }
 
-    findLocalHandler(handlerName : string) : any {
-        let htmlobj = this.HtmlObj.get();
-        if (htmlobj == null || htmlobj.list == null) {
-            return null;
-        }
-        for (let h of htmlobj.list) {
-            if ((h.tag == "define-handler") && h.attrs != null && h.attrs["name"] == handlerName) {
-                return h;
-            }
-        }
-        return null;
-    }
-
-    // opts: rtContext, dataenv
-    runLocalHandler(handlerHtml : any, handlerData : any[], opts? : any) : Promise<any> {
-        if (opts == null) {
-            opts = {};
-        }
-        let handlerText = textContent(handlerHtml);
-        console.log("run local handler", handlerHtml, handlerText, handlerData);
-        let rtctx = null;
-        if (opts.rtContext != null) {
-            rtctx = opts.rtContext;
-        }
-        if (rtctx == null) {
-            rtctx = new RtContext();
-        }
-        let dataenv = opts.dataenv;
-        if (dataenv == null) {
-            dataenv = this.rootDataenv();
-        }
-        let htmlContext = sprintf("@local:%s", handlerHtml.attrs.name)
-        let contextDataenv = dataenv.makeChildEnv({params: handlerData}, {htmlContext: htmlContext});
-        rtctx.pushContext(sprintf("Running @local handler '%s'", handlerHtml.attrs.name));
-        // TODO - use ParseBlockThrow / ExecuteBlockP to return a promise that can throw errors
-        let p = DataCtx.ParseAndExecuteBlock(handlerText, null, contextDataenv, rtctx);
-        return p;
-    }
-
     findScript(scriptName : string) : any {
         let htmlobj = this.HtmlObj.get();
         if (htmlobj == null || htmlobj.list == null) {

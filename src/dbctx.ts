@@ -6,7 +6,6 @@ import { v4 as uuidv4 } from 'uuid';
 import {DataEnvironment, getAttribute, getAttributes, getStyleMap} from "./state";
 import {sprintf} from "sprintf-js";
 import {boundMethod} from 'autobind-decorator'
-import {ParseAndExecuteBlock} from "./datactx";
 import {HibikiNode} from "./types";
 import * as NodeUtils from "./nodeutils";
 import {RtContext} from "./error";
