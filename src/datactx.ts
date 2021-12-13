@@ -32,6 +32,10 @@ type HAction = {
     actiontype : string,
     event?     : HExpr,
     native?    : boolean,
+    bubble?    : boolean,
+    pure?      : boolean,
+    debug?     : boolean,
+    alert?     : boolean,
     setop?     : string,
     setpath?   : PathType,
     callpath?  : HExpr,
@@ -1425,6 +1429,21 @@ function isContextPath(path : PathType) : boolean {
     return pp.pathtype == "root" && pp.pathkey == "context" && !pp.caret;
 }
 
+function doAssignment(action : HAction, val : any, pure : boolean, dataenv : DataEnvironment) {
+    if (action.setpath == null) {
+        return;
+    }
+    let lvaluePath = evalAssignLVThrow(action.setpath, dataenv);
+    if (lvaluePath == null || lvaluePath.length == 0) {
+        return null;
+    }
+    if (pure && !isContextPath(lvaluePath)) {
+        return null;
+    }
+    let setop = action.setop ?? "set";
+    setPathWrapper(setop, lvaluePath, dataenv, val, {allowContext: true});
+}
+
 async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEnvironment, rtctx : RtContext) : Promise<any> {
     if (action == null) {
         return null;
@@ -1436,19 +1455,7 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
     rtctx.pushContext(sprintf("%s action", action.actiontype), null);
     if (action.actiontype == "setdata") {
         let expr = evalExprAst(action.data, dataenv);
-        if (action.setpath == null) {
-            return null
-        }
-        let lvaluePath = evalAssignLVThrow(action.setpath, dataenv);
-        if (lvaluePath == null || lvaluePath.length == 0) {
-            return null;
-        }
-        if (pure && !isContextPath(lvaluePath)) {
-            return null;
-        }
-        let setop = action.setop ?? "set";
-        setPathWrapper(setop, lvaluePath, dataenv, expr, {allowContext: true});
-        return null;
+        doAssignment(action, expr, pure, dataenv);
     }
     else if (action.actiontype == "if") {
         let condVal = evalExprAst(action.data, dataenv);
@@ -1467,22 +1474,16 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
         let val = evalExprAst(action.data, dataenv);
         return val;
     }
-    else if (action.actiontype == "callhandler" || action.actiontype == "datahandler") {
+    else if (action.actiontype == "callhandler") {
         let callPath = evalExprAst(action.callpath, dataenv);
         let data = demobx(evalExprAst(action.data, dataenv));
         rtctx.replaceContext(sprintf("Calling handler %s", callPath), null);
-        let pureCall = pure || (action.actiontype == "datahandler");
+        let pureCall = pure || action.pure;
         let pactions = dataenv.dbstate.callHandlerRtnBlock(callPath, data, pureCall, {rtContext: rtctx, dataenv: dataenv});
         let actions = await pactions;
         let handlerEnv = dataenv.makeChildEnv(null, {blockLocalData: true});
         let rtnVal = await ExecuteHandlerBlock(actions, pureCall, handlerEnv, rtctx, false);
-        if (action.setpath != null) {
-            let lvaluePath = evalAssignLVThrow(action.setpath, dataenv);
-            let setop = action.setop ?? "set";
-            if (!pure || isContextPath(lvaluePath)) {
-                setPathWrapper(setop, lvaluePath, dataenv, rtnVal, {allowContext: true});
-            }
-        }
+        doAssignment(action, rtnVal, pure, dataenv);
         return rtnVal;
     }
     else if (action.actiontype == "invalidate") {
@@ -1504,7 +1505,7 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
         }
         return null;
     }
-    else if (action.actiontype == "fire" || action.actiontype == "bubble") {
+    else if (action.actiontype == "fireevent") {
         if (pure) {
             return null;
         }
@@ -1515,7 +1516,7 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
         if (eventStr == null || eventStr == "") {
             return null;
         }
-        let bubble = (action.actiontype == "bubble");
+        let bubble = !!action.bubble;
         if (!action.native) {
             rtctx.replaceContext(sprintf("%s->%s", (bubble ? "bubble" : "fire"), eventStr), null);
         }
@@ -1537,7 +1538,7 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
         rtctx.pushContext(ctxStr, {handlerEnv: ehandler.dataenv, handlerName: event.event});
         return ExecuteHandlerBlock(ehandler.handler, pure, eventEnv, rtctx, false);
     }
-    else if (action.actiontype == "log" || action.actiontype == "debug" || action.actiontype == "alert") {
+    else if (action.actiontype == "log") {
         let dataValArr = forceAsArray(demobx(evalExprAst(action.data, dataenv)));
         dataValArr = dataValArr.map((val) => {
             if (val instanceof HibikiError) {
@@ -1545,18 +1546,16 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
             }
             return val;
         });
-        if (action.actiontype == "alert") {
+        console.log("hibiki-log", ...dataValArr);
+        if (action.debug) {
+            console.log("DataEnvironment Stack");
+            dataenv.printStack();
+            console.log("Runtime Context", rtctx);
+            console.log(rtctx.asString());
+        }
+        if (action.alert) {
             let alertStr = dataValArr.map((v) => String(v)).join(", ");
             alert(alertStr);
-        }
-        else {
-            console.log("hibiki-log", ...dataValArr);
-            if (action.actiontype == "debug") {
-                console.log("DataEnvironment Stack");
-                dataenv.printStack();
-                console.log("Runtime Context", rtctx);
-                console.log(rtctx.asString());
-            }
         }
         return null;
     }
@@ -1626,6 +1625,10 @@ function convertAction(action : HibikiAction) : HAction {
     if (action.event != null) {
         rtn.event = evalActionStr(action.event);
     }
+    if (action.bubble) rtn.bubble = true;
+    if (action.pure) rtn.pure = true;
+    if (action.debug) rtn.debug = true;
+    if (action.alert) rtn.alert = true;
     if (action.setop != null) rtn.setop = action.setop;
     if (action.setpath != null) {
         let path = ParsePathThrow(action.setpath, true);
@@ -1735,7 +1738,8 @@ function ExecuteHandlerBlock(actions : HandlerBlock, pure : boolean, dataenv : D
                 return;
             }
             let errAction = {
-                actiontype: "bubble",
+                actiontype: "fireevent",
+                bubble: true,
                 native: true,
                 event: {etype: "literal", val: "error"},
                 data: {etype: "literal", val: {"error": errorObj}},
@@ -1833,19 +1837,6 @@ function EvalSimpleExprThrow(exprStr : string, dataenv : DataEnvironment, rtCont
     let exprAst = ParseSimpleExprThrow(exprStr);
     let val = evalExprAst(exprAst, dataenv);
     return val;
-}
-
-function ApplySingleRRA(dataenv : DataEnvironment, rra : HibikiAction) {
-    if (rra.actiontype == "setdata") {
-        SetPath(rra.setpath, dataenv, rra.data);
-    }
-    else if (rra.actiontype == "blob") {
-        let blob = BlobFromRRA(rra);
-        SetPath(rra.setpath, dataenv, blob);
-    }
-    else if (rra.actiontype == "blobext") {
-        SetPath("blobext:" + rra.setpath, dataenv, rra.blobbase64);
-    }
 }
 
 function BlobFromBlob(blob : Blob) : Promise<HibikiBlob> {
@@ -1985,7 +1976,7 @@ function convertSimpleType(typeName : string, value : string, defaultValue : any
     return value;
 }
 
-export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, ApplySingleRRA, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, BoundValue, ParseLValuePath, ParseLValuePathThrow, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock};
+export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, BoundValue, ParseLValuePath, ParseLValuePathThrow, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction};
 
 export type {PathType, HandlerBlock, HAction};
 

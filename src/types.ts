@@ -4,6 +4,7 @@ import type {HibikiState} from "./state";
 import type {RtContext, HibikiError} from "./error";
 import type {HibikiRequest} from "./request";
 import * as mobx from "mobx";
+import type {HandlerBlock} from "./datactx";
 
 type HibikiNode = {
     tag    : string,
@@ -37,17 +38,21 @@ type HibikiActionString   = string | {hibikiexpr : string};
 
 type HibikiAction = {
     actiontype    : string,
-    event?        : HibikiActionString,
+    event?        : HibikiActionString,  // for type=fire
+    bubble?       : boolean,             // for type=fire
+    pure?         : boolean,             // for type=callhandler
+    debug?        : boolean,             // for type=log
+    alert?        : boolean,             // for type=log
     setop?        : string,
     setpath?      : string,
     callpath?     : HibikiActionString,
     data?         : HibikiActionValue,
-    html?         : string,
+    html?         : string,              // for type=html
     actions?      : Record<string, HibikiAction[]>,
-    blockstr?     : string,
-    blockctx?     : string,
-    blobbase64?   : string,
-    blobmimetype? : string,
+    blockstr?     : string,              // for type=block
+    blockctx?     : string,              // for type=block
+    blobbase64?   : string,              // for type=setpath (blobs)
+    blobmimetype? : string,              // for type=setpath (blobs)
 };
 
 type HibikiHandlerModule = {
@@ -156,7 +161,7 @@ interface HibikiExtState {
     setHtml(html : string | HTMLElement);
     setData(path : string, data : any);
     getData(path : string) : any;
-    runActions(actions : HibikiAction[]) : any;
+    executeHandlerBlock(actions : HandlerBlock, pure? : boolean);
     setPage(htmlPage : string);
     setInitCallback(fn : () => void);
     initialize(force : boolean);

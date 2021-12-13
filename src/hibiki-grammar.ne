@@ -260,21 +260,21 @@ nopStatement -> %KW_NOP (%LPAREN %RPAREN):? {% (data) => ({actiontype: "nop"}) %
 
 bubbleStatement ->
     %KW_BUBBLE %DASHGT idOrKeyword optCallParamsSingle {% (data) => {
-        let rtn = {actiontype: "bubble", event: {etype: "literal", val: data[2].value}, data: data[3]};
+        let rtn = {actiontype: "fireevent", bubble: true, event: {etype: "literal", val: data[2].value}, data: data[3]};
         return rtn;
     } %}
 
 fireStatement ->
     %KW_FIRE %DASHGT idOrKeyword optCallParamsSingle {% (data) => {
-        let rtn = {actiontype: "fire", event: {etype: "literal", val: data[2].value}, data: data[3]};
+        let rtn = {actiontype: "fireevent", event: {etype: "literal", val: data[2].value}, data: data[3]};
         return rtn;
     } %}
 
 logStatement -> %KW_LOG callParams {% (data) => ({actiontype: "log", data: {etype: "array", exprs: data[1]}}) %}
 
-debugStatement -> %KW_DEBUG callParams {% (data) => ({actiontype: "debug", data: {etype: "array", exprs: data[1]}}) %}
+debugStatement -> %KW_DEBUG callParams {% (data) => ({actiontype: "log", debug: true, data: {etype: "array", exprs: data[1]}}) %}
 
-alertStatement -> %KW_ALERT callParams {% (data) => ({actiontype: "alert", data: {etype: "array", exprs: data[1]}}) %}
+alertStatement -> %KW_ALERT callParams {% (data) => ({actiontype: "log", alert: true, data: {etype: "array", exprs: data[1]}}) %}
 
 # [setop : string, PathType]
 lvalue ->

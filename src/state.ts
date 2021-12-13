@@ -787,8 +787,8 @@ class HibikiExtState {
         return dataenv.resolvePath(path, false);
     }
 
-    runActions(actions : HibikiAction[]) : any {
-        return this.state.runActions(actions);
+    executeHandlerBlock(actions : HandlerBlock, pure? : boolean) : Promise<any> {
+        return this.state.executeHandlerBlock(actions, pure);
     }
 
     setPage(htmlPage : string) {
@@ -902,7 +902,7 @@ class HibikiState {
         console.log(sprintf("Hibiki root dependencies: %s", JSON.stringify(srcs)));
         deps.then(() => {
             let action = {
-                actiontype: "fire",
+                actiontype: "fireevent",
                 native: true,
                 event: {etype: "literal", val: "init"},
             };
@@ -1094,44 +1094,15 @@ class HibikiState {
         return null;
     }
 
-    returnValueFromActions(rra : HibikiAction[]) : any {
-        return this.processActions(rra, true);
-    }
-
-    runActions(rra : HibikiAction[]) : any {
-        return this.processActions(rra, false);
+    executeHandlerBlock(actions : HandlerBlock, pure? : boolean) : Promise<any> {
+        let rtctx = new RtContext();
+        rtctx.pushContext("HibikiState.executeHandlerBlock()", null);
+        let pinit = DataCtx.ExecuteHandlerBlock(actions, pure, this.initDataenv(), rtctx, true);
+        return pinit;
     }
 
     blobFromBlob(blob : Blob) : Promise<DataCtx.HibikiBlob> {
         return DataCtx.BlobFromBlob(blob);
-    }
-
-    @mobx.action processActions(rra : HibikiAction[], pureRequest : boolean) : any {
-        if (rra == null) {
-            return null;
-        }
-        let rtnval = null;
-        let dataenv = this.rootDataenv();
-        for (let rr of rra) {
-            if (rr.actiontype == "setreturn") {
-                rtnval = rr.data;
-                continue;
-            }
-            if (pureRequest) {
-                continue;
-            }
-            if (rr.actiontype == "invalidate") {
-                this.invalidateRegex(rr.data);
-            }
-            else if (rr.actiontype == "html") {
-                let htmlObj = parseHtml(rr.html);
-                if (htmlObj != null) {
-                    this.HtmlObj.set(htmlObj);
-                }
-            }
-            DataCtx.ApplySingleRRA(dataenv, rr);
-        }
-        return rtnval;
     }
 
     async callHandlerRtnBlock(handlerPath : string, handlerData : object, pureRequest : boolean, opts? : CallHandlerOptsType) : Promise<HandlerBlock> {
@@ -1179,69 +1150,6 @@ class HibikiState {
             }
             return {hibikiactions: [{actiontype: "setreturn", data: data}]};
         });
-    }
-
-    async callHandlerInternalAsync(handlerPath : string, handlerData : any[], pureRequest : boolean, opts? : CallHandlerOptsType) : Promise<any> {
-        opts = opts || {};
-        if (handlerPath == null || handlerPath == "") {
-            throw new Error("Invalid handler path");
-        }
-        let hpath = parseHandler(handlerPath);
-        if (hpath == null) {
-            throw new Error("Invalid handler path: " + handlerPath);
-        }
-        let libContext = (opts.dataenv != null ? opts.dataenv.getLibContext() : null);
-        let moduleName = hpath.ns ?? "default";
-        let module : HibikiHandlerModule;
-        if (libContext == null || libContext == "@main") {
-            module = this.Modules[moduleName];
-        }
-        else {
-            module = this.ComponentLibrary.getModule(moduleName, libContext);
-        }
-        if (module == null) {
-            throw new Error(sprintf("Invalid handler, no module '%s' found for path: %s", moduleName, handlerPath));
-        }
-        let req = new HibikiRequest(this.getExtState());
-        req.path = {
-            module: moduleName,
-            path: hpath.path,
-            pathfrag: hpath.pathfrag,
-        };
-        req.data = handlerData ?? {};
-        req.rtContext = opts.rtContext;
-        req.pure = pureRequest;
-        req.libContext = libContext;
-        let self = this;
-        let rtnp = module.callHandler(req);
-        return rtnp.then((data) => {
-            if (data == null || typeof(data) != "object" || !("hibikiactions" in data) || !Array.isArray(data.hibikiactions)) {
-                return data;
-            }
-            let rtn = self.processActions(data.hibikiactions, pureRequest);
-            return rtn;
-        });
-    }
-
-    callHandler(handlerPath : string, handlerData : any[], opts? : {rtContext? : RtContext}) : Promise<any> {
-        opts = opts || {};
-        let self = this;
-        let handlerP = this.callHandlerInternalAsync(handlerPath, handlerData, false);
-        let prtn = handlerP.catch((e) => {
-            let errObj = new HibikiError(sprintf("Error calling handler %s", handlerPath), e, opts.rtContext);
-            self.reportErrorObj(errObj);
-        });
-        return prtn;
-    }
-
-    callData(handlerPath : string, handlerData : any[], opts? : {rtContext? : RtContext}) : Promise<any> {
-        let self = this;
-        let handlerP = this.callHandlerInternalAsync(handlerPath, handlerData, true);
-        let prtn = handlerP.catch((e) => {
-            let errObj = new HibikiError(sprintf("Error calling data handler %s", handlerPath), e, opts.rtContext);
-            self.reportErrorObj(errObj);
-        });
-        return prtn;
     }
 
     reportError(errorMessage : string, rtctx? : RtContext) {

@@ -257,16 +257,16 @@ var grammar = {
     {"name": "nopStatement$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
     {"name": "nopStatement", "symbols": [(lexer.has("KW_NOP") ? {type: "KW_NOP"} : KW_NOP), "nopStatement$ebnf$1"], "postprocess": (data) => ({actiontype: "nop"})},
     {"name": "bubbleStatement", "symbols": [(lexer.has("KW_BUBBLE") ? {type: "KW_BUBBLE"} : KW_BUBBLE), (lexer.has("DASHGT") ? {type: "DASHGT"} : DASHGT), "idOrKeyword", "optCallParamsSingle"], "postprocess":  (data) => {
-            let rtn = {actiontype: "bubble", event: {etype: "literal", val: data[2].value}, data: data[3]};
+            let rtn = {actiontype: "fireevent", bubble: true, event: {etype: "literal", val: data[2].value}, data: data[3]};
             return rtn;
         } },
     {"name": "fireStatement", "symbols": [(lexer.has("KW_FIRE") ? {type: "KW_FIRE"} : KW_FIRE), (lexer.has("DASHGT") ? {type: "DASHGT"} : DASHGT), "idOrKeyword", "optCallParamsSingle"], "postprocess":  (data) => {
-            let rtn = {actiontype: "fire", event: {etype: "literal", val: data[2].value}, data: data[3]};
+            let rtn = {actiontype: "fireevent", event: {etype: "literal", val: data[2].value}, data: data[3]};
             return rtn;
         } },
     {"name": "logStatement", "symbols": [(lexer.has("KW_LOG") ? {type: "KW_LOG"} : KW_LOG), "callParams"], "postprocess": (data) => ({actiontype: "log", data: {etype: "array", exprs: data[1]}})},
-    {"name": "debugStatement", "symbols": [(lexer.has("KW_DEBUG") ? {type: "KW_DEBUG"} : KW_DEBUG), "callParams"], "postprocess": (data) => ({actiontype: "debug", data: {etype: "array", exprs: data[1]}})},
-    {"name": "alertStatement", "symbols": [(lexer.has("KW_ALERT") ? {type: "KW_ALERT"} : KW_ALERT), "callParams"], "postprocess": (data) => ({actiontype: "alert", data: {etype: "array", exprs: data[1]}})},
+    {"name": "debugStatement", "symbols": [(lexer.has("KW_DEBUG") ? {type: "KW_DEBUG"} : KW_DEBUG), "callParams"], "postprocess": (data) => ({actiontype: "log", debug: true, data: {etype: "array", exprs: data[1]}})},
+    {"name": "alertStatement", "symbols": [(lexer.has("KW_ALERT") ? {type: "KW_ALERT"} : KW_ALERT), "callParams"], "postprocess": (data) => ({actiontype: "log", alert: true, data: {etype: "array", exprs: data[1]}})},
     {"name": "lvalue$ebnf$1$subexpression$1", "symbols": ["idOrKeyword", (lexer.has("COLON") ? {type: "COLON"} : COLON)]},
     {"name": "lvalue$ebnf$1", "symbols": ["lvalue$ebnf$1$subexpression$1"], "postprocess": id},
     {"name": "lvalue$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},

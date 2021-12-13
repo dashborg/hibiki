@@ -940,23 +940,10 @@ class SimpleQueryNode extends React.Component<{node : HibikiNode, dataenv : Data
             if (queryStr == null) {
                 return;
             }
-            /* rtctx.pushContext("Parsing 'query' attribute (must be a data handler expression)", null);
-             * let callStmt = DataCtx.ParseStaticCallStatement(queryStr);
-             * let handler = DataCtx.evalExprAst(callStmt.handler, ctx.dataenv);
-             * rtctx.popContext();
-             * rtctx.pushContext("Evaluating 'query' parameters", null);
-             * let handlerData = null;
-             * if (callStmt.data != null) {
-             *     handlerData = DataCtx.evalExprAst(callStmt.data, ctx.dataenv);
-             * }
-             * rtctx.popContext();
-             * rtctx.pushContext(sprintf("Calling data handler '%s'", handler), null);
-             * let qrtn = dbstate.callHandlerInternalAsync(handler, handlerData, true, {rtContext: rtctx, dataenv: ctx.dataenv});
-             */
             rtctx.pushContext("Parsing 'query' attribute (must be a data handler expression)", null);
             let callAction = DataCtx.ParseStaticCallStatement(queryStr);
             rtctx.popContext();
-            let qrtn = DataCtx.ExecuteHandlerBlock([callAction], true, ctx.dataenv, rtctx, false);
+            let qrtn = DataCtx.ExecuteHAction(callAction, true, ctx.dataenv, rtctx);
             qrtn.then((queryRtn) => {
                 if (curCallNum != this.callNum) {
                     console.log(sprintf("%s not setting stale data return", nodeStr(ctx.node)));
