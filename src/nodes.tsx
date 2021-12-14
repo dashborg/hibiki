@@ -62,7 +62,7 @@ class HibikiRootNode extends React.Component<{hibikiState : HibikiExtState}, {}>
     getDataenv() : DataEnvironment {
         let state = this.getHibikiState();
         let rde = state.rootDataenv();
-        let htmlContext = sprintf("<page %s>", state.HtmlPage.get());
+        let htmlContext = sprintf("<page %s>", state.PageName.get());
         let dataenv = rde.makeChildEnv(null, {htmlContext: htmlContext, libContext: "@main", eventBoundary: "hard"});
         return dataenv;
     }
@@ -187,12 +187,19 @@ function baseRenderHtmlChildren(list : HibikiNode[], dataenv : DataEnvironment) 
                 rtn.push(<ErrorMsg message={"<define-handler> no name attribute"}/>);
                 continue;
             }
+            if (attrs.name.startsWith("/@local")) {
+                continue;   // local handlers are handled in state.ts
+            }
             let eventDE = dataenv.getEventBoundary("*");
             if (eventDE == null) {
                 rtn.push(<ErrorMsg message={"<define-handler> no event boundary"}/>);
                 continue;
             }
             let handlerStr = textContent(child);
+            if (!attrs.name.startsWith("/@event/")) {
+                rtn.push(<ErrorMsg message={"<define-handler> bad name, must start with /@event/ or /@local/"}/>);
+                continue;
+            }
             eventDE.handlers[attrs.name] = {handlerStr: handlerStr, node: child}
             continue;
         }

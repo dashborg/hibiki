@@ -418,11 +418,8 @@ function makeHandlers(node : HibikiNode) : Record<string, HandlerValType> {
     for (let key in node.attrs) {
         if (key == "handler" || key.endsWith(".handler")) {
             let eventName = key.replace(/\.handler$/, "");
-            handlers[eventName] = {handlerStr: node.attrs[key], node: node};
-        }
-        else if (key == "onclickhandler") {
-            console.log("WARNING: old onclickhandler parsed");
-            handlers["click"] = {handlerStr: node.attrs[key], node: node};
+            let hname = sprintf("/@event/%s", eventName);
+            handlers[hname] = {handlerStr: node.attrs[key], node: node};
         }
     }
     return handlers;

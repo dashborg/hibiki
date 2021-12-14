@@ -121,7 +121,7 @@ class AppModule {
     callHandler(req : HibikiRequest) : Promise<any> {
         let url : URL = null;
         try {
-            url = new URL(this.rootPath + req.path.path);
+            url = new URL(this.rootPath + req.path.path, window.location.href);
         }
         catch (e) {
             throw new Error(sprintf("Invalid URL for /@app[%s] handler '%s': %s", this.rootPath, this.rootPath + req.path.path, e.toString()));
@@ -131,6 +131,38 @@ class AppModule {
         method = (method ?? this.defaultMethod).toUpperCase();
         if (!VALID_METHODS[method]) {
             throw new Error(sprintf("Invalid method passed to /@app%s '%s'", req.path.path, method));
+        }
+        fetchInit = fetchInit ?? {};
+        fetchInit.headers = convertHeaders(fetchInit.headers);
+        fetchInit.method = method;
+        let params = stripAtKeys(data);
+        setParams(method, url, fetchInit, params);
+        this.state.runFetchHooks(url, fetchInit);
+        let p = fetch(url.toString(), fetchInit).then((resp) => handleFetchResponse(url, resp));
+        return p;
+    }
+}
+
+class RawModule {
+    state : HibikiState;
+
+    constructor(state : HibikiState) {
+        this.state = state;
+    }
+
+    callHandler(req : HibikiRequest) : Promise<any> {
+        let url : URL = null;
+        try {
+            url = new URL(req.path.path, window.location.href);
+        }
+        catch (e) {
+            throw new Error(sprintf("Invalid URL for raw handler '%s': %s", req.path.path, e.toString()));
+        }
+        let data : Record<string, any> = req.data || {};
+        let {"@method": method, "@init": fetchInit, "@headers": headersObj} = data;
+        method = (method ?? "get").toUpperCase();
+        if (!VALID_METHODS[method]) {
+            throw new Error(sprintf("Invalid method passed to %s: '%s'", req.path.path, method));
         }
         fetchInit = fetchInit ?? {};
         fetchInit.headers = convertHeaders(fetchInit.headers);
@@ -170,4 +202,4 @@ class LocalModule {
     }
 }
 
-export {FetchModule, AppModule, LocalModule};
+export {FetchModule, AppModule, LocalModule, RawModule};

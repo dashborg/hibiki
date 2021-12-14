@@ -37,6 +37,19 @@ function unbox(data : any) : any {
     return data;
 }
 
+function findLocalHandler(node : HibikiNode, handlerName : string) : HandlerBlock {
+    if (node == null || node.list == null) {
+        return null;
+    }
+    for (let i=0; i<node.list.length; i++) {
+        let subNode = node.list[i];
+        if (subNode.tag == "define-handler" && subNode.attrs != null && subNode.attrs.name == handlerName) {
+            return {hibikihandler: textContent(subNode)};
+        }
+    }
+    return null;
+}
+
 function createDepPromise(libName : string, srcUrl : string, state : HibikiState, libNode : HibikiNode) : [Promise<any>, string[]] {
     if (libNode == null) {
         return [Promise.resolve(true), []];
@@ -340,15 +353,16 @@ class DataEnvironment {
     }
 
     // always returns hard
-    // returns soft if event == "*" or env.handlers[event] != null
+    // returns soft if event == "*" or env.handlers[/@event/[event]] != null
     getEventBoundary(event : string) : DataEnvironment {
         let env : DataEnvironment = this;;
+        let evHandlerName = sprintf("/@event/%s", event);
         while (env != null) {
             if (env.eventBoundary == "hard") {
                 return env;
             }
             if (event != null && env.eventBoundary == "soft") {
-                if (event == "*" || env.handlers[event] != null) {
+                if (event == "*" || env.handlers[evHandlerName] != null) {
                     return env;
                 }
             }
@@ -370,8 +384,9 @@ class DataEnvironment {
         if (env == null) {
             return null;
         }
-        if ((event.event in env.handlers) && !rtctx.isHandlerInStack(env, event.event)) {
-            let hval = env.handlers[event.event];
+        let evHandlerName = sprintf("/@event/%s", event.event);
+        if ((evHandlerName in env.handlers) && !rtctx.isHandlerInStack(env, event.event)) {
+            let hval = env.handlers[evHandlerName];
             return {handler: {hibikihandler: hval.handlerStr}, node: hval.node, dataenv: env};
         }
         if (env.parent == null) {
@@ -791,8 +806,8 @@ class HibikiExtState {
         return this.state.executeHandlerBlock(actions, pure);
     }
 
-    setPage(htmlPage : string) {
-        this.state.setPage(htmlPage);
+    setPageName(pageName : string) {
+        this.state.setPageName(pageName);
     }
 
     setInitCallback(fn : () => void) {
@@ -836,7 +851,7 @@ class HibikiState {
     NodeDataMap : Map<string, mobx.IObservableValue<any>> = new Map();  // TODO clear on unmount
     ExtHtmlObj : mobx.ObservableMap<string,any> = mobx.observable.map({}, {name: "ExtHtmlObj", deep: false});
     Config : HibikiConfig = {};
-    HtmlPage : mobx.IObservableValue<string> = mobx.observable.box("default", {name: "HtmlPage"});
+    PageName : mobx.IObservableValue<string> = mobx.observable.box("default", {name: "PageName"});
     InitCallbacks : (() => void)[];
     JSFuncs : Record<string, JSFuncType>;
     CsrfHook : CsrfHookFn;
@@ -898,7 +913,7 @@ class HibikiState {
             return;
         }
         let rtctx = new RtContext();
-        let [deps, srcs] = createDepPromise("@main", null, this, this.HtmlObj.get());
+        let [deps, srcs] = createDepPromise("@main", window.location.href, this, this.HtmlObj.get());
         console.log(sprintf("Hibiki root dependencies: %s", JSON.stringify(srcs)));
         deps.then(() => {
             let action = {
@@ -921,8 +936,8 @@ class HibikiState {
         return new HibikiExtState(this);
     }
 
-    @mobx.action setPage(htmlPage : string) {
-        this.HtmlPage.set(htmlPage);
+    @mobx.action setPageName(pageName : string) {
+        this.PageName.set(pageName);
     }
 
     @mobx.action setConfig(config : HibikiConfig) {
@@ -1029,8 +1044,12 @@ class HibikiState {
         let env = this.rootDataenv();
         if (this.Config.initHandler != null) {
             let opts = {eventBoundary: "hard", handlers: {}};
-            opts.handlers["init"] = {
+            opts.handlers["/@event/init"] = {
                 handlerStr: this.Config.initHandler,
+                node: {tag: "hibiki-root"},
+            };
+            opts.handlers["/@event/error"] = {
+                handlerStr: this.Config.errorHandler,
                 node: {tag: "hibiki-root"},
             };
             env = env.makeChildEnv(null, opts);
@@ -1042,8 +1061,22 @@ class HibikiState {
         console.log("Destroy Hibiki State");
     }
 
+    // search root and page
+    findLocalHandler(handlerName : string) : HandlerBlock {
+        let curPage = this.findCurrentPage();
+        let block = findLocalHandler(curPage, handlerName);
+        if (block != null) {
+            return block;
+        }
+        block = findLocalHandler(this.HtmlObj.get(), handlerName);
+        if (block != null) {
+            return block;
+        }
+        return null;
+    }
+
     findCurrentPage() : HibikiNode {
-        return this.findPage(this.HtmlPage.get());
+        return this.findPage(this.PageName.get());
     }
 
     findPage(pageName? : string) : HibikiNode {

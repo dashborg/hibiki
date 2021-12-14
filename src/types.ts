@@ -77,6 +77,7 @@ type HtmlParserOpts = {
 
 type HibikiConfig = {
     initHandler?           : string,
+    errorHandler?          : string,
     noConfigMergeFromHtml? : boolean,
     noDataMergeFromHtml?   : boolean,
     hooks? : {
@@ -162,7 +163,7 @@ interface HibikiExtState {
     setData(path : string, data : any);
     getData(path : string) : any;
     executeHandlerBlock(actions : HandlerBlock, pure? : boolean);
-    setPage(htmlPage : string);
+    setPageName(pageName : string);
     setInitCallback(fn : () => void);
     initialize(force : boolean);
 };

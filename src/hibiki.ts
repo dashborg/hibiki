@@ -15,12 +15,13 @@ import {DefaultJSFuncs} from "./jsfuncs";
 
 declare var window : any;
 
-function readHibikiOptsFromHtml(htmlObj : HibikiNode) : {config : HibikiConfig, initialData : any, initHandler : string} {
+function readHibikiOptsFromHtml(htmlObj : HibikiNode) : {config : HibikiConfig, initialData : any, initHandler : string, errorHandler : string} {
     let config : HibikiConfig = null;
     let initialData : any = null;
     let initHandler : string = null;
+    let errorHandler : string = null;
     if (htmlObj == null || htmlObj.list == null) {
-        return {config, initialData, initHandler};
+        return {config, initialData, initHandler, errorHandler};
     }
     for (let i=0; i<htmlObj.list.length; i++) {
         let subNode = htmlObj.list[i];
@@ -33,11 +34,14 @@ function readHibikiOptsFromHtml(htmlObj : HibikiNode) : {config : HibikiConfig, 
                 initialData = {data: initialData};
             }
         }
-        if (initHandler == null && subNode.tag == "hibiki-init") {
+        if (initHandler == null && subNode.tag == "define-handler" && subNode.attrs != null && subNode.attrs.name == "/@event/init") {
             initHandler = deepTextContent(subNode);
         }
+        if (errorHandler == null && subNode.tag == "define-handler" && subNode.attrs != null && subNode.attrs.name == "/@event/error") {
+            errorHandler = deepTextContent(subNode);
+        }
     }
-    return {config, initialData, initHandler};
+    return {config, initialData, initHandler, errorHandler};
 }
 
 function readHibikiConfigFromOuterHtml(htmlElem : string | HTMLElement) : HibikiConfig {
@@ -48,6 +52,10 @@ function readHibikiConfigFromOuterHtml(htmlElem : string | HTMLElement) : Hibiki
     let initHandlerAttr = htmlElem.getAttribute("init.handler");
     if (initHandlerAttr != null) {
         rtn.initHandler = initHandlerAttr;
+    }
+    let errorHandlerAttr = htmlElem.getAttribute("error.handler");
+    if (errorHandlerAttr != null) {
+        rtn.errorHandler = errorHandlerAttr;
     }
     if (htmlElem.hasAttribute("nousageimg")) {
         rtn.noUsageImg = true;
