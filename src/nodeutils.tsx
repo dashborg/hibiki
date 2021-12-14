@@ -410,7 +410,7 @@ function automerge(ctx : DBCtx, automergeAttrs : AutoMergeAttrsType, subName : s
     }
 }
 
-function makeHandlers(node : HibikiNode, defineEventHandlerAllowed? : boolean, defineLocalHandlerAllowed? : boolean) : Record<string, HandlerValType> {
+function makeHandlers(node : HibikiNode, handlerPrefixes? : string[]) : Record<string, HandlerValType> {
     let handlers = {};
     if (node.attrs != null) {
         for (let key in node.attrs) {
@@ -421,15 +421,19 @@ function makeHandlers(node : HibikiNode, defineEventHandlerAllowed? : boolean, d
             }
         }
     }
-    if ((defineEventHandlerAllowed || defineLocalHandlerAllowed) && node.list != null) {
+    if (handlerPrefixes != null && node.list != null) {
         for (let i=0; i<node.list.length; i++) {
             let subNode = node.list[i];
             if (subNode.tag == "define-handler" && subNode.attrs != null && subNode.attrs.name != null) {
                 let hname = subNode.attrs.name;
-                if (defineEventHandlerAllowed && hname.startsWith("/@event/")) {
-                    handlers[hname] = {handlerStr: textContent(subNode), node: subNode};
+                let prefixOk = false;
+                for (let j=0; j<handlerPrefixes.length; j++) {
+                    if (hname.startsWith(sprintf("/@%s/", handlerPrefixes[j]))) {
+                        prefixOk = true;
+                        break;
+                    }
                 }
-                if (defineLocalHandlerAllowed && hname.startsWith("/@local/")) {
+                if (prefixOk) {
                     handlers[hname] = {handlerStr: textContent(subNode), node: subNode};
                 }
             }

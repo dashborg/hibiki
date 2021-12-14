@@ -547,7 +547,7 @@ class CustomNode extends React.Component<{node : HibikiNode, component : Compone
         specials.children = childrenVar;
         specials.node = nodeVar;
         let resolvedAttrs = {};
-        let handlers = NodeUtils.makeHandlers(implNode, true);
+        let handlers = NodeUtils.makeHandlers(implNode, ["event"]);
         let crootProxy = componentRootProxy(nodeDataLV, resolvedAttrs);
         let envOpts = {
             componentRoot: crootProxy,

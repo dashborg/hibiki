@@ -639,7 +639,8 @@ class ComponentLibrary {
             let hibiki = getHibiki();
             let mreg = hibiki.ModuleRegistry;
             lib.modules["fetch"] = new mreg["fetch"](this.state, {});
-            lib.modules["local"] = new mreg["local"](this.state, {});
+            lib.modules["lib"] = new mreg["local"](this.state, {});
+            lib.modules["local"] = new mreg["local"](this.state, {libContext: "@main"});
             this.libs[libName] = lib;
         }
         let libObj = this.libs[libName];
@@ -669,7 +670,7 @@ class ComponentLibrary {
             }
             libObj.libComponents[name] = {componentType: "hibiki-html", node: h};
         }
-        let handlers = NodeUtils.makeHandlers(htmlobj, false, true);
+        let handlers = NodeUtils.makeHandlers(htmlobj, ["lib"]);
         libObj.handlers = handlers;
     }
 
@@ -709,14 +710,6 @@ class ComponentLibrary {
     }
 
     findLocalBlockHandler(handlerName : string, libContext : string) : HandlerBlock {
-        if (libContext == null || libContext == "@main") {
-            let ide = this.state.initDataenv();
-            if (ide.handlers[handlerName] == null) {
-                return null;
-            }
-            return {hibikihandler: ide.handlers[handlerName].handlerStr};
-        }
-
         let libObj = this.libs[libContext];
         if (libObj == null) {
             return null;
@@ -981,7 +974,7 @@ class HibikiState {
             this.Modules["fetch"] = new mreg["fetch"](this, {});
         }
         if (config.modules == null || !("local" in config.modules)) {
-            this.Modules["local"] = new mreg["local"](this, {});
+            this.Modules["local"] = new mreg["local"](this, {libContext: "@main"});
         }
     }
 
@@ -1045,8 +1038,8 @@ class HibikiState {
         let env = this.rootDataenv();
         let opts = {eventBoundary: "hard", handlers: {}};
         let curPage = this.findCurrentPage();
-        let h1 = NodeUtils.makeHandlers(curPage, true, true);
-        let h2 = NodeUtils.makeHandlers(this.HtmlObj.get(), true, true);
+        let h1 = NodeUtils.makeHandlers(curPage, ["event", "local"]);
+        let h2 = NodeUtils.makeHandlers(this.HtmlObj.get(), ["event", "local"]);
         opts.handlers = Object.assign({}, h2, h1);
         env = env.makeChildEnv(null, opts);
         return env;
@@ -1129,14 +1122,24 @@ class HibikiState {
             throw new Error("Invalid handler path: " + handlerPath);
         }
         let libContext = (opts.dataenv != null ? opts.dataenv.getLibContext() : null);
-        if (hpath.ns == "local") {
-            // check local html handlers
-            let localName = sprintf("/@local%s", hpath.path);
-            let block = this.ComponentLibrary.findLocalBlockHandler(localName, libContext);
+
+        // check local html handlers
+        if (hpath.ns == "local") {            
+            let handlerName = sprintf("/@local%s", hpath.path);
+            let ide = this.initDataenv();
+            if (ide.handlers[handlerName] == null) {
+                return null;
+            }
+            return {hibikihandler: ide.handlers[handlerName].handlerStr};
+        }
+        if (hpath.ns == "lib") {
+            let handlerName = sprintf("/@lib%s", hpath.path);
+            let block = this.ComponentLibrary.findLocalBlockHandler(handlerName, libContext);
             if (block != null) {
                 return block;
             }
         }
+        
         let moduleName = hpath.ns
         let module : HibikiHandlerModule;
         if (moduleName == null || moduleName == "") {
