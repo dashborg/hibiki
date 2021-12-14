@@ -639,8 +639,8 @@ class ComponentLibrary {
             let hibiki = getHibiki();
             let mreg = hibiki.ModuleRegistry;
             lib.modules["fetch"] = new mreg["fetch"](this.state, {});
-            lib.modules["lib"] = new mreg["local"](this.state, {});
-            lib.modules["local"] = new mreg["local"](this.state, {libContext: "@main"});
+            lib.modules["local"] = new mreg["local"](this.state, {});
+            lib.modules["lib"] = new mreg["lib"](this.state, {libContext: libName});
             this.libs[libName] = lib;
         }
         let libObj = this.libs[libName];
@@ -721,9 +721,6 @@ class ComponentLibrary {
     }
 
     findLocalHandler(handlerName : string, libContext : string) : (req : HibikiRequest) => Promise<any> {
-        if (libContext == null || libContext == "@main") {
-            return getHibiki().LocalHandlers[handlerName];
-        }
         let libObj = this.libs[libContext];
         if (libObj == null) {
             return null;
@@ -974,7 +971,7 @@ class HibikiState {
             this.Modules["fetch"] = new mreg["fetch"](this, {});
         }
         if (config.modules == null || !("local" in config.modules)) {
-            this.Modules["local"] = new mreg["local"](this, {libContext: "@main"});
+            this.Modules["local"] = new mreg["local"](this, {});
         }
     }
 
@@ -988,10 +985,10 @@ class HibikiState {
         let hibiki = getHibiki();
         let mreg = hibiki.ModuleRegistry;
         if (libContext == null || libContext == "@main") {
-            this.Modules["lib-" + prefix] = new mreg["local"](this, {libContext: libName});
+            this.Modules["lib-" + prefix] = new mreg["lib"](this, {libContext: libName});
         }
         else {
-            let mod = new mreg["local"](this, {libContext: libName});
+            let mod = new mreg["lib"](this, {libContext: libName});
             this.ComponentLibrary.registerModule(libContext, "lib-" + prefix, mod);
         }
     }
@@ -1122,24 +1119,6 @@ class HibikiState {
             throw new Error("Invalid handler path: " + handlerPath);
         }
         let libContext = (opts.dataenv != null ? opts.dataenv.getLibContext() : null);
-
-        // check local html handlers
-        if (hpath.ns == "local") {            
-            let handlerName = sprintf("/@local%s", hpath.path);
-            let ide = this.initDataenv();
-            if (ide.handlers[handlerName] == null) {
-                return null;
-            }
-            return {hibikihandler: ide.handlers[handlerName].handlerStr};
-        }
-        if (hpath.ns == "lib") {
-            let handlerName = sprintf("/@lib%s", hpath.path);
-            let block = this.ComponentLibrary.findLocalBlockHandler(handlerName, libContext);
-            if (block != null) {
-                return block;
-            }
-        }
-        
         let moduleName = hpath.ns
         let module : HibikiHandlerModule;
         if (moduleName == null || moduleName == "") {

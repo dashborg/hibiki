@@ -177,17 +177,18 @@ class RawModule {
 
 class LocalModule {
     state : HibikiState;
-    libContext : string;
     
     constructor(state : HibikiState, config : any) {
-        config = config ?? {};
         this.state = state;
-        this.libContext = config.libContext;
     }
 
     callHandler(req : HibikiRequest) : Promise<any> {
-        let libContext = this.libContext ?? req.libContext;
-        let handler = this.state.ComponentLibrary.findLocalHandler(req.path.path, libContext);
+        let handlerName = sprintf("/@local%s", req.path.path);
+        let ide = this.state.initDataenv();
+        if (ide.handlers[handlerName] != null) {
+            return Promise.resolve({hibikihandler: ide.handlers[handlerName].handlerStr});
+        }
+        let handler = getHibiki().LocalHandlers[handlerName];
         if (handler == null) {
             throw new Error(sprintf("Local handler '%s' not found", req.path.path));
         }
@@ -202,4 +203,36 @@ class LocalModule {
     }
 }
 
-export {FetchModule, AppModule, LocalModule, RawModule};
+class LibModule {
+    state : HibikiState;
+    libContext : string;
+    
+    constructor(state : HibikiState, config : any) {
+        config = config ?? {};
+        this.state = state;
+        this.libContext = config.libContext;
+    }
+
+    callHandler(req : HibikiRequest) : Promise<any> {
+        let libContext = this.libContext;
+        let handlerName = sprintf("/@lib%s", req.path.path);
+        let block = this.state.ComponentLibrary.findLocalBlockHandler(handlerName, libContext);
+        if (block != null) {
+            return Promise.resolve(block);
+        }
+        let handler = this.state.ComponentLibrary.findLocalHandler(req.path.path, libContext);
+        if (handler == null) {
+            throw new Error(sprintf("Lib '%s' handler '%s' not found", libContext, req.path.path));
+        }
+        let rtn = handler(req);
+        let p = Promise.resolve(rtn).then((rtnVal) => {
+            if (rtnVal != null) {
+                req.setReturn(rtnVal);
+            }
+            return {hibikiactions: req.actions};
+        });
+        return p;
+    }
+}
+
+export {FetchModule, AppModule, LocalModule, RawModule, LibModule};
