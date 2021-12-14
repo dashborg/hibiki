@@ -1481,7 +1481,7 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
         let pureCall = pure || action.pure;
         let pactions = dataenv.dbstate.callHandlerRtnBlock(callPath, data, pureCall, {rtContext: rtctx, dataenv: dataenv});
         let actions = await pactions;
-        let handlerEnv = dataenv.makeChildEnv(null, {blockLocalData: true});
+        let handlerEnv = dataenv.makeChildEnv({data: data}, {blockLocalData: true});
         let rtnVal = await ExecuteHandlerBlock(actions, pureCall, handlerEnv, rtctx, false);
         doAssignment(action, rtnVal, pure, dataenv);
         return rtnVal;
