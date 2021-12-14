@@ -502,7 +502,7 @@ class ComponentLibrary {
         return sprintf("%s(%s)", libName, libObj.url);
     }
 
-    registerLocalHandler(libName : string, handlerName : string, fn : (HibikiRequest) => any) {
+    registerLocalJSHandler(libName : string, handlerName : string, fn : (HibikiRequest) => any) {
         let libObj = this.libs[libName];
         if (libObj == null) {
             console.log("Hibiki registerLocalHandler library '%s' not found", libName);

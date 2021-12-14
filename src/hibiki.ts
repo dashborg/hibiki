@@ -141,7 +141,7 @@ let LocalHandlers : Record<string, (HibikiRequest) => any> = {};
 let LocalReactComponents : mobx.ObservableMap<string, ReactClass> = mobx.observable.map({}, {name: "LocalReactComponents", deep: false});
 let LocalNativeComponents : mobx.ObservableMap<string, ReactClass> = mobx.observable.map({}, {name: "LocalNativeComponents", deep: false});
 
-function registerLocalHandler(path : string, fn : (HibikiRequest) => any) {
+function registerLocalJSHandler(path : string, fn : (HibikiRequest) => any) {
     LocalHandlers[path] = fn;
 }
 
@@ -165,7 +165,7 @@ let hibiki : Hibiki = {
     loadTag: loadTag,
     render: render,
     createState: createState,
-    registerLocalHandler: registerLocalHandler,
+    registerLocalJSHandler: registerLocalJSHandler,
     registerLocalReactComponentImpl: registerLocalReactComponentImpl,
     registerLocalNativeComponentImpl: registerLocalNativeComponentImpl,
     addLibraryCallback: addLibraryCallback,

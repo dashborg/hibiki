@@ -142,7 +142,7 @@ interface Hibiki {
     loadTag(elem: HTMLElement) : HibikiExtState;
     render(elem : HTMLElement, state : HibikiExtState);
     createState(config : HibikiConfig, html : string | HTMLElement, initialData : any) : HibikiExtState;
-    registerLocalHandler(path : string, fn : (HibikiRequest) => any);
+    registerLocalJSHandler(path : string, fn : (HibikiRequest) => any);
     registerLocalReactComponentImpl(name : string, reactImpl : ReactClass);
     registerLocalNativeComponentImpl(name : string, reactImpl : ReactClass);
     addLibraryCallback(libName : string, fn : Function);
