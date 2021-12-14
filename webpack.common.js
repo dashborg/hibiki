@@ -4,6 +4,7 @@ module.exports = {
     mode: "development",
     entry: {
         hibiki: ["./src/hibiki.ts"],
+        playground: ["./src/playground.less"],
     },
     output: {
         path: __dirname,

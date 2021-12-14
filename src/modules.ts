@@ -184,11 +184,11 @@ class LocalModule {
 
     callHandler(req : HibikiRequest) : Promise<any> {
         let handlerName = sprintf("/@local%s", req.path.path);
-        let ide = this.state.initDataenv();
+        let ide = this.state.pageDataenv();
         if (ide.handlers[handlerName] != null) {
             return Promise.resolve({hibikihandler: ide.handlers[handlerName].handlerStr});
         }
-        let handler = getHibiki().LocalHandlers[handlerName];
+        let handler = getHibiki().LocalHandlers[req.path.path];
         if (handler == null) {
             throw new Error(sprintf("Local handler '%s' not found", req.path.path));
         }

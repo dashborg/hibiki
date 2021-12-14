@@ -60,11 +60,7 @@ class HibikiRootNode extends React.Component<{hibikiState : HibikiExtState}, {}>
     }
 
     getDataenv() : DataEnvironment {
-        let state = this.getHibikiState();
-        let rde = state.initDataenv();
-        let htmlContext = sprintf("<page %s>", state.PageName.get());
-        let dataenv = rde.makeChildEnv(null, {htmlContext: htmlContext, libContext: "@main", eventBoundary: "hard"});
-        return dataenv;
+        return this.getHibikiState().pageDataenv();
     }
     
     componentDidMount() {

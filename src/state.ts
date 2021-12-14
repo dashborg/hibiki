@@ -912,7 +912,7 @@ class HibikiState {
                 native: true,
                 event: {etype: "literal", val: "init"},
             };
-            let pinit = DataCtx.ExecuteHandlerBlock([action], false, this.initDataenv(), rtctx, true);
+            let pinit = DataCtx.ExecuteHandlerBlock([action], false, this.pageDataenv(), rtctx, true);
             return pinit;
         }).then(() => {
             this.setInitialized();
@@ -1031,9 +1031,10 @@ class HibikiState {
         return new DataEnvironment(this, opts);
     }
 
-    initDataenv() : DataEnvironment {
+    pageDataenv() : DataEnvironment {
         let env = this.rootDataenv();
-        let opts = {eventBoundary: "hard", handlers: {}};
+        let htmlContext = sprintf("<page %s>", this.PageName.get());
+        let opts = {eventBoundary: "hard", htmlContext: htmlContext, libContext: "@main", handlers: {}};
         let curPage = this.findCurrentPage();
         let h1 = NodeUtils.makeHandlers(curPage, ["event", "local"]);
         let h2 = NodeUtils.makeHandlers(this.HtmlObj.get(), ["event", "local"]);
@@ -1101,7 +1102,7 @@ class HibikiState {
     executeHandlerBlock(actions : HandlerBlock, pure? : boolean) : Promise<any> {
         let rtctx = new RtContext();
         rtctx.pushContext("HibikiState.executeHandlerBlock()", null);
-        let pinit = DataCtx.ExecuteHandlerBlock(actions, pure, this.initDataenv(), rtctx, true);
+        let pinit = DataCtx.ExecuteHandlerBlock(actions, pure, this.pageDataenv(), rtctx, true);
         return pinit;
     }
 
