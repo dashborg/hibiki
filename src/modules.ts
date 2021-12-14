@@ -6,6 +6,7 @@ import type {HibikiState} from "./state";
 import type {AppModuleConfig, FetchHookFn, Hibiki, HibikiAction} from "./types";
 import * as DataCtx from "./datactx";
 import type {HibikiRequest} from "./request";
+import merge from "lodash/merge";
 
 let VALID_METHODS = {"GET": true, "POST": true, "PUT": true, "PATCH": true, "DELETE": true};
 
@@ -21,13 +22,15 @@ function handleFetchResponse(url : URL, resp : any) : Promise<any> {
     return blobp.then((blob) => DataCtx.BlobFromBlob(blob));
 }
 
-function convertHeaders(headersObj : any) : Headers {
+function convertHeaders(...headersObjArr : any[]) : Headers {
     let rtn = new Headers();
-    if (headersObj == null || !isObject(headersObj)) {
-        return rtn;
-    }
-    for (let key in headersObj) {
-        rtn.set(key, headersObj[key]);
+    for (let i=0; i<headersObjArr.length; i++) {
+        let headersObj = headersObjArr[i];
+        if (headersObj != null && isObject(headersObj)) {
+            for (let key in headersObj) {
+                rtn.set(key, headersObj[key]);
+            }
+        }
     }
     return rtn;
 }
@@ -64,7 +67,9 @@ class FetchModule {
     }
     
     callHandler(req : HibikiRequest) : Promise<any> {
-        let {url: urlStr, params, init: fetchInit, method} = unpackPositionalArgs(req.data, ["url", "params", "init"]);
+        let reqData = req.data ?? {};
+        let {url: urlStr, data, init: fetchInit, method} = unpackPositionalArgs(reqData, ["url", "data", "init"]);
+        let {"@headers": headersObj} = reqData;
         if (method == null) {
             method = req.path.pathfrag;
         }
@@ -85,23 +90,38 @@ class FetchModule {
         catch (e) {
             throw new Error(sprintf("Invalid URL passed to fetch '%s': %s", urlStr, e.toString()));
         }
-        if (params != null && !isObject(params)) {
-            throw new Error(sprintf("Invalid params passed to /@fetch for url '%s', params must be an object not an array", urlStr));
+        if (data != null && !isObject(data)) {
+            throw new Error(sprintf("Invalid data passed to /@fetch for url '%s', data must be an object not an array", urlStr));
         }
         fetchInit = fetchInit ?? {};
-        fetchInit.headers = convertHeaders(fetchInit.headers);
+        fetchInit.headers = convertHeaders(fetchInit.headers, headersObj);
         fetchInit.method = method;
-        setParams(method, url, fetchInit, params);
+        setParams(method, url, fetchInit, data);
         this.state.runFetchHooks(url, fetchInit);
         let p = fetch(url.toString(), fetchInit).then((resp) => handleFetchResponse(url, resp));
         return p;
     }
 }
 
+function evalHExprMap(m : Record<string, DataCtx.HExpr>, state : HibikiState, datacontext : Record<string, any>) {
+    if (m == null) {
+        return null;
+    }
+    let dataenv = state.rootDataenv().makeChildEnv(datacontext, null);
+    let rtn = {};
+    for (let key in m) {
+        let val = DataCtx.evalExprAst(m[key], dataenv);
+        rtn[key] = val;
+    }
+    return DataCtx.demobx(rtn);
+}
+
 class AppModule {
     state : HibikiState;
     rootPath : string;
     defaultMethod : string;
+    defaultHeaders : Record<string, DataCtx.HExpr>;
+    defaultInit : any;
     
     constructor(state : HibikiState, config : AppModuleConfig) {
         this.state = state;
@@ -116,6 +136,13 @@ class AppModule {
             this.rootPath = this.rootPath.substr(0, this.rootPath.length-1);
         }
         this.defaultMethod = config.defaultMethod ?? "GET";
+        this.defaultHeaders = {};
+        if (config.defaultHeaders != null) {
+            for (let hkey in config.defaultHeaders) {
+                this.defaultHeaders[hkey] = DataCtx.evalActionStr(config.defaultHeaders[hkey]);
+            }
+        }
+        this.defaultInit = config.defaultInit ?? {};
     }
 
     callHandler(req : HibikiRequest) : Promise<any> {
@@ -132,8 +159,9 @@ class AppModule {
         if (!VALID_METHODS[method]) {
             throw new Error(sprintf("Invalid method passed to /@app%s '%s'", req.path.path, method));
         }
-        fetchInit = fetchInit ?? {};
-        fetchInit.headers = convertHeaders(fetchInit.headers);
+        fetchInit = merge({}, this.defaultInit, fetchInit ?? {});
+        let defaultHeaders = evalHExprMap(this.defaultHeaders, ((req.state as any).state as HibikiState), {data: req.data, url: url.toString()});
+        fetchInit.headers = convertHeaders(defaultHeaders, fetchInit.headers, headersObj);
         fetchInit.method = method;
         let params = stripAtKeys(data);
         setParams(method, url, fetchInit, params);
@@ -165,7 +193,7 @@ class RawModule {
             throw new Error(sprintf("Invalid method passed to %s: '%s'", req.path.path, method));
         }
         fetchInit = fetchInit ?? {};
-        fetchInit.headers = convertHeaders(fetchInit.headers);
+        fetchInit.headers = convertHeaders(fetchInit.headers, headersObj);
         fetchInit.method = method;
         let params = stripAtKeys(data);
         setParams(method, url, fetchInit, params);

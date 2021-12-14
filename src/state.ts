@@ -564,9 +564,6 @@ class ComponentLibrary {
         }
         this.importedUrls[srcUrl] = true;
         let fetchInit : any = {};
-        if (srcUrl.startsWith("http")) {
-            fetchInit.mode = "cors";
-        }
         let libName = null;
         let p = fetch(srcUrl).then((resp) => {
             if (!resp.ok) {
@@ -792,8 +789,8 @@ class HibikiExtState {
         return dataenv.resolvePath(path, false);
     }
 
-    executeHandlerBlock(actions : HandlerBlock, datacontext : Record<string, any>, pure? : boolean) : Promise<any> {
-        return this.state.executeHandlerBlock(actions, datacontext, pure);
+    executeHandlerBlock(actions : HandlerBlock, pure? : boolean) : Promise<any> {
+        return this.state.executeHandlerBlock(actions, pure);
     }
 
     setPageName(pageName : string) {
@@ -911,7 +908,7 @@ class HibikiState {
                 native: true,
                 event: {etype: "literal", val: "init"},
             };
-            let pinit = DataCtx.ExecuteHandlerBlock([action], null, false, this.pageDataenv(), rtctx, true);
+            let pinit = DataCtx.ExecuteHandlerBlock([action], false, this.pageDataenv(), rtctx, true);
             return pinit;
         }).then(() => {
             this.setInitialized();
@@ -1090,10 +1087,10 @@ class HibikiState {
         return null;
     }
 
-    executeHandlerBlock(actions : HandlerBlock, datacontext? : Record<string, any>, pure? : boolean) : Promise<any> {
+    executeHandlerBlock(actions : HandlerBlock, pure? : boolean) : Promise<any> {
         let rtctx = new RtContext();
         rtctx.pushContext("HibikiState.executeHandlerBlock()", null);
-        let pinit = DataCtx.ExecuteHandlerBlock(actions, datacontext, pure, this.pageDataenv(), rtctx, true);
+        let pinit = DataCtx.ExecuteHandlerBlock(actions, pure, this.pageDataenv(), rtctx, true);
         return pinit;
     }
 

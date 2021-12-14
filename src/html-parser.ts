@@ -125,7 +125,11 @@ class HtmlParser {
         }
         for (let i=0; i<nodeAttrs.length; i++) {
             let attr = nodeAttrs.item(i);
-            node.attrs[attr.name] = (attr.value == "" ? "1" : attr.value);
+            let value = attr.value;
+            if (value == "" && attr.name != "value") {
+                value = "1";
+            }
+            node.attrs[attr.name] = value;
             if (attr.name == "style") {
                 let styleMap = this.parseStyleAttr(attr.value);
                 node.style = styleMap;

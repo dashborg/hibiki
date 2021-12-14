@@ -41,8 +41,7 @@ type HandlerValType = {
 type HandlerBlock =
       {hibikihandler: string, hibikicontext?: Record<string, any>, ctxstr? : string}
     | {hibikiactions: HibikiAction[], hibikicontext?: Record<string, any>}
-    | HAction[]
-    | ((HibikiRequest) => any);
+    | HAction[];
 
 type HibikiActionValue = {hibikiexpr : string} | any;
 type HibikiActionString   = string | {hibikiexpr : string};
@@ -73,6 +72,8 @@ type HibikiHandlerModule = {
 type AppModuleConfig = {
     rootPath : string,
     defaultMethod? : string,
+    defaultHeaders? : Record<string, HibikiActionString>,
+    defaultInit? : any,
 };
 
 type FetchHookFn = string | ((url : URL, fetchInit : Record<string, any>) => void);
@@ -164,7 +165,7 @@ interface HibikiExtState {
     setHtml(html : string | HTMLElement);
     setData(path : string, data : any);
     getData(path : string) : any;
-    executeHandlerBlock(actions : HandlerBlock, datacontext? : Record<string, any>, pure? : boolean);
+    executeHandlerBlock(actions : HandlerBlock, pure? : boolean);
     setPageName(pageName : string);
     setInitCallback(fn : () => void);
     initialize(force : boolean);

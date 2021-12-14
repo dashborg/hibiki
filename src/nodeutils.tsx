@@ -78,6 +78,7 @@ let GETVALUE_ELEMS = {
     "select": true,
     "input": true,
     "textarea": true,
+    "option": true,
 };
 
 function getFilteredSubNodesByTag(ctx : DBCtx, tag : string) {
