@@ -1560,6 +1560,7 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
         return null;
     }
     else if (action.actiontype == "throw") {
+        rtctx.popContext();
         let errVal = evalExprAst(action.data, dataenv);
         return Promise.reject(new Error(errVal));
     }

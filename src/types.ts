@@ -76,8 +76,6 @@ type HtmlParserOpts = {
 };
 
 type HibikiConfig = {
-    initHandler?           : string,
-    errorHandler?          : string,
     noConfigMergeFromHtml? : boolean,
     noDataMergeFromHtml?   : boolean,
     hooks? : {
@@ -128,6 +126,7 @@ type LibraryType = {
     importedComponents : Record<string, ComponentType>;
     localHandlers : Record<string, (HibikiRequest) => any>;
     modules : Record<string, HibikiHandlerModule>;
+    handlers : Record<string, HandlerValType>;
 };
 
 type HandlerPathObj = {

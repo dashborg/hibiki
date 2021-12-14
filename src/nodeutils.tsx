@@ -7,7 +7,7 @@ import {DBCtx} from "./dbctx";
 import type {HibikiNode, HandlerValType} from "./types";
 import * as DataCtx from "./datactx";
 import {sprintf} from "sprintf-js";
-import {isObject} from "./utils";
+import {isObject, textContent} from "./utils";
 import {getAttribute} from "./state";
 import {DataEnvironment} from "./state";
 
@@ -410,16 +410,29 @@ function automerge(ctx : DBCtx, automergeAttrs : AutoMergeAttrsType, subName : s
     }
 }
 
-function makeHandlers(node : HibikiNode) : Record<string, HandlerValType> {
+function makeHandlers(node : HibikiNode, defineEventHandlerAllowed? : boolean, defineLocalHandlerAllowed? : boolean) : Record<string, HandlerValType> {
     let handlers = {};
-    if (node.attrs == null) {
-        return handlers;
+    if (node.attrs != null) {
+        for (let key in node.attrs) {
+            if (key == "handler" || key.endsWith(".handler")) {
+                let eventName = key.replace(/\.handler$/, "");
+                let hname = sprintf("/@event/%s", eventName);
+                handlers[hname] = {handlerStr: node.attrs[key], node: node};
+            }
+        }
     }
-    for (let key in node.attrs) {
-        if (key == "handler" || key.endsWith(".handler")) {
-            let eventName = key.replace(/\.handler$/, "");
-            let hname = sprintf("/@event/%s", eventName);
-            handlers[hname] = {handlerStr: node.attrs[key], node: node};
+    if ((defineEventHandlerAllowed || defineLocalHandlerAllowed) && node.list != null) {
+        for (let i=0; i<node.list.length; i++) {
+            let subNode = node.list[i];
+            if (subNode.tag == "define-handler" && subNode.attrs != null && subNode.attrs.name != null) {
+                let hname = subNode.attrs.name;
+                if (defineEventHandlerAllowed && hname.startsWith("/@event/")) {
+                    handlers[hname] = {handlerStr: textContent(subNode), node: subNode};
+                }
+                if (defineLocalHandlerAllowed && hname.startsWith("/@local/")) {
+                    handlers[hname] = {handlerStr: textContent(subNode), node: subNode};
+                }
+            }
         }
     }
     return handlers;

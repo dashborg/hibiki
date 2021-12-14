@@ -61,7 +61,7 @@ class HibikiRootNode extends React.Component<{hibikiState : HibikiExtState}, {}>
 
     getDataenv() : DataEnvironment {
         let state = this.getHibikiState();
-        let rde = state.rootDataenv();
+        let rde = state.initDataenv();
         let htmlContext = sprintf("<page %s>", state.PageName.get());
         let dataenv = rde.makeChildEnv(null, {htmlContext: htmlContext, libContext: "@main", eventBoundary: "hard"});
         return dataenv;
@@ -100,7 +100,7 @@ class HibikiRootNode extends React.Component<{hibikiState : HibikiExtState}, {}>
         this.renderingDBState = ctx.dataenv.dbstate;
         return (
             <div style={style} className={cn(cnMap)}>
-                <NodeList list={ctx.node.list} ctx={ctx}/>
+                <NodeList list={ctx.node.list} ctx={ctx} isRoot={true}/>
             </div>
         );
     }
@@ -127,15 +127,11 @@ function ctxRenderHtmlChildren(ctx : DBCtx, dataenv? : DataEnvironment) : (Eleme
     if (ctx.node.tag == "option") {
         return [evalOptionChildren(ctx.node, dataenv)];
     }
-    let rtn = baseRenderHtmlChildren(ctx.node.list, dataenv);
+    let rtn = baseRenderHtmlChildren(ctx.node.list, dataenv, false);
     return rtn;
 }
 
-function renderHtmlChildren(node : {list? : HibikiNode[]}, dataenv : DataEnvironment) : Element[] {
-    return baseRenderHtmlChildren(node.list, dataenv);
-}
-
-function baseRenderHtmlChildren(list : HibikiNode[], dataenv : DataEnvironment) : Element[] {
+function baseRenderHtmlChildren(list : HibikiNode[], dataenv : DataEnvironment, isRoot : boolean) : Element[] {
     let rtn : any[] = [];
     if (list == null || list.length == 0) {
         return null;
@@ -183,24 +179,18 @@ function baseRenderHtmlChildren(list : HibikiNode[], dataenv : DataEnvironment) 
         }
         else if (child.tag == "define-handler") {
             let attrs = child.attrs || {};
+            if (!isRoot) {
+                rtn.push(<ErrorMsg message={"<define-handler> is only allowed at root of <hibiki>, <page>, or <define-component> nodes"}/>);
+                continue;
+            }
+            if (attrs["if"] != null || attrs["foreach"] != null) {
+                rtn.push(<ErrorMsg message={"<define-handler> does not support 'if' or 'foreach' attributes"}/>);
+                continue;
+            }
             if (attrs.name == null || attrs.name == "") {
-                rtn.push(<ErrorMsg message={"<define-handler> no name attribute"}/>);
+                rtn.push(<ErrorMsg message={"<define-handler> requires 'name' attribute"}/>);
                 continue;
             }
-            if (attrs.name.startsWith("/@local")) {
-                continue;   // local handlers are handled in state.ts
-            }
-            let eventDE = dataenv.getEventBoundary("*");
-            if (eventDE == null) {
-                rtn.push(<ErrorMsg message={"<define-handler> no event boundary"}/>);
-                continue;
-            }
-            let handlerStr = textContent(child);
-            if (!attrs.name.startsWith("/@event/")) {
-                rtn.push(<ErrorMsg message={"<define-handler> bad name, must start with /@event/ or /@local/"}/>);
-                continue;
-            }
-            eventDE.handlers[attrs.name] = {handlerStr: handlerStr, node: child}
             continue;
         }
         else {
@@ -211,10 +201,10 @@ function baseRenderHtmlChildren(list : HibikiNode[], dataenv : DataEnvironment) 
 }
 
 @mobxReact.observer
-class NodeList extends React.Component<{list : HibikiNode[], ctx : DBCtx}> {
+class NodeList extends React.Component<{list : HibikiNode[], ctx : DBCtx, isRoot? : boolean}> {
     render() {
         let {list, ctx} = this.props;
-        let rtn = baseRenderHtmlChildren(list, ctx.childDataenv);
+        let rtn = baseRenderHtmlChildren(list, ctx.childDataenv, this.props.isRoot);
         if (rtn == null) {
             return null;
         }
@@ -356,7 +346,7 @@ class CustomReactNode extends React.Component<{node : HibikiNode, component : Co
         let nodeVar = NodeUtils.makeNodeVar(ctx);
         let htmlContext = sprintf("react:<%s>", ctx.node.tag);
         let childEnv = ctx.childDataenv.makeChildEnv({node: nodeVar}, {htmlContext: htmlContext, libContext: component.libName});
-        let rtnElems = renderHtmlChildren(ctx.node, childEnv)
+        let rtnElems = baseRenderHtmlChildren(ctx.node.list, childEnv, false)
         let reactElem = React.createElement(reactImpl, attrs, rtnElems);
         return reactElem;
     }
@@ -557,7 +547,7 @@ class CustomNode extends React.Component<{node : HibikiNode, component : Compone
         specials.children = childrenVar;
         specials.node = nodeVar;
         let resolvedAttrs = {};
-        let handlers = NodeUtils.makeHandlers(implNode);
+        let handlers = NodeUtils.makeHandlers(implNode, true);
         let crootProxy = componentRootProxy(nodeDataLV, resolvedAttrs);
         let envOpts = {
             componentRoot: crootProxy,
@@ -597,7 +587,7 @@ class CustomNode extends React.Component<{node : HibikiNode, component : Compone
         let component = this.props.component;
         let implNode = component.node;
         let childEnv = this.makeCustomChildEnv(false);
-        let rtnElems = renderHtmlChildren(implNode, childEnv)
+        let rtnElems = baseRenderHtmlChildren(implNode.list, childEnv, true)
         if (implNode.attrs && implNode.attrs["dashelem"]) {
             return <DashElemNode ctx={ctx}>{rtnElems}</DashElemNode>
         }
@@ -700,7 +690,7 @@ class ForEachNode extends React.Component<{node : HibikiNode, dataenv : DataEnvi
             }
             let htmlContext = sprintf("<%s %d>", ctx.node.tag, index);
             let childEnv = ctx.dataenv.makeChildEnv(ctxVars, {htmlContext: htmlContext, localData: val});
-            let childElements = renderHtmlChildren(ctx.node, childEnv);
+            let childElements = baseRenderHtmlChildren(ctx.node.list, childEnv, false);
             if (childElements != null) {
                 rtnElems.push(...childElements);
             }
@@ -865,7 +855,7 @@ class ChildrenNode extends React.Component<{node : HibikiNode, dataenv : DataEnv
                 return <ErrorMsg message={sprintf("%s bad child node @ index:%d", nodeStr(ctx.node), i)}/>;
             }
         }
-        let rtnElems = renderHtmlChildren({list: children}, ctx.childDataenv);
+        let rtnElems = baseRenderHtmlChildren(children, ctx.childDataenv, false);
         if (rtnElems == null) {
             return null;
         }
@@ -1344,6 +1334,7 @@ let CORE_LIBRARY : LibraryType = {
     importedComponents: {},
     localHandlers: {},
     modules: {},
+    handlers: {},
 };
 
 addCoreComponent("if", IfNode);

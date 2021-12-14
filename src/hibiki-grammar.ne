@@ -45,6 +45,7 @@ let lexer = moo.states({
                         KW_FALSE: "false",
                         KW_NULL: "null",
                         KW_CALL: "call",
+                        KW_SETRETURN: "setreturn",
                         KW_INVALIDATE: "invalidate",
                         KW_FIRE: "fire",
                         KW_NOP: "nop",
@@ -134,20 +135,23 @@ statementBlock -> statement (%SEMI statement):* %SEMI:?  {% (data) => {
 
 # returns HAction
 statement ->
-      callStatement         {% id %}   #
-    | assignmentStatement   {% id %}   #
-    | invalidateStatement   {% id %}   #
-    | fireStatement         {% id %}   #
-    | bubbleStatement       {% id %}   #
-    | logStatement          {% id %}   #
-    | debugStatement        {% id %}   #
-    | alertStatement        {% id %}   #
-    | exprStatement         {% id %}   #
-    | ifStatement           {% id %}   #
-    | throwStatement        {% id %}   #
-    | nopStatement          {% id %}   #
+      callStatement         {% id %}
+    | assignmentStatement   {% id %}
+    | invalidateStatement   {% id %}
+    | fireStatement         {% id %}
+    | bubbleStatement       {% id %}
+    | logStatement          {% id %}
+    | debugStatement        {% id %}
+    | alertStatement        {% id %}
+    | exprStatement         {% id %}
+    | ifStatement           {% id %}
+    | throwStatement        {% id %}
+    | setReturnStatement    {% id %}
+    | nopStatement          {% id %}
 
 throwStatement -> %KW_THROW callParamsSingle {% (data) => ({actiontype: "throw", data: data[1]}) %}
+
+setReturnStatement -> %KW_SETRETURN fullExpr {% (data) => ({actiontype: "setreturn", data: data[1]}) %}
 
 ifStatement -> %KW_IF %LPAREN fullExpr %RPAREN %LBRACE statementBlock %RBRACE (%KW_ELSE %LBRACE statementBlock %RBRACE):? {% (data) => {
         let rtn = {actiontype: "if", data: data[2], actions: {}};
@@ -493,6 +497,7 @@ idOrKeyword ->
     | %KW_FALSE  {% id %}
     | %KW_NULL   {% id %}
     | %KW_CALL   {% id %}
+    | %KW_SETRETURN {% id %}
     | %KW_INVALIDATE {% id %}
     | %KW_FIRE   {% id %}
     | %KW_NOP    {% id %}
