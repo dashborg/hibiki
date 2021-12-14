@@ -8,8 +8,8 @@ import {DataEnvironment} from "./state";
 import {sprintf} from "sprintf-js";
 import {parseHtml} from "./html-parser";
 import {RtContext, getShortEMsg, HibikiError} from "./error";
-import {makeUrlParamsFromObject, SYM_PROXY, SYM_FLATTEN, isObject, unpackPositionalArgs, nodeStr} from "./utils";
-import {PathPart, PathType, PathUnionType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue} from "./types";
+import {makeUrlParamsFromObject, SYM_PROXY, SYM_FLATTEN, isObject, unpackPositionalArgs, nodeStr, parseHandler} from "./utils";
+import {PathPart, PathType, PathUnionType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue, HandlerBlock} from "./types";
 import {HibikiRequest} from "./request";
 
 declare var window : any;
@@ -45,8 +45,6 @@ type HAction = {
     blockstr?  : string,
     blockctx?  : string,
 };
-
-type HandlerBlock = {hibikihandler: string, ctxstr? : string} | {hibikiactions: HibikiAction[]} | HAction[];
 
 class HibikiBlob {
     mimetype : string = null;
@@ -1444,6 +1442,25 @@ function doAssignment(action : HAction, val : any, pure : boolean, dataenv : Dat
     setPathWrapper(setop, lvaluePath, dataenv, val, {allowContext: true});
 }
 
+function RequestFromAction(action : HAction, pure : boolean, dataenv : DataEnvironment, rtctx : RtContext) : HibikiRequest {
+    if (action.actiontype != "callhandler") {
+        throw new Error(sprintf("Cannot create HibikiRequest from actiontype: '%s'", action.actiontype));
+    }
+    let callPath = evalExprAst(action.callpath, dataenv);
+    let hpath = parseHandler(callPath);
+    if (hpath == null) {
+        throw new Error("Invalid handler path: " + callPath);
+    }
+    let data = demobx(evalExprAst(action.data, dataenv));
+    let req = new HibikiRequest(dataenv.dbstate.getExtState());
+    req.path = hpath;
+    req.rtContext = rtctx;
+    req.pure = pure || action.pure;
+    req.libContext = dataenv.getLibContext();
+    req.data = data;
+    return req;
+}
+
 async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEnvironment, rtctx : RtContext) : Promise<any> {
     if (action == null) {
         return null;
@@ -1462,11 +1479,11 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
         let actions = action.actions ?? {};
         if (condVal) {
             rtctx.pushContext("then clause", null);
-            await ExecuteHandlerBlock(actions["then"], pure, dataenv, rtctx, false);
+            await ExecuteHandlerBlock(actions["then"], null, pure, dataenv, rtctx, false);
         }
         else {
             rtctx.pushContext("else clause", null);
-            await ExecuteHandlerBlock(actions["else"], pure, dataenv, rtctx, false);
+            await ExecuteHandlerBlock(actions["else"], null, pure, dataenv, rtctx, false);
         }
         return null;
     }
@@ -1478,11 +1495,10 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
         let callPath = evalExprAst(action.callpath, dataenv);
         let data = demobx(evalExprAst(action.data, dataenv));
         rtctx.replaceContext(sprintf("Calling handler %s", callPath), null);
-        let pureCall = pure || action.pure;
-        let pactions = dataenv.dbstate.callHandlerRtnBlock(callPath, data, pureCall, {rtContext: rtctx, dataenv: dataenv});
-        let actions = await pactions;
+        let req = RequestFromAction(action, pure, dataenv, rtctx);
+        let block = await dataenv.dbstate.callHandlerWithReq(req);
         let handlerEnv = dataenv.makeChildEnv({data: data}, {blockLocalData: true});
-        let rtnVal = await ExecuteHandlerBlock(actions, pureCall, handlerEnv, rtctx, false);
+        let rtnVal = await ExecuteHandlerBlock(block, {data: data}, req.pure, handlerEnv, rtctx, false);
         doAssignment(action, rtnVal, pure, dataenv);
         return rtnVal;
     }
@@ -1536,7 +1552,7 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
         let eventEnv = ehandler.dataenv.makeChildEnv(event.datacontext, {htmlContext: htmlContext});
         let ctxStr = sprintf("Running %s:%s.handler (in [[%s]])", nodeStr(ehandler.node), event.event, ehandler.dataenv.getFullHtmlContext());
         rtctx.pushContext(ctxStr, {handlerEnv: ehandler.dataenv, handlerName: event.event});
-        return ExecuteHandlerBlock(ehandler.handler, pure, eventEnv, rtctx, false);
+        return ExecuteHandlerBlock(ehandler.handler, event.datacontext, pure, eventEnv, rtctx, false);
     }
     else if (action.actiontype == "log") {
         let dataValArr = forceAsArray(demobx(evalExprAst(action.data, dataenv)));
@@ -1687,22 +1703,30 @@ function convertActions(actions : HibikiAction[]) : HAction[] {
     return rtn;
 }
 
-async function ExecuteHandlerBlockInternal(actions : HandlerBlock, pure : boolean, dataenv : DataEnvironment, rtctx : RtContext) : Promise<any> {
-    if (actions == null) {
+async function ExecuteHandlerBlockInternal(block : HandlerBlock, datacontext : Record<string, any>, pure : boolean, dataenv : DataEnvironment, rtctx : RtContext) : Promise<any> {
+    if (block == null) {
         return null;
     }
     let actionArr : HAction[] = null;
-    if ("hibikiactions" in actions) {
-        actionArr = convertActions(actions.hibikiactions);
+    if ("hibikiactions" in block) {
+        actionArr = convertActions(block.hibikiactions);
+        datacontext = Object.assign({}, block.hibikicontext, datacontext ?? {});
     }
-    else if ("hibikihandler" in actions) {
-        let ctxstr = actions.ctxstr ?? "handler";
+    else if ("hibikihandler" in block) {
+        let ctxstr = block.ctxstr ?? "handler";
         rtctx.pushContext(sprintf("Parsing %s", ctxstr), null);
-        actionArr = ParseBlockThrow(actions.hibikihandler);
+        actionArr = ParseBlockThrow(block.hibikihandler);
         rtctx.popContext();
+        datacontext = Object.assign({}, block.hibikicontext, datacontext ?? {});
+    }
+    else if (typeof(block) == "function") {
+        actionArr = [];
     }
     else {
-        actionArr = actions;
+        actionArr = block;
+    }
+    if (datacontext != null && isObject(datacontext)) {
+        dataenv = dataenv.makeChildEnv(datacontext, null);
     }
     let rtn = null;
     let markPoint = rtctx.stackSize();
@@ -1717,8 +1741,8 @@ async function ExecuteHandlerBlockInternal(actions : HandlerBlock, pure : boolea
     return rtn;
 }
 
-function ExecuteHandlerBlock(actions : HandlerBlock, pure : boolean, dataenv : DataEnvironment, rtctx : RtContext, throwErrors : boolean) : Promise<any> {
-    let prtn = ExecuteHandlerBlockInternal(actions, pure, dataenv, rtctx);
+function ExecuteHandlerBlock(block : HandlerBlock, datacontext : Record<string, any>, pure : boolean, dataenv : DataEnvironment, rtctx : RtContext, throwErrors : boolean) : Promise<any> {
+    let prtn = ExecuteHandlerBlockInternal(block, datacontext, pure, dataenv, rtctx);
     if (rtctx.stack.length > 20 || throwErrors) {
         return prtn;
     }
@@ -1745,7 +1769,7 @@ function ExecuteHandlerBlock(actions : HandlerBlock, pure : boolean, dataenv : D
                 event: {etype: "literal", val: "error"},
                 data: {etype: "literal", val: {"error": errorObj}},
             };
-            ExecuteHandlerBlock([errAction], pure, handlerEnv, rtctx, true);
+            ExecuteHandlerBlock([errAction], null, pure, handlerEnv, rtctx, true);
             return null;
         });
     }
@@ -1979,7 +2003,7 @@ function convertSimpleType(typeName : string, value : string, defaultValue : any
 
 export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, BoundValue, ParseLValuePath, ParseLValuePathThrow, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction};
 
-export type {PathType, HandlerBlock, HAction};
+export type {PathType, HAction};
 
 
 

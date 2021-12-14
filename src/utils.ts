@@ -1,7 +1,7 @@
 // Copyright 2021 Dashborg Inc
 
 import * as mobx from "mobx";
-import {HibikiNode, Hibiki} from "./types";
+import {HibikiNode, Hibiki, HandlerPathType} from "./types";
 import {sprintf} from "sprintf-js";
 
 declare var window : any;
@@ -361,9 +361,20 @@ function stripAtKeys(obj : Record<string, any>) : Record<string, any> {
     return rtn;
 }
 
+function parseHandler(handlerPath : string) : HandlerPathType {
+    if (handlerPath == null || handlerPath == "" || handlerPath[0] != '/') {
+        return null;
+    }
+    let match = handlerPath.match("^(?:/@([a-zA-Z_][a-zA-Z0-9_-]*))?(/[a-zA-Z0-9._/-]*)?(?:[:](@?[a-zA-Z][a-zA-Z0-9_-]*))?$")
+    if (match == null) {
+        return null;
+    }
+    return {fullpath: handlerPath, module: (match[1] ?? ""), path: (match[2] ?? "/"), pathfrag: (match[3] ?? "")};
+}
+
 function getHibiki() : Hibiki {
     return (window as any).Hibiki;
 }
 
-export {jsonRespHandler, parseUrlParams, valToString, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, makeUrlParamsFromObject, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, rawAttr, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki};
+export {jsonRespHandler, parseUrlParams, valToString, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, makeUrlParamsFromObject, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, rawAttr, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler};
 

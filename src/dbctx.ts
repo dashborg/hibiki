@@ -228,7 +228,7 @@ class DBCtx {
             event: {etype: "literal", val: event},
             data: {etype: "literal", val: datacontext},
         };
-        DataCtx.ExecuteHandlerBlock([action], false, execDataenv, rtctx, false);
+        DataCtx.ExecuteHandlerBlock([action], datacontext, false, execDataenv, rtctx, false);
         return false;
     }
 

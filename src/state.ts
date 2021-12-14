@@ -5,13 +5,12 @@ import md5 from "md5";
 import {sprintf} from "sprintf-js";
 import {boundMethod} from 'autobind-decorator'
 import {v4 as uuidv4} from 'uuid';
-import type {HibikiNode, ComponentType, LibraryType, HandlerPathObj, HibikiConfig, HibikiHandlerModule, HibikiAction, EventType, HandlerValType, JSFuncType, CsrfHookFn, FetchHookFn, Hibiki, ErrorCallbackFn, HtmlParserOpts} from "./types";
+import type {HibikiNode, ComponentType, LibraryType, HibikiConfig, HibikiHandlerModule, HibikiAction, EventType, HandlerValType, JSFuncType, CsrfHookFn, FetchHookFn, Hibiki, ErrorCallbackFn, HtmlParserOpts, HandlerBlock} from "./types";
 import * as DataCtx from "./datactx";
-import {isObject, textContent, SYM_PROXY, SYM_FLATTEN, nodeStr, callHook, getHibiki} from "./utils";
+import {isObject, textContent, SYM_PROXY, SYM_FLATTEN, nodeStr, callHook, getHibiki, parseHandler} from "./utils";
 import {subNodesByTag, firstSubNodeByTag} from "./nodeutils";
 import {RtContext, HibikiError} from "./error";
 import {HibikiRequest} from "./request";
-import type {HandlerBlock} from "./datactx";
 import * as NodeUtils from "./nodeutils";
 
 import {parseHtml} from "./html-parser";
@@ -793,8 +792,8 @@ class HibikiExtState {
         return dataenv.resolvePath(path, false);
     }
 
-    executeHandlerBlock(actions : HandlerBlock, pure? : boolean) : Promise<any> {
-        return this.state.executeHandlerBlock(actions, pure);
+    executeHandlerBlock(actions : HandlerBlock, datacontext : Record<string, any>, pure? : boolean) : Promise<any> {
+        return this.state.executeHandlerBlock(actions, datacontext, pure);
     }
 
     setPageName(pageName : string) {
@@ -912,7 +911,7 @@ class HibikiState {
                 native: true,
                 event: {etype: "literal", val: "init"},
             };
-            let pinit = DataCtx.ExecuteHandlerBlock([action], false, this.pageDataenv(), rtctx, true);
+            let pinit = DataCtx.ExecuteHandlerBlock([action], null, false, this.pageDataenv(), rtctx, true);
             return pinit;
         }).then(() => {
             this.setInitialized();
@@ -934,9 +933,6 @@ class HibikiState {
     @mobx.action setConfig(config : HibikiConfig) {
         config = config ?? {};
         this.Config = config;
-        if (config.errorCallback != null) {
-            this.ErrorCallback = config.errorCallback;
-        }
         if (config.hooks != null) {
             if (config.hooks.csrfHook != null) {
                 this.CsrfHook = config.hooks.csrfHook;
@@ -1015,13 +1011,8 @@ class HibikiState {
             this.reportErrorObj(event.datacontext.error);
         }
         else {
-            if (this.Config.eventCallback != null) {
-                callHook("EventCallback", this.Config.eventCallback, event);
-            }
-            else {
-                if (event.event != "init") {
-                    console.log(sprintf("Hibiki unhandled event %s", event.event), event.datacontext, rtctx);
-                }
+            if (event.event != "init") {
+                console.log(sprintf("Hibiki unhandled event %s", event.event), event.datacontext, rtctx);
             }
         }
     }
@@ -1099,10 +1090,10 @@ class HibikiState {
         return null;
     }
 
-    executeHandlerBlock(actions : HandlerBlock, pure? : boolean) : Promise<any> {
+    executeHandlerBlock(actions : HandlerBlock, datacontext? : Record<string, any>, pure? : boolean) : Promise<any> {
         let rtctx = new RtContext();
         rtctx.pushContext("HibikiState.executeHandlerBlock()", null);
-        let pinit = DataCtx.ExecuteHandlerBlock(actions, pure, this.pageDataenv(), rtctx, true);
+        let pinit = DataCtx.ExecuteHandlerBlock(actions, datacontext, pure, this.pageDataenv(), rtctx, true);
         return pinit;
     }
 
@@ -1110,43 +1101,23 @@ class HibikiState {
         return DataCtx.BlobFromBlob(blob);
     }
 
-    async callHandlerRtnBlock(handlerPath : string, handlerData : object, pureRequest : boolean, opts? : CallHandlerOptsType) : Promise<HandlerBlock> {
-        opts = opts || {};
-        if (handlerPath == null || handlerPath == "") {
-            throw new Error("Invalid handler path");
-        }
-        let hpath = parseHandler(handlerPath);
-        if (hpath == null) {
-            throw new Error("Invalid handler path: " + handlerPath);
-        }
-        let libContext = (opts.dataenv != null ? opts.dataenv.getLibContext() : null);
-        let moduleName = hpath.ns
+    async callHandlerWithReq(req : HibikiRequest) : Promise<HandlerBlock> {
+        let moduleName = req.path.module;
         let module : HibikiHandlerModule;
         if (moduleName == null || moduleName == "") {
             let hibiki = getHibiki();
             let mreg = hibiki.ModuleRegistry;
             module = new mreg["raw"](this, {});
         }
-        else if (libContext == null || libContext == "@main") {
+        else if (req.libContext == null || req.libContext == "@main") {
             module = this.Modules[moduleName];
         }
         else {
-            module = this.ComponentLibrary.getModule(moduleName, libContext);
+            module = this.ComponentLibrary.getModule(moduleName, req.libContext);
         }
         if (module == null) {
-            throw new Error(sprintf("Invalid handler, no module '%s' found for path: %s, lib-context '%s'", moduleName, handlerPath, libContext));
+            throw new Error(sprintf("Invalid handler, no module '%s' found for path: %s, lib-context '%s'", moduleName, req.path.fullpath, req.libContext));
         }
-        let req = new HibikiRequest(this.getExtState());
-        req.path = {
-            module: moduleName,
-            path: hpath.path,
-            pathfrag: hpath.pathfrag,
-        };
-        req.data = handlerData ?? {};
-        req.rtContext = opts.rtContext;
-        req.pure = pureRequest;
-        req.libContext = libContext;
-        let self = this;
         let rtnp = module.callHandler(req);
         return rtnp.then((data) => {
             if (data == null) {
@@ -1455,17 +1426,6 @@ function getStyleMap(node : HibikiNode, styleName : string, dataenv : DataEnviro
         rtn[k] = rval;
     }
     return rtn;
-}
-
-function parseHandler(handlerPath : string) : HandlerPathObj {
-    if (handlerPath == null || handlerPath == "" || handlerPath[0] != '/') {
-        return null;
-    }
-    let match = handlerPath.match("^(?:/@([a-zA-Z_][a-zA-Z0-9_-]*))?(/[a-zA-Z0-9._/-]*)?(?:[:](@?[a-zA-Z][a-zA-Z0-9_-]*))?$")
-    if (match == null) {
-        return null;
-    }
-    return {ns: (match[1] ?? ""), path: (match[2] ?? "/"), pathfrag: (match[3] ?? "")};
 }
 
 function hasHtmlRR(rra : any[]) : boolean {

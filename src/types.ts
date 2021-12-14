@@ -4,7 +4,7 @@ import type {HibikiState} from "./state";
 import type {RtContext, HibikiError} from "./error";
 import type {HibikiRequest} from "./request";
 import * as mobx from "mobx";
-import type {HandlerBlock} from "./datactx";
+import type {HAction} from "./datactx";
 
 type HibikiNode = {
     tag    : string,
@@ -20,18 +20,29 @@ type JSFuncType = {
     native : boolean,
 };
 
-type HandlerPathType = {module : string, path : string, pathfrag : string};
+type HandlerPathType = {
+    module : string,
+    path : string,
+    pathfrag : string,
+    fullpath : string,
+};
 
 type EventType = {
     event : string,
     bubble : boolean,
-    datacontext : Record<string, any>;
+    datacontext : Record<string, any>,
 };
 
 type HandlerValType = {
     handlerStr : string,
     node : HibikiNode,
 };
+
+type HandlerBlock =
+      {hibikihandler: string, hibikicontext?: Record<string, any>, ctxstr? : string}
+    | {hibikiactions: HibikiAction[], hibikicontext?: Record<string, any>}
+    | HAction[]
+    | ((HibikiRequest) => any);
 
 type HibikiActionValue = {hibikiexpr : string} | any;
 type HibikiActionString   = string | {hibikiexpr : string};
@@ -76,16 +87,14 @@ type HtmlParserOpts = {
 };
 
 type HibikiConfig = {
-    noConfigMergeFromHtml? : boolean,
-    noDataMergeFromHtml?   : boolean,
     hooks? : {
         csrfHook?  : CsrfHookFn,
         fetchHook? : FetchHookFn,
     },
+    noConfigMergeFromHtml? : boolean,
+    noDataMergeFromHtml?   : boolean,
     noUsageImg? : boolean,
     noWelcomeMessage? : boolean,
-    errorCallback? : ErrorCallbackFn,
-    eventCallback? : EventCallbackFn,
     modules? : Record<string, ModuleConfig>,
 };
 
@@ -129,12 +138,6 @@ type LibraryType = {
     handlers : Record<string, HandlerValType>;
 };
 
-type HandlerPathObj = {
-    ns : string,
-    path : string,
-    pathfrag : string,
-};
-
 type ReactClass = new(props : any) => React.Component<any, any>;
 
 interface Hibiki {
@@ -161,10 +164,10 @@ interface HibikiExtState {
     setHtml(html : string | HTMLElement);
     setData(path : string, data : any);
     getData(path : string) : any;
-    executeHandlerBlock(actions : HandlerBlock, pure? : boolean);
+    executeHandlerBlock(actions : HandlerBlock, datacontext? : Record<string, any>, pure? : boolean);
     setPageName(pageName : string);
     setInitCallback(fn : () => void);
     initialize(force : boolean);
 };
 
-export type {HibikiNode, HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, ComponentType, LibraryType, HandlerPathObj, HibikiRequest, Hibiki, HibikiAction, HibikiActionString, HibikiActionValue, HibikiExtState, EventType, HandlerValType, JSFuncType, AppModuleConfig, FetchHookFn, CsrfHookFn, ReactClass, HandlerPathType, ErrorCallbackFn, EventCallbackFn, HtmlParserOpts, LibComponentType};
+export type {HibikiNode, HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, ComponentType, LibraryType, HibikiRequest, Hibiki, HibikiAction, HibikiActionString, HibikiActionValue, HibikiExtState, EventType, HandlerValType, JSFuncType, AppModuleConfig, FetchHookFn, CsrfHookFn, ReactClass, HandlerPathType, ErrorCallbackFn, EventCallbackFn, HtmlParserOpts, LibComponentType, HandlerBlock};
