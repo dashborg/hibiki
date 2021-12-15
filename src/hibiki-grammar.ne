@@ -151,7 +151,7 @@ statement ->
 
 throwStatement -> %KW_THROW callParamsSingle {% (data) => ({actiontype: "throw", data: data[1]}) %}
 
-setReturnStatement -> %KW_SETRETURN fullExpr {% (data) => ({actiontype: "setreturn", data: data[1]}) %}
+setReturnStatement -> %KW_SETRETURN %LPAREN fullExpr %RPAREN {% (data) => ({actiontype: "setreturn", data: data[2]}) %}
 
 ifStatement -> %KW_IF %LPAREN fullExpr %RPAREN %LBRACE statementBlock %RBRACE (%KW_ELSE %LBRACE statementBlock %RBRACE):? {% (data) => {
         let rtn = {actiontype: "if", data: data[2], actions: {}};
@@ -263,13 +263,13 @@ invalidateStatement -> %KW_INVALIDATE optCallParams {% (data) => {
 nopStatement -> %KW_NOP (%LPAREN %RPAREN):? {% (data) => ({actiontype: "nop"}) %}
 
 bubbleStatement ->
-    %KW_BUBBLE %DASHGT idOrKeyword optCallParamsSingle {% (data) => {
+    %KW_BUBBLE %DASHGT idOrKeyword namedCallParams {% (data) => {
         let rtn = {actiontype: "fireevent", bubble: true, event: {etype: "literal", val: data[2].value}, data: data[3]};
         return rtn;
     } %}
 
 fireStatement ->
-    %KW_FIRE %DASHGT idOrKeyword optCallParamsSingle {% (data) => {
+    %KW_FIRE %DASHGT idOrKeyword namedCallParams {% (data) => {
         let rtn = {actiontype: "fireevent", event: {etype: "literal", val: data[2].value}, data: data[3]};
         return rtn;
     } %}

@@ -150,7 +150,7 @@ var grammar = {
     {"name": "statement", "symbols": ["setReturnStatement"], "postprocess": id},
     {"name": "statement", "symbols": ["nopStatement"], "postprocess": id},
     {"name": "throwStatement", "symbols": [(lexer.has("KW_THROW") ? {type: "KW_THROW"} : KW_THROW), "callParamsSingle"], "postprocess": (data) => ({actiontype: "throw", data: data[1]})},
-    {"name": "setReturnStatement", "symbols": [(lexer.has("KW_SETRETURN") ? {type: "KW_SETRETURN"} : KW_SETRETURN), "fullExpr"], "postprocess": (data) => ({actiontype: "setreturn", data: data[1]})},
+    {"name": "setReturnStatement", "symbols": [(lexer.has("KW_SETRETURN") ? {type: "KW_SETRETURN"} : KW_SETRETURN), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "fullExpr", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => ({actiontype: "setreturn", data: data[2]})},
     {"name": "ifStatement$ebnf$1$subexpression$1", "symbols": [(lexer.has("KW_ELSE") ? {type: "KW_ELSE"} : KW_ELSE), (lexer.has("LBRACE") ? {type: "LBRACE"} : LBRACE), "statementBlock", (lexer.has("RBRACE") ? {type: "RBRACE"} : RBRACE)]},
     {"name": "ifStatement$ebnf$1", "symbols": ["ifStatement$ebnf$1$subexpression$1"], "postprocess": id},
     {"name": "ifStatement$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
@@ -259,11 +259,11 @@ var grammar = {
     {"name": "nopStatement$ebnf$1", "symbols": ["nopStatement$ebnf$1$subexpression$1"], "postprocess": id},
     {"name": "nopStatement$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
     {"name": "nopStatement", "symbols": [(lexer.has("KW_NOP") ? {type: "KW_NOP"} : KW_NOP), "nopStatement$ebnf$1"], "postprocess": (data) => ({actiontype: "nop"})},
-    {"name": "bubbleStatement", "symbols": [(lexer.has("KW_BUBBLE") ? {type: "KW_BUBBLE"} : KW_BUBBLE), (lexer.has("DASHGT") ? {type: "DASHGT"} : DASHGT), "idOrKeyword", "optCallParamsSingle"], "postprocess":  (data) => {
+    {"name": "bubbleStatement", "symbols": [(lexer.has("KW_BUBBLE") ? {type: "KW_BUBBLE"} : KW_BUBBLE), (lexer.has("DASHGT") ? {type: "DASHGT"} : DASHGT), "idOrKeyword", "namedCallParams"], "postprocess":  (data) => {
             let rtn = {actiontype: "fireevent", bubble: true, event: {etype: "literal", val: data[2].value}, data: data[3]};
             return rtn;
         } },
-    {"name": "fireStatement", "symbols": [(lexer.has("KW_FIRE") ? {type: "KW_FIRE"} : KW_FIRE), (lexer.has("DASHGT") ? {type: "DASHGT"} : DASHGT), "idOrKeyword", "optCallParamsSingle"], "postprocess":  (data) => {
+    {"name": "fireStatement", "symbols": [(lexer.has("KW_FIRE") ? {type: "KW_FIRE"} : KW_FIRE), (lexer.has("DASHGT") ? {type: "DASHGT"} : DASHGT), "idOrKeyword", "namedCallParams"], "postprocess":  (data) => {
             let rtn = {actiontype: "fireevent", event: {etype: "literal", val: data[2].value}, data: data[3]};
             return rtn;
         } },

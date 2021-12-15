@@ -8,7 +8,7 @@ import {DataEnvironment} from "./state";
 import {sprintf} from "sprintf-js";
 import {parseHtml} from "./html-parser";
 import {RtContext, getShortEMsg, HibikiError} from "./error";
-import {makeUrlParamsFromObject, SYM_PROXY, SYM_FLATTEN, isObject, unpackPositionalArgs, nodeStr, parseHandler} from "./utils";
+import {makeUrlParamsFromObject, SYM_PROXY, SYM_FLATTEN, isObject, stripAtKeys, unpackPositionalArgs, nodeStr, parseHandler} from "./utils";
 import {PathPart, PathType, PathUnionType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue, HandlerBlock} from "./types";
 import {HibikiRequest} from "./request";
 
@@ -1461,6 +1461,9 @@ function RequestFromAction(action : HAction, pure : boolean, dataenv : DataEnvir
     req.pure = pure || action.pure;
     req.libContext = dataenv.getLibContext();
     req.data = data;
+    if (data != null && isObject(data) && data["@pure"]) {
+        req.pure = true;
+    }
     return req;
 }
 
@@ -1539,9 +1542,15 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
         if (!action.native) {
             rtctx.replaceContext(sprintf("%s->%s", (bubble ? "bubble" : "fire"), eventStr), null);
         }
-        let datacontext = evalExprAst(action.data, dataenv);
-        if (datacontext != null && !isObject(datacontext)) {
-            datacontext = {value: datacontext};
+        let datacontext = null;
+        let params = evalExprAst(action.data, dataenv);
+        if (params != null) {
+            let {value} = unpackPositionalArgs(params, ["value"]);
+            datacontext = stripAtKeys(params);
+            delete datacontext["*args"];
+            if (value != null && !("value" in datacontext)) {
+                datacontext.value = value;
+            }
         }
         let event = {event: eventStr, datacontext, bubble};
         let ehandler = dataenv.resolveEventHandler(event, rtctx);
