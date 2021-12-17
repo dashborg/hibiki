@@ -47,6 +47,7 @@ let lexer = moo.states({
         DASHGT:      "->",
         LT:          "<",
         GT:          ">",
+        COMMENT:     { match: /\/\*[^]*?\*\// },
         DOLLAR:   "$",
         ATID:     { match: /@[a-zA-Z][a-zA-Z_0-9]*/, value: (v) => v.substr(1) },
         ATSIGN:   "@",
@@ -120,7 +121,7 @@ let origNext = lexer.next.bind(lexer);
 lexer.next = () => {
     while (true) {
         let tok = origNext();
-        if (tok && tok.type == "WS") {
+        if (tok && (tok.type == "WS" || tok.type == "COMMENT")) {
             continue;
         }
         return tok;
