@@ -1,6 +1,6 @@
 // Copyright 2021 Dashborg Inc
 
-import {isObject, unpackPositionalArgs, stripAtKeys, getHibiki} from "./utils";
+import {isObject, unpackPositionalArgs, stripAtKeys, getHibiki, fullPath} from "./utils";
 import {sprintf} from "sprintf-js";
 import type {HibikiState} from "./state";
 import type {AppModuleConfig, FetchHookFn, Hibiki, HibikiAction} from "./types";
@@ -43,6 +43,7 @@ function setParams(method : string, url : URL, fetchInit : Record<string, any>, 
         for (let key in params) {
             let val = params[key];
             if (val == null || typeof(val) == "function") {
+                url.searchParams.delete(key);
                 continue;
             }
             if (typeof(val) == "string" || typeof(val) == "number") {
@@ -68,17 +69,15 @@ class FetchModule {
     
     callHandler(req : HibikiRequest) : Promise<any> {
         let reqData = req.data ?? {};
-        let {url: urlStr, data, init: fetchInit, method} = unpackPositionalArgs(reqData, ["url", "data", "init"]);
+        let {url: urlStr, data, init: fetchInit} = unpackPositionalArgs(reqData, ["url", "data", "init"]);
         let {"@headers": headersObj} = reqData;
-        if (method == null) {
-            method = req.path.pathfrag;
-        }
+        let method = getMethod(req);
         if (method == null) {
             throw new Error(sprintf("Invalid null method passed to /@fetch:[method]"));
         }
         method = method.toUpperCase();
         if (!VALID_METHODS[method]) {
-            throw new Error(sprintf("Invalid method passed to /@fetch:[method]: '%s'", method));
+            throw new Error(sprintf("Invalid method '%s' passed to /@fetch", method));
         }
         if (urlStr == null || typeof(urlStr) != "string") {
             throw new Error("Invalid call to /@fetch, first argument must be a string (the URL to fetch)");
@@ -148,16 +147,16 @@ class AppModule {
     callHandler(req : HibikiRequest) : Promise<any> {
         let url : URL = null;
         try {
-            url = new URL(this.rootPath + req.path.path, window.location.href);
+            url = new URL(this.rootPath + req.callpath.url, window.location.href);
         }
         catch (e) {
-            throw new Error(sprintf("Invalid URL for /@app[%s] handler '%s': %s", this.rootPath, this.rootPath + req.path.path, e.toString()));
+            throw new Error(sprintf("Invalid URL for /@app[%s] handler '%s': %s", this.rootPath, this.rootPath + req.callpath.url, e.toString()));
         }
         let data : Record<string, any> = req.data || {};
-        let {"@method": method, "@init": fetchInit, "@headers": headersObj} = data;
-        method = (method ?? this.defaultMethod).toUpperCase();
+        let {"@init": fetchInit, "@headers": headersObj} = data;
+        let method = getMethod(req);
         if (!VALID_METHODS[method]) {
-            throw new Error(sprintf("Invalid method passed to /@app%s '%s'", req.path.path, method));
+            throw new Error(sprintf("Invalid method '%s' passed to %s", method, fullPath(req.callpath)));
         }
         fetchInit = merge({}, this.defaultInit, fetchInit ?? {});
         let defaultHeaders = evalHExprMap(this.defaultHeaders, ((req.state as any).state as HibikiState), {data: req.data, url: url.toString()});
@@ -171,7 +170,21 @@ class AppModule {
     }
 }
 
-class RawModule {
+function getMethod(req : HibikiRequest) : string {
+    let method = req.callpath.method;
+    if (method != null && method != "DYN") {
+        return method.toUpperCase();
+    }
+    if (req.data != null) {
+        let dataMethod = req.data["@method"];
+        if (dataMethod != null) {
+            return dataMethod.toUpperCase();
+        }
+    }
+    return "GET";
+}
+
+class HttpModule {
     state : HibikiState;
 
     constructor(state : HibikiState) {
@@ -181,16 +194,16 @@ class RawModule {
     callHandler(req : HibikiRequest) : Promise<any> {
         let url : URL = null;
         try {
-            url = new URL(req.path.path, window.location.href);
+            url = new URL(req.callpath.url, window.location.href);
         }
         catch (e) {
-            throw new Error(sprintf("Invalid URL for raw handler '%s': %s", req.path.path, e.toString()));
+            throw new Error(sprintf("Invalid URL for http handler '%s': %s", req.callpath.url, e.toString()));
         }
         let data : Record<string, any> = req.data || {};
-        let {"@method": method, "@init": fetchInit, "@headers": headersObj} = data;
-        method = (method ?? "get").toUpperCase();
+        let {"@init": fetchInit, "@headers": headersObj} = data;
+        let method = getMethod(req);
         if (!VALID_METHODS[method]) {
-            throw new Error(sprintf("Invalid method passed to %s: '%s'", req.path.path, method));
+            throw new Error(sprintf("Invalid method '%s' passed to http handler %s", method, req.callpath.url));
         }
         fetchInit = fetchInit ?? {};
         fetchInit.headers = convertHeaders(fetchInit.headers, headersObj);
@@ -211,14 +224,14 @@ class LocalModule {
     }
 
     callHandler(req : HibikiRequest) : Promise<any> {
-        let handlerName = sprintf("/@local%s", req.path.path);
+        let handlerName = sprintf("//@local%s", req.callpath.url);
         let ide = this.state.pageDataenv();
         if (ide.handlers[handlerName] != null) {
             return Promise.resolve({hibikihandler: ide.handlers[handlerName].handlerStr});
         }
-        let handler = getHibiki().LocalHandlers[req.path.path];
+        let handler = getHibiki().LocalHandlers[req.callpath.url];
         if (handler == null) {
-            throw new Error(sprintf("Local handler '%s' not found", req.path.path));
+            throw new Error(sprintf("Local handler '%s' not found", req.callpath.url));
         }
         let rtn = handler(req);
         let p = Promise.resolve(rtn).then((rtnVal) => {
@@ -243,14 +256,14 @@ class LibModule {
 
     callHandler(req : HibikiRequest) : Promise<any> {
         let libContext = this.libContext;
-        let handlerName = sprintf("/@lib%s", req.path.path);
+        let handlerName = sprintf("//@lib%s", req.callpath.url);
         let block = this.state.ComponentLibrary.findLocalBlockHandler(handlerName, libContext);
         if (block != null) {
             return Promise.resolve(block);
         }
-        let handler = this.state.ComponentLibrary.findLocalHandler(req.path.path, libContext);
+        let handler = this.state.ComponentLibrary.findLocalHandler(req.callpath.url, libContext);
         if (handler == null) {
-            throw new Error(sprintf("Lib '%s' handler '%s' not found", libContext, req.path.path));
+            throw new Error(sprintf("Lib '%s' handler '%s' not found", libContext, req.callpath.url));
         }
         let rtn = handler(req);
         let p = Promise.resolve(rtn).then((rtnVal) => {
@@ -263,4 +276,4 @@ class LibModule {
     }
 }
 
-export {FetchModule, AppModule, LocalModule, RawModule, LibModule};
+export {FetchModule, AppModule, LocalModule, HttpModule, LibModule};

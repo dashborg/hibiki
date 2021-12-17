@@ -22,9 +22,8 @@ type JSFuncType = {
 
 type HandlerPathType = {
     module : string,
-    path : string,
-    pathfrag : string,
-    fullpath : string,
+    url : string,
+    method : string,
 };
 
 type EventType = {

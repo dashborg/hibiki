@@ -417,7 +417,7 @@ function makeHandlers(node : HibikiNode, handlerPrefixes? : string[]) : Record<s
         for (let key in node.attrs) {
             if (key == "handler" || key.endsWith(".handler")) {
                 let eventName = key.replace(/\.handler$/, "");
-                let hname = sprintf("/@event/%s", eventName);
+                let hname = sprintf("//@event/%s", eventName);
                 handlers[hname] = {handlerStr: node.attrs[key], node: node};
             }
         }
@@ -429,7 +429,7 @@ function makeHandlers(node : HibikiNode, handlerPrefixes? : string[]) : Record<s
                 let hname = subNode.attrs.name;
                 let prefixOk = false;
                 for (let j=0; j<handlerPrefixes.length; j++) {
-                    if (hname.startsWith(sprintf("/@%s/", handlerPrefixes[j]))) {
+                    if (hname.startsWith(sprintf("//@%s/", handlerPrefixes[j]))) {
                         prefixOk = true;
                         break;
                     }

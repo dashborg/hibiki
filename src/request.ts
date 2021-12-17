@@ -4,7 +4,7 @@ import type {RtContext} from "./error";
 import type {HibikiAction, HibikiExtState, HandlerPathType} from "./types";
 
 class HibikiRequest {
-    path : HandlerPathType;
+    callpath : HandlerPathType;
     data : Record<string, any>;
     rtContext : RtContext;
     state : HibikiExtState;

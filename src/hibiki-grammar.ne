@@ -21,9 +21,19 @@ function strEscValue(val) {
     return ch;
 }
 
+// method            = (?:(?:GET|POST|PUT|PATCH|DELETE|DYN)\s+)
+// scheme            = (?:(?:https?:)?\/\/)
+// hostname (w/port) = (?:[a-zA-Z0-9][a-zA-Z0-9.-]*(?:\:\d+)?)
+// url               = (?:\/[A-Za-z0-9._~:/?#\[\]@!$&'*+,=-]*)   // everything from RFC 3986 except '(', ')', and ';'
+// module            = (?:\/\/@[a-zA-Z_][a-zA-Z0-9_-]*)
+// baseurl           = // does not allow initial '$', '@'
+
+// URLPATH = method? scheme hostname url? | method? module url? | method url
+
 let lexer = moo.states({
     main: {
-        CALLPATH: { match: /(?:(?:(?:\/@[a-zA-Z_][a-zA-Z0-9_-]*)?\/[a-zA-Z0-9._\/-]+|\/@[a-zA-Z_][a-zA-Z0-9_-]*\/?)(?::@?[a-zA-Z][a-zA-Z0-9_-]*)?)/ },
+        URLPATH: { match: /(?:(?:GET|POST|PUT|PATCH|DELETE|DYN)\s+)?(?:(?:https?:)?\/\/)(?:[a-zA-Z0-9][a-zA-Z0-9.-]*(?:\:\d+)?)(?:\/[A-Za-z0-9._~:/?#\[\]@!$&'*+,=-]*)?|(?:(?:GET|POST|PUT|PATCH|DELETE|DYN)\s+)?(?:\/\/@[a-zA-Z_][a-zA-Z0-9_-]*)(?:\/[A-Za-z0-9._~:/?#\[\]@!$&'*+,=-]*)?|(?:(?:GET|POST|PUT|PATCH|DELETE|DYN)\s+)(?:\/[A-Za-z0-9._~:/?#\[\]@!$&'*+,=-]*)/ },
+        // CALLPATH: { match: /(?:(?:(?:\/@[a-zA-Z_][a-zA-Z0-9_-]*)?\/[a-zA-Z0-9._\/-]+|\/@[a-zA-Z_][a-zA-Z0-9_-]*\/?)(?::@?[a-zA-Z][a-zA-Z0-9_-]*)?)/ },
         LOGICAL_OR:  "||",
         LOGICAL_AND: "&&",
         GEQ:         ">=",
@@ -44,7 +54,7 @@ let lexer = moo.states({
                         KW_TRUE: "true",
                         KW_FALSE: "false",
                         KW_NULL: "null",
-                        KW_CALL: "call",
+                        KW_CALLHANDLER: "callhandler",
                         KW_SETRETURN: "setreturn",
                         KW_INVALIDATE: "invalidate",
                         KW_FIRE: "fire",
@@ -175,11 +185,11 @@ callStatementNoAssign ->
       staticCallStatement  {% id %}
     | dynCallStatement     {% id %}
 
-dynCallStatement -> %KW_CALL fullExpr namedCallParams {% (data) => {
+dynCallStatement -> %KW_CALLHANDLER fullExpr namedCallParams {% (data) => {
           return {actiontype: "callhandler", callpath: data[1], data: data[2]};
       } %}
 
-staticCallStatement -> %CALLPATH namedCallParams {% (data) => {
+staticCallStatement -> %URLPATH namedCallParams {% (data) => {
           let callpath = {etype: "literal", val: data[0].value};
           let rtn = {actiontype: "callhandler", callpath: callpath, data: data[1]};
           return rtn;
@@ -496,9 +506,6 @@ idOrKeyword ->
     | %KW_TRUE   {% id %}
     | %KW_FALSE  {% id %}
     | %KW_NULL   {% id %}
-    | %KW_CALL   {% id %}
-    | %KW_SETRETURN {% id %}
-    | %KW_INVALIDATE {% id %}
     | %KW_FIRE   {% id %}
     | %KW_NOP    {% id %}
     | %KW_BUBBLE {% id %}
@@ -511,6 +518,9 @@ idOrKeyword ->
     | %KW_ELSE   {% id %}
     | %KW_THROW  {% id %}
     | %KW_REF    {% id %}
+    | %KW_SETRETURN   {% id %}
+    | %KW_INVALIDATE  {% id %}
+    | %KW_CALLHANDLER {% id %}
     | %KW_REPORTERROR {% id %}
     | %KW_SWITCHAPP   {% id %}
     | %KW_PUSHAPP     {% id %}

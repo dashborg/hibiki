@@ -361,20 +361,57 @@ function stripAtKeys(obj : Record<string, any>) : Record<string, any> {
     return rtn;
 }
 
+function fullPath(hpath : HandlerPathType) : string {
+    if (hpath == null) {
+        return null;
+    }
+    let method = hpath.method ?? "DYN";
+    if (hpath.module == "http") {
+        if (method == "DYN" && (hpath.url.startsWith("http") || hpath.url.startsWith("//"))) {
+            return hpath.url;
+        }
+        return method + " " + hpath.url;
+    }
+    else {
+        let url = (hpath.url == null || hpath.url == "/" ? "" : hpath.url);
+        if (method == "DYN") {
+            return "//@" + hpath.module + url;;
+        }
+        return method + " " + "//@" + hpath.module + url;
+    }
+}
+
 function parseHandler(handlerPath : string) : HandlerPathType {
-    if (handlerPath == null || handlerPath == "" || handlerPath[0] != '/') {
+    if (handlerPath == null || handlerPath == "") {
         return null;
     }
-    let match = handlerPath.match("^(?:/@([a-zA-Z_][a-zA-Z0-9_-]*))?(/[a-zA-Z0-9._/-]*)?(?:[:](@?[a-zA-Z][a-zA-Z0-9_-]*))?$")
-    if (match == null) {
+    let methodMatch = handlerPath.match("^(GET|POST|PUT|PATCH|DELETE|DYN)\\s*");
+    let method = null;
+    if (methodMatch != null) {
+        handlerPath = handlerPath.substr(methodMatch[0].length);
+        if (method != "DYN") {
+            method = methodMatch[1];
+        }
+    }
+    if (handlerPath.startsWith("//@")) {
+        let match = handlerPath.match("^//@([a-zA-Z_][a-zA-Z0-9_-]*)(/.*)?$")
+        if (match == null) {
+            return null;
+        }
+        return {module: match[1], url: (match[2] ?? "/"), method: method};
+    }
+    try {
+        let url = new URL(handlerPath, window.location.href);
+        return {module: "http", url: handlerPath, method: method};
+    }
+    catch (e) {
         return null;
     }
-    return {fullpath: handlerPath, module: (match[1] ?? ""), path: (match[2] ?? "/"), pathfrag: (match[3] ?? "")};
 }
 
 function getHibiki() : Hibiki {
     return (window as any).Hibiki;
 }
 
-export {jsonRespHandler, parseUrlParams, valToString, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, makeUrlParamsFromObject, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, rawAttr, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler};
+export {jsonRespHandler, parseUrlParams, valToString, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, makeUrlParamsFromObject, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, rawAttr, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath};
 

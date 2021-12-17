@@ -1456,7 +1456,7 @@ function RequestFromAction(action : HAction, pure : boolean, dataenv : DataEnvir
     }
     let data = demobx(evalExprAst(action.data, dataenv));
     let req = new HibikiRequest(dataenv.dbstate.getExtState());
-    req.path = hpath;
+    req.callpath = hpath;
     req.rtContext = rtctx;
     req.pure = pure || action.pure;
     req.libContext = dataenv.getLibContext();
@@ -1928,7 +1928,7 @@ function JsonEqual(v1 : any, v2 : any) : boolean {
 
 function ParseStaticCallStatement(str : string) : HAction {
     let g = nearley.Grammar.fromCompiled(hibikiGrammar);
-    g.ParserStart = g.start = "staticCallStatement";
+    g.ParserStart = g.start = "callStatementNoAssign";
     let parser = new nearley.Parser(g);
     try {
         parser.feed(str);

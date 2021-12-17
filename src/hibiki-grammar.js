@@ -23,9 +23,19 @@ function strEscValue(val) {
     return ch;
 }
 
+// method            = (?:(?:GET|POST|PUT|PATCH|DELETE|DYN)\s+)
+// scheme            = (?:(?:https?:)?\/\/)
+// hostname (w/port) = (?:[a-zA-Z0-9][a-zA-Z0-9.-]*(?:\:\d+)?)
+// url               = (?:\/[A-Za-z0-9._~:/?#\[\]@!$&'*+,=-]*)   // everything from RFC 3986 except '(', ')', and ';'
+// module            = (?:\/\/@[a-zA-Z_][a-zA-Z0-9_-]*)
+// baseurl           = // does not allow initial '$', '@'
+
+// URLPATH = method? scheme hostname url? | method? module url? | method url
+
 let lexer = moo.states({
     main: {
-        CALLPATH: { match: /(?:(?:(?:\/@[a-zA-Z_][a-zA-Z0-9_-]*)?\/[a-zA-Z0-9._\/-]+|\/@[a-zA-Z_][a-zA-Z0-9_-]*\/?)(?::@?[a-zA-Z][a-zA-Z0-9_-]*)?)/ },
+        URLPATH: { match: /(?:(?:GET|POST|PUT|PATCH|DELETE|DYN)\s+)?(?:(?:https?:)?\/\/)(?:[a-zA-Z0-9][a-zA-Z0-9.-]*(?:\:\d+)?)(?:\/[A-Za-z0-9._~:/?#\[\]@!$&'*+,=-]*)?|(?:(?:GET|POST|PUT|PATCH|DELETE|DYN)\s+)?(?:\/\/@[a-zA-Z_][a-zA-Z0-9_-]*)(?:\/[A-Za-z0-9._~:/?#\[\]@!$&'*+,=-]*)?|(?:(?:GET|POST|PUT|PATCH|DELETE|DYN)\s+)(?:\/[A-Za-z0-9._~:/?#\[\]@!$&'*+,=-]*)/ },
+        // CALLPATH: { match: /(?:(?:(?:\/@[a-zA-Z_][a-zA-Z0-9_-]*)?\/[a-zA-Z0-9._\/-]+|\/@[a-zA-Z_][a-zA-Z0-9_-]*\/?)(?::@?[a-zA-Z][a-zA-Z0-9_-]*)?)/ },
         LOGICAL_OR:  "||",
         LOGICAL_AND: "&&",
         GEQ:         ">=",
@@ -46,7 +56,7 @@ let lexer = moo.states({
                         KW_TRUE: "true",
                         KW_FALSE: "false",
                         KW_NULL: "null",
-                        KW_CALL: "call",
+                        KW_CALLHANDLER: "callhandler",
                         KW_SETRETURN: "setreturn",
                         KW_INVALIDATE: "invalidate",
                         KW_FIRE: "fire",
@@ -175,10 +185,10 @@ var grammar = {
         } },
     {"name": "callStatementNoAssign", "symbols": ["staticCallStatement"], "postprocess": id},
     {"name": "callStatementNoAssign", "symbols": ["dynCallStatement"], "postprocess": id},
-    {"name": "dynCallStatement", "symbols": [(lexer.has("KW_CALL") ? {type: "KW_CALL"} : KW_CALL), "fullExpr", "namedCallParams"], "postprocess":  (data) => {
+    {"name": "dynCallStatement", "symbols": [(lexer.has("KW_CALLHANDLER") ? {type: "KW_CALLHANDLER"} : KW_CALLHANDLER), "fullExpr", "namedCallParams"], "postprocess":  (data) => {
             return {actiontype: "callhandler", callpath: data[1], data: data[2]};
         } },
-    {"name": "staticCallStatement", "symbols": [(lexer.has("CALLPATH") ? {type: "CALLPATH"} : CALLPATH), "namedCallParams"], "postprocess":  (data) => {
+    {"name": "staticCallStatement", "symbols": [(lexer.has("URLPATH") ? {type: "URLPATH"} : URLPATH), "namedCallParams"], "postprocess":  (data) => {
             let callpath = {etype: "literal", val: data[0].value};
             let rtn = {actiontype: "callhandler", callpath: callpath, data: data[1]};
             return rtn;
@@ -457,9 +467,6 @@ var grammar = {
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_TRUE") ? {type: "KW_TRUE"} : KW_TRUE)], "postprocess": id},
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_FALSE") ? {type: "KW_FALSE"} : KW_FALSE)], "postprocess": id},
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_NULL") ? {type: "KW_NULL"} : KW_NULL)], "postprocess": id},
-    {"name": "idOrKeyword", "symbols": [(lexer.has("KW_CALL") ? {type: "KW_CALL"} : KW_CALL)], "postprocess": id},
-    {"name": "idOrKeyword", "symbols": [(lexer.has("KW_SETRETURN") ? {type: "KW_SETRETURN"} : KW_SETRETURN)], "postprocess": id},
-    {"name": "idOrKeyword", "symbols": [(lexer.has("KW_INVALIDATE") ? {type: "KW_INVALIDATE"} : KW_INVALIDATE)], "postprocess": id},
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_FIRE") ? {type: "KW_FIRE"} : KW_FIRE)], "postprocess": id},
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_NOP") ? {type: "KW_NOP"} : KW_NOP)], "postprocess": id},
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_BUBBLE") ? {type: "KW_BUBBLE"} : KW_BUBBLE)], "postprocess": id},
@@ -472,6 +479,9 @@ var grammar = {
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_ELSE") ? {type: "KW_ELSE"} : KW_ELSE)], "postprocess": id},
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_THROW") ? {type: "KW_THROW"} : KW_THROW)], "postprocess": id},
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_REF") ? {type: "KW_REF"} : KW_REF)], "postprocess": id},
+    {"name": "idOrKeyword", "symbols": [(lexer.has("KW_SETRETURN") ? {type: "KW_SETRETURN"} : KW_SETRETURN)], "postprocess": id},
+    {"name": "idOrKeyword", "symbols": [(lexer.has("KW_INVALIDATE") ? {type: "KW_INVALIDATE"} : KW_INVALIDATE)], "postprocess": id},
+    {"name": "idOrKeyword", "symbols": [(lexer.has("KW_CALLHANDLER") ? {type: "KW_CALLHANDLER"} : KW_CALLHANDLER)], "postprocess": id},
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_REPORTERROR") ? {type: "KW_REPORTERROR"} : KW_REPORTERROR)], "postprocess": id},
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_SWITCHAPP") ? {type: "KW_SWITCHAPP"} : KW_SWITCHAPP)], "postprocess": id},
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_PUSHAPP") ? {type: "KW_PUSHAPP"} : KW_PUSHAPP)], "postprocess": id},
