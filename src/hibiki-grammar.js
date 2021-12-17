@@ -35,7 +35,6 @@ function strEscValue(val) {
 let lexer = moo.states({
     main: {
         URLPATH: { match: /(?:(?:GET|POST|PUT|PATCH|DELETE|DYN)\s+)?(?:(?:https?:)?\/\/)(?:[a-zA-Z0-9][a-zA-Z0-9.-]*(?:\:\d+)?)(?:\/[A-Za-z0-9._~:/?#\[\]@!$&'*+,=-]*)?|(?:(?:GET|POST|PUT|PATCH|DELETE|DYN)\s+)?(?:\/\/@[a-zA-Z_][a-zA-Z0-9_-]*)(?:\/[A-Za-z0-9._~:/?#\[\]@!$&'*+,=-]*)?|(?:(?:GET|POST|PUT|PATCH|DELETE|DYN)\s+)(?:\/[A-Za-z0-9._~:/?#\[\]@!$&'*+,=-]*)/ },
-        // CALLPATH: { match: /(?:(?:(?:\/@[a-zA-Z_][a-zA-Z0-9_-]*)?\/[a-zA-Z0-9._\/-]+|\/@[a-zA-Z_][a-zA-Z0-9_-]*\/?)(?::@?[a-zA-Z][a-zA-Z0-9_-]*)?)/ },
         LOGICAL_OR:  "||",
         LOGICAL_AND: "&&",
         GEQ:         ">=",
@@ -115,6 +114,7 @@ let lexer = moo.states({
         STRPART: /[^'\n]+/,
         STREND: {match: "'", pop: 1},
     },
+    
 });
 
 let origNext = lexer.next.bind(lexer);
@@ -186,8 +186,8 @@ var grammar = {
         } },
     {"name": "callStatementNoAssign", "symbols": ["staticCallStatement"], "postprocess": id},
     {"name": "callStatementNoAssign", "symbols": ["dynCallStatement"], "postprocess": id},
-    {"name": "dynCallStatement", "symbols": [(lexer.has("KW_CALLHANDLER") ? {type: "KW_CALLHANDLER"} : KW_CALLHANDLER), "fullExpr", "namedCallParams"], "postprocess":  (data) => {
-            return {actiontype: "callhandler", callpath: data[1], data: data[2]};
+    {"name": "dynCallStatement", "symbols": [(lexer.has("KW_CALLHANDLER") ? {type: "KW_CALLHANDLER"} : KW_CALLHANDLER), "namedCallParams"], "postprocess":  (data) => {
+            return {actiontype: "callhandler", data: data[1]};
         } },
     {"name": "staticCallStatement", "symbols": [(lexer.has("URLPATH") ? {type: "URLPATH"} : URLPATH), "namedCallParams"], "postprocess":  (data) => {
             let callpath = {etype: "literal", val: data[0].value};
@@ -321,8 +321,8 @@ var grammar = {
     {"name": "mulExpr", "symbols": ["mulExpr", (lexer.has("PERCENT") ? {type: "PERCENT"} : PERCENT), "pathExpr"], "postprocess": (data) => ({etype: "op", op: "%", exprs: [data[0], data[2]]})},
     {"name": "unaryExpr", "symbols": ["pathExpr"], "postprocess": id},
     {"name": "unaryExpr", "symbols": [(lexer.has("BANG") ? {type: "BANG"} : BANG), "unaryExpr"], "postprocess": (data) => ({etype: "op", op: "!", exprs: [data[1]]})},
-    {"name": "unaryExpr", "symbols": [(lexer.has("DASH") ? {type: "DASH"} : DASH), "unaryExpr"], "postprocess": (data) => ({etype: "op", op: "-", exprs: [data[1]]})},
-    {"name": "unaryExpr", "symbols": [(lexer.has("PLUS") ? {type: "PLUS"} : PLUS), "unaryExpr"], "postprocess": (data) => ({etype: "op", op: "+", exprs: [data[1]]})},
+    {"name": "unaryExpr", "symbols": [(lexer.has("DASH") ? {type: "DASH"} : DASH), "unaryExpr"], "postprocess": (data) => ({etype: "op", op: "u-", exprs: [data[1]]})},
+    {"name": "unaryExpr", "symbols": [(lexer.has("PLUS") ? {type: "PLUS"} : PLUS), "unaryExpr"], "postprocess": (data) => ({etype: "op", op: "u+", exprs: [data[1]]})},
     {"name": "pathExpr", "symbols": ["primaryExpr"], "postprocess": id},
     {"name": "primaryExpr", "symbols": ["literalVal"], "postprocess": id},
     {"name": "primaryExpr", "symbols": ["literalArray"], "postprocess": id},

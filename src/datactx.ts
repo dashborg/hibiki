@@ -8,7 +8,7 @@ import {DataEnvironment} from "./state";
 import {sprintf} from "sprintf-js";
 import {parseHtml} from "./html-parser";
 import {RtContext, getShortEMsg, HibikiError} from "./error";
-import {makeUrlParamsFromObject, SYM_PROXY, SYM_FLATTEN, isObject, stripAtKeys, unpackPositionalArgs, nodeStr, parseHandler} from "./utils";
+import {makeUrlParamsFromObject, SYM_PROXY, SYM_FLATTEN, isObject, stripAtKeys, unpackPositionalArgs, nodeStr, parseHandler, fullPath} from "./utils";
 import {PathPart, PathType, PathUnionType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue, HandlerBlock} from "./types";
 import {HibikiRequest} from "./request";
 
@@ -1334,53 +1334,60 @@ function evalExprAst(exprAst : HExpr, dataenv : DataEnvironment) : any {
             return evalExprAst(exprAst.exprs[1], dataenv);
         }
         else if (exprAst.op == "*") {
-            let e1 = evalExprAst(exprAst.exprs[0], dataenv) ?? 0;
-            let e2 = evalExprAst(exprAst.exprs[1], dataenv) ?? 0;
+            let e1 = evalExprAst(exprAst.exprs[0], dataenv) ?? null;
+            let e2 = evalExprAst(exprAst.exprs[1], dataenv) ?? null;
             return e1 * e2;
         }
         else if (exprAst.op == "+") {
-            let e1 = evalExprAst(exprAst.exprs[0], dataenv) ?? 0;
-            let e2 = evalExprAst(exprAst.exprs[1], dataenv) ?? 0;
-            return e1 + e2;
+            // special, will evaluate entire array.
+            if (exprAst.exprs == null || exprAst.exprs.length == 0) {
+                return null;
+            }
+            let rtnVal = evalExprAst(exprAst.exprs[0], dataenv) ?? null;
+            for (let i=1; i<exprAst.exprs.length; i++) {
+                let ev = evalExprAst(exprAst.exprs[i], dataenv) ?? null;
+                rtnVal = rtnVal + ev;
+            }
+            return rtnVal;
         }
         else if (exprAst.op == "/") {
-            let e1 = evalExprAst(exprAst.exprs[0], dataenv) ?? 0;
-            let e2 = evalExprAst(exprAst.exprs[1], dataenv) ?? 0;
+            let e1 = evalExprAst(exprAst.exprs[0], dataenv) ?? null;
+            let e2 = evalExprAst(exprAst.exprs[1], dataenv) ?? null;
             return e1 / e2;
         }
         else if (exprAst.op == "%") {
-            let e1 = evalExprAst(exprAst.exprs[0], dataenv) ?? 0;
-            let e2 = evalExprAst(exprAst.exprs[1], dataenv) ?? 0;
+            let e1 = evalExprAst(exprAst.exprs[0], dataenv) ?? null;
+            let e2 = evalExprAst(exprAst.exprs[1], dataenv) ?? null;
             return e1 % e2;
         }
         else if (exprAst.op == ">=") {
-            let e1 = evalExprAst(exprAst.exprs[0], dataenv);
-            let e2 = evalExprAst(exprAst.exprs[1], dataenv);
+            let e1 = evalExprAst(exprAst.exprs[0], dataenv) ?? null;
+            let e2 = evalExprAst(exprAst.exprs[1], dataenv) ?? null;
             return e1 >= e2;
         }
         else if (exprAst.op == "<=") {
-            let e1 = evalExprAst(exprAst.exprs[0], dataenv);
-            let e2 = evalExprAst(exprAst.exprs[1], dataenv);
+            let e1 = evalExprAst(exprAst.exprs[0], dataenv) ?? null;
+            let e2 = evalExprAst(exprAst.exprs[1], dataenv) ?? null;
             return e1 <= e2;
         }
         else if (exprAst.op == ">") {
-            let e1 = evalExprAst(exprAst.exprs[0], dataenv);
-            let e2 = evalExprAst(exprAst.exprs[1], dataenv);
+            let e1 = evalExprAst(exprAst.exprs[0], dataenv) ?? null;
+            let e2 = evalExprAst(exprAst.exprs[1], dataenv) ?? null;
             return e1 > e2;
         }
         else if (exprAst.op == "<") {
-            let e1 = evalExprAst(exprAst.exprs[0], dataenv);
-            let e2 = evalExprAst(exprAst.exprs[1], dataenv);
+            let e1 = evalExprAst(exprAst.exprs[0], dataenv) ?? null;
+            let e2 = evalExprAst(exprAst.exprs[1], dataenv) ?? null;
             return e1 < e2;
         }
         else if (exprAst.op == "==") {
-            let e1 = evalExprAst(exprAst.exprs[0], dataenv);
-            let e2 = evalExprAst(exprAst.exprs[1], dataenv);
+            let e1 = evalExprAst(exprAst.exprs[0], dataenv) ?? null;
+            let e2 = evalExprAst(exprAst.exprs[1], dataenv) ?? null;
             return e1 == e2;
         }
         else if (exprAst.op == "!=") {
-            let e1 = evalExprAst(exprAst.exprs[0], dataenv);
-            let e2 = evalExprAst(exprAst.exprs[1], dataenv);
+            let e1 = evalExprAst(exprAst.exprs[0], dataenv) ?? null;
+            let e2 = evalExprAst(exprAst.exprs[1], dataenv) ?? null;
             return e1 != e2;
         }
         else if (exprAst.op == "!") {
@@ -1388,19 +1395,16 @@ function evalExprAst(exprAst : HExpr, dataenv : DataEnvironment) : any {
             return !e1;
         }
         else if (exprAst.op == "-") {
-            if (exprAst.exprs.length == 1) {
-                let e1 = evalExprAst(exprAst.exprs[0], dataenv) ?? 0;
-                return -e1;
-            }
-            else {
-                let e1 = evalExprAst(exprAst.exprs[0], dataenv) ?? 0;
-                let e2 = evalExprAst(exprAst.exprs[1], dataenv) ?? 0;
-                console.log("minus", e1, e2);
-                return e1 - e2;
-            }
+            let e1 = evalExprAst(exprAst.exprs[0], dataenv) ?? null;
+            let e2 = evalExprAst(exprAst.exprs[1], dataenv) ?? null;
+            return e1 - e2;
         }
-        else if (exprAst.op == "+") {
-            let e1 = evalExprAst(exprAst.exprs[0], dataenv) ?? 0;
+        else if (exprAst.op == "u-") {
+            let e1 = evalExprAst(exprAst.exprs[0], dataenv) ?? null;
+            return -e1;
+        }
+        else if (exprAst.op == "u+") {
+            let e1 = evalExprAst(exprAst.exprs[0], dataenv) ?? null;
             return +e1;
         }
         else if (exprAst.op == "?:") {
@@ -1449,19 +1453,39 @@ function RequestFromAction(action : HAction, pure : boolean, dataenv : DataEnvir
     if (action.actiontype != "callhandler") {
         throw new Error(sprintf("Cannot create HibikiRequest from actiontype: '%s'", action.actiontype));
     }
-    let callPath = evalExprAst(action.callpath, dataenv);
-    let hpath = parseHandler(callPath);
-    if (hpath == null) {
-        throw new Error("Invalid handler path: " + callPath);
-    }
-    let data = demobx(evalExprAst(action.data, dataenv));
     let req = new HibikiRequest(dataenv.dbstate.getExtState());
-    req.callpath = hpath;
+    let fullData = demobx(evalExprAst(action.data, dataenv));
+    if (fullData != null && !isObject(fullData)) {
+        throw new Error(sprintf("HibikiAction 'callhandler' data must be null or an object, cannot be '%s'", typeof(fullData)));
+    }
+    req.data = fullData;
     req.rtContext = rtctx;
     req.pure = pure || action.pure;
     req.libContext = dataenv.getLibContext();
-    req.data = data;
-    if (data != null && isObject(data) && data["@pure"]) {
+    if (action.callpath != null) {
+        let callPath = evalExprAst(action.callpath, dataenv);
+        let hpath = parseHandler(callPath);
+        if (hpath == null) {
+            throw new Error("Invalid handler path: " + callPath);
+        }
+        req.callpath = hpath;
+    }
+    else {
+        if (fullData == null) {
+            throw new Error(sprintf("HibikiAction 'callhandler' without a callpath must specify an @url param"));
+        }
+        let {"@url": dataUrl, "@method": dataMethod, "@module": dataModule} = fullData;
+        if (dataUrl == null) {
+            throw new Error(sprintf("HibikiAction 'callhandler' without a callpath must specify an @url param"));
+        }
+        let hpath = {
+            module: dataModule ?? "http",
+            url: dataUrl,
+            method: dataMethod ?? "DYN",
+        };
+        req.callpath = hpath;
+    }
+    if (fullData != null && isObject(fullData) && fullData["@pure"]) {
         req.pure = true;
     }
     return req;
@@ -1498,12 +1522,10 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
         return val;
     }
     else if (action.actiontype == "callhandler") {
-        let callPath = evalExprAst(action.callpath, dataenv);
-        let data = demobx(evalExprAst(action.data, dataenv));
-        rtctx.replaceContext(sprintf("Calling handler %s", callPath), null);
         let req = RequestFromAction(action, pure, dataenv, rtctx);
+        rtctx.replaceContext(sprintf("Calling handler %s", fullPath(req.callpath)), null);
         let block = await dataenv.dbstate.callHandlerWithReq(req);
-        let handlerEnv = dataenv.makeChildEnv({data: data}, {blockLocalData: true});
+        let handlerEnv = dataenv.makeChildEnv({data: req.data}, {blockLocalData: true});
         let rtnVal = await ExecuteHandlerBlock(block, req.pure, handlerEnv, rtctx, false);
         doAssignment(action, rtnVal, pure, dataenv);
         return rtnVal;
@@ -1574,7 +1596,7 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
             }
             return val;
         });
-        console.log("hibiki-log", ...dataValArr);
+        console.log("HibikiLog", ...dataValArr);
         if (action.debug) {
             console.log("DataEnvironment Stack");
             dataenv.printStack();
@@ -1632,17 +1654,6 @@ function evalActionVal(aval : HibikiActionValue) : HExpr {
 }
 
 function validateAction(action : HAction) : string {
-    if (action.actiontype == "setdata") {
-        if (action.setpath == null) {
-            return "Invalid 'setdata' action, no 'setpath' specified";
-        }
-        return null;
-    }
-    if (action.actiontype == "callhandler") {
-        if (action.callpath == null) {
-            return "Invalid 'callhandler' action, no 'callpath' specified";
-        }
-    }
     return null;
 }
 
@@ -1666,8 +1677,7 @@ function convertAction(action : HibikiAction) : HAction {
     if (action.callpath != null) {
         let pathExpr = evalActionStr(action.callpath);
         if (pathExpr != null) {
-            let path : PathType = [{pathtype: "deref", expr: pathExpr}];
-            rtn.callpath = {etype: "path", path: path};
+            rtn.callpath = pathExpr;
         }
     }
     if (action.data != null) {

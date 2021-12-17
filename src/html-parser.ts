@@ -69,47 +69,33 @@ class HtmlParser {
         return rtn;
     }
 
-    parseText(text : string) : HibikiNode | HibikiNode[] {
+    parseText(parentTag : string, text : string) : HibikiNode | HibikiNode[] {
         if (text == null || text == "") {
             return null;
         }
-        if (this.opts.noInlineText) {
+        if (this.opts.noInlineText || parentTag == "script" || parentTag == "define-handler") {
             return {tag: "#text", text: text};
         }
         if (text.indexOf("{{") == -1) {
             return {tag: "#text", text: escapeBrackets(text)};
         }
-        let parts : HibikiNode[] = [];
-        let textPos = 0;
-        let iters = 0;
-        while (textPos < text.length) {
-            let startPos = text.indexOf("{{", textPos);
-            let endPos = -1;
-            if (startPos != -1) {
-                endPos = text.indexOf("}}", startPos);
+        let textParts = parseDelimitedSections(text, "{{", "}}");
+        let parts : HibikiNode[] = textParts.map((part) => {
+            if (part.parttype == "plain") {
+                let tval = escapeBrackets(part.text);
+                return {tag: "#text", text: tval};
             }
-            if (startPos == -1 || endPos == -1) {
-                let tval = escapeBrackets(text.substr(textPos));
-                parts.push({tag: "#text", text: tval});
-                break;
+            else {
+                let tval = part.text.trim();
+                return {tag: "h-text", attrs: {bind: tval}};
             }
-            if (startPos > textPos) {
-                let tval = escapeBrackets(text.substr(textPos, startPos-textPos));
-                parts.push({tag: "#text", text: tval});
-            }
-            let bindText = text.substr(startPos+2, endPos-startPos-2).trim();
-            parts.push({
-                tag: "h-text",
-                attrs: {bind: bindText},
-            });
-            textPos = endPos+2;
-        }
+        });
         return parts;
     }
 
-    parseHtmlNode(htmlNode : Node) : HibikiNode | HibikiNode[] {
+    parseHtmlNode(parentTag : string, htmlNode : Node) : HibikiNode | HibikiNode[] {
         if (htmlNode.nodeType == 3 || htmlNode.nodeType == 4) {  // TEXT_NODE, CDATA_SECTION_NODE
-            return this.parseText(htmlNode.textContent);
+            return this.parseText(parentTag, htmlNode.textContent);
         }
         if (htmlNode.nodeType == 8) { // COMMENT_NODE
             let node = {tag: "#comment", text: htmlNode.textContent};
@@ -139,7 +125,7 @@ class HtmlParser {
                 node.morestyles[attr.name] = this.parseStyleAttr(attr.value);
             }
         }
-        let list = this.parseNodeChildren(htmlNode);
+        let list = this.parseNodeChildren(node.tag, htmlNode);
         if (list != null) {
             node.list = list;
         }
@@ -149,7 +135,7 @@ class HtmlParser {
         return node;
     }
 
-    parseNodeChildren(htmlNode : Node) : HibikiNode[] {
+    parseNodeChildren(parentTag : string, htmlNode : Node) : HibikiNode[] {
         let nodeChildren = htmlNode.childNodes;
         if (nodeChildren.length == 0) {
             return null;
@@ -157,7 +143,7 @@ class HtmlParser {
         let rtn = [];
         for (let i=0; i<nodeChildren.length; i++) {
             let htmlNode = nodeChildren[i];
-            let hnode = this.parseHtmlNode(htmlNode);
+            let hnode = this.parseHtmlNode(parentTag, htmlNode);
             if (hnode == null) {
                 continue;
             }
@@ -182,7 +168,7 @@ class HtmlParser {
         }
         let rootNode = (elem.tagName.toLowerCase() == "template" ? elem.content : elem);
         let rtn : HibikiNode = {tag: "#def", list: []};
-        rtn.list = this.parseNodeChildren(rootNode) || [];
+        rtn.list = this.parseNodeChildren(rtn.tag, rootNode) || [];
         return rtn;
     }
 }
@@ -201,4 +187,33 @@ function parseHtml(input : string | HTMLElement, opts? : HtmlParserOpts) : Hibik
     return parser.parseHtml(input);
 }
 
-export {parseHtml};
+function parseDelimitedSections(text : string, openDelim : string, closeDelim : string) : {parttype : "plain"|"delim", text : string}[] {
+    let parts : {parttype : "plain"|"delim", text : string}[] = [];
+    if (text == null) {
+        return parts;
+    }
+    let textPos = 0;
+    let iters = 0;
+    while (textPos < text.length) {
+        let startPos = text.indexOf(openDelim, textPos);
+        let endPos = -1;
+        if (startPos != -1) {
+            endPos = text.indexOf(closeDelim, startPos + openDelim.length);
+        }
+        if (startPos == -1 || endPos == -1) {
+            let tval = text.substr(textPos);
+            parts.push({parttype: "plain", text: tval});
+            break;
+        }
+        if (startPos > textPos) {
+            let tval = text.substr(textPos, startPos-textPos);
+            parts.push({parttype: "plain", text: tval});
+        }
+        let bindText = text.substr(startPos+openDelim.length, endPos-startPos-openDelim.length);
+        parts.push({parttype: "delim", text: bindText});
+        textPos = endPos+closeDelim.length;
+    }
+    return parts;
+}
+
+export {parseHtml, parseDelimitedSections};

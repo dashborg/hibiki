@@ -33,7 +33,6 @@ function strEscValue(val) {
 let lexer = moo.states({
     main: {
         URLPATH: { match: /(?:(?:GET|POST|PUT|PATCH|DELETE|DYN)\s+)?(?:(?:https?:)?\/\/)(?:[a-zA-Z0-9][a-zA-Z0-9.-]*(?:\:\d+)?)(?:\/[A-Za-z0-9._~:/?#\[\]@!$&'*+,=-]*)?|(?:(?:GET|POST|PUT|PATCH|DELETE|DYN)\s+)?(?:\/\/@[a-zA-Z_][a-zA-Z0-9_-]*)(?:\/[A-Za-z0-9._~:/?#\[\]@!$&'*+,=-]*)?|(?:(?:GET|POST|PUT|PATCH|DELETE|DYN)\s+)(?:\/[A-Za-z0-9._~:/?#\[\]@!$&'*+,=-]*)/ },
-        // CALLPATH: { match: /(?:(?:(?:\/@[a-zA-Z_][a-zA-Z0-9_-]*)?\/[a-zA-Z0-9._\/-]+|\/@[a-zA-Z_][a-zA-Z0-9_-]*\/?)(?::@?[a-zA-Z][a-zA-Z0-9_-]*)?)/ },
         LOGICAL_OR:  "||",
         LOGICAL_AND: "&&",
         GEQ:         ">=",
@@ -113,6 +112,7 @@ let lexer = moo.states({
         STRPART: /[^'\n]+/,
         STREND: {match: "'", pop: 1},
     },
+    
 });
 
 let origNext = lexer.next.bind(lexer);
@@ -186,8 +186,8 @@ callStatementNoAssign ->
       staticCallStatement  {% id %}
     | dynCallStatement     {% id %}
 
-dynCallStatement -> %KW_CALLHANDLER fullExpr namedCallParams {% (data) => {
-          return {actiontype: "callhandler", callpath: data[1], data: data[2]};
+dynCallStatement -> %KW_CALLHANDLER namedCallParams {% (data) => {
+          return {actiontype: "callhandler", data: data[1]};
       } %}
 
 staticCallStatement -> %URLPATH namedCallParams {% (data) => {
@@ -352,8 +352,8 @@ mulExpr ->
 unaryExpr ->
       pathExpr {% id %}
     | %BANG unaryExpr {% (data) => ({etype: "op", op: "!", exprs: [data[1]]}) %}
-    | %DASH unaryExpr {% (data) => ({etype: "op", op: "-", exprs: [data[1]]}) %}
-    | %PLUS unaryExpr {% (data) => ({etype: "op", op: "+", exprs: [data[1]]}) %}
+    | %DASH unaryExpr {% (data) => ({etype: "op", op: "u-", exprs: [data[1]]}) %}
+    | %PLUS unaryExpr {% (data) => ({etype: "op", op: "u+", exprs: [data[1]]}) %}
 
 pathExpr -> 
       primaryExpr     {% id %}
