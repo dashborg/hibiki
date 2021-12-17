@@ -484,7 +484,8 @@ class RawHtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnvi
         }
         if (!ctx.isEditMode() && NodeUtils.GETVALUE_ELEMS[tagName]) {
             let isCheckbox = (tagName == "input" && typeAttr == "checkbox");
-            let valueLV = ctx.resolveData("value", true);
+            let isWriteable = (tagName != "option" && !ctx.resolveAttr("readonly"));
+            let valueLV = ctx.resolveData("value", isWriteable);
             let value = DataCtx.demobx(valueLV.get());
             if (isCheckbox) {
                 elemProps["checked"] = !!value;
