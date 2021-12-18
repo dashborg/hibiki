@@ -634,7 +634,6 @@ class ComponentLibrary {
             }
             let hibiki = getHibiki();
             let mreg = hibiki.ModuleRegistry;
-            lib.modules["fetch"] = new mreg["fetch"](this.state, {});
             lib.modules["http"] = new mreg["http"](this.state, {});
             lib.modules["local"] = new mreg["local"](this.state, {});
             lib.modules["lib"] = new mreg["lib"](this.state, {libContext: libName});
@@ -960,9 +959,6 @@ class HibikiState {
                     console.log(sprintf("Hibiki Config, error initializing module '%s' (type '%s')", moduleName, mtype), e);
                 }
             }
-        }
-        if (config.modules == null || !("fetch" in config.modules)) {
-            this.Modules["fetch"] = new mreg["fetch"](this, {});
         }
         if (config.modules == null || !("local" in config.modules)) {
             this.Modules["local"] = new mreg["local"](this, {});

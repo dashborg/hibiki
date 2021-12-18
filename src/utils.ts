@@ -374,6 +374,9 @@ function fullPath(hpath : HandlerPathType) : string {
     }
     else {
         let url = (hpath.url == null || hpath.url == "/" ? "" : hpath.url);
+        if (!url.startsWith("/")) {
+            url = ":" + url;
+        }
         if (method == "DYN") {
             return "//@" + hpath.module + url;;
         }

@@ -69,8 +69,7 @@ type HibikiHandlerModule = {
 };
 
 type AppModuleConfig = {
-    rootPath : string,
-    defaultMethod? : string,
+    rootUrl : string,
     defaultHeaders? : Record<string, HibikiActionString>,
     defaultInit? : any,
 };

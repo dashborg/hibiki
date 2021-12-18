@@ -3,7 +3,7 @@
 import {isObject, unpackPositionalArgs, stripAtKeys, getHibiki, fullPath} from "./utils";
 import {sprintf} from "sprintf-js";
 import type {HibikiState} from "./state";
-import type {AppModuleConfig, FetchHookFn, Hibiki, HibikiAction} from "./types";
+import type {AppModuleConfig, FetchHookFn, Hibiki, HibikiAction, HandlerPathType} from "./types";
 import * as DataCtx from "./datactx";
 import type {HibikiRequest} from "./request";
 import merge from "lodash/merge";
@@ -35,10 +35,11 @@ function convertHeaders(...headersObjArr : any[]) : Headers {
     return rtn;
 }
 
-function setParams(method : string, url : URL, fetchInit : Record<string, any>, params : any) {
-    if (params == null || !isObject(params)) {
+function setParams(method : string, url : URL, fetchInit : Record<string, any>, data : any) {
+    if (data == null || !isObject(data)) {
         return;
     }
+    let params = stripAtKeys(data);
     if (method == "GET" || method == "DELETE") {
         for (let key in params) {
             let val = params[key];
@@ -60,54 +61,68 @@ function setParams(method : string, url : URL, fetchInit : Record<string, any>, 
     return;
 }
 
-class FetchModule {
+function buildFetchInit(req : HibikiRequest, defaultInit : any, defaultHeaders : Record<string, any>) : any{
+    let fullData = req.data ?? {};
+    let {"@mode": dataMode, "@init": dataInit, "@headers": dataHeaders, "@credentials": dataCredentials} = fullData;
+    let method = getMethod(req);
+    let fetchInit = Object.assign({}, defaultInit, dataInit);
+    fetchInit.headers = convertHeaders((defaultInit ?? {}).headers, defaultHeaders, (dataInit || {}).headers, dataHeaders);
+    fetchInit.method = method;
+    if (dataMode != null) {
+        fetchInit.mode = dataMode;
+    }
+    if (dataCredentials != null) {
+        fetchInit.credentials = dataCredentials;
+    }
+    return fetchInit;
+}
+
+function validateModulePath(modName : string, hpath : HandlerPathType) {
+    if (hpath.url.startsWith("http://") || hpath.url.startsWith("https://") || hpath.url.startsWith("//") || !urlSameOrigin(hpath.url)) {
+        throw new Error(sprintf("Invalid %s module URL, must not specify a protocol or host: %s", modName, fullPath(hpath)));
+    }
+    if (!hpath.url.startsWith("/")) {
+        throw new Error(sprintf("Invalid %s module URL, must not specify a relative url: %s", modName, fullPath(hpath)));
+    }
+}
+
+function urlSameOrigin(urlStr : string) {
+    let url = new URL(urlStr, window.location.href);
+    return url.origin == window.location.origin;
+}
+
+class HttpModule {
     state : HibikiState;
 
     constructor(state : HibikiState) {
         this.state = state;
     }
-    
+
     callHandler(req : HibikiRequest) : Promise<any> {
-        let reqData = req.data ?? {};
-        let {url: urlStr, data, init: fetchInit} = unpackPositionalArgs(reqData, ["url", "data", "init"]);
-        let {"@headers": headersObj} = reqData;
-        let method = getMethod(req);
-        if (method == null) {
-            throw new Error(sprintf("Invalid null method passed to /@fetch:[method]"));
-        }
-        method = method.toUpperCase();
-        if (!VALID_METHODS[method]) {
-            throw new Error(sprintf("Invalid method '%s' passed to /@fetch", method));
-        }
-        if (urlStr == null || typeof(urlStr) != "string") {
-            throw new Error("Invalid call to /@fetch, first argument must be a string (the URL to fetch)");
-        }
         let url : URL = null;
         try {
-            url = new URL(urlStr, window.location.href);
+            url = new URL(req.callpath.url, window.location.href);
         }
         catch (e) {
-            throw new Error(sprintf("Invalid URL passed to fetch '%s': %s", urlStr, e.toString()));
+            throw new Error(sprintf("Invalid URL for http handler '%s': %s", req.callpath.url, e.toString()));
         }
-        if (data != null && !isObject(data)) {
-            throw new Error(sprintf("Invalid data passed to /@fetch for url '%s', data must be an object not an array", urlStr));
+        let fetchInit = buildFetchInit(req, null, null);
+        if (!VALID_METHODS[fetchInit.method]) {
+            throw new Error(sprintf("Invalid method '%s' passed to http handler %s", fetchInit.method, fullPath(req.callpath)));
         }
-        fetchInit = fetchInit ?? {};
-        fetchInit.headers = convertHeaders(fetchInit.headers, headersObj);
-        fetchInit.method = method;
-        setParams(method, url, fetchInit, data);
+        setParams(fetchInit.method, url, fetchInit, req.data);
         this.state.runFetchHooks(url, fetchInit);
         let p = fetch(url.toString(), fetchInit).then((resp) => handleFetchResponse(url, resp));
         return p;
     }
 }
 
-function evalHExprMap(m : Record<string, DataCtx.HExpr>, state : HibikiState, datacontext : Record<string, any>) {
+function evalHExprMap(m : Record<string, DataCtx.HExpr>, state : HibikiState, datacontext : Record<string, any>) : Record<string, any> {
     if (m == null) {
         return null;
     }
     let dataenv = state.rootDataenv().makeChildEnv(datacontext, null);
-    let rtn = {};
+    let rtn : Record<string, any> = {};
     for (let key in m) {
         let val = DataCtx.evalExprAst(m[key], dataenv);
         rtn[key] = val;
@@ -117,8 +132,7 @@ function evalHExprMap(m : Record<string, DataCtx.HExpr>, state : HibikiState, da
 
 class AppModule {
     state : HibikiState;
-    rootPath : string;
-    defaultMethod : string;
+    rootUrl : URL;
     defaultHeaders : Record<string, DataCtx.HExpr>;
     defaultInit : any;
     
@@ -127,14 +141,15 @@ class AppModule {
         if (config == null) {
             throw new Error("Invalid AppModule config, cannot be null");
         }
-        this.rootPath = config.rootPath;
-        if (this.rootPath == null) {
-            this.rootPath = "";
+        if (config.rootUrl == null) {
+            throw new Error("Invalid AppModule config, must set rootUrl");
         }
-        if (this.rootPath.endsWith("/")) {
-            this.rootPath = this.rootPath.substr(0, this.rootPath.length-1);
+        try {
+            this.rootUrl = new URL(config.rootUrl, window.location.href);
         }
-        this.defaultMethod = config.defaultMethod ?? "GET";
+        catch (e) {
+            throw new Error("Invalid AppModule rootUrl: " + e.toString());
+        }
         this.defaultHeaders = {};
         if (config.defaultHeaders != null) {
             for (let hkey in config.defaultHeaders) {
@@ -145,25 +160,26 @@ class AppModule {
     }
 
     callHandler(req : HibikiRequest) : Promise<any> {
+        let callpathUrl = req.callpath.url;
+        if (callpathUrl.startsWith("/")) {
+            callpathUrl = callpathUrl.substr(1);
+        }
         let url : URL = null;
         try {
-            url = new URL(this.rootPath + req.callpath.url, window.location.href);
+            url = new URL(callpathUrl, this.rootUrl);
+            if (url.origin != this.rootUrl.origin) {
+                throw new Error(sprintf("Must use a relative URL for app module, origin does not match rootUrl '%s' vs '%s'", this.rootUrl.origin, url.origin));
+            }
         }
         catch (e) {
-            throw new Error(sprintf("Invalid URL for /@app[%s] handler '%s': %s", this.rootPath, this.rootPath + req.callpath.url, e.toString()));
+            throw new Error(sprintf("Invalid handler path '%s' [module=app, rootUrl=%s]: %s", fullPath(req.callpath), this.rootUrl.toString(), e.toString()));
         }
-        let data : Record<string, any> = req.data || {};
-        let {"@init": fetchInit, "@headers": headersObj} = data;
-        let method = getMethod(req);
-        if (!VALID_METHODS[method]) {
-            throw new Error(sprintf("Invalid method '%s' passed to %s", method, fullPath(req.callpath)));
-        }
-        fetchInit = merge({}, this.defaultInit, fetchInit ?? {});
         let defaultHeaders = evalHExprMap(this.defaultHeaders, ((req.state as any).state as HibikiState), {data: req.data, url: url.toString()});
-        fetchInit.headers = convertHeaders(defaultHeaders, fetchInit.headers, headersObj);
-        fetchInit.method = method;
-        let params = stripAtKeys(data);
-        setParams(method, url, fetchInit, params);
+        let fetchInit = buildFetchInit(req, this.defaultInit, defaultHeaders);
+        if (!VALID_METHODS[fetchInit.method]) {
+            throw new Error(sprintf("Invalid method '%s' passed to handler %s", fetchInit.method, fullPath(req.callpath)));
+        }
+        setParams(fetchInit.method, url, fetchInit, req.data);
         this.state.runFetchHooks(url, fetchInit);
         let p = fetch(url.toString(), fetchInit).then((resp) => handleFetchResponse(url, resp));
         return p;
@@ -184,38 +200,6 @@ function getMethod(req : HibikiRequest) : string {
     return "GET";
 }
 
-class HttpModule {
-    state : HibikiState;
-
-    constructor(state : HibikiState) {
-        this.state = state;
-    }
-
-    callHandler(req : HibikiRequest) : Promise<any> {
-        let url : URL = null;
-        try {
-            url = new URL(req.callpath.url, window.location.href);
-        }
-        catch (e) {
-            throw new Error(sprintf("Invalid URL for http handler '%s': %s", req.callpath.url, e.toString()));
-        }
-        let data : Record<string, any> = req.data || {};
-        let {"@init": fetchInit, "@headers": headersObj} = data;
-        let method = getMethod(req);
-        if (!VALID_METHODS[method]) {
-            throw new Error(sprintf("Invalid method '%s' passed to http handler %s", method, req.callpath.url));
-        }
-        fetchInit = fetchInit ?? {};
-        fetchInit.headers = convertHeaders(fetchInit.headers, headersObj);
-        fetchInit.method = method;
-        let params = stripAtKeys(data);
-        setParams(method, url, fetchInit, params);
-        this.state.runFetchHooks(url, fetchInit);
-        let p = fetch(url.toString(), fetchInit).then((resp) => handleFetchResponse(url, resp));
-        return p;
-    }
-}
-
 class LocalModule {
     state : HibikiState;
     
@@ -224,6 +208,7 @@ class LocalModule {
     }
 
     callHandler(req : HibikiRequest) : Promise<any> {
+        validateModulePath("local", req.callpath);
         let handlerName = sprintf("//@local%s", req.callpath.url);
         let ide = this.state.pageDataenv();
         if (ide.handlers[handlerName] != null) {
@@ -255,6 +240,7 @@ class LibModule {
     }
 
     callHandler(req : HibikiRequest) : Promise<any> {
+        validateModulePath("lib", req.callpath);
         let libContext = this.libContext;
         let handlerName = sprintf("//@lib%s", req.callpath.url);
         let block = this.state.ComponentLibrary.findLocalBlockHandler(handlerName, libContext);
@@ -276,4 +262,4 @@ class LibModule {
     }
 }
 
-export {FetchModule, AppModule, LocalModule, HttpModule, LibModule};
+export {AppModule, LocalModule, HttpModule, LibModule};

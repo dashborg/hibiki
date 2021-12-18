@@ -1469,6 +1469,11 @@ function RequestFromAction(action : HAction, pure : boolean, dataenv : DataEnvir
             throw new Error("Invalid handler path: " + callPath);
         }
         req.callpath = hpath;
+        if (fullData != null) {
+            if ("@url" in fullData || "@module" in fullData) {
+                throw new Error(sprintf("HibikiAction 'callhandler' cannot specifiy @url or @module params when a callpath is specified"));
+            }
+        }
     }
     else {
         if (fullData == null) {
