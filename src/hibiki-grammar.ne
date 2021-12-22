@@ -173,7 +173,7 @@ throwStatement -> %KW_THROW callParamsSingle {% (data) => ({actiontype: "throw",
 setReturnStatement -> %KW_SETRETURN %LPAREN fullExpr %RPAREN {% (data) => ({actiontype: "setreturn", data: data[2]}) %}
 
 ifStatement -> %KW_IF %LPAREN fullExpr %RPAREN %LBRACE statementBlock %RBRACE (%KW_ELSE %LBRACE statementBlock %RBRACE):? {% (data) => {
-        let rtn = {actiontype: "if", data: data[2], actions: {}};
+        let rtn = {actiontype: "ifblock", data: data[2], actions: {}};
         rtn.actions["then"] = data[5];
         if (data[7] != null) {
             rtn.actions["else"] = data[7][2];

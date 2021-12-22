@@ -1511,7 +1511,7 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
         let expr = evalExprAst(action.data, dataenv);
         doAssignment(action, expr, pure, dataenv);
     }
-    else if (action.actiontype == "if") {
+    else if (action.actiontype == "ifblock") {
         let condVal = evalExprAst(action.data, dataenv);
         let actions = action.actions ?? {};
         if (condVal) {

@@ -165,7 +165,7 @@ var grammar = {
     {"name": "ifStatement$ebnf$1", "symbols": ["ifStatement$ebnf$1$subexpression$1"], "postprocess": id},
     {"name": "ifStatement$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
     {"name": "ifStatement", "symbols": [(lexer.has("KW_IF") ? {type: "KW_IF"} : KW_IF), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "fullExpr", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN), (lexer.has("LBRACE") ? {type: "LBRACE"} : LBRACE), "statementBlock", (lexer.has("RBRACE") ? {type: "RBRACE"} : RBRACE), "ifStatement$ebnf$1"], "postprocess":  (data) => {
-            let rtn = {actiontype: "if", data: data[2], actions: {}};
+            let rtn = {actiontype: "ifblock", data: data[2], actions: {}};
             rtn.actions["then"] = data[5];
             if (data[7] != null) {
                 rtn.actions["else"] = data[7][2];
