@@ -205,11 +205,7 @@ class DBCtx {
         this.dataenv.setDataPath(path, value);
     }
 
-    @boundMethod handleEvent(event : string, datacontext? : Record<string, any>, opts? : {rtctx? : RtContext}) : Promise<any> {
-        if (this.isEditMode()) {
-            return null;
-        }
-        opts = opts ?? {};
+    getEventDataenv() : DataEnvironment {
         let handlers = NodeUtils.makeHandlers(this.node);
         let htmlContext = sprintf("<%s>", this.node.tag);
         let envOpts = {
@@ -217,11 +213,16 @@ class DBCtx {
             handlers: handlers,
             eventBoundary: "hard",
         };
-        let execDataenv = this.dataenv.makeChildEnv(null, envOpts);
-        let rtctx = opts.rtctx;
-        if (rtctx == null) {
-            rtctx = new RtContext();
+        let eventDataenv = this.dataenv.makeChildEnv(null, envOpts);
+        return eventDataenv;
+    }
+
+    @boundMethod handleEvent(event : string, datacontext? : Record<string, any>) : Promise<any> {
+        if (this.isEditMode()) {
+            return null;
         }
+        let eventDataenv = this.getEventDataenv();
+        let rtctx = new RtContext();
         rtctx.pushContext(sprintf("native event %s:%s (in %s)", nodeStr(this.node), event, this.dataenv.getHtmlContext()), null);
         let action = {
             actiontype: "fireevent",
@@ -229,7 +230,7 @@ class DBCtx {
             event: {etype: "literal", val: event},
             data: {etype: "literal", val: datacontext},
         };
-        return DataCtx.ExecuteHandlerBlock([action], false, execDataenv, rtctx, false);
+        return DataCtx.ExecuteHandlerBlock([action], false, eventDataenv, rtctx, false);
     }
 
     @boundMethod handleOnSubmit(e : any) : boolean {

@@ -509,7 +509,7 @@ function ParsePath(path : string) : PathType {
         return ParsePathThrow(path);
     }
     catch (e) {
-        console.log("ERROR during ParsePath", "[[", path, "]]", e);
+        console.log(sprintf("ERROR during ParsePath [[%s]]", path), e);
         return null;
     }
 }
@@ -1590,12 +1590,11 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
         let ehandler : EHandlerType = null;
         if (action.nodeuuid) {
             let dbctx = dataenv.dbstate.NodeUuidMap.get(action.nodeuuid);
-            console.log("nodeuuid", action.nodeuuid, dbctx);
             if (dbctx == null) {
                 console.log(sprintf("Hibiki Action fireevent:%s, could not find node uuid %s", eventStr, action.nodeuuid));
                 return null;
             }
-            ehandler = dbctx.dataenv.resolveEventHandler(event, rtctx);
+            ehandler = dbctx.getEventDataenv().resolveEventHandler(event, rtctx);
             console.log("got ehandler", ehandler);
         }
         else {
