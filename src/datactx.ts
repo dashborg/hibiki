@@ -11,6 +11,7 @@ import {RtContext, getShortEMsg, HibikiError} from "./error";
 import {makeUrlParamsFromObject, SYM_PROXY, SYM_FLATTEN, isObject, stripAtKeys, unpackPositionalArgs, nodeStr, parseHandler, fullPath} from "./utils";
 import {PathPart, PathType, PathUnionType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue, HandlerBlock} from "./types";
 import {HibikiRequest} from "./request";
+import type {EHandlerType} from "./state";
 
 declare var window : any;
 
@@ -41,6 +42,7 @@ type HAction = {
     callpath?  : HExpr,
     data?      : HExpr,
     html?      : string,
+    nodeuuid?  : string,
     actions?   : Record<string, HAction[]>,
     blockstr?  : string,
     blockctx?  : string,
@@ -486,7 +488,7 @@ function ParseBlockThrow(blockStr : string) : HAction[] {
     g.ParserStart = g.start = "statementBlock";
     let blockParser = new nearley.Parser(g);
     try {
-        blockParser.feed(blockStr);
+        blockParser.feed(blockStr + ";");
     }
     catch (e) {
         let emsg = getShortEMsg(e);
@@ -1567,7 +1569,12 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
         }
         let bubble = !!action.bubble;
         if (!action.native) {
-            rtctx.replaceContext(sprintf("%s->%s", (bubble ? "bubble" : "fire"), eventStr), null);
+            if (action.nodeuuid) {
+                rtctx.replaceContext(sprintf("%s->%s (node uuid %s)", (bubble ? "bubble" : "fire"), eventStr, action.nodeuuid), null);
+            }
+            else {
+                rtctx.replaceContext(sprintf("%s->%s", (bubble ? "bubble" : "fire"), eventStr), null);
+            }
         }
         let datacontext = null;
         let params = evalExprAst(action.data, dataenv);
@@ -1580,7 +1587,20 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
             }
         }
         let event = {event: eventStr, datacontext, bubble};
-        let ehandler = dataenv.resolveEventHandler(event, rtctx);
+        let ehandler : EHandlerType = null;
+        if (action.nodeuuid) {
+            let dbctx = dataenv.dbstate.NodeUuidMap.get(action.nodeuuid);
+            console.log("nodeuuid", action.nodeuuid, dbctx);
+            if (dbctx == null) {
+                console.log(sprintf("Hibiki Action fireevent:%s, could not find node uuid %s", eventStr, action.nodeuuid));
+                return null;
+            }
+            ehandler = dbctx.dataenv.resolveEventHandler(event, rtctx);
+            console.log("got ehandler", ehandler);
+        }
+        else {
+            ehandler = dataenv.resolveEventHandler(event, rtctx);
+        }
         if (ehandler == null) {
             if (bubble) {
                 dataenv.dbstate.unhandledEvent(event, rtctx);
@@ -1698,6 +1718,7 @@ function convertAction(action : HibikiAction) : HAction {
             rtn.actions[key] = convertActions(action.actions[key]);
         }
     }
+    if (action.nodeuuid != null) rtn.nodeuuid = action.nodeuuid;
     if (action.blockstr != null) rtn.blockstr = action.blockstr;
     if (action.blockctx != null) rtn.blockctx = action.blockctx;
     if (action.blobbase64 != null) {

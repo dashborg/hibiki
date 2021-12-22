@@ -26,15 +26,16 @@ function strEscValue(val) {
 // method            = (?:(?:GET|POST|PUT|PATCH|DELETE|DYN)\s+)
 // scheme            = (?:(?:https?:)?\/\/)
 // hostname (w/port) = (?:[a-zA-Z0-9][a-zA-Z0-9.-]*(?:\:\d+)?)
-// url               = (?:\/[A-Za-z0-9._~:/?#\[\]@!$&'*+,=-]*)   // everything from RFC 3986 except '(', ')', and ';'
+// absurl            = (?:\/[A-Za-z0-9._~:/?#\[\]@!$&'*+,=-]*)  // everything from RFC 3986 except '(', ')', and ';'
+// url               = (?:[A-Za-z0-9._~:/?#\[\]@!$&'*+,=-]*)    // no leading slash (relative urls)
 // module            = (?:\/\/@[a-zA-Z_][a-zA-Z0-9_-]*)
 // baseurl           = // does not allow initial '$', '@'
 
-// URLPATH = method? scheme hostname url? | method? module url? | method url
+// URLPATH = method? scheme hostname absurl? | method? module absurl? | method? module ':' scheme hostname absurl? | method url
 
 let lexer = moo.states({
     main: {
-        URLPATH: { match: /(?:(?:GET|POST|PUT|PATCH|DELETE|DYN)\s+)?(?:(?:https?:)?\/\/)(?:[a-zA-Z0-9][a-zA-Z0-9.-]*(?:\:\d+)?)(?:\/[A-Za-z0-9._~:/?#\[\]@!$&'*+,=-]*)?|(?:(?:GET|POST|PUT|PATCH|DELETE|DYN)\s+)?(?:\/\/@[a-zA-Z_][a-zA-Z0-9_-]*)(?:\/[A-Za-z0-9._~:/?#\[\]@!$&'*+,=-]*)?|(?:(?:GET|POST|PUT|PATCH|DELETE|DYN)\s+)(?:\/[A-Za-z0-9._~:/?#\[\]@!$&'*+,=-]*)/ },
+        URLPATH: { match: /(?:(?:GET|POST|PUT|PATCH|DELETE|DYN)\s+)?(?:(?:https?:)?\/\/)(?:[a-zA-Z0-9][a-zA-Z0-9.-]*(?:\:\d+)?)(?:\/[A-Za-z0-9._~:/?#\[\]@!$&'*+,=-]*)?|(?:(?:GET|POST|PUT|PATCH|DELETE|DYN)\s+)?(?:\/\/@[a-zA-Z_][a-zA-Z0-9_-]*)(?:\/[A-Za-z0-9._~:/?#\[\]@!$&'*+,=-]*)?|(?:(?:GET|POST|PUT|PATCH|DELETE|DYN)\s+)(?:[A-Za-z0-9._~:/?#\[\]@!$&'*+,=-]*)/ },
         LOGICAL_OR:  "||",
         LOGICAL_AND: "&&",
         GEQ:         ">=",
@@ -132,21 +133,20 @@ var grammar = {
     Lexer: lexer,
     ParserRules: [
     {"name": "fullExpr", "symbols": ["filterExpr"], "postprocess": id},
-    {"name": "statementBlock$ebnf$1", "symbols": []},
-    {"name": "statementBlock$ebnf$1$subexpression$1", "symbols": [(lexer.has("SEMI") ? {type: "SEMI"} : SEMI), "statement"]},
-    {"name": "statementBlock$ebnf$1", "symbols": ["statementBlock$ebnf$1", "statementBlock$ebnf$1$subexpression$1"], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
-    {"name": "statementBlock$ebnf$2", "symbols": [(lexer.has("SEMI") ? {type: "SEMI"} : SEMI)], "postprocess": id},
-    {"name": "statementBlock$ebnf$2", "symbols": [], "postprocess": function(d) {return null;}},
-    {"name": "statementBlock", "symbols": ["statement", "statementBlock$ebnf$1", "statementBlock$ebnf$2"], "postprocess":  (data) => {
-            let rtn = [data[0]];
-            if (data[1] != null && data[1].length > 0) {
-                for (let i=0; i<data[1].length; i++) {
-                    let spart = data[1][i];
-                    rtn.push(spart[1]);
-                }
-            }
+    {"name": "statementBlock$ebnf$1", "symbols": ["anyStatement"]},
+    {"name": "statementBlock$ebnf$1", "symbols": ["statementBlock$ebnf$1", "anyStatement"], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
+    {"name": "statementBlock", "symbols": ["statementBlock$ebnf$1"], "postprocess":  (data) => {
+            let rtn = data[0].filter((v) => (v != null));
             return rtn;
         } },
+    {"name": "anyStatement", "symbols": [(lexer.has("SEMI") ? {type: "SEMI"} : SEMI)], "postprocess": (data) => null},
+    {"name": "anyStatement", "symbols": ["statement", (lexer.has("SEMI") ? {type: "SEMI"} : SEMI)], "postprocess": (data) => data[0]},
+    {"name": "anyStatement", "symbols": ["statementNoSemi"], "postprocess": id},
+    {"name": "lastStatement$ebnf$1", "symbols": [(lexer.has("SEMI") ? {type: "SEMI"} : SEMI)], "postprocess": id},
+    {"name": "lastStatement$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
+    {"name": "lastStatement", "symbols": ["statement", "lastStatement$ebnf$1"], "postprocess": (data) => data[0]},
+    {"name": "lastStatement", "symbols": ["statementNoSemi"], "postprocess": id},
+    {"name": "statementNoSemi", "symbols": ["ifStatement"], "postprocess": id},
     {"name": "statement", "symbols": ["callStatement"], "postprocess": id},
     {"name": "statement", "symbols": ["assignmentStatement"], "postprocess": id},
     {"name": "statement", "symbols": ["invalidateStatement"], "postprocess": id},
@@ -156,7 +156,6 @@ var grammar = {
     {"name": "statement", "symbols": ["debugStatement"], "postprocess": id},
     {"name": "statement", "symbols": ["alertStatement"], "postprocess": id},
     {"name": "statement", "symbols": ["exprStatement"], "postprocess": id},
-    {"name": "statement", "symbols": ["ifStatement"], "postprocess": id},
     {"name": "statement", "symbols": ["throwStatement"], "postprocess": id},
     {"name": "statement", "symbols": ["setReturnStatement"], "postprocess": id},
     {"name": "statement", "symbols": ["nopStatement"], "postprocess": id},

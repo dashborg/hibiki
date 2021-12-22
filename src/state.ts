@@ -7,11 +7,12 @@ import {boundMethod} from 'autobind-decorator'
 import {v4 as uuidv4} from 'uuid';
 import type {HibikiNode, ComponentType, LibraryType, HibikiConfig, HibikiHandlerModule, HibikiAction, EventType, HandlerValType, JSFuncType, CsrfHookFn, FetchHookFn, Hibiki, ErrorCallbackFn, HtmlParserOpts, HandlerBlock} from "./types";
 import * as DataCtx from "./datactx";
-import {isObject, textContent, SYM_PROXY, SYM_FLATTEN, nodeStr, callHook, getHibiki, parseHandler, fullPath} from "./utils";
+import {isObject, textContent, SYM_PROXY, SYM_FLATTEN, nodeStr, callHook, getHibiki, parseHandler, fullPath, parseUrlParams, smartDecodeParams} from "./utils";
 import {subNodesByTag, firstSubNodeByTag} from "./nodeutils";
 import {RtContext, HibikiError} from "./error";
 import {HibikiRequest} from "./request";
 import * as NodeUtils from "./nodeutils";
+import type {DBCtx} from "./dbctx";
 
 import {parseHtml} from "./html-parser";
 
@@ -19,6 +20,8 @@ type CallHandlerOptsType = {
     dataenv? : DataEnvironment,
     rtContext? : RtContext,
 };
+
+type EHandlerType = {handler : HandlerBlock, node : HibikiNode, dataenv : DataEnvironment};
 
 function eventBubbles(event : string) : boolean {
     if (event == "load") {
@@ -358,7 +361,7 @@ class DataEnvironment {
         return eb1.parent.getEventBoundary(event);
     }
 
-    resolveEventHandler(event : EventType, rtctx : RtContext, parent? : boolean) : {handler : HandlerBlock, node : HibikiNode, dataenv : DataEnvironment} {
+    resolveEventHandler(event : EventType, rtctx : RtContext, parent? : boolean) : EHandlerType {
         let env = this.getEventBoundary(event.event);
         if (env == null) {
             return null;
@@ -634,6 +637,7 @@ class ComponentLibrary {
             }
             let hibiki = getHibiki();
             let mreg = hibiki.ModuleRegistry;
+            lib.modules["hibiki"] = new mreg["hibiki"](this.state, {});
             lib.modules["http"] = new mreg["http"](this.state, {});
             lib.modules["local"] = new mreg["local"](this.state, {});
             lib.modules["lib"] = new mreg["lib"](this.state, {libContext: libName});
@@ -843,6 +847,7 @@ class HibikiState {
     JSFuncs : Record<string, JSFuncType>;
     CsrfHook : CsrfHookFn;
     FetchHook : FetchHookFn;
+    NodeUuidMap : Map<string, DBCtx> = new Map();
     
     Modules : Record<string, HibikiHandlerModule> = {};
     DataRoots : Record<string, mobx.IObservableValue<any>>;
@@ -899,6 +904,9 @@ class HibikiState {
             this.setInitialized();
             return;
         }
+        let rootDataenv = this.rootDataenv();
+        rootDataenv.setDataPath("$state.rawurlparams", parseUrlParams());
+        rootDataenv.setDataPath("$state.urlparams", smartDecodeParams(window.location.search));
         let rtctx = new RtContext();
         let [deps, srcs] = createDepPromise("@main", window.location.href, this, this.HtmlObj.get());
         console.log(sprintf("Hibiki root dependencies: %s", JSON.stringify(srcs)));
@@ -960,6 +968,7 @@ class HibikiState {
                 }
             }
         }
+        this.Modules["hibiki"] = new mreg["hibiki"](this, {});
         if (config.modules == null || !("local" in config.modules)) {
             this.Modules["local"] = new mreg["local"](this, {});
         }
@@ -1114,6 +1123,7 @@ class HibikiState {
             throw new Error(sprintf("Invalid handler, no module '%s' found for path: %s, lib-context '%s'", moduleName, fullPath(req.callpath), req.libContext));
         }
         let rtnp = module.callHandler(req);
+        rtnp = Promise.resolve(rtnp);
         return rtnp.then((data) => {
             if (data == null) {
                 return null;
@@ -1437,3 +1447,4 @@ function hasHtmlRR(rra : any[]) : boolean {
 }
 
 export {HibikiState, DataEnvironment, getAttributes, getAttribute, getStyleMap, HibikiExtState};
+export type {EHandlerType};

@@ -23,7 +23,7 @@ function jsonRespHandler(resp) {
     return resp.data;
 }
 
-function parseUrlParams() : any {
+function parseUrlParams() : Record<string,string> {
     let urlParams = new URLSearchParams(window.location.search);
     let paramsObj = {};
     for (let [k, v] of (urlParams as any).entries()) {

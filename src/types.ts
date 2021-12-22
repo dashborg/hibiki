@@ -47,8 +47,8 @@ type HibikiActionString   = string | {hibikiexpr : string};
 
 type HibikiAction = {
     actiontype    : string,
-    event?        : HibikiActionString,  // for type=fire
-    bubble?       : boolean,             // for type=fire
+    event?        : HibikiActionString,  // for type=fireevent
+    bubble?       : boolean,             // for type=fireevent
     pure?         : boolean,             // for type=callhandler
     debug?        : boolean,             // for type=log
     alert?        : boolean,             // for type=log
@@ -57,6 +57,7 @@ type HibikiAction = {
     callpath?     : HibikiActionString,
     data?         : HibikiActionValue,
     html?         : string,              // for type=html
+    nodeuuid?     : string,              // for type=fireevent
     actions?      : Record<string, HibikiAction[]>,
     blockstr?     : string,              // for type=block
     blockctx?     : string,              // for type=block

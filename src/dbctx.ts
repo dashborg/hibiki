@@ -8,6 +8,7 @@ import {sprintf} from "sprintf-js";
 import {boundMethod} from 'autobind-decorator'
 import {HibikiNode} from "./types";
 import * as NodeUtils from "./nodeutils";
+import {nodeStr} from "./utils";
 import {RtContext} from "./error";
 
 let NODASHELEM = {
@@ -204,15 +205,12 @@ class DBCtx {
         this.dataenv.setDataPath(path, value);
     }
 
-    @boundMethod handleEvent(event : string, val? : any) {
+    @boundMethod handleEvent(event : string, datacontext? : Record<string, any>, opts? : {rtctx? : RtContext}) : Promise<any> {
         if (this.isEditMode()) {
-            return false;
+            return null;
         }
+        opts = opts ?? {};
         let handlers = NodeUtils.makeHandlers(this.node);
-        let datacontext = null;
-        if (val != null) {
-            datacontext = {"value": val};
-        }
         let htmlContext = sprintf("<%s>", this.node.tag);
         let envOpts = {
             htmlContext: htmlContext,
@@ -220,34 +218,39 @@ class DBCtx {
             eventBoundary: "hard",
         };
         let execDataenv = this.dataenv.makeChildEnv(null, envOpts);
-        let rtctx = new RtContext();
-        rtctx.pushContext(sprintf("event <%s>:*%s (in %s)", this.node.tag, event, this.dataenv.getHtmlContext()), null);
+        let rtctx = opts.rtctx;
+        if (rtctx == null) {
+            rtctx = new RtContext();
+        }
+        rtctx.pushContext(sprintf("native event %s:%s (in %s)", nodeStr(this.node), event, this.dataenv.getHtmlContext()), null);
         let action = {
             actiontype: "fireevent",
             native: true,
             event: {etype: "literal", val: event},
             data: {etype: "literal", val: datacontext},
         };
-        DataCtx.ExecuteHandlerBlock([action], false, execDataenv, rtctx, false);
+        return DataCtx.ExecuteHandlerBlock([action], false, execDataenv, rtctx, false);
+    }
+
+    @boundMethod handleOnSubmit(e : any) : boolean {
+        console.log("running handleonsubmit", this);
+        e.preventDefault();
+        this.handleEvent("submit");
         return false;
     }
 
-    @boundMethod handleOnSubmit(e : any) {
-        console.log("running handleonsubmit", this);
-        e.preventDefault();
-        return this.handleEvent("submit");
-    }
-
-    @boundMethod handleOnClick(e : any) {
+    @boundMethod handleOnClick(e : any) : boolean {
         if (e != null) {
             e.preventDefault();
             e.stopPropagation();
         }
         this.handleEvent("click");
+        return false;
     }
 
-    @boundMethod handleOnChange(newVal : any) {
-        return this.handleEvent("change", newVal);
+    @boundMethod handleOnChange(newVal : any) : boolean {
+        this.handleEvent("change", {value: newVal});
+        return false;
     }
 
     getNodeLValueRoot() : DataCtx.LValue {
@@ -358,6 +361,14 @@ class DBCtx {
             return this.getNodeLValueRoot().subMapKey(dataName);
         }
         return DataCtx.CreateReadOnlyLValue(null, "readonly-null:" + this.node.tag + "#" + dataName);
+    }
+
+    registerUuid() {
+        this.dataenv.dbstate.NodeUuidMap.set(this.uuid, this);
+    }
+
+    unregisterUuid() {
+        this.dataenv.dbstate.NodeUuidMap.delete(this.uuid);
     }
 }
 

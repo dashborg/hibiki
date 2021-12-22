@@ -23,6 +23,7 @@
     "babel-plugin-jsx-control-statements": "^4.1.1",
     "copy-webpack-plugin": "^9.0.1",
     "css-loader": "^6.5.1",
+    "http-server": "^14.0.0",
     "less": "^4.1.2",
     "less-loader": "^10.2.0",
     "lodash-webpack-plugin": "^0.11.6",
@@ -58,6 +59,8 @@
     "webpack-watch": "webpack --watch --config webpack.dev.js",
     "buildprod": "webpack --config webpack.prod.js",
     "typecheck": "tsc --jsx preserve --noEmit --esModuleInterop --target ES5 --experimentalDecorators --downlevelIteration src/hibiki.ts",
-    "expr-grammar": "nearleyc src/hibiki-grammar.ne -o src/hibiki-grammar.js"
+    "expr-grammar": "nearleyc src/hibiki-grammar.ne -o src/hibiki-grammar.js",
+    "playground-css": "lessc ./playground/playground.less ./playground/playground.css",
+    "playground-server": "http-server ./playground -p 5002"
   }
 }

@@ -10,7 +10,7 @@ import {HibikiRootNode, CORE_LIBRARY} from "./nodes";
 import {deepTextContent, evalDeepTextContent, isObject} from "./utils";
 import merge from "lodash/merge";
 import type {HibikiNode, HibikiConfig, Hibiki, HibikiExtState, ReactClass, LibraryType} from "./types";
-import {AppModule, LocalModule, HttpModule, LibModule} from "./modules";
+import {AppModule, LocalModule, HttpModule, LibModule, HibikiModule} from "./modules";
 import {DefaultJSFuncs} from "./jsfuncs";
 
 declare var window : any;
@@ -175,6 +175,7 @@ let hibiki : Hibiki = {
         "app": AppModule,
         "http": HttpModule,
         "lib": LibModule,
+        "hibiki": HibikiModule,
     },
     JSFuncs: DefaultJSFuncs,
     LocalHandlers: LocalHandlers,

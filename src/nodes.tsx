@@ -579,8 +579,14 @@ class CustomNode extends React.Component<{node : HibikiNode, component : Compone
         ctx.handleEvent("mount");
     }
 
+    componentWillUnmount() {
+        let ctx = new DBCtx(this);
+        ctx.unregisterUuid();
+    }
+
     render() {
         let ctx = new DBCtx(this);
+        ctx.registerUuid();
         let component = this.props.component;
         let implNode = component.node;
         let childEnv = this.makeCustomChildEnv(false);
@@ -945,7 +951,7 @@ class SimpleQueryNode extends React.Component<{node : HibikiNode, dataenv : Data
                 }
                 let outputLV = ctx.resolveData("output", true);
                 outputLV.set(queryRtn);
-                setTimeout(() => ctx.handleEvent("load", queryRtn), 10);
+                setTimeout(() => ctx.handleEvent("load", {value: queryRtn}), 10);
             }).catch((e) => {
                 let errObj = new HibikiError(e.toString(), e, rtctx);
                 dbstate.reportErrorObj(errObj);

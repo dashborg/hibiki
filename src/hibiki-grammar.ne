@@ -24,15 +24,16 @@ function strEscValue(val) {
 // method            = (?:(?:GET|POST|PUT|PATCH|DELETE|DYN)\s+)
 // scheme            = (?:(?:https?:)?\/\/)
 // hostname (w/port) = (?:[a-zA-Z0-9][a-zA-Z0-9.-]*(?:\:\d+)?)
-// url               = (?:\/[A-Za-z0-9._~:/?#\[\]@!$&'*+,=-]*)   // everything from RFC 3986 except '(', ')', and ';'
+// absurl            = (?:\/[A-Za-z0-9._~:/?#\[\]@!$&'*+,=-]*)  // everything from RFC 3986 except '(', ')', and ';'
+// url               = (?:[A-Za-z0-9._~:/?#\[\]@!$&'*+,=-]*)    // no leading slash (relative urls)
 // module            = (?:\/\/@[a-zA-Z_][a-zA-Z0-9_-]*)
 // baseurl           = // does not allow initial '$', '@'
 
-// URLPATH = method? scheme hostname url? | method? module url? | method url
+// URLPATH = method? scheme hostname absurl? | method? module absurl? | method? module ':' scheme hostname absurl? | method url
 
 let lexer = moo.states({
     main: {
-        URLPATH: { match: /(?:(?:GET|POST|PUT|PATCH|DELETE|DYN)\s+)?(?:(?:https?:)?\/\/)(?:[a-zA-Z0-9][a-zA-Z0-9.-]*(?:\:\d+)?)(?:\/[A-Za-z0-9._~:/?#\[\]@!$&'*+,=-]*)?|(?:(?:GET|POST|PUT|PATCH|DELETE|DYN)\s+)?(?:\/\/@[a-zA-Z_][a-zA-Z0-9_-]*)(?:\/[A-Za-z0-9._~:/?#\[\]@!$&'*+,=-]*)?|(?:(?:GET|POST|PUT|PATCH|DELETE|DYN)\s+)(?:\/[A-Za-z0-9._~:/?#\[\]@!$&'*+,=-]*)/ },
+        URLPATH: { match: /(?:(?:GET|POST|PUT|PATCH|DELETE|DYN)\s+)?(?:(?:https?:)?\/\/)(?:[a-zA-Z0-9][a-zA-Z0-9.-]*(?:\:\d+)?)(?:\/[A-Za-z0-9._~:/?#\[\]@!$&'*+,=-]*)?|(?:(?:GET|POST|PUT|PATCH|DELETE|DYN)\s+)?(?:\/\/@[a-zA-Z_][a-zA-Z0-9_-]*)(?:\/[A-Za-z0-9._~:/?#\[\]@!$&'*+,=-]*)?|(?:(?:GET|POST|PUT|PATCH|DELETE|DYN)\s+)(?:[A-Za-z0-9._~:/?#\[\]@!$&'*+,=-]*)/ },
         LOGICAL_OR:  "||",
         LOGICAL_AND: "&&",
         GEQ:         ">=",
@@ -130,19 +131,27 @@ lexer.next = () => {
 
 @lexer lexer
 
+# EXTERNAL USE
 fullExpr -> filterExpr {% id %}
 
+# EXTENRAL USE
 # returns HAction[]
-statementBlock -> statement (%SEMI statement):* %SEMI:?  {% (data) => {
-        let rtn = [data[0]];
-        if (data[1] != null && data[1].length > 0) {
-            for (let i=0; i<data[1].length; i++) {
-                let spart = data[1][i];
-                rtn.push(spart[1]);
-            }
-        }
+statementBlock -> anyStatement:+  {% (data) => {
+        let rtn = data[0].filter((v) => (v != null));
         return rtn;
     } %}
+
+anyStatement ->
+      %SEMI                 {% (data) => null %}
+    | statement %SEMI       {% (data) => data[0] %}
+    | statementNoSemi       {% id %}
+
+lastStatement ->
+      statement %SEMI:?     {% (data) => data[0] %}
+    | statementNoSemi       {% id %}
+
+statementNoSemi ->
+      ifStatement           {% id %}
 
 # returns HAction
 statement ->
@@ -155,7 +164,6 @@ statement ->
     | debugStatement        {% id %}
     | alertStatement        {% id %}
     | exprStatement         {% id %}
-    | ifStatement           {% id %}
     | throwStatement        {% id %}
     | setReturnStatement    {% id %}
     | nopStatement          {% id %}
@@ -182,6 +190,7 @@ callStatement -> (lvalue %EQUAL):? callStatementNoAssign {% (data) => {
         return data[1];
     } %}
 
+# EXTERNAL USE
 callStatementNoAssign ->
       staticCallStatement  {% id %}
     | dynCallStatement     {% id %}
@@ -207,6 +216,7 @@ contextAssignPart -> contextAssignKey %EQUAL fullExpr {% (data) => {
 
 commaOrSemi -> %COMMA | %SEMI
 
+# EXTERNAL USE
 # {key, expr}[]
 contextAssignList -> contextAssignPart (commaOrSemi contextAssignPart):* commaOrSemi:? {% (data) => {
           let rtn = [data[0]];
@@ -291,6 +301,7 @@ debugStatement -> %KW_DEBUG callParams {% (data) => ({actiontype: "log", debug: 
 
 alertStatement -> %KW_ALERT callParams {% (data) => ({actiontype: "log", alert: true, data: {etype: "array", exprs: data[1]}}) %}
 
+# EXTERNAL USE
 # [setop : string, PathType]
 lvalue ->
     (idOrKeyword %COLON):? lvaluePath {% (data) => {
@@ -419,6 +430,7 @@ literalVal ->
     | %KW_FALSE  {% (data) => ({etype: "literal", val: false}) %}
     | %KW_NULL   {% (data) => ({etype: "literal", val: null}) %}
 
+# EXTERNAL USE
 pathExprNonTerm ->
       globalPathExpr  {% id %}
     | localPathExpr   {% id %}

@@ -1,6 +1,6 @@
 // Copyright 2021 Dashborg Inc
 
-import {isObject, unpackPositionalArgs, stripAtKeys, getHibiki, fullPath} from "./utils";
+import {isObject, unpackPositionalArgs, stripAtKeys, getHibiki, fullPath, getSS, setSS} from "./utils";
 import {sprintf} from "sprintf-js";
 import type {HibikiState} from "./state";
 import type {AppModuleConfig, FetchHookFn, Hibiki, HibikiAction, HandlerPathType} from "./types";
@@ -262,4 +262,42 @@ class LibModule {
     }
 }
 
-export {AppModule, LocalModule, HttpModule, LibModule};
+class HibikiModule {
+    state : HibikiState;
+
+    constructor(state : HibikiState, config : any) {
+        this.state = state;
+    }
+
+    callHandler(req : HibikiRequest) : Promise<any> {
+        validateModulePath("hibiki", req.callpath);
+        let handlerName = req.callpath.url;
+        if (handlerName == "/get-session-storage") {
+            return this.getSS(req);
+        }
+        else if (handlerName == "/set-session-storage") {
+            return this.setSS(req);
+        }
+        else {
+            throw new Error("Invalid Hibiki Module handler: " + fullPath(req.callpath));
+        }
+    }
+
+    getSS(req : HibikiRequest) {
+        if (!req.data || req.data.key == null) {
+            throw new Error("get-session-storage requires 'key' parameter");
+        }
+        return getSS(req.data.key);
+    }
+
+    setSS(req : HibikiRequest) {
+        if (!req.data || req.data.key == null) {
+            throw new Error("set-session-storage requires 'key' parameter");
+        }
+        let val = DataCtx.demobx(req.data.value);
+        setSS(req.data.key, val);
+        return null;
+    }
+}
+
+export {AppModule, LocalModule, HttpModule, LibModule, HibikiModule};
