@@ -861,6 +861,18 @@ class HibikiState {
         let hibiki = getHibiki();
         this.JSFuncs = hibiki.JSFuncs;
         this.CsrfHook = DefaultCsrfHook;
+        window.addEventListener("popstate", this.popStateHandler);
+    }
+    
+    @boundMethod popStateHandler() {
+        this.setStateVars();
+        let action = {
+            actiontype: "fireevent",
+            native: true,
+            event: {etype: "literal", val: "popstate"},
+        };
+        let rtctx = new RtContext();
+        DataCtx.ExecuteHandlerBlock([action], false, this.pageDataenv(), rtctx, true);
     }
 
     runFetchHooks(url : URL, fetchInit : any) {
@@ -896,6 +908,15 @@ class HibikiState {
         }
     }
 
+    @mobx.action setStateVars() {
+        let rootDataenv = this.rootDataenv();
+        rootDataenv.setDataPath("$state.pagename", this.PageName.get());
+        rootDataenv.setDataPath("$state.historystate", window.history.state);
+        rootDataenv.setDataPath("$state.title", document.title);
+        rootDataenv.setDataPath("$state.rawurlparams", parseUrlParams());
+        rootDataenv.setDataPath("$state.urlparams", smartDecodeParams(window.location.search));
+    }
+
     initialize(force : boolean) {
         if (this.Initialized.get()) {
             console.log("Hibiki State is already initialized");
@@ -904,9 +925,7 @@ class HibikiState {
             this.setInitialized();
             return;
         }
-        let rootDataenv = this.rootDataenv();
-        rootDataenv.setDataPath("$state.rawurlparams", parseUrlParams());
-        rootDataenv.setDataPath("$state.urlparams", smartDecodeParams(window.location.search));
+        this.setStateVars();
         let rtctx = new RtContext();
         let [deps, srcs] = createDepPromise("@main", window.location.href, this, this.HtmlObj.get());
         console.log(sprintf("Hibiki root dependencies: %s", JSON.stringify(srcs)));

@@ -1,9 +1,9 @@
 // Copyright 2021 Dashborg Inc
 
-import {isObject, unpackPositionalArgs, stripAtKeys, getHibiki, fullPath, getSS, setSS} from "./utils";
+import {isObject, unpackPositionalArgs, stripAtKeys, getHibiki, fullPath, getSS, setSS, smartEncodeParam, unpackArg, unpackAtArgs} from "./utils";
 import {sprintf} from "sprintf-js";
 import type {HibikiState} from "./state";
-import type {AppModuleConfig, FetchHookFn, Hibiki, HibikiAction, HandlerPathType} from "./types";
+import type {AppModuleConfig, FetchHookFn, Hibiki, HibikiAction, HandlerPathType, HibikiExtState} from "./types";
 import * as DataCtx from "./datactx";
 import type {HibikiRequest} from "./request";
 import merge from "lodash/merge";
@@ -35,6 +35,10 @@ function convertHeaders(...headersObjArr : any[]) : Headers {
     return rtn;
 }
 
+function hibikiState(state : HibikiExtState) : HibikiState {
+    return ((state as any).state as HibikiState);
+}
+
 function setParams(method : string, url : URL, fetchInit : Record<string, any>, data : any) {
     if (data == null || !isObject(data)) {
         return;
@@ -62,8 +66,7 @@ function setParams(method : string, url : URL, fetchInit : Record<string, any>, 
 }
 
 function buildFetchInit(req : HibikiRequest, defaultInit : any, defaultHeaders : Record<string, any>) : any{
-    let fullData = req.data ?? {};
-    let {"@mode": dataMode, "@init": dataInit, "@headers": dataHeaders, "@credentials": dataCredentials} = fullData;
+    let {mode: dataMode, init: dataInit, headers: dataHeaders, credentials: dataCredentials} = unpackAtArgs(req.data);
     let method = getMethod(req);
     let fetchInit = Object.assign({}, defaultInit, dataInit);
     fetchInit.headers = convertHeaders((defaultInit ?? {}).headers, defaultHeaders, (dataInit || {}).headers, dataHeaders);
@@ -192,7 +195,7 @@ function getMethod(req : HibikiRequest) : string {
         return method.toUpperCase();
     }
     if (req.data != null) {
-        let dataMethod = req.data["@method"];
+        let dataMethod = unpackArg(req.data, "@method");
         if (dataMethod != null) {
             return dataMethod.toUpperCase();
         }
@@ -278,24 +281,67 @@ class HibikiModule {
         else if (handlerName == "/set-session-storage") {
             return this.setSS(req);
         }
+        else if (handlerName == "/set-title") {
+            return this.setTitle(req);
+        }
+        else if (handlerName == "/update-url") {
+            return this.updateUrl(req);
+        }
         else {
             throw new Error("Invalid Hibiki Module handler: " + fullPath(req.callpath));
         }
     }
 
-    getSS(req : HibikiRequest) {
-        if (!req.data || req.data.key == null) {
+    getSS(req : HibikiRequest) : Promise<any> {
+        let key = unpackArg(req.data, "key", 0);
+        if (key == null) {
             throw new Error("get-session-storage requires 'key' parameter");
         }
-        return getSS(req.data.key);
+        return getSS(key);
     }
 
-    setSS(req : HibikiRequest) {
-        if (!req.data || req.data.key == null) {
+    setSS(req : HibikiRequest) : Promise<any> {
+        let key = unpackArg(req.data, "key", 0);
+        if (key == null) {
             throw new Error("set-session-storage requires 'key' parameter");
         }
-        let val = DataCtx.demobx(req.data.value);
-        setSS(req.data.key, val);
+        let val = DataCtx.demobx(unpackArg(req.data, "value", 1));
+        setSS(key, val);
+        return null;
+    }
+
+    setTitle(req : HibikiRequest) : Promise<any> {
+        let title = unpackArg(req.data, "title", 0);
+        if (title == null) {
+            throw new Error("set-title requires 'title' parameter");
+        }
+        document.title = String(title);
+        req.setData("$state.title", document.title);
+        return null;
+    }
+
+    updateUrl(req : HibikiRequest) : Promise<any> {
+        let data = stripAtKeys(req.data);
+        let {path: urlStr, raw: isRaw, replace, title} = unpackAtArgs(req.data);
+        let url  = new URL((urlStr ?? ""), window.location.href);
+        for (let key in data) {
+            let val = data[key];
+            if (val == null) {
+                url.searchParams.delete(key);
+                continue;
+            }
+            url.searchParams.set(key, smartEncodeParam(val, isRaw));
+        }
+        if (title != null) {
+            document.title = title;
+        }
+        if (replace) {
+            window.history.replaceState(null, document.title, url.toString());
+        }
+        else {
+            window.history.pushState(null, document.title, url.toString());
+        }
+        hibikiState(req.state).setStateVars();
         return null;
     }
 }

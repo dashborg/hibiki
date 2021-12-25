@@ -201,6 +201,28 @@ function smartDecodeParams(paramsStr : string) : {[e : string] : any} {
     return rtn;
 }
 
+function smartEncodeParam(val : any, isRaw? : boolean) : string {
+    if (val == null) {
+        return null;
+    }
+    if (isRaw) {
+        return String(val);
+    }
+    if (typeof(val) == "string") {
+        if (val == "") {
+            return "";
+        }
+        if (val[0] == "\"" || val[0] == "{" || val[0] == "[" || val[0] == "-" || (val[0] >= "0" && val[0] <= "9")) {
+            return JSON.stringify(val);
+        }
+        return val;
+    }
+    if (typeof(val) == "number") {
+        return String(val);
+    }
+    return JSON.stringify(val);
+}
+
 function smartEncodeParams(paramsObj : {[e : string] : any}) : string {
     let usp = new URLSearchParams();
     if (paramsObj == null) {
@@ -208,26 +230,15 @@ function smartEncodeParams(paramsObj : {[e : string] : any}) : string {
     }
     for (let key in paramsObj) {
         let val = paramsObj[key];
-        if (typeof(val) == "string") {
-            if (val == "") {
-                usp.set(key, "");
-                continue;
-            }
-            if (val[0] == "\"" || val[0] == "{" || val[0] == "[" || val[0] == "-" || (val[0] >= "0" && val[0] <= "9")) {
-                usp.set(key, JSON.stringify(val));
-                continue;
-            }
-            usp.set(key, val);
-            continue;
-        }
-        if (typeof(val) == "number") {
-            usp.set(key, String(val));
+        if (val == null) {
+            usp.delete(key);
             continue;
         }
         try {
-            usp.set(key, JSON.stringify(val));
+            let encVal = smartEncodeParam(val);
+            usp.set(key, val);
         }
-        catch (e) {
+        catch(e) {
             continue;
         }
     }
@@ -311,6 +322,39 @@ function nodeStr(node : HibikiNode) : string {
     }
     return "<" + node.tag + ">";
 }
+
+function unpackArg(data : Record<string, any>, argName : string, pos? : number) : any {
+    if (data == null) {
+        return null;
+    }
+    if (argName != null) {
+        if (argName in data) {
+            return data[argName];
+        }
+    }
+    if (pos == null) {
+        return null;
+    }
+    let posArgs = data["*args"];
+    if (posArgs == null || posArgs.length <= pos) {
+        return null;
+    }
+    return posArgs[pos];
+}
+
+function unpackAtArgs(data : Record<string, any>) : Record<string, any> {
+    if (data == null) {
+        return {};
+    }
+    let rtn : Record<string, any> = {};
+    for (let key in data) {
+        if (key.startsWith("@")) {
+            rtn[key.substr(1)] = data[key];
+        }
+    }
+    return rtn;
+}
+
 
 function unpackPositionalArgs(data : Record<string, any>, posArgNames : string[]) : Record<string, any> {
     if (data == null) {
@@ -416,5 +460,5 @@ function getHibiki() : Hibiki {
     return (window as any).Hibiki;
 }
 
-export {jsonRespHandler, parseUrlParams, valToString, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, makeUrlParamsFromObject, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, rawAttr, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath};
+export {jsonRespHandler, parseUrlParams, valToString, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, makeUrlParamsFromObject, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, rawAttr, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs};
 
