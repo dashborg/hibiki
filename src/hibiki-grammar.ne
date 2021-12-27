@@ -70,11 +70,7 @@ let lexer = moo.states({
                         KW_ELSE: "else",
                         KW_THROW: "throw",
                         KW_REF: "ref",
-                        KW_REPORTERROR: "reportError",
-                        KW_SWITCHAPP: "switchapp",
-                        KW_PUSHAPP: "pushapp",
-                        KW_POPAPP: "popapp",
-                        KW_NAVTO: "navto",
+                        KW_IN: "in",
                     }),
                   },
         LBRACK:   "[",
@@ -139,7 +135,7 @@ ext_callStatementNoAssign -> callStatementNoAssign {% id %}
 ext_contextAssignList     -> contextAssignList     {% id %}
 ext_lvaluePath            -> lvaluePath            {% id %}
 ext_pathExprNonTerm       -> pathExprNonTerm       {% id %}
-
+ext_iteratorExpr          -> iteratorExpr          {% id %}
 
 # INTERNAL RULES
 
@@ -162,6 +158,18 @@ lastStatement ->
 
 statementNoSemi ->
       ifStatement           {% id %}
+
+iteratorExpr ->
+      %ATID %KW_IN fullExpr {% 
+          (data) => ({etype: "iterator", exprs: [data[2]], itemvar: data[0].value}) 
+      %}
+    | %LPAREN %ATID (%COMMA %ATID):? %RPAREN %KW_IN fullExpr {% (data) => {
+          let rtn = {etype: "iterator", exprs: [data[5]], itemvar: data[1].value};
+          if (data[2] != null) {
+              rtn.keyvar = data[2][1].value;
+          }
+          return rtn;
+      } %}
 
 # returns HAction
 statement ->
@@ -540,11 +548,8 @@ idOrKeyword ->
     | %KW_SETRETURN   {% id %}
     | %KW_INVALIDATE  {% id %}
     | %KW_CALLHANDLER {% id %}
-    | %KW_REPORTERROR {% id %}
-    | %KW_SWITCHAPP   {% id %}
-    | %KW_PUSHAPP     {% id %}
-    | %KW_POPAPP      {% id %}
     | %KW_NAVTO       {% id %}
+    | %KW_IN          {% id %}
 
 _ -> %WS:*
 

@@ -72,11 +72,7 @@ let lexer = moo.states({
                         KW_ELSE: "else",
                         KW_THROW: "throw",
                         KW_REF: "ref",
-                        KW_REPORTERROR: "reportError",
-                        KW_SWITCHAPP: "switchapp",
-                        KW_PUSHAPP: "pushapp",
-                        KW_POPAPP: "popapp",
-                        KW_NAVTO: "navto",
+                        KW_IN: "in",
                     }),
                   },
         LBRACK:   "[",
@@ -138,6 +134,7 @@ var grammar = {
     {"name": "ext_contextAssignList", "symbols": ["contextAssignList"], "postprocess": id},
     {"name": "ext_lvaluePath", "symbols": ["lvaluePath"], "postprocess": id},
     {"name": "ext_pathExprNonTerm", "symbols": ["pathExprNonTerm"], "postprocess": id},
+    {"name": "ext_iteratorExpr", "symbols": ["iteratorExpr"], "postprocess": id},
     {"name": "fullExpr", "symbols": ["filterExpr"], "postprocess": id},
     {"name": "statementBlock$ebnf$1", "symbols": ["anyStatement"]},
     {"name": "statementBlock$ebnf$1", "symbols": ["statementBlock$ebnf$1", "anyStatement"], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
@@ -153,6 +150,19 @@ var grammar = {
     {"name": "lastStatement", "symbols": ["statement", "lastStatement$ebnf$1"], "postprocess": (data) => data[0]},
     {"name": "lastStatement", "symbols": ["statementNoSemi"], "postprocess": id},
     {"name": "statementNoSemi", "symbols": ["ifStatement"], "postprocess": id},
+    {"name": "iteratorExpr", "symbols": [(lexer.has("ATID") ? {type: "ATID"} : ATID), (lexer.has("KW_IN") ? {type: "KW_IN"} : KW_IN), "fullExpr"], "postprocess":  
+        (data) => ({etype: "iterator", exprs: [data[2]], itemvar: data[0].value}) 
+              },
+    {"name": "iteratorExpr$ebnf$1$subexpression$1", "symbols": [(lexer.has("COMMA") ? {type: "COMMA"} : COMMA), (lexer.has("ATID") ? {type: "ATID"} : ATID)]},
+    {"name": "iteratorExpr$ebnf$1", "symbols": ["iteratorExpr$ebnf$1$subexpression$1"], "postprocess": id},
+    {"name": "iteratorExpr$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
+    {"name": "iteratorExpr", "symbols": [(lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), (lexer.has("ATID") ? {type: "ATID"} : ATID), "iteratorExpr$ebnf$1", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN), (lexer.has("KW_IN") ? {type: "KW_IN"} : KW_IN), "fullExpr"], "postprocess":  (data) => {
+            let rtn = {etype: "iterator", exprs: [data[5]], itemvar: data[1].value};
+            if (data[2] != null) {
+                rtn.keyvar = data[2][1].value;
+            }
+            return rtn;
+        } },
     {"name": "statement", "symbols": ["callStatement"], "postprocess": id},
     {"name": "statement", "symbols": ["assignmentStatement"], "postprocess": id},
     {"name": "statement", "symbols": ["invalidateStatement"], "postprocess": id},
@@ -488,11 +498,8 @@ var grammar = {
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_SETRETURN") ? {type: "KW_SETRETURN"} : KW_SETRETURN)], "postprocess": id},
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_INVALIDATE") ? {type: "KW_INVALIDATE"} : KW_INVALIDATE)], "postprocess": id},
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_CALLHANDLER") ? {type: "KW_CALLHANDLER"} : KW_CALLHANDLER)], "postprocess": id},
-    {"name": "idOrKeyword", "symbols": [(lexer.has("KW_REPORTERROR") ? {type: "KW_REPORTERROR"} : KW_REPORTERROR)], "postprocess": id},
-    {"name": "idOrKeyword", "symbols": [(lexer.has("KW_SWITCHAPP") ? {type: "KW_SWITCHAPP"} : KW_SWITCHAPP)], "postprocess": id},
-    {"name": "idOrKeyword", "symbols": [(lexer.has("KW_PUSHAPP") ? {type: "KW_PUSHAPP"} : KW_PUSHAPP)], "postprocess": id},
-    {"name": "idOrKeyword", "symbols": [(lexer.has("KW_POPAPP") ? {type: "KW_POPAPP"} : KW_POPAPP)], "postprocess": id},
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_NAVTO") ? {type: "KW_NAVTO"} : KW_NAVTO)], "postprocess": id},
+    {"name": "idOrKeyword", "symbols": [(lexer.has("KW_IN") ? {type: "KW_IN"} : KW_IN)], "postprocess": id},
     {"name": "_$ebnf$1", "symbols": []},
     {"name": "_$ebnf$1", "symbols": ["_$ebnf$1", (lexer.has("WS") ? {type: "WS"} : WS)], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
     {"name": "_", "symbols": ["_$ebnf$1"]}

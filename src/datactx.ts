@@ -26,6 +26,8 @@ type HExpr = {
     val?     : any,
     key?     : HExpr,
     path?    : PathType,
+    itemvar? : string,
+    keyvar?  : string,
     valexpr? : HExpr,
 };
 
@@ -484,23 +486,7 @@ function ParseBlock(blockStr : string) : HAction[] {
 }
 
 function ParseBlockThrow(blockStr : string) : HAction[] {
-    let g = nearley.Grammar.fromCompiled(hibikiGrammar);
-    g.ParserStart = g.start = "ext_statementBlock";
-    let blockParser = new nearley.Parser(g);
-    try {
-        blockParser.feed(blockStr + ";");
-    }
-    catch (e) {
-        let emsg = getShortEMsg(e);
-        throw new Error(emsg);
-    }
-    if (blockParser.results == null || blockParser.results.length == 0) {
-        throw new Error("Error parsing block, unterminated statement: " + blockStr);
-    }
-    let block = blockParser.results[0];
-    if (blockParser.results.length > 1) {
-        console.log("Ambiguous parse of block", blockStr, blockParser.results);
-    }
+    let block : HAction[] = doParse(blockStr + ";", "ext_statementBlock");
     return block;
 }
 
@@ -515,20 +501,8 @@ function ParsePath(path : string) : PathType {
 }
 
 function ParsePathThrow(pathStr : string, allowDynamic? : boolean) : PathType {
-    let g = nearley.Grammar.fromCompiled(hibikiGrammar);
-    g.ParserStart = g.start = "ext_pathExprNonTerm";
-    let exprParser = new nearley.Parser(nearley.Grammar.fromCompiled(hibikiGrammar));
-    try {
-        exprParser.feed(pathStr);
-    }
-    catch (e) {
-        let emsg = getShortEMsg(e);
-        throw new Error(emsg);
-    }
-    if (exprParser.results == null || exprParser.results.length == 0) {
-        throw new Error("Error parsing path, unterminated expression: + " + pathStr);
-    }
-    let path = exprParser.results[0].path;
+    let expr = doParse(pathStr, "ext_pathExprNonTerm");
+    let path : PathType = expr.path;
     if (!allowDynamic) {
         for (let i=0; i<path.length; i++) {
             if (path[i].pathtype == "dyn") {
@@ -1832,25 +1806,8 @@ function makeErrorObj(e : any, rtctx : RtContext) : HibikiError {
 }
 
 function ParseContextAssignListThrow(ctxStr : string) : {key : string, expr : HExpr, setop? : string}[] {
-    try {
-        let g = nearley.Grammar.fromCompiled(hibikiGrammar);
-        g.ParserStart = g.start = "ext_contextAssignList";
-        let parser = new nearley.Parser(g);
-        parser.feed(ctxStr);
-        if (parser.results == null || parser.results.length == 0) {
-            throw new Error("Error parsing expression, unterminated context: + " + ctxStr);
-        }
-        if (parser.results.length > 1) {
-            console.log("Hibiki Parser: ambiguious context result", parser.results);
-        }
-        let actions = parser.results[0];
-        return actions;
-    }
-    catch (e) {
-        let emsg = getShortEMsg(e);
-        console.log(e);
-        throw new Error(emsg);
-    }
+    let actions = doParse(ctxStr, "ext_contextAssignList");
+    return actions;
 }
 
 function ParseAndCreateContextThrow(ctxStr : string, rootName : "context" | "c", dataenv : DataEnvironment, htmlContext : string) : DataEnvironment {
@@ -1887,17 +1844,7 @@ function EvalSimpleExpr(exprStr : string, dataenv : DataEnvironment, rtContext? 
 }
 
 function ParseSimpleExprThrow(exprStr : string) : HExpr {
-    let g = nearley.Grammar.fromCompiled(hibikiGrammar);
-    g.ParserStart = g.start = "ext_fullExpr";
-    let exprParser = new nearley.Parser(g);
-    exprParser.feed(exprStr);
-    if (exprParser.results == null || exprParser.results.length == 0) {
-        throw new Error("Error parsing expression, unterminated expression: + " + exprStr);
-    }
-    if (exprParser.results.length > 1) {
-        console.log("Hibiki Parser: ambiguious result", exprParser.results);
-    }
-    let exprAst = exprParser.results[0];
+    let exprAst : HExpr = doParse(exprStr, "ext_fullExpr");
     return exprAst;
 }
 
@@ -1963,9 +1910,10 @@ function JsonEqual(v1 : any, v2 : any) : boolean {
     return JsonStringify(v1) == JsonStringify(v2);
 }
 
-function ParseStaticCallStatement(str : string) : HAction {
+function doParse(str : string, nonTerm : string) : any {
+    let nonTermLogStr = nonTerm.replace("ext_", "");
     let g = nearley.Grammar.fromCompiled(hibikiGrammar);
-    g.ParserStart = g.start = "ext_callStatementNoAssign";
+    g.ParserStart = g.start = nonTerm;
     let parser = new nearley.Parser(g);
     try {
         parser.feed(str);
@@ -1974,34 +1922,28 @@ function ParseStaticCallStatement(str : string) : HAction {
         let emsg = getShortEMsg(e);
         throw new Error(emsg);
     }
-    if (parser.results == null || parser.results.length == null) {
-        throw new Error("Error parsing staticCallStatement, unterminated expr");
+    if (parser.results == null || parser.results.length == null || parser.results.length == 0) {
+        throw new Error(sprintf("Error parsing %s, unterminated expr", nonTermLogStr));
     }
-    let callAction = parser.results[0];
     if (parser.results.length > 1) {
-        console.log("Ambiguous parse of staticCallStatement: ", str, parser.results);
+        console.log(sprintf("Ambiguous parse of %s: ", nonTermLogStr), str, parser.results);
     }
+    let parseResult = parser.results[0];
+    return parseResult;
+}
+
+function ParseStaticCallStatement(str : string) : HAction {
+    let callAction : HAction = doParse(str, "ext_callStatementNoAssign");
     return callAction;
 }
 
-function ParseLValuePathThrow(str : string, dataenv : DataEnvironment) {
-    let g = nearley.Grammar.fromCompiled(hibikiGrammar);
-    g.ParserStart = g.start = "ext_lvaluePath";
-    let parser = new nearley.Parser(g);
-    try {
-        parser.feed(str);
-    }
-    catch (e) {
-        let emsg = getShortEMsg(e);
-        throw new Error(emsg);
-    }
-    if (parser.results == null || parser.results.length == null) {
-        throw new Error("Error parsing lvalue, unterminated expr");
-    }
-    let lvalue = parser.results[0];
-    if (parser.results.length > 1) {
-        console.log("Ambiguous parse of lvalue: ", str, parser.results);
-    }
+function ParseIteratorExpr(str : string) : HExpr {
+    let iterExpr : HExpr = doParse(str, "ext_iteratorExpr");
+    return iterExpr;
+}
+
+function ParseLValuePathThrow(str : string, dataenv : DataEnvironment) : LValue {
+    let lvalue = doParse(str, "ext_lvaluePath");
     return new BoundLValue(lvalue, dataenv);
 }
 
