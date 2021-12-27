@@ -132,6 +132,12 @@ lexer.next = () => {
 var grammar = {
     Lexer: lexer,
     ParserRules: [
+    {"name": "ext_fullExpr", "symbols": ["fullExpr"], "postprocess": id},
+    {"name": "ext_statementBlock", "symbols": ["statementBlock"], "postprocess": id},
+    {"name": "ext_callStatementNoAssign", "symbols": ["callStatementNoAssign"], "postprocess": id},
+    {"name": "ext_contextAssignList", "symbols": ["contextAssignList"], "postprocess": id},
+    {"name": "ext_lvaluePath", "symbols": ["lvaluePath"], "postprocess": id},
+    {"name": "ext_pathExprNonTerm", "symbols": ["pathExprNonTerm"], "postprocess": id},
     {"name": "fullExpr", "symbols": ["filterExpr"], "postprocess": id},
     {"name": "statementBlock$ebnf$1", "symbols": ["anyStatement"]},
     {"name": "statementBlock$ebnf$1", "symbols": ["statementBlock$ebnf$1", "anyStatement"], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
@@ -491,7 +497,7 @@ var grammar = {
     {"name": "_$ebnf$1", "symbols": ["_$ebnf$1", (lexer.has("WS") ? {type: "WS"} : WS)], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
     {"name": "_", "symbols": ["_$ebnf$1"]}
 ]
-  , ParserStart: "fullExpr"
+  , ParserStart: "ext_fullExpr"
 }
 if (typeof module !== 'undefined'&& typeof module.exports !== 'undefined') {
    module.exports = grammar;

@@ -485,7 +485,7 @@ function ParseBlock(blockStr : string) : HAction[] {
 
 function ParseBlockThrow(blockStr : string) : HAction[] {
     let g = nearley.Grammar.fromCompiled(hibikiGrammar);
-    g.ParserStart = g.start = "statementBlock";
+    g.ParserStart = g.start = "ext_statementBlock";
     let blockParser = new nearley.Parser(g);
     try {
         blockParser.feed(blockStr + ";");
@@ -515,8 +515,8 @@ function ParsePath(path : string) : PathType {
 }
 
 function ParsePathThrow(pathStr : string, allowDynamic? : boolean) : PathType {
-    let g = nearley.Grammar.fromCompiled(hibikiGrammar, "pathExprNonTerm");
-    g.ParserStart = g.start = "pathExprNonTerm";
+    let g = nearley.Grammar.fromCompiled(hibikiGrammar);
+    g.ParserStart = g.start = "ext_pathExprNonTerm";
     let exprParser = new nearley.Parser(nearley.Grammar.fromCompiled(hibikiGrammar));
     try {
         exprParser.feed(pathStr);
@@ -1834,7 +1834,7 @@ function makeErrorObj(e : any, rtctx : RtContext) : HibikiError {
 function ParseContextAssignListThrow(ctxStr : string) : {key : string, expr : HExpr, setop? : string}[] {
     try {
         let g = nearley.Grammar.fromCompiled(hibikiGrammar);
-        g.ParserStart = g.start = "contextAssignList";
+        g.ParserStart = g.start = "ext_contextAssignList";
         let parser = new nearley.Parser(g);
         parser.feed(ctxStr);
         if (parser.results == null || parser.results.length == 0) {
@@ -1887,7 +1887,9 @@ function EvalSimpleExpr(exprStr : string, dataenv : DataEnvironment, rtContext? 
 }
 
 function ParseSimpleExprThrow(exprStr : string) : HExpr {
-    let exprParser = new nearley.Parser(nearley.Grammar.fromCompiled(hibikiGrammar, "fullExpr"));
+    let g = nearley.Grammar.fromCompiled(hibikiGrammar);
+    g.ParserStart = g.start = "ext_fullExpr";
+    let exprParser = new nearley.Parser(g);
     exprParser.feed(exprStr);
     if (exprParser.results == null || exprParser.results.length == 0) {
         throw new Error("Error parsing expression, unterminated expression: + " + exprStr);
@@ -1963,7 +1965,7 @@ function JsonEqual(v1 : any, v2 : any) : boolean {
 
 function ParseStaticCallStatement(str : string) : HAction {
     let g = nearley.Grammar.fromCompiled(hibikiGrammar);
-    g.ParserStart = g.start = "callStatementNoAssign";
+    g.ParserStart = g.start = "ext_callStatementNoAssign";
     let parser = new nearley.Parser(g);
     try {
         parser.feed(str);
@@ -1984,7 +1986,7 @@ function ParseStaticCallStatement(str : string) : HAction {
 
 function ParseLValuePathThrow(str : string, dataenv : DataEnvironment) {
     let g = nearley.Grammar.fromCompiled(hibikiGrammar);
-    g.ParserStart = g.start = "lvaluePath";
+    g.ParserStart = g.start = "ext_lvaluePath";
     let parser = new nearley.Parser(g);
     try {
         parser.feed(str);

@@ -131,10 +131,20 @@ lexer.next = () => {
 
 @lexer lexer
 
-# EXTERNAL USE
+# EXTERNAL RULES
+
+ext_fullExpr              -> fullExpr              {% id %}
+ext_statementBlock        -> statementBlock        {% id %}
+ext_callStatementNoAssign -> callStatementNoAssign {% id %}
+ext_contextAssignList     -> contextAssignList     {% id %}
+ext_lvaluePath            -> lvaluePath            {% id %}
+ext_pathExprNonTerm       -> pathExprNonTerm       {% id %}
+
+
+# INTERNAL RULES
+
 fullExpr -> filterExpr {% id %}
 
-# EXTENRAL USE
 # returns HAction[]
 statementBlock -> anyStatement:+  {% (data) => {
         let rtn = data[0].filter((v) => (v != null));
@@ -190,7 +200,6 @@ callStatement -> (lvalue %EQUAL):? callStatementNoAssign {% (data) => {
         return data[1];
     } %}
 
-# EXTERNAL USE
 callStatementNoAssign ->
       staticCallStatement  {% id %}
     | dynCallStatement     {% id %}
@@ -216,7 +225,6 @@ contextAssignPart -> contextAssignKey %EQUAL fullExpr {% (data) => {
 
 commaOrSemi -> %COMMA | %SEMI
 
-# EXTERNAL USE
 # {key, expr}[]
 contextAssignList -> contextAssignPart (commaOrSemi contextAssignPart):* commaOrSemi:? {% (data) => {
           let rtn = [data[0]];
@@ -301,7 +309,6 @@ debugStatement -> %KW_DEBUG callParams {% (data) => ({actiontype: "log", debug: 
 
 alertStatement -> %KW_ALERT callParams {% (data) => ({actiontype: "log", alert: true, data: {etype: "array", exprs: data[1]}}) %}
 
-# EXTERNAL USE
 # [setop : string, PathType]
 lvalue ->
     (idOrKeyword %COLON):? lvaluePath {% (data) => {
@@ -430,7 +437,6 @@ literalVal ->
     | %KW_FALSE  {% (data) => ({etype: "literal", val: false}) %}
     | %KW_NULL   {% (data) => ({etype: "literal", val: null}) %}
 
-# EXTERNAL USE
 pathExprNonTerm ->
       globalPathExpr  {% id %}
     | localPathExpr   {% id %}
