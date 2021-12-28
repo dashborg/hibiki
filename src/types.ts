@@ -101,7 +101,7 @@ type HibikiConfig = {
 type PathUnionType = string | PathType;
 
 type PathPart = {
-    pathtype : ("root" | "dot" | "array" | "map" | "dyn" | "dynfind" | "deref"),
+    pathtype : ("root" | "dot" | "array" | "map" | "dyn" | "deref"),
     pathindex? : number,
     pathkey? : string,
 

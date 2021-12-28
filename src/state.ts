@@ -113,7 +113,6 @@ type DataEnvironmentOpts = {
     htmlContext? : string,
     libContext? : string,
     eventBoundary? : string, // "soft" | "hard",
-    localData? : any,
     blockLocalData? : boolean,
 };
 
@@ -127,14 +126,11 @@ class DataEnvironment {
     libContext : string;
     description : string;
     eventBoundary : "soft" | "hard";
-    localData : any;
-    hasLocalData : boolean;
     blockLocalData : boolean;
 
     constructor(dbstate : HibikiState, opts? : DataEnvironmentOpts) {
         this.parent = null;
         this.dbstate = dbstate;
-        this.hasLocalData = false;
         this.specials = {};
         this.handlers = {};
         this.eventBoundary = null;
@@ -149,10 +145,6 @@ class DataEnvironment {
             this.libContext = opts.libContext;
             if (opts.eventBoundary == "soft" || opts.eventBoundary == "hard") {
                 this.eventBoundary = opts.eventBoundary;
-            }
-            if ("localData" in opts) {
-                this.hasLocalData = true;
-                this.localData = opts.localData;
             }
             this.blockLocalData = opts.blockLocalData;
         }
@@ -200,16 +192,6 @@ class DataEnvironment {
         return rtn;
     }
 
-    resolveLocalData() : any {
-        if (this.hasLocalData) {
-            return this.localData;
-        }
-        if (this.parent == null || this.blockLocalData) {
-            return null;
-        }
-        return this.parent.resolveLocalData();
-    }
-
     resolveRoot(rootName : string, opts?: {caret? : number}) : any {
         opts = opts || {};
         if (opts.caret != null && opts.caret < 0 || opts.caret > 1) {
@@ -220,16 +202,6 @@ class DataEnvironment {
         }
         if (rootName == "state") {
             return unbox(this.dbstate.DataRoots["state"]);
-        }
-        if (rootName == "local") {
-            if (opts.caret) {
-                let localstack = this.getLocalStack();
-                if (localstack.length <= opts.caret) {
-                    return null;
-                }
-                return localstack[opts.caret];
-            }
-            return this.resolveLocalData();
         }
         if (rootName == "null") {
             return null;
@@ -260,9 +232,6 @@ class DataEnvironment {
                 return null;
             }
             return ref.specials;
-        }
-        if (rootName == "localstack") {
-            return this.getLocalStack();
         }
         if (rootName == "contextstack") {
             return this.getContextStack();
@@ -410,24 +379,6 @@ class DataEnvironment {
             return null;
         }
         return this.parent.getComponentRoot();
-    }
-
-    getLocalStack() : any[] {
-        let dataenv : DataEnvironment = this;
-        let rtn = [];
-        while (true) {
-            if (dataenv == null) {
-                break;
-            }
-            if (this.hasLocalData) {
-                rtn.push(dataenv.localData);
-            }
-            if (this.blockLocalData) {
-                break;
-            }
-            dataenv = dataenv.parent;
-        }
-        return rtn;
     }
 
     getContextStack() : any[] {

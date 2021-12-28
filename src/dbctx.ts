@@ -111,7 +111,6 @@ function resolveCnMapEx(node : HibikiNode, dataenv : DataEnvironment, classAttr 
 
 class DBCtx {
     dataenv : DataEnvironment;
-    childDataenv : DataEnvironment;
     node : HibikiNode;
     uuid : string;
     
@@ -139,23 +138,14 @@ class DBCtx {
         if (this.dataenv == null) {
             throw new Error("DBCtx no dataenv prop");
         }
-        let ldattr = this.resolveAttr("localdata");
-        if (ldattr != null) {
-            let newData = this.evalExpr(ldattr);
-            let htmlContext = sprintf("localdata:<%s>", this.node.tag);
-            this.childDataenv = this.dataenv.makeChildEnv(null, {htmlContext: htmlContext, localData: newData});
-        }
-        else {
-            this.childDataenv = this.dataenv;
-        }
     }
 
-    getTagName() : string {
-        let rtn = this.node.tag;
-        if (rtn.startsWith("html-")) {
-            rtn = rtn.substr(5);
+    getHtmlTagName() : string {
+        let tagName = this.resolveAttr("component") ?? this.node.tag;
+        if (tagName.startsWith("html-")) {
+            tagName = tagName.substr(5);
         }
-        return rtn;
+        return tagName;
     }
 
     resolvePath(path : string) : any {

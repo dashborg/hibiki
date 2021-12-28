@@ -317,10 +317,14 @@ function rawAttr(node : HibikiNode, attrName : string) : string {
 }
 
 function nodeStr(node : HibikiNode) : string {
-    if (node.attrs != null && node.attrs.name != null) {
-        return "<" + node.tag + " " + node.attrs.name + ">";
+    let extraStr = "";
+    if (node.attrs != null && node.attrs.component != null) {
+        extraStr += " component=" + node.attrs.component;
     }
-    return "<" + node.tag + ">";
+    if (node.attrs != null && node.attrs.name != null) {
+        extraStr += " name=" + node.attrs.name;
+    }
+    return "<" + node.tag + extraStr + ">";
 }
 
 function unpackArg(data : Record<string, any>, argName : string, pos? : number) : any {

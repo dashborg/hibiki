@@ -26,10 +26,14 @@ type HExpr = {
     val?     : any,
     key?     : HExpr,
     path?    : PathType,
-    itemvar? : string,
-    keyvar?  : string,
     valexpr? : HExpr,
 };
+
+type HIteratorExpr = {
+    data     : HExpr,
+    itemvar? : string,
+    keyvar?  : string,
+}
 
 type HAction = {
     actiontype : string,
@@ -117,6 +121,63 @@ function rtnIfType(v : any, itype : string) : any {
     }
     else {
         return null;
+    }
+}
+
+function makeIteratorFromValue(bindVal : any) : [any, boolean] {
+    let iterator = null;
+    let isMap = false;
+    if (bindVal == null) {
+        return [[], false];
+    }
+    if (bindVal instanceof HibikiBlob || (isObject(bindVal) && bindVal._type == "HibikiNode")) {
+        return [[bindVal], false];
+    }
+    if (bindVal instanceof DataEnvironment || bindVal instanceof LValue) {
+        return [[], false];
+    }
+    if (bindVal instanceof Map || mobx.isObservableMap(bindVal)) {
+        return [bindVal, true];
+    }
+    if (mobx.isArrayLike(bindVal)) {
+        return [bindVal, false];
+    }
+    if (typeof(bindVal) == "object") {
+        return [Object.entries(bindVal), true];
+    }
+    else {
+        return [[bindVal], false];
+    }
+}
+
+function getKV(ival : any, isMap : boolean) : [any, any] {
+    if (isMap) {
+        let [key, val] = ival;
+        return [key, val];
+    }
+    return [null, ival];
+}
+
+function* makeIteratorFromExpr(iteratorExpr : HIteratorExpr, dataenv : DataEnvironment) : Generator<Record<string, any>, void, void> {
+    let rawData = evalExprAst(iteratorExpr.data, dataenv);
+    let [iterator, isMap] = makeIteratorFromValue(rawData);
+    let index = 0;
+    for (let rawVal of iterator) {
+        let [key, val] = getKV(rawVal, isMap);
+        let rtn : Record<string, any> = {};
+        if (iteratorExpr.itemvar != null) {
+            rtn[iteratorExpr.itemvar] = val;
+        }
+        if (iteratorExpr.keyvar != null) {
+            if (isMap) {
+                rtn[iteratorExpr.keyvar] = key;
+            }
+            else {
+                rtn[iteratorExpr.keyvar] = index;
+            }
+        }
+        index++;
+        yield rtn;
     }
 }
 
@@ -428,9 +489,6 @@ function StringPath(path : PathUnionType) : string {
                 else if (pp.pathkey == "currentcontext") {
                     rtn = "@";
                 }
-                else if (pp.pathkey == "local") {
-                    rtn = ".";
-                }
                 else {
                     rtn = "$" + pp.pathkey;
                 }
@@ -445,9 +503,6 @@ function StringPath(path : PathUnionType) : string {
         }
         else if (pp.pathtype == "dyn") {
             rtn = rtn + "[dyn]";
-        }
-        else if (pp.pathtype == "dynfind") {
-            rtn = rtn + "[*dynfind]";
         }
         else if (pp.pathtype == "deref") {
             rtn = rtn + "$(deref)";
@@ -592,50 +647,8 @@ function internalResolvePath(path : PathType, irData : any, dataenv : DataEnviro
         }
         return internalResolvePath(path, irData[pp.pathkey], dataenv, level+1);
     }
-    else if (pp.pathtype == "dynfind") {
-        if (dataenv == null) {
-            throw new Error(sprintf("Cannot resolve array dyn-index in ResolvePath without DataEnvironment, path=%s", StringPath(path)));
-        }
-        if (irData == null) {
-            return null;
-        }
-        if (irData instanceof LValue) {
-            let lvalArr = irData.get();
-            if (lvalArr == null) {
-                return null;
-            }
-            if (!mobx.isArrayLike(lvalArr)) {
-                throw new Error(sprintf("Cannot resolve array index (non-array) in ResolvePath, path=%s, level=%d", StringPath(path), level));
-            }
-            let dynindex = resolveDynfind(lvalArr, pp.expr, dataenv);
-            if (dynindex == null) {
-                return null;
-            }
-            return internalResolvePath(path, irData.subArrayIndex(dynindex), dataenv, level+1);
-        }
-        if (!mobx.isArrayLike(irData)) {
-            throw new Error(sprintf("Cannot resolve array index (non-array) in ResolvePath, path=%s, level=%d", StringPath(path), level));
-        }
-        let dynindex = resolveDynfind(irData, pp.expr, dataenv);
-        if (dynindex == null) {
-            return null;
-        }
-        return internalResolvePath(path, irData[dynindex], dataenv, level+1);
-    }
     else {
         throw new Error(sprintf("Bad PathPart in ResolvePath, path=%s, pathtype=%s, level=%d", StringPath(path), pp.pathtype, level));
-    }
-    return null;
-}
-
-function resolveDynfind(arr : any[], expr : any, dataenv : DataEnvironment) : number {
-    for (let i=0; i<arr.length; i++) {
-        let htmlContext = sprintf("dynfind[%d]", i);
-        let childEnv = dataenv.makeChildEnv({"index": i}, {htmlContext: htmlContext, localData: arr[i]});
-        let e1 = evalExprAst(expr, childEnv);
-        if (!!e1) {
-            return i;
-        }
     }
     return null;
 }
@@ -741,17 +754,12 @@ function setPathWrapper(op : string, path : PathType, dataenv : DataEnvironment,
         internalSetPath(dataenv, op, path, irData, setData, 1);
         return;
     }
-    else if (rootpp.pathkey == "local") {
-        let irData = dataenv.resolveRoot("local", {caret: rootpp.caret});
-        internalSetPath(dataenv, op, path, irData, setData, 1);
-        return;
-    }
     else {
         if (allowContext) {
-            throw new Error(sprintf("Cannot SetPath except $data ($), $state, $local (.), $c, or $context (@) roots, path=%s", StringPath(path)));
+            throw new Error(sprintf("Cannot SetPath except $data ($), $state, $c, or $context (@) roots, path=%s", StringPath(path)));
         }
         else {
-            throw new Error(sprintf("Cannot SetPath except $data ($), $state, $local (.), roots, path=%s", StringPath(path)));
+            throw new Error(sprintf("Cannot SetPath except $data ($), $state, roots, path=%s", StringPath(path)));
         }
     }
     
@@ -861,41 +869,6 @@ function internalSetPath(dataenv : DataEnvironment, op : string, path : PathType
         }
         let newVal = internalSetPath(dataenv, op, path, localRoot[pp.pathindex], setData, level+1, opts);
         localRoot[pp.pathindex] = newVal;
-        return localRoot;
-    }
-    else if (pp.pathtype == "dynfind") {
-        if (dataenv == null) {
-            throw new Error(sprintf("Cannot resolve array dyn-index in SetPath without DataEnvironment, path=%s", StringPath(path)));
-        }
-        if (localRoot == null) {
-            localRoot = [];
-        }
-        if (localRoot instanceof LValue) {
-            let lvalArr = localRoot.get();
-            if (lvalArr == null) {
-                lvalArr = [];
-            }
-            if (!mobx.isArrayLike(lvalArr)) {
-                throw new Error(sprintf("SetPath cannot resolve array dyn-index through non-array, path=%s, level=%d", StringPath(path), level));
-            }
-            let dynindex = resolveDynfind(lvalArr, pp.expr, dataenv);
-            if (dynindex == null) {
-                console.log("Warning, cannot resolve dyn-index in SetPath, path=%s, ignoring set", StringPath(path));
-                return localRoot;
-            }
-            internalSetPath(dataenv, op, path, localRoot.subArrayIndex(dynindex), setData, level+1, opts);
-            return localRoot;
-        }
-        if (!mobx.isArrayLike(localRoot)) {
-            throw new Error(sprintf("SetPath cannot resolve array dyn-index through non-array, path=%s, level=%d", StringPath(path), level));
-        }
-        let dynindex = resolveDynfind(localRoot, pp.expr, dataenv);
-        if (dynindex == null) {
-            console.log("Warning, cannot resolve dyn-index in SetPath, path=%s, ignoring set", StringPath(path));
-            return localRoot;
-        }
-        let newVal = internalSetPath(dataenv, op, path, localRoot[dynindex], setData, level+1, opts);
-        localRoot[dynindex] = newVal;
         return localRoot;
     }
     else if (pp.pathtype == "map") {
@@ -1937,9 +1910,19 @@ function ParseStaticCallStatement(str : string) : HAction {
     return callAction;
 }
 
-function ParseIteratorExpr(str : string) : HExpr {
-    let iterExpr : HExpr = doParse(str, "ext_iteratorExpr");
+function ParseIteratorExprThrow(str : string) : HIteratorExpr {
+    let iterExpr : HIteratorExpr = doParse(str, "ext_iteratorExpr");
     return iterExpr;
+}
+
+function ParseIteratorExpr(str : string) : HIteratorExpr {
+    try {
+        return ParseIteratorExprThrow(str);
+    }
+    catch (e) {
+        console.log("ERROR during ParseIteratorExpr [[" + str + "]]", e);
+        return null;
+    }
 }
 
 function ParseLValuePathThrow(str : string, dataenv : DataEnvironment) : LValue {
@@ -1990,9 +1973,9 @@ function convertSimpleType(typeName : string, value : string, defaultValue : any
     return value;
 }
 
-export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, BoundValue, ParseLValuePath, ParseLValuePathThrow, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, evalActionStr};
+export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, BoundValue, ParseLValuePath, ParseLValuePathThrow, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, evalActionStr, ParseIteratorExpr, ParseIteratorExprThrow, makeIteratorFromExpr};
 
-export type {PathType, HAction, HExpr};
+export type {PathType, HAction, HExpr, HIteratorExpr};
 
 
 

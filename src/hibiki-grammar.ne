@@ -161,10 +161,10 @@ statementNoSemi ->
 
 iteratorExpr ->
       %ATID %KW_IN fullExpr {% 
-          (data) => ({etype: "iterator", exprs: [data[2]], itemvar: data[0].value}) 
+          (data) => ({data: data[2], itemvar: data[0].value}) 
       %}
     | %LPAREN %ATID (%COMMA %ATID):? %RPAREN %KW_IN fullExpr {% (data) => {
-          let rtn = {etype: "iterator", exprs: [data[5]], itemvar: data[1].value};
+          let rtn = {data: data[5], itemvar: data[1].value};
           if (data[2] != null) {
               rtn.keyvar = data[2][1].value;
           }
@@ -447,7 +447,6 @@ literalVal ->
 
 pathExprNonTerm ->
       globalPathExpr  {% id %}
-    | localPathExpr   {% id %}
     | contextPathExpr {% id %}
     | derefPathExpr   {% id %}
     | caretPathExpr   {% id %}
@@ -470,19 +469,7 @@ globalPathExpr -> %DOLLAR idOrKeyword:? pathPartAny:* {% (data) => {
           return {etype: "path", path: rtn};
       } %}
 
-caretPathExpr ->
-      %CARET localPathExpr    {% (data) => { data[1].path[0].caret = 1; return data[1]; } %}
-    | %CARET contextPathExpr  {% (data) => { data[1].path[0].caret = 1; return data[1]; } %}
-
-localPathExpr -> %DOT ((pathPartDyn | pathPartBareMap) pathPartAny:*):? {% (data) => {
-          let rtn = [];
-          rtn.push({pathtype: "root", pathkey: "local"});
-          if (data[1] != null) {
-              rtn.push(data[1][0][0]);
-              rtn.push(...data[1][1]);
-          }
-          return {etype: "path", path: rtn};
-      } %}
+caretPathExpr -> %CARET contextPathExpr  {% (data) => { data[1].path[0].caret = 1; return data[1]; } %}
 
 contextPathExpr -> %ATID pathPartAny:* {% (data) => {
           let rtn = [];
@@ -502,7 +489,6 @@ pathPartDot -> %DOT idOrKeyword {% (data) => ({pathtype: "map", pathkey: data[1]
 
 pathPartDyn ->
       pathPartDynSimple {% id %}
-    | pathPartDynFind   {% id %}
 
 pathPartDynSimple -> %LBRACK fullExpr %RBRACK {% (data) => {
         let expr = data[1];
@@ -515,10 +501,6 @@ pathPartDynSimple -> %LBRACK fullExpr %RBRACK {% (data) => {
         else {
             return {pathtype: "dyn", expr: data[1]};
         }
-    } %}
-
-pathPartDynFind -> %LBRACK %STAR fullExpr %RBRACK {% (data) => {
-        return {pathtype: "dynfind", expr: data[2]};
     } %}
 
 stringLit -> 

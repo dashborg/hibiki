@@ -118,7 +118,7 @@ function evalOptionChildren(node : HibikiNode, dataenv : DataEnvironment) : stri
 
 function ctxRenderHtmlChildren(ctx : DBCtx, dataenv? : DataEnvironment) : (Element | string)[] {
     if (dataenv == null) {
-        dataenv = ctx.childDataenv;
+        dataenv = ctx.dataenv;
     }
     if (ctx.node.tag == "option") {
         return [evalOptionChildren(ctx.node, dataenv)];
@@ -200,7 +200,7 @@ function baseRenderHtmlChildren(list : HibikiNode[], dataenv : DataEnvironment, 
 class NodeList extends React.Component<{list : HibikiNode[], ctx : DBCtx, isRoot? : boolean}> {
     render() {
         let {list, ctx} = this.props;
-        let rtn = baseRenderHtmlChildren(list, ctx.childDataenv, this.props.isRoot);
+        let rtn = baseRenderHtmlChildren(list, ctx.dataenv, this.props.isRoot);
         if (rtn == null) {
             return null;
         }
@@ -209,13 +209,14 @@ class NodeList extends React.Component<{list : HibikiNode[], ctx : DBCtx, isRoot
 }
 
 function staticEvalTextNode(node : HibikiNode, dataenv : DataEnvironment) : string {
-    if (node.tag == "#text") {
+    let ctx = new DBCtx(null, node, dataenv);
+    let tagName = ctx.node.tag;
+    if (tagName == "#text") {
         return node.text;
     }
-    if (node.tag != "h-text") {
+    if (tagName != "h-text") {
         return nodeStr(node);
     }
-    let ctx = new DBCtx(null, node, dataenv);
     if (!ctx.isEditMode() && ctx.hasAttr("if")) {
         let ifText = ctx.resolveAttr("if");
         let ifExpr = ctx.evalExpr(ifText);
@@ -235,18 +236,16 @@ class AnyNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironm
     renderForeach(ctx : DBCtx) : any {
         let node = ctx.node;
         let foreachText = ctx.resolveAttr("foreach");
-        let foreachExpr = ctx.evalExpr(foreachText);
-        let [iterator, isMap] = NodeUtils.makeIterator(foreachExpr);
-        let index = 0;
+        let iteratorExpr = DataCtx.ParseIteratorExpr(foreachText);
+        if (iteratorExpr == null) {
+            return <ErrorMsg message={sprintf("%s invalid foreach attribute", nodeStr(ctx.node))}/>;
+        }
+        let iterator = DataCtx.makeIteratorFromExpr(iteratorExpr, ctx.dataenv);
         let rtnContent = [];
-        for (let rawVal of iterator) {
-            let ctxVars = {"index": index};
-            let [key, val] = NodeUtils.getKV(rawVal, isMap);
-            if (key != null) {
-                ctxVars["key"] = key;
-            }
-            let htmlContext = sprintf("<%s foreach-%d>", ctx.node.tag, index);
-            let childEnv = ctx.dataenv.makeChildEnv(ctxVars, {htmlContext: htmlContext, localData: val});
+        let index = 0;
+        for (let ctxVars of iterator) {
+            let htmlContext = sprintf("%s:%d", nodeStr(ctx.node), index);
+            let childEnv = ctx.dataenv.makeChildEnv(ctxVars, {htmlContext: htmlContext});
             let childCtx = new DBCtx(null, node, childEnv);
             let content = this.renderInner(childCtx, true);
             if (content != null) {
@@ -254,13 +253,13 @@ class AnyNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironm
             }
             index++;
         }
-        return rtnContent;
+        return rtnContent
     }
     
     renderInner(ctx : DBCtx, iterating : boolean) : any {
         let node = ctx.node;
-        let nodeName = node.tag;
-        if (nodeName.startsWith("hibiki-")) {
+        let tagName = ctx.node.tag;
+        if (tagName.startsWith("hibiki-")) {
             return null;
         }
         if (!iterating && !ctx.isEditMode() && ctx.hasAttr("foreach")) {
@@ -275,7 +274,8 @@ class AnyNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironm
         }
         let dataenv = ctx.dataenv;
         let dbstate = dataenv.dbstate;
-        let component = dbstate.ComponentLibrary.findComponent(node.tag, dataenv.getLibContext());
+        let compName = ctx.resolveAttr("component") ?? tagName;
+        let component = dbstate.ComponentLibrary.findComponent(compName, dataenv.getLibContext());
         if (component != null) {
             if (component.componentType == "react-custom") {
                 this.nodeType = "react-component";
@@ -298,15 +298,15 @@ class AnyNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironm
             }
             else {
                 this.nodeType = "unknown";
-                return <div>&lt;{nodeName}&gt;</div>;
+                return <div>&lt;{compName}&gt;</div>;
             }
         }
-        if (nodeName.startsWith("html-") || nodeName.indexOf("-") == -1) {
+        if (compName.startsWith("html-") || compName.indexOf("-") == -1) {
             this.nodeType = "rawhtml";
             return <RawHtmlNode node={node} dataenv={dataenv}/>
         }
         this.nodeType = "unknown";
-        return <div>&lt;{nodeName}&gt;</div>;
+        return <div>&lt;{compName}&gt;</div>;
     }
 
     render() {
@@ -340,8 +340,8 @@ class CustomReactNode extends React.Component<{node : HibikiNode, component : Co
         }
         let attrs = ctx.resolveAttrs({raw: true});
         let nodeVar = NodeUtils.makeNodeVar(ctx);
-        let htmlContext = sprintf("react:<%s>", ctx.node.tag);
-        let childEnv = ctx.childDataenv.makeChildEnv({node: nodeVar}, {htmlContext: htmlContext, libContext: component.libName});
+        let htmlContext = sprintf("react:%s", nodeStr(ctx.node));
+        let childEnv = ctx.dataenv.makeChildEnv({node: nodeVar}, {htmlContext: htmlContext, libContext: component.libName});
         let rtnElems = baseRenderHtmlChildren(ctx.node.list, childEnv, false)
         let reactElem = React.createElement(reactImpl, attrs, rtnElems);
         return reactElem;
@@ -354,7 +354,7 @@ class RawHtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnvi
         super(props);
         let ctx = new DBCtx(this);
         if (!ctx.isEditMode()) {
-            if (NodeUtils.GETVALUE_ELEMS[ctx.getTagName()]) {
+            if (NodeUtils.GETVALUE_ELEMS[ctx.getHtmlTagName()]) {
                 ctx.setDefaultForData("value");
             }
         }
@@ -374,9 +374,10 @@ class RawHtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnvi
             return;
         }
         let isReadOnly = !!ctx.resolveAttr("readonly");
-        let isOnChangeElem = NodeUtils.ONCHANGE_ELEMS[ctx.getTagName()];
+        let tagName = ctx.getHtmlTagName();
+        let isOnChangeElem = NodeUtils.ONCHANGE_ELEMS[tagName];
         let typeAttr = ctx.resolveAttr("type");
-        let isCheckbox = (ctx.getTagName() == "input" && typeAttr == "checkbox");
+        let isCheckbox = (tagName == "input" && typeAttr == "checkbox");
         let valueLV = ctx.resolveData("value", true);
         let outputValue = null;
         if (isCheckbox) {
@@ -405,7 +406,7 @@ class RawHtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnvi
     
     render() {
         let ctx = new DBCtx(this);
-        let tagName = ctx.getTagName();
+        let tagName = ctx.getHtmlTagName();
         let elemProps : any = {};
         let attrs = ctx.resolveAttrs();
         let style = ctx.resolveStyleMap("style");
@@ -425,7 +426,7 @@ class RawHtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnvi
         
         let typeAttr = attrs["type"];
         for (let [k,v] of Object.entries(attrs)) {
-            if (k == "style" || k == "class" || k == "if" || k == "notif" || k == "localdata" || k == "eid" || k == "disabled") {
+            if (k == "style" || k == "class" || k == "if" || k == "notif" || k == "eid" || k == "disabled") {
                 continue;
             }
             if (!ctx.isEditMode()) {
@@ -537,8 +538,8 @@ class CustomNode extends React.Component<{node : HibikiNode, component : Compone
             ctx.dataenv.dbstate.NodeDataMap.set(ctx.uuid, nodeDataBox);
         }
         let ctxHandlers = NodeUtils.makeHandlers(ctx.node);
-        let eventCtx = sprintf("<%s>", ctx.node.tag);
-        let eventDE = ctx.childDataenv.makeChildEnv(null, {eventBoundary: "hard", handlers: ctxHandlers, htmlContext: eventCtx});
+        let eventCtx = sprintf("%s", nodeStr(ctx.node));
+        let eventDE = ctx.dataenv.makeChildEnv(null, {eventBoundary: "hard", handlers: ctxHandlers, htmlContext: eventCtx});
         let nodeDataLV = new DataCtx.ObjectLValue(null, nodeDataBox);
         let specials : Record<string, any> = {};
         specials.children = childrenVar;
@@ -673,26 +674,28 @@ class IfNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironme
 }
 
 @mobxReact.observer
+class FragmentNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
+    render() {
+        let ctx = new DBCtx(this);
+        return <NodeList list={ctx.node.list} ctx={ctx}/>;
+    }
+}
+
+@mobxReact.observer
 class ForEachNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
     render() {
-        // let {node, data, dbstate, attrs, bindattr, bindVal} = this.setup();
         let ctx = new DBCtx(this);
-        let dataLV = ctx.resolveData("data", false);
-        let rtnElems = [];
-        let bindVal = dataLV.get();
-        if (bindVal == null) {
-            return null;
+        let foreachText = ctx.resolveAttr("expr");
+        let iteratorExpr = DataCtx.ParseIteratorExpr(foreachText);
+        if (iteratorExpr == null) {
+            return <ErrorMsg message={sprintf("Invalid <h-foreach> expr attribute")}/>;
         }
-        let [iterator, isMap] = NodeUtils.makeIterator(bindVal);
+        let iterator = DataCtx.makeIteratorFromExpr(iteratorExpr, ctx.dataenv);
+        let rtnElems = [];
         let index = 0;
-        for (let rawVal of iterator) {
-            let ctxVars = {"index": index};
-            let [key, val] = NodeUtils.getKV(rawVal, isMap);
-            if (key != null) {
-                ctxVars["key"] = key;
-            }
-            let htmlContext = sprintf("<%s %d>", ctx.node.tag, index);
-            let childEnv = ctx.dataenv.makeChildEnv(ctxVars, {htmlContext: htmlContext, localData: val});
+        for (let ctxVars of iterator) {
+            let htmlContext = sprintf("<h-foreach>:%d", index);
+            let childEnv = ctx.dataenv.makeChildEnv(ctxVars, {htmlContext: htmlContext});
             let childElements = baseRenderHtmlChildren(ctx.node.list, childEnv, false);
             if (childElements != null) {
                 rtnElems.push(...childElements);
@@ -824,10 +827,10 @@ class WithContextNode extends React.Component<{node : HibikiNode, dataenv : Data
         let ctx = new DBCtx(this);
         let contextattr = ctx.resolveAttr("context");
         if (contextattr == null) {
-            return <ErrorMsg message={sprintf("<%s> no context attribute", nodeStr(ctx.node))}/>;
+            return <ErrorMsg message={sprintf("%s no context attribute", nodeStr(ctx.node))}/>;
         }
         try {
-            let ctxDataenv = DataCtx.ParseAndCreateContextThrow(contextattr, "context", ctx.childDataenv, nodeStr(ctx.node));
+            let ctxDataenv = DataCtx.ParseAndCreateContextThrow(contextattr, "context", ctx.dataenv, nodeStr(ctx.node));
             return ctxRenderHtmlChildren(ctx, ctxDataenv);
         }
         catch (e) {
@@ -858,7 +861,7 @@ class ChildrenNode extends React.Component<{node : HibikiNode, dataenv : DataEnv
                 return <ErrorMsg message={sprintf("%s bad child node @ index:%d", nodeStr(ctx.node), i)}/>;
             }
         }
-        let rtnElems = baseRenderHtmlChildren(children, ctx.childDataenv, false);
+        let rtnElems = baseRenderHtmlChildren(children, ctx.dataenv, false);
         if (rtnElems == null) {
             return null;
         }
@@ -1366,5 +1369,6 @@ addCoreComponent("h-renderlog", RenderLogNode);
 addCoreComponent("h-datasorter", DataSorterNode);
 addCoreComponent("h-datapager", DataPagerNode);
 addCoreComponent("h-table", SimpleTableNode);
+addCoreComponent("h-fragment", FragmentNode);
 
 export {HibikiRootNode, CORE_LIBRARY};

@@ -151,13 +151,13 @@ var grammar = {
     {"name": "lastStatement", "symbols": ["statementNoSemi"], "postprocess": id},
     {"name": "statementNoSemi", "symbols": ["ifStatement"], "postprocess": id},
     {"name": "iteratorExpr", "symbols": [(lexer.has("ATID") ? {type: "ATID"} : ATID), (lexer.has("KW_IN") ? {type: "KW_IN"} : KW_IN), "fullExpr"], "postprocess":  
-        (data) => ({etype: "iterator", exprs: [data[2]], itemvar: data[0].value}) 
+        (data) => ({data: data[2], itemvar: data[0].value}) 
               },
     {"name": "iteratorExpr$ebnf$1$subexpression$1", "symbols": [(lexer.has("COMMA") ? {type: "COMMA"} : COMMA), (lexer.has("ATID") ? {type: "ATID"} : ATID)]},
     {"name": "iteratorExpr$ebnf$1", "symbols": ["iteratorExpr$ebnf$1$subexpression$1"], "postprocess": id},
     {"name": "iteratorExpr$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
     {"name": "iteratorExpr", "symbols": [(lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), (lexer.has("ATID") ? {type: "ATID"} : ATID), "iteratorExpr$ebnf$1", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN), (lexer.has("KW_IN") ? {type: "KW_IN"} : KW_IN), "fullExpr"], "postprocess":  (data) => {
-            let rtn = {etype: "iterator", exprs: [data[5]], itemvar: data[1].value};
+            let rtn = {data: data[5], itemvar: data[1].value};
             if (data[2] != null) {
                 rtn.keyvar = data[2][1].value;
             }
@@ -398,7 +398,6 @@ var grammar = {
     {"name": "literalVal", "symbols": [(lexer.has("KW_FALSE") ? {type: "KW_FALSE"} : KW_FALSE)], "postprocess": (data) => ({etype: "literal", val: false})},
     {"name": "literalVal", "symbols": [(lexer.has("KW_NULL") ? {type: "KW_NULL"} : KW_NULL)], "postprocess": (data) => ({etype: "literal", val: null})},
     {"name": "pathExprNonTerm", "symbols": ["globalPathExpr"], "postprocess": id},
-    {"name": "pathExprNonTerm", "symbols": ["localPathExpr"], "postprocess": id},
     {"name": "pathExprNonTerm", "symbols": ["contextPathExpr"], "postprocess": id},
     {"name": "pathExprNonTerm", "symbols": ["derefPathExpr"], "postprocess": id},
     {"name": "pathExprNonTerm", "symbols": ["caretPathExpr"], "postprocess": id},
@@ -424,24 +423,7 @@ var grammar = {
             rtn.push(...data[2]);
             return {etype: "path", path: rtn};
         } },
-    {"name": "caretPathExpr", "symbols": [(lexer.has("CARET") ? {type: "CARET"} : CARET), "localPathExpr"], "postprocess": (data) => { data[1].path[0].caret = 1; return data[1]; }},
     {"name": "caretPathExpr", "symbols": [(lexer.has("CARET") ? {type: "CARET"} : CARET), "contextPathExpr"], "postprocess": (data) => { data[1].path[0].caret = 1; return data[1]; }},
-    {"name": "localPathExpr$ebnf$1$subexpression$1$subexpression$1", "symbols": ["pathPartDyn"]},
-    {"name": "localPathExpr$ebnf$1$subexpression$1$subexpression$1", "symbols": ["pathPartBareMap"]},
-    {"name": "localPathExpr$ebnf$1$subexpression$1$ebnf$1", "symbols": []},
-    {"name": "localPathExpr$ebnf$1$subexpression$1$ebnf$1", "symbols": ["localPathExpr$ebnf$1$subexpression$1$ebnf$1", "pathPartAny"], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
-    {"name": "localPathExpr$ebnf$1$subexpression$1", "symbols": ["localPathExpr$ebnf$1$subexpression$1$subexpression$1", "localPathExpr$ebnf$1$subexpression$1$ebnf$1"]},
-    {"name": "localPathExpr$ebnf$1", "symbols": ["localPathExpr$ebnf$1$subexpression$1"], "postprocess": id},
-    {"name": "localPathExpr$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
-    {"name": "localPathExpr", "symbols": [(lexer.has("DOT") ? {type: "DOT"} : DOT), "localPathExpr$ebnf$1"], "postprocess":  (data) => {
-            let rtn = [];
-            rtn.push({pathtype: "root", pathkey: "local"});
-            if (data[1] != null) {
-                rtn.push(data[1][0][0]);
-                rtn.push(...data[1][1]);
-            }
-            return {etype: "path", path: rtn};
-        } },
     {"name": "contextPathExpr$ebnf$1", "symbols": []},
     {"name": "contextPathExpr$ebnf$1", "symbols": ["contextPathExpr$ebnf$1", "pathPartAny"], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
     {"name": "contextPathExpr", "symbols": [(lexer.has("ATID") ? {type: "ATID"} : ATID), "contextPathExpr$ebnf$1"], "postprocess":  (data) => {
@@ -456,7 +438,6 @@ var grammar = {
     {"name": "pathPartBareMap", "symbols": ["idOrKeyword"], "postprocess": (data) => ({pathtype: "map", pathkey: data[0].value})},
     {"name": "pathPartDot", "symbols": [(lexer.has("DOT") ? {type: "DOT"} : DOT), "idOrKeyword"], "postprocess": (data) => ({pathtype: "map", pathkey: data[1].value})},
     {"name": "pathPartDyn", "symbols": ["pathPartDynSimple"], "postprocess": id},
-    {"name": "pathPartDyn", "symbols": ["pathPartDynFind"], "postprocess": id},
     {"name": "pathPartDynSimple", "symbols": [(lexer.has("LBRACK") ? {type: "LBRACK"} : LBRACK), "fullExpr", (lexer.has("RBRACK") ? {type: "RBRACK"} : RBRACK)], "postprocess":  (data) => {
             let expr = data[1];
             if (expr.etype == "literal") {
@@ -468,9 +449,6 @@ var grammar = {
             else {
                 return {pathtype: "dyn", expr: data[1]};
             }
-        } },
-    {"name": "pathPartDynFind", "symbols": [(lexer.has("LBRACK") ? {type: "LBRACK"} : LBRACK), (lexer.has("STAR") ? {type: "STAR"} : STAR), "fullExpr", (lexer.has("RBRACK") ? {type: "RBRACK"} : RBRACK)], "postprocess":  (data) => {
-            return {pathtype: "dynfind", expr: data[2]};
         } },
     {"name": "stringLit$subexpression$1", "symbols": [(lexer.has("STRSTART_DQ") ? {type: "STRSTART_DQ"} : STRSTART_DQ)]},
     {"name": "stringLit$subexpression$1", "symbols": [(lexer.has("STRSTART_SQ") ? {type: "STRSTART_SQ"} : STRSTART_SQ)]},

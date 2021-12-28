@@ -155,12 +155,13 @@ function makeNodeVar(ctx : DBCtx) : any {
         return null;
     }
     let rtn : any = {};
-    rtn.tag = ctx.getTagName();
+    rtn.tag = ctx.getHtmlTagName();
+    rtn.rawtag = ctx.node.tag;
     rtn._type = "HibikiNode";
     rtn.attrs = ctx.resolveAttrs({raw: true});
     rtn.stylemap = {};
     rtn.uuid = ctx.uuid;
-    rtn.dataenv = ctx.childDataenv;
+    rtn.dataenv = ctx.dataenv;
     rtn.cnmap = {};
 
     // classes
@@ -245,40 +246,6 @@ function parseArgsDecl(datatypes : string) : {[e : string] : boolean} {
         rtn[field] = isWriteable;
     }
     return rtn;
-}
-
-function makeIterator(bindVal : any) : [any, boolean] {
-    let iterator = null;
-    let isMap = false;
-    if (bindVal == null) {
-        return [[], false];
-    }
-    if (bindVal instanceof DataCtx.HibikiBlob || (isObject(bindVal) && bindVal._type == "HibikiNode")) {
-        return [[bindVal], false];
-    }
-    if (bindVal instanceof DataEnvironment || bindVal instanceof DataCtx.LValue) {
-        return [[], false];
-    }
-    if (bindVal instanceof Map || mobx.isObservableMap(bindVal)) {
-        return [bindVal, true];
-    }
-    if (mobx.isArrayLike(bindVal)) {
-        return [bindVal, false];
-    }
-    if (typeof(bindVal) == "object") {
-        return [Object.entries(bindVal), true];
-    }
-    else {
-        return [[bindVal], false];
-    }
-}
-
-function getKV(ival : any, isMap : boolean) : [any, any] {
-    if (isMap) {
-        let [key, val] = ival;
-        return [key, val];
-    }
-    return [null, ival];
 }
 
 function parseSingleAutomerge(amVal : string) : {name? : string, opts? : any} {
@@ -468,4 +435,4 @@ function firstSubNodeByTag(node : HibikiNode, tag : string) : HibikiNode {
     return null;
 }
 
-export {BLOCKED_ELEMS, INLINE_ELEMS, SUBMIT_ELEMS, ONCHANGE_ELEMS, BINDVALUE_ONCHANGE_ELEMS, GETVALUE_ELEMS, renderTextSpan, renderTextData, makeNodeVar, makeChildrenVar, parseArgsDecl, makeIterator, getKV, parseAutomerge, handleConvertType, automerge, makeHandlers, subNodesByTag, firstSubNodeByTag};
+export {BLOCKED_ELEMS, INLINE_ELEMS, SUBMIT_ELEMS, ONCHANGE_ELEMS, BINDVALUE_ONCHANGE_ELEMS, GETVALUE_ELEMS, renderTextSpan, renderTextData, makeNodeVar, makeChildrenVar, parseArgsDecl, parseAutomerge, handleConvertType, automerge, makeHandlers, subNodesByTag, firstSubNodeByTag};
