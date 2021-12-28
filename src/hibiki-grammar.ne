@@ -21,19 +21,18 @@ function strEscValue(val) {
     return ch;
 }
 
+// we define the URLPATH token to accept a superset of valid URLs and module URLs to prevent
+// weird lexing tokens.  parseUrl will sort out the invalid URLs later
+//
 // method            = (?:(?:GET|POST|PUT|PATCH|DELETE|DYN)\s+)
-// scheme            = (?:(?:https?:)?\/\/)
-// hostname (w/port) = (?:[a-zA-Z0-9][a-zA-Z0-9.-]*(?:\:\d+)?)
-// absurl            = (?:\/[A-Za-z0-9._~:/?#\[\]@!$&'*+,=-]*)  // everything from RFC 3986 except '(', ')', and ';'
-// url               = (?:[A-Za-z0-9._~:/?#\[\]@!$&'*+,=-]*)    // no leading slash (relative urls)
-// module            = (?:\/\/@[a-zA-Z_][a-zA-Z0-9_-]*)
-// baseurl           = // does not allow initial '$', '@'
-
-// URLPATH = method? scheme hostname absurl? | method? module absurl? | method? module ':' scheme hostname absurl? | method url
+// prefix            = (?:http:|https:|\/\/)
+// maxurl            = [^(); \t\r\n]+
+//
+// URLPATH = method maxurl | prefix maxurl
 
 let lexer = moo.states({
     main: {
-        URLPATH: { match: /(?:(?:GET|POST|PUT|PATCH|DELETE|DYN)\s+)?(?:(?:https?:)?\/\/)(?:[a-zA-Z0-9][a-zA-Z0-9.-]*(?:\:\d+)?)(?:\/[A-Za-z0-9._~:/?#\[\]@!$&'*+,=-]*)?|(?:(?:GET|POST|PUT|PATCH|DELETE|DYN)\s+)?(?:\/\/@[a-zA-Z_][a-zA-Z0-9_-]*)(?:\/[A-Za-z0-9._~:/?#\[\]@!$&'*+,=-]*)?|(?:(?:GET|POST|PUT|PATCH|DELETE|DYN)\s+)(?:[A-Za-z0-9._~:/?#\[\]@!$&'*+,=-]*)/ },
+        URLPATH: { match: /(?:(?:GET|POST|PUT|PATCH|DELETE|DYN)\s+)[^(); \t\r\n]+|(?:http:|https:|\/\/)[^(); \t\r\n]+/ },
         LOGICAL_OR:  "||",
         LOGICAL_AND: "&&",
         GEQ:         ">=",

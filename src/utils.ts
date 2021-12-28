@@ -434,7 +434,7 @@ function fullPath(hpath : HandlerPathType) : string {
 
 function parseHandler(handlerPath : string) : HandlerPathType {
     if (handlerPath == null || handlerPath == "") {
-        return null;
+        throw new Error("Invalid handler path, cannot be null or empty");
     }
     let methodMatch = handlerPath.match("^(GET|POST|PUT|PATCH|DELETE|DYN)\\s*");
     let method = null;
@@ -444,20 +444,41 @@ function parseHandler(handlerPath : string) : HandlerPathType {
             method = methodMatch[1];
         }
     }
+    let testUrl : URL = null;
     if (handlerPath.startsWith("//@")) {
-        let match = handlerPath.match("^//@([a-zA-Z_][a-zA-Z0-9_-]*)(/.*)?$")
-        if (match == null) {
-            return null;
+        let okModule = handlerPath.match("^//@([a-zA-Z_][a-zA-Z0-9_-]*)(/|:|$)");
+        if (okModule == null) {
+            throw new Error("Invalid handler path, bad module name: " + handlerPath);
         }
-        return {module: match[1], url: (match[2] ?? "/"), method: method};
+        let match = handlerPath.match("^//@([a-zA-Z_][a-zA-Z0-9_-]*)(/.*)?$");
+        if (match == null) {
+            match = handlerPath.match("^//@([a-zA-Z_][a-zA-Z0-9_-]*):(.*)$")
+        }
+        if (match == null) {
+            throw new Error("Invalid handler path, bad module URL format: " + handlerPath);
+        }
+        let urlStr = (match[2] ?? "/");
+        try {
+            testUrl = new URL(urlStr, window.location.href);
+        }
+        catch (e) {
+            throw new Error("Invalid handler path, bad module URL: " + handlerPath);
+        }
+        if (testUrl.protocol != "http:" && testUrl.protocol != "https:") {
+            throw new Error("Invalid handler path, invalid protocol: " + handlerPath);
+        }
+        return {module: match[1], url: urlStr, method: method};
     }
     try {
-        let url = new URL(handlerPath, window.location.href);
-        return {module: "http", url: handlerPath, method: method};
+        testUrl = new URL(handlerPath, window.location.href);
     }
     catch (e) {
-        return null;
+        throw new Error("Invalid handler path, bad URL: " + handlerPath);
     }
+    if (testUrl.protocol != "http:" && testUrl.protocol != "https:") {
+        throw new Error("Invalid handler path, invalid protocol: " + handlerPath);
+    }
+    return {module: "http", url: handlerPath, method: method};
 }
 
 function getHibiki() : Hibiki {
