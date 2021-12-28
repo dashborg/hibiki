@@ -39,6 +39,42 @@ function hibikiState(state : HibikiExtState) : HibikiState {
     return ((state as any).state as HibikiState);
 }
 
+function formDataFromParams(params : Record<string, any>) : FormData {
+    let formData = new FormData();
+    for (let key in params) {
+        let val = params[key];
+        if (val == null || typeof(val) == "function") {
+            formData.delete(key);
+            continue;
+        }
+        if (typeof(val) == "string" || typeof(val) == "number") {
+            formData.set(key, val.toString());
+        }
+        else {
+            formData.set(key, JSON.stringify(val));
+        }
+    }
+    return formData;
+}
+
+function urlSearchParamsFromParams(params : Record<string, any>) : URLSearchParams {
+    let usp = new URLSearchParams();
+    for (let key in params) {
+        let val = params[key];
+        if (val == null || typeof(val) == "function") {
+            usp.delete(key);
+            continue;
+        }
+        if (typeof(val) == "string" || typeof(val) == "number") {
+            usp.set(key, val.toString());
+        }
+        else {
+            usp.set(key, JSON.stringify(val));
+        }
+    }
+    return usp;
+}
+
 function setParams(method : string, url : URL, fetchInit : Record<string, any>, data : any) {
     if (data == null || !isObject(data)) {
         return;
@@ -60,8 +96,23 @@ function setParams(method : string, url : URL, fetchInit : Record<string, any>, 
         }
         return;
     }
-    fetchInit.headers.set("Content-Type", "application/json");
-    fetchInit.body = JSON.stringify(params);
+    let encoding = unpackArg(data, "@encoding");
+    if (encoding == null || encoding == "json") {
+        fetchInit.headers.set("Content-Type", "application/json");
+        fetchInit.body = JSON.stringify(params);
+    }
+    else if (encoding == "url") {
+        fetchInit.headers.set("Content-Type", "application/x-www-form-urlencoded");
+        let usp = urlSearchParamsFromParams(params);
+        fetchInit.body = usp;
+    }
+    else if (encoding == "form" || encoding == "multipart") {
+        let formData = formDataFromParams(params);
+        fetchInit.body = formData;
+    }
+    else {
+        throw new Error("Invalid @encoding specified (must be 'json', 'url', 'form', or 'multipart'): " + encoding);
+    }
     return;
 }
 
