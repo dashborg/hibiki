@@ -224,9 +224,22 @@ class DBCtx {
     }
 
     @boundMethod handleOnSubmit(e : any) : boolean {
-        console.log("running handleonsubmit", this);
+        let formData = new FormData(e.target);
+        let params = {};
+        for (let key of (formData as any).keys()) {
+            let arrVal = formData.getAll(key);
+            if (arrVal.length == 0) {
+                continue;
+            }
+            else if (arrVal.length == 1) {
+                params[key] = arrVal[0];
+            }
+            else {
+                params[key] = arrVal;
+            }
+        }
         e.preventDefault();
-        this.handleEvent("submit");
+        this.handleEvent("submit", {formdata: params});
         return false;
     }
 

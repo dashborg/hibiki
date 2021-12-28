@@ -1,6 +1,6 @@
 // Copyright 2021 Dashborg Inc
 
-import {isObject, unpackPositionalArgs, stripAtKeys, getHibiki, fullPath, getSS, setSS, smartEncodeParam, unpackArg, unpackAtArgs} from "./utils";
+import {isObject, unpackPositionalArgs, stripAtKeys, getHibiki, fullPath, getSS, setSS, smartEncodeParam, unpackArg, unpackAtArgs, blobPrintStr} from "./utils";
 import {sprintf} from "sprintf-js";
 import type {HibikiState} from "./state";
 import type {AppModuleConfig, FetchHookFn, Hibiki, HibikiAction, HandlerPathType, HibikiExtState} from "./types";
@@ -50,6 +50,9 @@ function formDataFromParams(params : Record<string, any>) : FormData {
         if (typeof(val) == "string" || typeof(val) == "number") {
             formData.set(key, val.toString());
         }
+        else if (val instanceof Blob) {
+            formData.set(key, val);
+        }
         else {
             formData.set(key, JSON.stringify(val));
         }
@@ -68,6 +71,9 @@ function urlSearchParamsFromParams(params : Record<string, any>) : URLSearchPara
         if (typeof(val) == "string" || typeof(val) == "number") {
             usp.set(key, val.toString());
         }
+        else if (val instanceof Blob) {
+            throw new Error(sprintf("Cannot serialize Blob %s with url encoding (use 'multipart' encoding)", blobPrintStr(val)));
+        }
         else {
             usp.set(key, JSON.stringify(val));
         }
@@ -75,11 +81,35 @@ function urlSearchParamsFromParams(params : Record<string, any>) : URLSearchPara
     return usp;
 }
 
+function jsonParamsFromParams(params : Record<string, any>) : string {
+    let rtn = {};
+    for (let key in params) {
+        let val = params[key];
+        if (val == null || typeof(val) == "function") {
+            rtn[key] = null;
+        }
+        if (typeof(val) == "string" || typeof(val) == "number") {
+            rtn[key] = val;
+        }
+        else if (val instanceof Blob) {
+            throw new Error(sprintf("Cannot serialize Blob %s with json encoding (use 'multipart' encoding)", blobPrintStr(val)));
+        }
+        else {
+            rtn[key] = val;
+        }
+    }
+    return DataCtx.JsonStringify(rtn);
+}
+
 function setParams(method : string, url : URL, fetchInit : Record<string, any>, data : any) {
     if (data == null || !isObject(data)) {
         return;
     }
-    let params = stripAtKeys(data);
+    let atData = unpackArg(data, "@data");
+    if (atData != null && !isObject(atData)) {
+        throw new Error("Invalid @data, must be an object: type=" + typeof(atData));
+    }
+    let params = Object.assign({}, (atData ?? {}), stripAtKeys(data));
     if (method == "GET" || method == "DELETE") {
         for (let key in params) {
             let val = params[key];
@@ -99,7 +129,7 @@ function setParams(method : string, url : URL, fetchInit : Record<string, any>, 
     let encoding = unpackArg(data, "@encoding");
     if (encoding == null || encoding == "json") {
         fetchInit.headers.set("Content-Type", "application/json");
-        fetchInit.body = JSON.stringify(params);
+        fetchInit.body = jsonParamsFromParams(params);
     }
     else if (encoding == "url") {
         fetchInit.headers.set("Content-Type", "application/x-www-form-urlencoded");

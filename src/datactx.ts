@@ -8,7 +8,7 @@ import {DataEnvironment} from "./state";
 import {sprintf} from "sprintf-js";
 import {parseHtml} from "./html-parser";
 import {RtContext, getShortEMsg, HibikiError} from "./error";
-import {makeUrlParamsFromObject, SYM_PROXY, SYM_FLATTEN, isObject, stripAtKeys, unpackPositionalArgs, nodeStr, parseHandler, fullPath} from "./utils";
+import {makeUrlParamsFromObject, SYM_PROXY, SYM_FLATTEN, isObject, stripAtKeys, unpackPositionalArgs, nodeStr, parseHandler, fullPath, blobPrintStr} from "./utils";
 import {PathPart, PathType, PathUnionType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue, HandlerBlock} from "./types";
 import {HibikiRequest} from "./request";
 import type {EHandlerType} from "./state";
@@ -951,12 +951,15 @@ function MapReplacer(key : string, value : any) : any {
         }
         return rtn;
     }
+    else if (this[key] instanceof Blob) {
+        return blobPrintStr(this[key]);
+    }
     else if (this[key] instanceof HibikiBlob) {
         let bloblen = 0;
         if (this[key].data != null) {
             bloblen = this[key].data.length;
         }
-        return sprintf("[blob type=%s, len=%s]", this[key].mimetype, Math.ceil((bloblen/4)*3));
+        return sprintf("[hibikiblob type=%s, len=%s]", this[key].mimetype, Math.ceil((bloblen/4)*3));
     }
     else if (this[key] instanceof LValue) {
         return this[key].get();
@@ -1084,6 +1087,10 @@ function demobxInternal(v : any) : [any, boolean] {
         return [v, false];
     }
     if (v instanceof HibikiBlob || v instanceof LValue || v instanceof DataEnvironment || v._type == "HibikiNode") {
+        return [v, false];
+    }
+    if (v instanceof Blob) {
+        console.log("demobx-blob", v);
         return [v, false];
     }
     if (v instanceof Map) {

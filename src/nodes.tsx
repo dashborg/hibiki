@@ -484,8 +484,11 @@ class RawHtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnvi
             elemProps[k] = v;
         }
         if (!ctx.isEditMode() && NodeUtils.GETVALUE_ELEMS[tagName]) {
-            let isCheckbox = (tagName == "input" && typeAttr == "checkbox");
+            let isCheckbox = (tagName == "input" && (typeAttr == "checkbox" || typeAttr == "radio"));
             let isWriteable = (tagName != "option" && !ctx.resolveAttr("readonly"));
+            if (tagName == "input" && NodeUtils.READONLY_INPUT_TYPES[typeAttr]) {
+                isWriteable = false;
+            }
             let valueLV = ctx.resolveData("value", isWriteable);
             let value = DataCtx.demobx(valueLV.get());
             if (isCheckbox) {

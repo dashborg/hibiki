@@ -485,5 +485,12 @@ function getHibiki() : Hibiki {
     return (window as any).Hibiki;
 }
 
-export {jsonRespHandler, parseUrlParams, valToString, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, makeUrlParamsFromObject, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, rawAttr, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs};
+function blobPrintStr(blob : Blob) : string {
+    if (blob instanceof File && blob.name != null) {
+        sprintf("[jsblob type=%s, len=%s, name=%s]", blob.type, blob.size, blob.name);
+    }
+    return sprintf("[jsblob type=%s, len=%s]", blob.type, blob.size);
+}
+
+export {jsonRespHandler, parseUrlParams, valToString, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, makeUrlParamsFromObject, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, rawAttr, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs, blobPrintStr};
 

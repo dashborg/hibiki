@@ -68,6 +68,15 @@ let ONCHANGE_ELEMS = {
     // and checkbox
 };
 
+let READONLY_INPUT_TYPES = {
+    "submit": true,
+    "button": true,
+    "hidden": true,
+    "reset": true,
+    "search": true,
+    "image": true,
+};
+
 let BINDVALUE_ONCHANGE_ELEMS = {
     "input": true,
     "textarea": true,
@@ -435,4 +444,4 @@ function firstSubNodeByTag(node : HibikiNode, tag : string) : HibikiNode {
     return null;
 }
 
-export {BLOCKED_ELEMS, INLINE_ELEMS, SUBMIT_ELEMS, ONCHANGE_ELEMS, BINDVALUE_ONCHANGE_ELEMS, GETVALUE_ELEMS, renderTextSpan, renderTextData, makeNodeVar, makeChildrenVar, parseArgsDecl, parseAutomerge, handleConvertType, automerge, makeHandlers, subNodesByTag, firstSubNodeByTag};
+export {BLOCKED_ELEMS, INLINE_ELEMS, SUBMIT_ELEMS, ONCHANGE_ELEMS, BINDVALUE_ONCHANGE_ELEMS, GETVALUE_ELEMS, READONLY_INPUT_TYPES, renderTextSpan, renderTextData, makeNodeVar, makeChildrenVar, parseArgsDecl, parseAutomerge, handleConvertType, automerge, makeHandlers, subNodesByTag, firstSubNodeByTag};
