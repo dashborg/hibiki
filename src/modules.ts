@@ -1,6 +1,6 @@
 // Copyright 2021 Dashborg Inc
 
-import {isObject, unpackPositionalArgs, stripAtKeys, getHibiki, fullPath, getSS, setSS, smartEncodeParam, unpackArg, unpackAtArgs, blobPrintStr} from "./utils";
+import {isObject, unpackPositionalArgs, stripAtKeys, getHibiki, fullPath, getSS, setSS, smartEncodeParam, unpackArg, unpackAtArgs, blobPrintStr, base64ToArray} from "./utils";
 import {sprintf} from "sprintf-js";
 import type {HibikiState} from "./state";
 import type {AppModuleConfig, FetchHookFn, Hibiki, HibikiAction, HandlerPathType, HibikiExtState} from "./types";
@@ -53,8 +53,19 @@ function formDataFromParams(params : Record<string, any>) : FormData {
         else if (val instanceof Blob) {
             formData.set(key, val);
         }
+        else if (val instanceof DataCtx.HibikiBlob) {
+            let binaryArr = base64ToArray(val.data);
+            if (val.name != null) {
+                let blob = new File([binaryArr], val.name, {type: val.mimetype});
+                formData.set(key, blob);
+            }
+            else {
+                let blob = new Blob([binaryArr], {type: val.mimetype});
+                formData.set(key, blob);
+            }
+        }
         else {
-            formData.set(key, JSON.stringify(val));
+            formData.set(key, DataCtx.JsonStringify(val));
         }
     }
     return formData;
@@ -73,6 +84,9 @@ function urlSearchParamsFromParams(params : Record<string, any>) : URLSearchPara
         }
         else if (val instanceof Blob) {
             throw new Error(sprintf("Cannot serialize Blob %s with url encoding (use 'multipart' encoding)", blobPrintStr(val)));
+        }
+        else if (val instanceof DataCtx.HibikiBlob) {
+            throw new Error(sprintf("Cannot serialize HibikiBlob %s with url encoding (use 'multipart' encoding)", blobPrintStr(val)));
         }
         else {
             usp.set(key, JSON.stringify(val));
@@ -93,6 +107,15 @@ function jsonParamsFromParams(params : Record<string, any>) : string {
         }
         else if (val instanceof Blob) {
             throw new Error(sprintf("Cannot serialize Blob %s with json encoding (use 'multipart' encoding)", blobPrintStr(val)));
+        }
+        else if (val instanceof DataCtx.HibikiBlob) {
+            let blob : Record<string, any> = {};
+            blob.mimetype = val.mimetype;
+            blob.data = val.data;
+            if (val.name != null) {
+                blob.name = val.name;
+            }
+            rtn[key] = blob;
         }
         else {
             rtn[key] = val;

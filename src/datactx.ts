@@ -57,6 +57,7 @@ type HAction = {
 class HibikiBlob {
     mimetype : string = null;
     data : string = null;
+    name : string = null;
     _type : "HibikiBlob" = "HibikiBlob";
 
     makeDataUrl() : string {
@@ -955,11 +956,7 @@ function MapReplacer(key : string, value : any) : any {
         return blobPrintStr(this[key]);
     }
     else if (this[key] instanceof HibikiBlob) {
-        let bloblen = 0;
-        if (this[key].data != null) {
-            bloblen = this[key].data.length;
-        }
-        return sprintf("[hibikiblob type=%s, len=%s]", this[key].mimetype, Math.ceil((bloblen/4)*3));
+        return blobPrintStr(this[key]);
     }
     else if (this[key] instanceof LValue) {
         return this[key].get();
@@ -1842,17 +1839,28 @@ function BlobFromBlob(blob : Blob) : Promise<HibikiBlob> {
     return new Promise((resolve, reject) => {
         let reader = new FileReader();
         reader.onloadend = () => {
+            if (reader.error != null) {
+                reject(reader.error);
+                return;
+            }
+            if (reader.result == null) {
+                reject(new Error("Invalid BLOB, no reader result"));
+                return;
+            }
             let mimetype = blob.type;
             let semiIdx = (reader.result as string).indexOf(";");
             if (semiIdx == -1 || mimetype == null || mimetype == "") {
-                reject(new Error("Invalid BLOB returned from fetch, bad mimetype or encoding"));
+                reject(new Error("Invalid BLOB, bad mimetype or encoding"));
                 return;
             }
-            let dbblob = new HibikiBlob();
-            dbblob.mimetype = blob.type;
+            let hblob = new HibikiBlob();
+            hblob.mimetype = blob.type;
             // extra 7 bytes for "base64," ... e.g. data:image/jpeg;base64,[base64data]
-            dbblob.data = (reader.result as string).substr(semiIdx+1+7);
-            resolve(dbblob);
+            hblob.data = (reader.result as string).substr(semiIdx+1+7);
+            if (blob instanceof File && blob.name != null) {
+                hblob.name = blob.name;
+            }
+            resolve(hblob);
         };
         reader.readAsDataURL(blob);
     });

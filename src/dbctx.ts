@@ -92,6 +92,38 @@ function resolveCnMapEx(node : HibikiNode, dataenv : DataEnvironment, classAttr 
     return cnMap;
 }
 
+async function convertFormData(formData : FormData) : Promise<Record<string, any>> {
+    let params = {};
+    for (let key of (formData as any).keys()) {
+        let arrVal = formData.getAll(key);
+        if (arrVal.length == 0) {
+            continue;
+        }
+        else if (arrVal.length == 1) {
+            if (arrVal[0] instanceof Blob) {
+                params[key] = await DataCtx.BlobFromBlob(arrVal[0]);
+            }
+            else {
+                params[key] = arrVal[0];
+            }
+        }
+        else {
+            let newArr : any[] = [];
+            for (let i=0; i<arrVal.length; i++) {
+                let val = arrVal[i];
+                if (val instanceof Blob) {
+                    newArr.push(await DataCtx.BlobFromBlob(val));
+                }
+                else {
+                    newArr.push(val);
+                }
+            }
+            params[key] = newArr;
+        }
+    }
+    return params;
+}
+
 // dbstate
 //   Components
 //   queueScriptSrc
@@ -224,22 +256,12 @@ class DBCtx {
     }
 
     @boundMethod handleOnSubmit(e : any) : boolean {
-        let formData = new FormData(e.target);
-        let params = {};
-        for (let key of (formData as any).keys()) {
-            let arrVal = formData.getAll(key);
-            if (arrVal.length == 0) {
-                continue;
-            }
-            else if (arrVal.length == 1) {
-                params[key] = arrVal[0];
-            }
-            else {
-                params[key] = arrVal;
-            }
-        }
         e.preventDefault();
-        this.handleEvent("submit", {formdata: params});
+        let formData = new FormData(e.target);
+        let paramsPromise = convertFormData(formData);
+        paramsPromise.then((params) => {
+            this.handleEvent("submit", {formdata: params});
+        });
         return false;
     }
 

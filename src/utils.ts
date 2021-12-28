@@ -3,6 +3,7 @@
 import * as mobx from "mobx";
 import {HibikiNode, Hibiki, HandlerPathType} from "./types";
 import {sprintf} from "sprintf-js";
+import type {HibikiBlob} from "./datactx";
 
 declare var window : any;
 
@@ -485,12 +486,35 @@ function getHibiki() : Hibiki {
     return (window as any).Hibiki;
 }
 
-function blobPrintStr(blob : Blob) : string {
+function blobPrintStr(blob : Blob | HibikiBlob) : string {
+    if (blob == null) {
+        return null;
+    }
+    if (isObject(blob) && (blob as any)._type == "HibikiBlob") {
+        let hblob : HibikiBlob = (blob as any);
+        let bloblen = 0;
+        if (hblob.data != null) {
+            bloblen = hblob.data.length;
+        }
+        return sprintf("[hibikiblob type=%s, len=%s]", hblob.mimetype, Math.ceil((bloblen/4)*3))
+    }
     if (blob instanceof File && blob.name != null) {
         sprintf("[jsblob type=%s, len=%s, name=%s]", blob.type, blob.size, blob.name);
     }
-    return sprintf("[jsblob type=%s, len=%s]", blob.type, blob.size);
+    if (blob instanceof Blob) {
+        return sprintf("[jsblob type=%s, len=%s]", blob.type, blob.size);
+    }
+    return null;
 }
 
-export {jsonRespHandler, parseUrlParams, valToString, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, makeUrlParamsFromObject, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, rawAttr, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs, blobPrintStr};
+function base64ToArray(b64 : string) : Uint8Array {
+    let binaryStr = atob(b64);
+    let arr = new Uint8Array(binaryStr.length);
+    for (let i=0; i<binaryStr.length; i++) {
+        arr[i] = binaryStr.charCodeAt(i);
+    }
+    return arr;
+}
+
+export {jsonRespHandler, parseUrlParams, valToString, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, makeUrlParamsFromObject, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, rawAttr, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs, blobPrintStr, base64ToArray};
 
