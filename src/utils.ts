@@ -11,6 +11,40 @@ const ssFeClientIdKey = "hibiki-feclientid";
 const SYM_PROXY = Symbol("proxy");
 const SYM_FLATTEN = Symbol("flatten");
 
+function spliceCopy(arr : any[], ...rest : any[]) {
+    if (arr == null || !mobx.isArrayLike(arr)) {
+        return null;
+    }
+    let newArr = [...arr];
+    // @ts-ignore
+    newArr.splice(...rest);
+    return newArr;
+}
+
+function addToArrayDupCheck(arr : any[], val : string) {
+    if (arr == null) {
+        return;
+    }
+    for (let i=0; i<arr.length; i++) {
+        if (arr[i] == val) {
+            return;
+        }
+    }
+    arr.push(val);
+}
+
+function removeFromArray(arr : any[], val : string) {
+    if (arr == null) {
+        return;
+    }
+    for (let i=0; i<arr.length; i++) {
+        if (arr[i] == val) {
+            arr.splice(i, 1);
+            return;
+        }
+    }
+}
+
 function jsonRespHandler(resp) {
     if (!resp.data) {
         throw new Error("No Data Returned");
@@ -496,6 +530,9 @@ function blobPrintStr(blob : Blob | HibikiBlob) : string {
         if (hblob.data != null) {
             bloblen = hblob.data.length;
         }
+        if (hblob.name != null) {
+            return sprintf("[hibikiblob type=%s, len=%s, name=%s]", hblob.mimetype, Math.ceil((bloblen/4)*3), hblob.name);
+        }
         return sprintf("[hibikiblob type=%s, len=%s]", hblob.mimetype, Math.ceil((bloblen/4)*3))
     }
     if (blob instanceof File && blob.name != null) {
@@ -516,5 +553,5 @@ function base64ToArray(b64 : string) : Uint8Array {
     return arr;
 }
 
-export {jsonRespHandler, parseUrlParams, valToString, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, makeUrlParamsFromObject, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, rawAttr, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs, blobPrintStr, base64ToArray};
+export {jsonRespHandler, parseUrlParams, valToString, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, makeUrlParamsFromObject, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, rawAttr, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs, blobPrintStr, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy};
 

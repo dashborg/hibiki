@@ -7,6 +7,7 @@ import type {AppModuleConfig, FetchHookFn, Hibiki, HibikiAction, HandlerPathType
 import * as DataCtx from "./datactx";
 import type {HibikiRequest} from "./request";
 import merge from "lodash/merge";
+import * as mobx from "mobx";
 
 let VALID_METHODS = {"GET": true, "POST": true, "PUT": true, "PATCH": true, "DELETE": true};
 
@@ -39,89 +40,118 @@ function hibikiState(state : HibikiExtState) : HibikiState {
     return ((state as any).state as HibikiState);
 }
 
+function formDataConvertVal(val : any, inArray? : boolean) : any {
+    if (val == null || typeof(val) == "function") {
+        return null;
+    }
+    if (typeof(val) == "string" || typeof(val) == "number" || typeof(val) == "boolean") {
+        return val.toString();
+    }
+    if (val instanceof Blob) {
+        return val;
+    }
+    if (val instanceof DataCtx.HibikiBlob) {
+        let binaryArr = base64ToArray(val.data);
+        if (val.name != null) {
+            let blob = new File([binaryArr], val.name, {type: val.mimetype});
+            return blob;
+        }
+        else {
+            let blob = new Blob([binaryArr], {type: val.mimetype});
+            return blob;
+        }
+    }
+    if (!inArray && mobx.isArrayLike(val)) {
+        let rtn = [];
+        for (let i=0; i<val.length; i++) {
+            let subVal = formDataConvertVal(val[i], true);
+            rtn.push(subVal);
+        }
+        return rtn;
+    }
+    return DataCtx.JsonStringify(val);
+}
+
 function formDataFromParams(params : Record<string, any>) : FormData {
     let formData = new FormData();
     for (let key in params) {
         let val = params[key];
-        if (val == null || typeof(val) == "function") {
-            formData.delete(key);
+        let convertedVal = formDataConvertVal(val, false);
+        if (convertedVal == null) {
             continue;
         }
-        if (typeof(val) == "string" || typeof(val) == "number") {
-            formData.set(key, val.toString());
-        }
-        else if (val instanceof Blob) {
-            formData.set(key, val);
-        }
-        else if (val instanceof DataCtx.HibikiBlob) {
-            let binaryArr = base64ToArray(val.data);
-            if (val.name != null) {
-                let blob = new File([binaryArr], val.name, {type: val.mimetype});
-                formData.set(key, blob);
-            }
-            else {
-                let blob = new Blob([binaryArr], {type: val.mimetype});
-                formData.set(key, blob);
+        if (mobx.isArrayLike(convertedVal)) {
+            for (let i=0; i<convertedVal.length; i++) {
+                formData.append(key, convertedVal[i]);
             }
         }
         else {
-            formData.set(key, DataCtx.JsonStringify(val));
+            formData.set(key, convertedVal);
         }
     }
     return formData;
 }
 
+function urlSearchParamsConvertVal(val : any, inArray? : boolean) : any {
+    if (val == null || typeof(val) == "function") {
+        return null;
+    }
+    if (typeof(val) == "string" || typeof(val) == "number" || typeof(val) == "boolean") {
+        return val.toString();
+    }
+    else if (val instanceof Blob) {
+        throw new Error(sprintf("Cannot serialize Blob %s with url encoding (use 'multipart' encoding)", blobPrintStr(val)));
+    }
+    else if (val instanceof DataCtx.HibikiBlob) {
+        throw new Error(sprintf("Cannot serialize HibikiBlob %s with url encoding (use 'multipart' encoding)", blobPrintStr(val)));
+    }
+    else if (!inArray && mobx.isArrayLike(val)) {
+        let rtn = [];
+        for (let i=0; i<val.length; i++) {
+            let subVal = urlSearchParamsConvertVal(val[i], true);
+            rtn.push(subVal);
+        }
+        return rtn;
+    }
+    else {
+        return DataCtx.JsonStringify(val);
+    }
+}
+
 function urlSearchParamsFromParams(params : Record<string, any>) : URLSearchParams {
     let usp = new URLSearchParams();
     for (let key in params) {
-        let val = params[key];
-        if (val == null || typeof(val) == "function") {
-            usp.delete(key);
+        let val = urlSearchParamsConvertVal(params[key]);
+        if (val == null) {
             continue;
         }
-        if (typeof(val) == "string" || typeof(val) == "number") {
-            usp.set(key, val.toString());
-        }
-        else if (val instanceof Blob) {
-            throw new Error(sprintf("Cannot serialize Blob %s with url encoding (use 'multipart' encoding)", blobPrintStr(val)));
-        }
-        else if (val instanceof DataCtx.HibikiBlob) {
-            throw new Error(sprintf("Cannot serialize HibikiBlob %s with url encoding (use 'multipart' encoding)", blobPrintStr(val)));
+        if (mobx.isArrayLike(val)) {
+            for (let i=0; i<val.length; i++) {
+                usp.append(key, val[i]);
+            }
         }
         else {
-            usp.set(key, JSON.stringify(val));
+            usp.set(key, val);
         }
     }
     return usp;
 }
 
-function jsonParamsFromParams(params : Record<string, any>) : string {
-    let rtn = {};
-    for (let key in params) {
-        let val = params[key];
-        if (val == null || typeof(val) == "function") {
-            rtn[key] = null;
-        }
-        if (typeof(val) == "string" || typeof(val) == "number") {
-            rtn[key] = val;
-        }
-        else if (val instanceof Blob) {
-            throw new Error(sprintf("Cannot serialize Blob %s with json encoding (use 'multipart' encoding)", blobPrintStr(val)));
-        }
-        else if (val instanceof DataCtx.HibikiBlob) {
-            let blob : Record<string, any> = {};
-            blob.mimetype = val.mimetype;
-            blob.data = val.data;
-            if (val.name != null) {
-                blob.name = val.name;
-            }
-            rtn[key] = blob;
-        }
-        else {
-            rtn[key] = val;
-        }
+function jsonReplacer(key : string, value : any) : any {
+    if (this[key] instanceof Blob) {
+        throw new Error(sprintf("Cannot serialize Blob %s with json encoding (use 'multipart' encoding)", blobPrintStr(val)));
     }
-    return DataCtx.JsonStringify(rtn);
+    if (this[key] instanceof DataCtx.HibikiBlob) {
+        let val = this[key];
+        let blob : Record<string, any> = {};
+        blob.mimetype = val.mimetype;
+        blob.data = val.data;
+        if (val.name != null) {
+            blob.name = val.name;
+        }
+        return blob;
+    }
+    return DataCtx.MapReplacer.bind(this)(key, value);
 }
 
 function setParams(method : string, url : URL, fetchInit : Record<string, any>, data : any) {
@@ -152,7 +182,7 @@ function setParams(method : string, url : URL, fetchInit : Record<string, any>, 
     let encoding = unpackArg(data, "@encoding");
     if (encoding == null || encoding == "json") {
         fetchInit.headers.set("Content-Type", "application/json");
-        fetchInit.body = jsonParamsFromParams(params);
+        fetchInit.body = JSON.stringify(params, jsonReplacer);
     }
     else if (encoding == "url") {
         fetchInit.headers.set("Content-Type", "application/x-www-form-urlencoded");

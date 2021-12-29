@@ -99,6 +99,9 @@ async function convertFormData(formData : FormData) : Promise<Record<string, any
         if (arrVal.length == 0) {
             continue;
         }
+        else if (arrVal.length == 1 && (arrVal[0] instanceof Blob) && arrVal[0].size == 0 && !arrVal[0].name) {
+            continue;
+        }
         else if (arrVal.length == 1) {
             if (arrVal[0] instanceof Blob) {
                 params[key] = await DataCtx.BlobFromBlob(arrVal[0]);
@@ -339,18 +342,6 @@ class DBCtx {
         if (this.hasAttr(dataName + ".bindpath")) {
             return this._getBindPathLV(dataName + ".bindpath");
         }
-        if (this.hasAttr(dataName + ".bind")) {
-            let attrName = dataName + ".bind";
-            if (writeable) {
-                console.log(sprintf("Warning: %s=\"%s\" specified for writeable '%s' value (making read-only)", attrName, this.getRawAttr(attrName), dataName));
-            }
-            let attrval = this.resolveAttr(attrName);
-            let dataVal = this.evalExpr(attrval, true);
-            if (dataVal instanceof DataCtx.LValue) {
-                return dataVal;
-            }
-            return DataCtx.CreateReadOnlyLValue(dataVal, "readonly:" + this.node.tag + "#" + attrName);
-        }
         if (this.hasAttr(dataName)) {
             if (writeable) {
                 console.log(sprintf("Warning: %s=\"%s\" specified for writeable '%s' value (making read-only)", dataName, this.getRawAttr(dataName), dataName));
@@ -361,13 +352,20 @@ class DBCtx {
         return null;
     }
 
+    hasDataAttr(dataName : string) : boolean {
+        if (dataName == "data" && this.hasAttr("bind")) {
+            return true;
+        }
+        if (this.hasAttr(dataName)) {
+            return true;
+        }
+        if (this.hasAttr(dataName + ".bindpath")) {
+            return true;
+        }
+        return false;
+    }
+
     resolveData(dataName : string, writeable : boolean) : DataCtx.LValue {
-        if ((dataName == "value" || dataName == "output" || dataName == "open") && this.hasAttr("bindvalue")) {
-            return this._getBindPathLV("bindvalue");
-        }
-        if (dataName == "sortspec" && this.hasAttr("bindsortspec")) {
-            return this._getBindPathLV("bindsortspec");
-        }
         if (dataName == "data" && this.hasAttr("bind")) {
             if (writeable) {
                 console.log(sprintf("Warning: %s=\"%s\" specified for writeable '%s' value (making read-only)", "bind", this.getRawAttr("bind"), dataName));

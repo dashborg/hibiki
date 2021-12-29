@@ -68,6 +68,11 @@ let ONCHANGE_ELEMS = {
     // and checkbox
 };
 
+let CHECKED_INPUT_TYPES = {
+    "radio": true,
+    "checkbox": true,
+};
+
 let READONLY_INPUT_TYPES = {
     "submit": true,
     "button": true,
@@ -75,6 +80,8 @@ let READONLY_INPUT_TYPES = {
     "reset": true,
     "search": true,
     "image": true,
+    "radio": true,
+    "checkbox": true,
 };
 
 let BINDVALUE_ONCHANGE_ELEMS = {
@@ -87,8 +94,21 @@ let GETVALUE_ELEMS = {
     "select": true,
     "input": true,
     "textarea": true,
-    "option": true,
 };
+
+function hasManagedChecked(tagName : string, typeName : string) : boolean {
+    return (tagName == "input" && CHECKED_INPUT_TYPES[typeName]);
+}
+
+function hasManagedValue(tagName : string, typeName : string) : boolean {
+    if (!GETVALUE_ELEMS[tagName]) {
+        return false;
+    }
+    if (tagName == "input" && READONLY_INPUT_TYPES[typeName]) {
+        return false;
+    }
+    return true;
+}
 
 function getFilteredSubNodesByTag(ctx : DBCtx, tag : string) {
     let node = ctx.node;
@@ -444,4 +464,4 @@ function firstSubNodeByTag(node : HibikiNode, tag : string) : HibikiNode {
     return null;
 }
 
-export {BLOCKED_ELEMS, INLINE_ELEMS, SUBMIT_ELEMS, ONCHANGE_ELEMS, BINDVALUE_ONCHANGE_ELEMS, GETVALUE_ELEMS, READONLY_INPUT_TYPES, renderTextSpan, renderTextData, makeNodeVar, makeChildrenVar, parseArgsDecl, parseAutomerge, handleConvertType, automerge, makeHandlers, subNodesByTag, firstSubNodeByTag};
+export {BLOCKED_ELEMS, INLINE_ELEMS, SUBMIT_ELEMS, ONCHANGE_ELEMS, BINDVALUE_ONCHANGE_ELEMS, GETVALUE_ELEMS, READONLY_INPUT_TYPES, renderTextSpan, renderTextData, makeNodeVar, makeChildrenVar, parseArgsDecl, parseAutomerge, handleConvertType, automerge, makeHandlers, subNodesByTag, firstSubNodeByTag, hasManagedValue, hasManagedChecked};

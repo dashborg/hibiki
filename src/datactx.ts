@@ -944,6 +944,12 @@ function LValueMapReplacer(lvMap : any, key : string, value : any) : any {
 }
 
 function MapReplacer(key : string, value : any) : any {
+    if (this[key] == null) {
+        return null;
+    }
+    if (typeof(this[key]) == "function") {
+        return null;
+    }
     if (this[key] instanceof Map) {
         let rtn = {};
         let m = this[key];

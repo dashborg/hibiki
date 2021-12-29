@@ -18,7 +18,7 @@ import type {HibikiNode, ComponentType, LibraryType, HibikiExtState, LibComponen
 import {DBCtx} from "./dbctx";
 import * as DataCtx from "./datactx";
 import {HibikiState, DataEnvironment, getAttributes, getAttribute, getStyleMap} from "./state";
-import {valToString, valToInt, valToFloat, resolveNumber, isObject, textContent, SYM_PROXY, SYM_FLATTEN, jseval, nodeStr, getHibiki} from "./utils";
+import {valToString, valToInt, valToFloat, resolveNumber, isObject, textContent, SYM_PROXY, SYM_FLATTEN, jseval, nodeStr, getHibiki, addToArrayDupCheck, removeFromArray} from "./utils";
 import {parseHtml} from "./html-parser";
 import * as NodeUtils from "./nodeutils";
 import {RtContext, HibikiError} from "./error";
@@ -348,6 +348,14 @@ class CustomReactNode extends React.Component<{node : HibikiNode, component : Co
     }
 }
 
+async function convertBlobArray(blobArr : Blob[]) : Promise<DataCtx.HibikiBlob[]> {
+    let rtn : DataCtx.HibikiBlob[] = [];
+    for (let i=0; i<blobArr.length; i++) {
+        rtn[i] = await DataCtx.BlobFromBlob(blobArr[i]);
+    }
+    return rtn;
+}
+
 @mobxReact.observer
 class RawHtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
     constructor(props : any) {
@@ -367,6 +375,77 @@ class RawHtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnvi
         }
         ctx.handleEvent("mount");
     }
+
+    @boundMethod handleFileOnChange(e) {
+        let ctx = new DBCtx(this);
+        if (ctx.isEditMode()) {
+            return;
+        }
+        let isMultiple = !!ctx.resolveAttr("multiple");
+        let valueLV = ctx.resolveData("value", true);
+        let files = e.target.files;
+        if (!isMultiple) {
+            let file : File = null;
+            if (files.length > 0) {
+                file = files[0];
+            }
+            if (file == null) {
+                valueLV.set(null);
+                return;
+            }
+            let p = DataCtx.BlobFromBlob(file);
+            p.then((hblob) => {
+                valueLV.set(hblob);
+            });
+            return;
+        }
+        else {
+            if (files.length == 0) {
+                valueLV.set(null);
+            }
+            let p = convertBlobArray(files);
+            p.then((hblobArr) => {
+                valueLV.set(hblobArr);
+            });
+            return;
+        }
+    }
+
+    @boundMethod handleCheckedOnChange(e) {
+        let ctx = new DBCtx(this);
+        if (ctx.isEditMode()) {
+            return;
+        }
+        let isReadOnly = !!ctx.resolveAttr("readonly");
+        if (!isReadOnly) {
+            let checkedLV = ctx.resolveData("checked", true);
+            checkedLV.set(e.target.checked);
+            let formValue = ctx.resolveAttr("value");
+            let valueLV = ctx.resolveData("formvalue", true);
+            let value = valueLV.get();
+            if (e.target.type == "checkbox") {
+                if (value == null || !mobx.isArrayLike(value)) {
+                    value = [];
+                }
+                if (e.target.checked) {
+                    addToArrayDupCheck(value, formValue);
+                }
+                else {
+                    removeFromArray(value, formValue);
+                }
+                if (value.length == 0) {
+                    value = null;
+                }
+                valueLV.set(value);
+            }
+            else if (e.target.type == "radio") {
+                if (e.target.checked) {
+                    valueLV.set(formValue);
+                }
+            }
+            
+        }
+    }
     
     @boundMethod handleBindValueOnChange(e) {
         let ctx = new DBCtx(this);
@@ -375,8 +454,19 @@ class RawHtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnvi
         }
         let isReadOnly = !!ctx.resolveAttr("readonly");
         let tagName = ctx.getHtmlTagName();
-        let isOnChangeElem = NodeUtils.ONCHANGE_ELEMS[tagName];
         let typeAttr = ctx.resolveAttr("type");
+        if (NodeUtils.hasManagedChecked(tagName, typeAttr)) {
+            this.handleCheckedOnChange(e);
+            return;
+        }
+        if (tagName == "input" && NodeUtils.READONLY_INPUT_TYPES[typeAttr]) {
+            return;
+        }
+        if (tagName == "input" && typeAttr == "file") {
+            this.handleFileOnChange(e);
+            return;
+        }
+        let isOnChangeElem = NodeUtils.ONCHANGE_ELEMS[tagName];
         let isCheckbox = (tagName == "input" && typeAttr == "checkbox");
         let valueLV = ctx.resolveData("value", true);
         let outputValue = null;
@@ -426,7 +516,8 @@ class RawHtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnvi
         
         let typeAttr = attrs["type"];
         for (let [k,v] of Object.entries(attrs)) {
-            if (k == "style" || k == "class" || k == "if" || k == "notif" || k == "eid" || k == "disabled") {
+            if (k == "style" || k == "class" || k == "if" || k == "notif"
+                || k == "eid" || k == "disabled" || k == "ref" || k == "foreach" || k == "bind" || k == "handler") {
                 continue;
             }
             if (!ctx.isEditMode()) {
@@ -444,6 +535,9 @@ class RawHtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnvi
                 }
             }
             if (k.startsWith("on")) {
+                continue;
+            }
+            if (k.endsWith(".bindpath") || k.endsWith(".handler")) {
                 continue;
             }
             if (!ctx.isEditMode() && k == "blobsrc") {
@@ -474,7 +568,10 @@ class RawHtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnvi
                 }
                 continue;
             }
-            if ((k == "value" || k == "defaultvalue") && NodeUtils.GETVALUE_ELEMS[tagName]) {
+            if ((k == "value" || k == "defaultvalue") && NodeUtils.hasManagedValue(tagName, typeAttr)) {
+                continue;
+            }
+            if (k == "checked" && NodeUtils.hasManagedChecked(tagName, typeAttr)) {
                 continue;
             }
             if (k == "download" && v == "1") {
@@ -483,23 +580,23 @@ class RawHtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnvi
             }
             elemProps[k] = v;
         }
-        if (!ctx.isEditMode() && NodeUtils.GETVALUE_ELEMS[tagName]) {
-            let isCheckbox = (tagName == "input" && (typeAttr == "checkbox" || typeAttr == "radio"));
-            let isWriteable = (tagName != "option" && !ctx.resolveAttr("readonly"));
-            if (tagName == "input" && NodeUtils.READONLY_INPUT_TYPES[typeAttr]) {
-                isWriteable = false;
-            }
+        if (!ctx.isEditMode() && ctx.hasDataAttr("value") && NodeUtils.hasManagedValue(tagName, typeAttr)) {
+            let isWriteable = !ctx.resolveAttr("readonly");
+            let isFile = (tagName == "input" && typeAttr == "file");
             let valueLV = ctx.resolveData("value", isWriteable);
             let value = DataCtx.demobx(valueLV.get());
-            if (isCheckbox) {
-                elemProps["checked"] = !!value;
-            }
-            else {
+            if (!isFile) {
                 if (value == null) {
                     value = "";
                 }
                 elemProps["value"] = value;
             }
+        }
+        if (!ctx.isEditMode() && ctx.hasDataAttr("checked") && NodeUtils.hasManagedChecked(tagName, typeAttr)) {
+            let isWriteable = !ctx.resolveAttr("readonly");
+            let checkedLV = ctx.resolveData("checked", isWriteable);
+            let checked = !!DataCtx.demobx(checkedLV.get());
+            elemProps["checked"] = checked;
         }
         if (tagName == "form" && !elemProps.onSubmit && attrs["action"] == null) {
             elemProps.onSubmit = ctx.handleOnSubmit;
