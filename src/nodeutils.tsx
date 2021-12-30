@@ -61,6 +61,11 @@ let SUBMIT_ELEMS = {
     "form": true,
 };
 
+let BLOB_ATTRS = {
+    "src": true,
+    "href": true,
+};
+
 let SPECIAL_ATTRS = {
     "style": true,
     "class": true,
@@ -464,4 +469,4 @@ function firstSubNodeByTag(node : HibikiNode, tag : string) : HibikiNode {
     return null;
 }
 
-export {BLOCKED_ELEMS, INLINE_ELEMS, SPECIAL_ATTRS, SUBMIT_ELEMS, MANAGED_ATTRS, renderTextSpan, renderTextData, makeNodeVar, makeChildrenVar, parseArgsDecl, parseAutomerge, handleConvertType, automerge, makeHandlers, subNodesByTag, firstSubNodeByTag, getManagedType};
+export {BLOCKED_ELEMS, INLINE_ELEMS, SPECIAL_ATTRS, BLOB_ATTRS, SUBMIT_ELEMS, MANAGED_ATTRS, renderTextSpan, renderTextData, makeNodeVar, makeChildrenVar, parseArgsDecl, parseAutomerge, handleConvertType, automerge, makeHandlers, subNodesByTag, firstSubNodeByTag, getManagedType};

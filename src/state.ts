@@ -1305,7 +1305,7 @@ function resolveAttrVal(k : string, v : string, dataenv : DataEnvironment, opts 
     if (resolvedVal === true) {
         resolvedVal = 1;
     }
-    if (k == "blobsrc" && resolvedVal instanceof DataCtx.HibikiBlob) {
+    if (NodeUtils.BLOB_ATTRS[k] && resolvedVal instanceof DataCtx.HibikiBlob) {
         return (resolvedVal as any);
     }
     if (opts.style && typeof(resolvedVal) == "number") {

@@ -18,7 +18,7 @@ import type {HibikiNode, ComponentType, LibraryType, HibikiExtState, LibComponen
 import {DBCtx} from "./dbctx";
 import * as DataCtx from "./datactx";
 import {HibikiState, DataEnvironment, getAttributes, getAttribute, getStyleMap} from "./state";
-import {valToString, valToInt, valToFloat, resolveNumber, isObject, textContent, SYM_PROXY, SYM_FLATTEN, jseval, nodeStr, getHibiki, addToArrayDupCheck, removeFromArray, valInArray} from "./utils";
+import {valToString, valToInt, valToFloat, resolveNumber, isObject, textContent, SYM_PROXY, SYM_FLATTEN, jseval, nodeStr, getHibiki, addToArrayDupCheck, removeFromArray, valInArray, blobPrintStr} from "./utils";
 import {parseHtml} from "./html-parser";
 import * as NodeUtils from "./nodeutils";
 import {RtContext, HibikiError} from "./error";
@@ -612,6 +612,16 @@ class RawHtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnvi
                 elemProps["download"] = "";
                 continue;
             }
+            if (v instanceof DataCtx.HibikiBlob) {
+                console.log("hibikiblob", k, v);
+                if (NodeUtils.BLOB_ATTRS[k]) {
+                    elemProps[k] = v.makeDataUrl();
+                }
+                else {
+                    elemProps[k] = blobPrintStr(v);
+                }
+                continue;
+            }
             elemProps[k] = v;
         }
         if (!managedAttrs["value"] && elemProps["value"] == null && ctx.getRawAttr("value") == "") {
@@ -619,21 +629,6 @@ class RawHtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnvi
         }
         
         if (!ctx.isEditMode()) {
-            if (attrs["blobsrc"] != null) {
-                let blob = attrs["blobsrc"];
-                if (!(blob instanceof DataCtx.HibikiBlob)) {
-                    console.log("Invalid blobsrc attribute, not a Blob object");
-                }
-                else {
-                    if (tagName == "link") {
-                        elemProps.href = blob.makeDataUrl();
-                    }
-                    else {
-                        elemProps.src = blob.makeDataUrl();
-                    }
-                }
-            }
-
             // forms are managed if submit.handler
             if (tagName == "form" && ctx.hasAttr("submit.handler")) {
                 elemProps.onSubmit = ctx.handleOnSubmit;
