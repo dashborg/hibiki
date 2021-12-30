@@ -21,28 +21,42 @@ function spliceCopy(arr : any[], ...rest : any[]) {
     return newArr;
 }
 
-function addToArrayDupCheck(arr : any[], val : string) {
-    if (arr == null) {
-        return;
+function addToArrayDupCheck(arr : any[], val : any) : any[] {
+    if (arr == null || !mobx.isArrayLike(arr)) {
+        arr = [];
     }
     for (let i=0; i<arr.length; i++) {
         if (arr[i] == val) {
-            return;
+            return arr;
         }
     }
     arr.push(val);
+    return arr;
 }
 
-function removeFromArray(arr : any[], val : string) {
-    if (arr == null) {
-        return;
+function removeFromArray(arr : any[], val : any) : any[] {
+    if (arr == null || !mobx.isArrayLike(arr)) {
+        return arr;
     }
     for (let i=0; i<arr.length; i++) {
         if (arr[i] == val) {
             arr.splice(i, 1);
-            return;
+            return arr;
         }
     }
+    return arr;
+}
+
+function valInArray(arr : any[], val : any) : boolean {
+    if (arr == null || !mobx.isArrayLike(arr)) {
+        return false;
+    }
+    for (let i=0; i<arr.length; i++) {
+        if (arr[i] == val) {
+            return true;
+        }
+    }
+    return false;
 }
 
 function jsonRespHandler(resp) {
@@ -553,5 +567,5 @@ function base64ToArray(b64 : string) : Uint8Array {
     return arr;
 }
 
-export {jsonRespHandler, parseUrlParams, valToString, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, makeUrlParamsFromObject, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, rawAttr, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs, blobPrintStr, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy};
+export {jsonRespHandler, parseUrlParams, valToString, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, makeUrlParamsFromObject, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, rawAttr, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs, blobPrintStr, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy, valInArray};
 

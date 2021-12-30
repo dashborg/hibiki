@@ -3,7 +3,7 @@
 import * as mobx from "mobx";
 import type {JSFuncType} from "./types";
 import {sprintf} from "sprintf-js";
-import {isObject} from "./utils";
+import {isObject, addToArrayDupCheck, removeFromArray} from "./utils";
 import {v4 as uuidv4} from 'uuid';
 
 let DefaultJSFuncs : Record<string, JSFuncType> = {};
@@ -72,6 +72,60 @@ function jsSlice(arr : any[], ...rest : any[]) {
         return null;
     }
     return arr.slice(...rest);
+}
+
+function jsPush(arr : any[], ...rest : any[]) {
+    if (arr == null || !mobx.isArrayLike(arr)) {
+        return [...rest];
+    }
+    let rtn = [...arr, ...rest];
+    return rtn;
+}
+
+function jsPop(arr : any[], ...rest : any[]) {
+    if (arr == null) {
+        return [];
+    }
+    else if (!mobx.isArrayLike(arr)) {
+        return [];
+    }
+    let rtn = [...arr];
+    rtn.pop();
+    return rtn;
+}
+
+function jsSetAdd(arr : any[], ...rest : any[]) {
+    if (arr == null || !mobx.isArrayLike(arr)) {
+        arr = [];
+    }
+    let rtn = [...arr];
+    for (let i=0; i<rest.length; i++) {
+        addToArrayDupCheck(rtn, rest[i]);
+    }
+    return rtn;
+}
+
+function jsSetRemove(arr : any[], ...rest : any[]) {
+    if (arr == null || !mobx.isArrayLike(arr)) {
+        return [];
+    }
+    let rtn = [...arr];
+    for (let i=0; i<rest.length; i++) {
+        removeFromArray(rtn, rest[i]);
+    }
+    return rtn;
+}
+
+function jsSetHas(arr : any[], item : any) : boolean {
+    if (arr == null || !mobx.isArrayLike(arr)) {
+        return false;
+    }
+    for (let i=0; i<arr.length; i++) {
+        if (arr[i] == item) {
+            return true;
+        }
+    }
+    return false;
 }
 
 function jsInt(v : any) : number {
@@ -241,6 +295,16 @@ function jsBlobLen(blob : any) : number {
     return Math.ceil((bloblen/4)*3);
 }
 
+function jsBlobName(blob : any) : string {
+    if (blob == null) {
+        return null;
+    }
+    if (isObject(blob) && blob._type == "HibikiBlob") {
+        return blob.name;
+    }
+    return null;
+}
+
 function jsUuid() : string {
     return uuidv4();
 }
@@ -253,6 +317,11 @@ reg("min", jsMin, false);
 reg("max", jsMax, false);
 reg("splice", jsSplice, true);
 reg("slice", jsSlice, true);
+reg("push", jsPush, true);
+reg("pop", jsPop, true);
+reg("setadd", jsSetAdd, true);
+reg("setremove", jsSetRemove, true);
+reg("sethas", jsSetHas, true);
 reg("int", jsInt, true);
 reg("float", jsFloat, true);
 reg("str", jsStr, true);
@@ -274,6 +343,7 @@ reg("blobastext", jsBlobAsText, true);
 reg("blobasbase64", jsBlobAsBase64, true);
 reg("blobmimetype", jsBlobMimeType, true);
 reg("bloblen", jsBlobLen, true);
+reg("blobname", jsBlobName, true);
 reg("uuid", jsUuid, true);
 
 function reg(name : string, fn : any, native : boolean) {
