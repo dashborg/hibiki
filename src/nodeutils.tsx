@@ -61,53 +61,49 @@ let SUBMIT_ELEMS = {
     "form": true,
 };
 
-let ONCHANGE_ELEMS = {
-    "select": true,
-    "input": true,
-    "textarea": true,
-    // and checkbox
+let SPECIAL_ATTRS = {
+    "style": true,
+    "class": true,
+    "if": true,
+    "foreach": true,
+    "eid": true,
+    "disabled": true,
+    "ref": true,
+    "bind": true,
+    "handler": true,
+    "blobsrc": true,
+    "defaultvalue": true,
 };
 
-let CHECKED_INPUT_TYPES = {
-    "radio": true,
-    "checkbox": true,
-};
-
-let READONLY_INPUT_TYPES = {
+let UNMANAGED_INPUT_TYPES = {
     "submit": true,
     "button": true,
     "hidden": true,
     "reset": true,
-    "search": true,
     "image": true,
-    "radio": true,
-    "checkbox": true,
 };
 
-let BINDVALUE_ONCHANGE_ELEMS = {
-    "input": true,
-    "textarea": true,
-    "select": true,
+let MANAGED_ATTRS = {
+    "value": {"value": true, "defaultvalue": true},
+    "radio": {"checked": true, "defaultchecked": true},
+    "checkbox": {"checked": true, "defaultchecked": true},
+    "file": {"value": true},
 };
 
-let GETVALUE_ELEMS = {
-    "select": true,
-    "input": true,
-    "textarea": true,
-};
-
-function hasManagedChecked(tagName : string, typeName : string) : boolean {
-    return (tagName == "input" && CHECKED_INPUT_TYPES[typeName]);
-}
-
-function hasManagedValue(tagName : string, typeName : string) : boolean {
-    if (!GETVALUE_ELEMS[tagName]) {
-        return false;
+function getManagedType(tagName : string, typeName : string) : ("value" | "radio" | "checkbox" | "file" | null) {
+    if (tagName == "select" || tagName == "textarea") {
+        return "value";
     }
-    if (tagName == "input" && READONLY_INPUT_TYPES[typeName]) {
-        return false;
+    if (tagName != "input") {
+        return null;
     }
-    return true;
+    if (UNMANAGED_INPUT_TYPES[typeName]) {
+        return null;
+    }
+    if (typeName == "radio" || typeName == "checkbox" || typeName == "file") {
+        return typeName;
+    }
+    return "value";
 }
 
 function getFilteredSubNodesByTag(ctx : DBCtx, tag : string) {
@@ -464,4 +460,4 @@ function firstSubNodeByTag(node : HibikiNode, tag : string) : HibikiNode {
     return null;
 }
 
-export {BLOCKED_ELEMS, INLINE_ELEMS, SUBMIT_ELEMS, ONCHANGE_ELEMS, BINDVALUE_ONCHANGE_ELEMS, GETVALUE_ELEMS, READONLY_INPUT_TYPES, renderTextSpan, renderTextData, makeNodeVar, makeChildrenVar, parseArgsDecl, parseAutomerge, handleConvertType, automerge, makeHandlers, subNodesByTag, firstSubNodeByTag, hasManagedValue, hasManagedChecked};
+export {BLOCKED_ELEMS, INLINE_ELEMS, SPECIAL_ATTRS, SUBMIT_ELEMS, MANAGED_ATTRS, renderTextSpan, renderTextData, makeNodeVar, makeChildrenVar, parseArgsDecl, parseAutomerge, handleConvertType, automerge, makeHandlers, subNodesByTag, firstSubNodeByTag, getManagedType};

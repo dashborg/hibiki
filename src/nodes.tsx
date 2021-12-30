@@ -18,7 +18,7 @@ import type {HibikiNode, ComponentType, LibraryType, HibikiExtState, LibComponen
 import {DBCtx} from "./dbctx";
 import * as DataCtx from "./datactx";
 import {HibikiState, DataEnvironment, getAttributes, getAttribute, getStyleMap} from "./state";
-import {valToString, valToInt, valToFloat, resolveNumber, isObject, textContent, SYM_PROXY, SYM_FLATTEN, jseval, nodeStr, getHibiki, addToArrayDupCheck, removeFromArray} from "./utils";
+import {valToString, valToInt, valToFloat, resolveNumber, isObject, textContent, SYM_PROXY, SYM_FLATTEN, jseval, nodeStr, getHibiki, addToArrayDupCheck, removeFromArray, valInArray} from "./utils";
 import {parseHtml} from "./html-parser";
 import * as NodeUtils from "./nodeutils";
 import {RtContext, HibikiError} from "./error";
@@ -361,11 +361,6 @@ class RawHtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnvi
     constructor(props : any) {
         super(props);
         let ctx = new DBCtx(this);
-        if (!ctx.isEditMode()) {
-            if (NodeUtils.GETVALUE_ELEMS[ctx.getHtmlTagName()]) {
-                ctx.setDefaultForData("value");
-            }
-        }
     }
 
     componentDidMount() {
@@ -373,132 +368,259 @@ class RawHtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnvi
         if (ctx.isEditMode()) {
             return;
         }
-        ctx.handleEvent("mount");
+        if (ctx.hasAttr("mount.handler")) {
+            ctx.handleEvent("mount");
+        }
     }
 
     @boundMethod handleFileOnChange(e) {
         let ctx = new DBCtx(this);
-        if (ctx.isEditMode()) {
-            return;
-        }
         let isMultiple = !!ctx.resolveAttr("multiple");
-        let valueLV = ctx.resolveData("value", true);
-        let files = e.target.files;
-        if (!isMultiple) {
-            let file : File = null;
-            if (files.length > 0) {
-                file = files[0];
+        let hasBindPath = ctx.hasAttr("value.bindpath");
+        let p = convertBlobArray(e.target.files);
+        p.then((hblobArr) => {
+            if (isMultiple) {
+                if (hblobArr.length == 0) {
+                    hblobArr = null;
+                }
+                ctx.handleOnChange(hblobArr);
+                if (hasBindPath) {
+                    let valueLV = ctx.resolveData("value", true);
+                    valueLV.set(hblobArr);
+                }
             }
-            if (file == null) {
-                valueLV.set(null);
-                return;
+            else {
+                let blob : DataCtx.HibikiBlob = null;
+                if (hblobArr.length > 0) {
+                    blob = hblobArr[0];
+                }
+                ctx.handleOnChange(blob);
+                if (hasBindPath) {
+                    let valueLV = ctx.resolveData("value", true);
+                    valueLV.set(blob);
+                }
             }
-            let p = DataCtx.BlobFromBlob(file);
-            p.then((hblob) => {
-                valueLV.set(hblob);
-            });
-            return;
-        }
-        else {
-            if (files.length == 0) {
-                valueLV.set(null);
-            }
-            let p = convertBlobArray(files);
-            p.then((hblobArr) => {
-                valueLV.set(hblobArr);
-            });
-            return;
+        });
+    }
+
+    @boundMethod handleValueOnChange(e) {
+        let ctx = new DBCtx(this);
+        let hasBindPath = ctx.hasAttr("value.bindpath");
+        let newValue = e.target.value;
+        NodeUtils.handleConvertType(ctx, newValue);
+        ctx.handleOnChange(newValue);
+        if (hasBindPath) {
+            let valueLV = ctx.resolveData("value", true);
+            valueLV.set(newValue);
         }
     }
 
-    @boundMethod handleCheckedOnChange(e) {
+    @boundMethod handleRadioOnChange(e) {
         let ctx = new DBCtx(this);
-        if (ctx.isEditMode()) {
-            return;
+        let hasBindPath = ctx.hasAttr("formvalue.bindpath");
+        let newValue = e.target.checked;
+        ctx.handleOnChange(newValue);
+        if (hasBindPath) {
+            let formValueLV = ctx.resolveData("formvalue", true);
+            let radioValue = ctx.resolveAttr("value") ?? "on";
+            formValueLV.set(radioValue);
         }
-        let isReadOnly = !!ctx.resolveAttr("readonly");
-        if (!isReadOnly) {
+    }
+
+    @boundMethod handleCheckboxOnChange(e) {
+        let ctx = new DBCtx(this);
+        let hasCheckedBindPath = ctx.hasAttr("checked.bindpath");
+        let hasFormValueBindPath = ctx.hasAttr("formvalue.bindpath");
+        let newValue = e.target.checked;
+        ctx.handleOnChange(newValue);
+        if (hasCheckedBindPath) {
             let checkedLV = ctx.resolveData("checked", true);
-            checkedLV.set(e.target.checked);
-            let formValue = ctx.resolveAttr("value");
-            let valueLV = ctx.resolveData("formvalue", true);
-            let value = valueLV.get();
-            if (e.target.type == "checkbox") {
-                if (value == null || !mobx.isArrayLike(value)) {
-                    value = [];
-                }
-                if (e.target.checked) {
-                    addToArrayDupCheck(value, formValue);
-                }
-                else {
-                    removeFromArray(value, formValue);
-                }
-                if (value.length == 0) {
-                    value = null;
-                }
-                valueLV.set(value);
+            checkedLV.set(newValue);
+        }
+        else if (hasFormValueBindPath) {
+            let formValueLV = ctx.resolveData("formvalue", true);
+            let checkboxValue = ctx.resolveAttr("value") ?? "on";
+            if (newValue) {
+                let newFormValue = addToArrayDupCheck(formValueLV.get(), checkboxValue);
+                formValueLV.set(newFormValue);
             }
-            else if (e.target.type == "radio") {
-                if (e.target.checked) {
-                    valueLV.set(formValue);
-                }
+            else {
+                let newFormValue = removeFromArray(formValueLV.get(), checkboxValue);
+                formValueLV.set(newFormValue);
             }
             
         }
     }
-    
-    @boundMethod handleBindValueOnChange(e) {
-        let ctx = new DBCtx(this);
-        if (ctx.isEditMode()) {
-            return;
+
+    setupManagedValue(ctx : DBCtx, elemProps : Record<string, any>) {
+        let isBound = !!ctx.resolveAttr("bound");
+        let hasBindPath = ctx.hasAttr("value.bindpath");
+        if (hasBindPath) {
+            // 2-way data-binding
+            let valueLV = ctx.resolveData("value", true);
+            elemProps["onChange"] = this.handleValueOnChange;
+            elemProps["value"] = valueLV.get() ?? "";
         }
-        let isReadOnly = !!ctx.resolveAttr("readonly");
-        let tagName = ctx.getHtmlTagName();
-        let typeAttr = ctx.resolveAttr("type");
-        if (NodeUtils.hasManagedChecked(tagName, typeAttr)) {
-            this.handleCheckedOnChange(e);
-            return;
-        }
-        if (tagName == "input" && NodeUtils.READONLY_INPUT_TYPES[typeAttr]) {
-            return;
-        }
-        if (tagName == "input" && typeAttr == "file") {
-            this.handleFileOnChange(e);
-            return;
-        }
-        let isOnChangeElem = NodeUtils.ONCHANGE_ELEMS[tagName];
-        let isCheckbox = (tagName == "input" && typeAttr == "checkbox");
-        let valueLV = ctx.resolveData("value", true);
-        let outputValue = null;
-        if (isCheckbox) {
-            if (isReadOnly) {
-                // checkbox is a special onchangeelem
-                ctx.handleOnChange(e.target.checked);
-                return;
-            }
-            outputValue = e.target.checked;
-            valueLV.set(outputValue);
+        else if (isBound) {
+            // 1-way data-binding
+            let value = ctx.resolveAttr("value");
+            elemProps["onChange"] = this.handleValueOnChange;
+            elemProps["value"] = value ?? "";
         }
         else {
-            outputValue = e.target.value;
-            NodeUtils.handleConvertType(ctx, outputValue);
-            if (isReadOnly) {
-                if (isOnChangeElem) {
-                    ctx.handleOnChange(outputValue);
-                }
-                return;
+            // not managed
+            let value = ctx.resolveAttr("value");
+            if (value != null) {
+                elemProps["defaultValue"] = value;
             }
-            valueLV.set(outputValue);
-            ctx.handleOnChange(outputValue);
         }
-        return;
+    }
+
+    setupManagedFile(ctx : DBCtx, elemProps : Record<string, any>) {
+        elemProps["onChange"] = this.handleFileOnChange;
+    }
+
+    setupManagedRadio(ctx : DBCtx, elemProps : Record<string, any>) {
+        let isBound = !!ctx.resolveAttr("bound");
+        let hasBindPath = ctx.hasAttr("formvalue.bindpath");
+        if (hasBindPath) {
+            // 2-way data-binding
+            let formValueLV = ctx.resolveData("formvalue", true);
+            let radioValue = ctx.resolveAttr("value") ?? "on";
+            let checked = (formValueLV.get() == radioValue);
+            elemProps["checked"] = checked;
+            elemProps["onChange"] = this.handleRadioOnChange;
+        }
+        else if (isBound) {
+            // 1-way data-binding
+            let checked = ctx.resolveAttr("checked");
+            elemProps["checked"] = !!checked;
+            elemProps["onChange"] = this.handleRadioOnChange;
+        }
+        else {
+            // not managed
+            let checked = ctx.resolveAttr("checked");
+            if (checked) {
+                elemProps["defaultChecked"] = true;
+            }
+        }
+    }
+
+    setupManagedCheckbox(ctx : DBCtx, elemProps : Record<string, any>) {
+        let isBound = !!ctx.resolveAttr("bound");
+        let hasCheckedBindPath = ctx.hasAttr("checked.bindpath");
+        let hasFormValueBindPath = ctx.hasAttr("formvalue.bindpath");
+        if (hasCheckedBindPath) {
+            // 2-way simple data-binding
+            let checkedLV = ctx.resolveData("checked", true);
+            elemProps["checked"] = !!checkedLV.get();
+            elemProps["onChange"] = this.handleCheckboxOnChange;
+        }
+        else if (hasFormValueBindPath) {
+            // 2-way group data-binding
+            let formValueLV = ctx.resolveData("formvalue", true);
+            let checkboxValue = ctx.resolveAttr("value") ?? "on";
+            let checked = valInArray(formValueLV.get(), checkboxValue);
+            elemProps["checked"] = checked;
+            elemProps["onChange"] = this.handleCheckboxOnChange;
+        }
+        else if (isBound) {
+            // 1-way data-binding
+            let checked = ctx.resolveAttr("checked");
+            elemProps["checked"] = !!checked;
+            elemProps["onChange"] = this.handleCheckboxOnChange;
+        }
+        else {
+            // not managed
+            let checked = ctx.resolveAttr("checked");
+            if (checked) {
+                elemProps["defaultChecked"] = true;
+            }
+        }
     }
     
     render() {
         let ctx = new DBCtx(this);
         let tagName = ctx.getHtmlTagName();
-        let elemProps : any = {};
+        let elemProps : Record<string, any> = {};
         let attrs = ctx.resolveAttrs();
+        let typeAttr = attrs["type"];
+        let managedType = NodeUtils.getManagedType(tagName, typeAttr);
+        let managedAttrs = NodeUtils.MANAGED_ATTRS[managedType] ?? {};
+        for (let [k,v] of Object.entries(attrs)) {
+            k = k.toLowerCase();
+            if (NodeUtils.SPECIAL_ATTRS[k] || managedAttrs[k]) {
+                continue;
+            }
+            if (k.startsWith("on")) {
+                continue;
+            }
+            if (k.endsWith(".bindpath") || k.endsWith(".handler") || k.endsWith(".default")) {
+                continue;
+            }
+            if (k == "download" && v == "1") {
+                elemProps["download"] = "";
+                continue;
+            }
+            elemProps[k] = v;
+        }
+        if (managedType == "radio") {
+            console.log("radio", ctx.node, elemProps);
+        }
+        if (!ctx.isEditMode()) {
+            if (attrs["blobsrc"] != null) {
+                let blob = attrs["blobsrc"];
+                if (!(blob instanceof DataCtx.HibikiBlob)) {
+                    console.log("Invalid blobsrc attribute, not a Blob object");
+                }
+                else {
+                    if (tagName == "link") {
+                        elemProps.href = blob.makeDataUrl();
+                    }
+                    else {
+                        elemProps.src = blob.makeDataUrl();
+                    }
+                }
+            }
+
+            // forms are managed if submit.handler
+            if (tagName == "form" && ctx.hasAttr("submit.handler")) {
+                elemProps.onSubmit = ctx.handleOnSubmit;
+            }
+
+            if (ctx.hasAttr("click.handler")) {
+                elemProps.onClick = ctx.handleOnClick;
+                // anchors with click.handler work like links (not locations)
+                if (tagName == "a" && elemProps["href"] == null) {
+                    elemProps["href"] = "#";
+                }
+            }
+            
+            if (managedType != null) {
+                if (managedType == "value") {
+                    this.setupManagedValue(ctx, elemProps);
+                }
+                else if (managedType == "radio") {
+                    this.setupManagedRadio(ctx, elemProps);
+                }
+                else if (managedType == "checkbox") {
+                    this.setupManagedCheckbox(ctx, elemProps);
+                }
+                else if (managedType == "file") {
+                    this.setupManagedFile(ctx, elemProps);
+                }
+                else {
+                    console.log("Invalid managedType", managedType);
+                }
+            }
+        }
+        // automerge
+        this.doAutomerge(ctx, attrs, elemProps);
+        let elemChildren = ctxRenderHtmlChildren(ctx);
+        return React.createElement(tagName, elemProps, elemChildren);
+    }
+
+    doAutomerge(ctx : DBCtx, attrs : Record<string, any>, elemProps : Record<string, any>) {
         let style = ctx.resolveStyleMap("style");
         let cnMap = ctx.resolveCnMap("class");
         let automergeAttrs = {
@@ -513,94 +635,6 @@ class RawHtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnvi
                 NodeUtils.automerge(ctx, automergeAttrs, amParams.name, amParams.opts);
             }
         }
-        
-        let typeAttr = attrs["type"];
-        for (let [k,v] of Object.entries(attrs)) {
-            if (k == "style" || k == "class" || k == "if" || k == "notif"
-                || k == "eid" || k == "disabled" || k == "ref" || k == "foreach" || k == "bind" || k == "handler") {
-                continue;
-            }
-            if (!ctx.isEditMode()) {
-                if (k == "click.handler") {
-                    elemProps.onClick = ctx.handleOnClick;
-                    if (tagName == "a" && elemProps["href"] == null) {
-                        elemProps["href"] = "#";
-                    }
-                }
-                if (NodeUtils.BINDVALUE_ONCHANGE_ELEMS[tagName]) {
-                    elemProps.onChange = this.handleBindValueOnChange;
-                }
-                if (k == "submit.handler" && NodeUtils.SUBMIT_ELEMS[tagName]) {
-                    elemProps.onSubmit = ctx.handleOnSubmit;
-                }
-            }
-            if (k.startsWith("on")) {
-                continue;
-            }
-            if (k.endsWith(".bindpath") || k.endsWith(".handler")) {
-                continue;
-            }
-            if (!ctx.isEditMode() && k == "blobsrc") {
-                if (v == null) {
-                    continue;
-                }
-                if (!(v instanceof DataCtx.HibikiBlob)) {
-                    console.log("Invalid blobsrc attribute, not a Blob object");
-                    continue;
-                }
-                if (tagName == "link") {
-                    elemProps.href = v.makeDataUrl();
-                }
-                else {
-                    elemProps.src = v.makeDataUrl();
-                }
-                continue;
-            }
-            if (!ctx.isEditMode() && k == "pathsrc") {
-                if (v == null || typeof(v) != "string" || !v.startsWith("/")) {
-                    continue;
-                }
-                if (tagName == "link") {
-                    elemProps.href = "/@raw" + v;
-                }
-                else {
-                    elemProps.src = "/@raw" + v;
-                }
-                continue;
-            }
-            if ((k == "value" || k == "defaultvalue") && NodeUtils.hasManagedValue(tagName, typeAttr)) {
-                continue;
-            }
-            if (k == "checked" && NodeUtils.hasManagedChecked(tagName, typeAttr)) {
-                continue;
-            }
-            if (k == "download" && v == "1") {
-                elemProps["download"] = "";
-                continue;
-            }
-            elemProps[k] = v;
-        }
-        if (!ctx.isEditMode() && ctx.hasDataAttr("value") && NodeUtils.hasManagedValue(tagName, typeAttr)) {
-            let isWriteable = !ctx.resolveAttr("readonly");
-            let isFile = (tagName == "input" && typeAttr == "file");
-            let valueLV = ctx.resolveData("value", isWriteable);
-            let value = DataCtx.demobx(valueLV.get());
-            if (!isFile) {
-                if (value == null) {
-                    value = "";
-                }
-                elemProps["value"] = value;
-            }
-        }
-        if (!ctx.isEditMode() && ctx.hasDataAttr("checked") && NodeUtils.hasManagedChecked(tagName, typeAttr)) {
-            let isWriteable = !ctx.resolveAttr("readonly");
-            let checkedLV = ctx.resolveData("checked", isWriteable);
-            let checked = !!DataCtx.demobx(checkedLV.get());
-            elemProps["checked"] = checked;
-        }
-        if (tagName == "form" && !elemProps.onSubmit && attrs["action"] == null) {
-            elemProps.onSubmit = ctx.handleOnSubmit;
-        }
         if (Object.keys(automergeAttrs.style).length > 0) {
             elemProps["style"] = automergeAttrs.style;
         }
@@ -610,8 +644,6 @@ class RawHtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnvi
         if (automergeAttrs.disabled != null) {
             elemProps["disabled"] = automergeAttrs.disabled;
         }
-        let elemChildren = ctxRenderHtmlChildren(ctx);
-        return React.createElement(tagName, elemProps, elemChildren);
     }
 }
 

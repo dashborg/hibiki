@@ -111,18 +111,19 @@ class HtmlParser {
         }
         for (let i=0; i<nodeAttrs.length; i++) {
             let attr = nodeAttrs.item(i);
+            let name = attr.name.toLowerCase();
             let value = attr.value;
-            if (value == "" && attr.name != "value") {
+            if (value == "" && name != "value") {
                 value = "1";
             }
-            node.attrs[attr.name] = value;
-            if (attr.name == "style") {
+            node.attrs[name] = value;
+            if (name == "style") {
                 let styleMap = this.parseStyleAttr(attr.value);
                 node.style = styleMap;
             }
-            if (attr.name.startsWith("style-")) {
+            if (name.startsWith("style-")) {
                 node.morestyles = node.morestyles || {};
-                node.morestyles[attr.name] = this.parseStyleAttr(attr.value);
+                node.morestyles[name] = this.parseStyleAttr(attr.value);
             }
         }
         let list = this.parseNodeChildren(node.tag, htmlNode);

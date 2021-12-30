@@ -139,7 +139,7 @@ function urlSearchParamsFromParams(params : Record<string, any>) : URLSearchPara
 
 function jsonReplacer(key : string, value : any) : any {
     if (this[key] instanceof Blob) {
-        throw new Error(sprintf("Cannot serialize Blob %s with json encoding (use 'multipart' encoding)", blobPrintStr(val)));
+        throw new Error(sprintf("Cannot serialize Blob %s with json encoding (use 'multipart' encoding)", blobPrintStr(this[key])));
     }
     if (this[key] instanceof DataCtx.HibikiBlob) {
         let val = this[key];
