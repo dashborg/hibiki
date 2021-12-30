@@ -403,6 +403,24 @@ class RawHtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnvi
         });
     }
 
+    @boundMethod handleSelectOnChange(e) {
+        let ctx = new DBCtx(this);
+        let hasBindPath = ctx.hasAttr("value.bindpath");
+        let isMulti = !!ctx.resolveAttr("multiple");
+        let newValue : (string | string[]) = null;
+        if (isMulti) {
+            newValue = Array.from(event.target.selectedOptions, (option) => option.value);
+        }
+        else {
+            newValue = event.target.value;
+        }
+        ctx.handleOnChange(newValue);
+        if (hasBindPath) {
+            let valueLV = ctx.resolveData("value", true);
+            valueLV.set(newValue);
+        }
+    }
+
     @boundMethod handleValueOnChange(e) {
         let ctx = new DBCtx(this);
         let hasBindPath = ctx.hasAttr("value.bindpath");
@@ -538,6 +556,38 @@ class RawHtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnvi
             }
         }
     }
+
+    setupManagedSelect(ctx : DBCtx, elemProps : Record<string, any>) {
+        let isBound = !!ctx.resolveAttr("bound");
+        let hasBindPath = ctx.hasAttr("value.bindpath");
+        let isMulti = !!ctx.resolveAttr("multiple");
+        if (hasBindPath) {
+            // 2-way data-binding
+            let valueLV = ctx.resolveData("value", true);
+            elemProps["onChange"] = this.handleSelectOnChange;
+            if (isMulti) {
+                elemProps["value"] = valueLV.get() ?? [];
+            }
+            else {
+                elemProps["value"] = valueLV.get() ?? "";
+            }
+        }
+        else if (isBound) {
+            // 1-way data-binding
+            let value = ctx.resolveAttr("value");
+            elemProps["onChange"] = this.handleSelectOnChange;
+            if (isMulti) {
+                elemProps["value"] = value ?? [];
+            }
+            else {
+                elemProps["value"] = value ?? "";
+            }
+        }
+        else {
+            // not managed
+            // nothing
+        }
+    }
     
     render() {
         let ctx = new DBCtx(this);
@@ -564,9 +614,10 @@ class RawHtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnvi
             }
             elemProps[k] = v;
         }
-        if (managedType == "radio") {
-            console.log("radio", ctx.node, elemProps);
+        if (!managedAttrs["value"] && elemProps["value"] == null && ctx.getRawAttr("value") == "") {
+            elemProps["value"] = "";
         }
+        
         if (!ctx.isEditMode()) {
             if (attrs["blobsrc"] != null) {
                 let blob = attrs["blobsrc"];
@@ -608,6 +659,9 @@ class RawHtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnvi
                 }
                 else if (managedType == "file") {
                     this.setupManagedFile(ctx, elemProps);
+                }
+                else if (managedType == "select") {
+                    this.setupManagedSelect(ctx, elemProps);
                 }
                 else {
                     console.log("Invalid managedType", managedType);

@@ -88,10 +88,14 @@ let MANAGED_ATTRS = {
     "radio": {"checked": true, "defaultchecked": true},
     "checkbox": {"checked": true, "defaultchecked": true},
     "file": {"value": true},
+    "select": {"value": true, "defaultvalue": true},
 };
 
-function getManagedType(tagName : string, typeName : string) : ("value" | "radio" | "checkbox" | "file" | null) {
-    if (tagName == "select" || tagName == "textarea") {
+function getManagedType(tagName : string, typeName : string) : ("value" | "radio" | "checkbox" | "file" | "select" | null) {
+    if (tagName == "select") {
+        return "select";
+    }
+    if (tagName == "textarea") {
         return "value";
     }
     if (tagName != "input") {
