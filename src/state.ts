@@ -939,9 +939,8 @@ class HibikiState {
             }
         }
         this.Modules["hibiki"] = new mreg["hibiki"](this, {});
-        if (config.modules == null || !("local" in config.modules)) {
-            this.Modules["local"] = new mreg["local"](this, {});
-        }
+        this.Modules["local"] = new mreg["local"](this, {});
+        this.Modules["lib-local"] = new mreg["local"](this, {});
         if (config.modules == null || !("http" in config.modules)) {
             this.Modules["http"] = new mreg["http"](this, {});
         }
@@ -1288,6 +1287,9 @@ function resolveAttrVal(k : string, v : string, dataenv : DataEnvironment, opts 
         return null;
     }
     if (!v.startsWith("*")) {
+        return v;
+    }
+    if (v == "*" || v == "**") {
         return v;
     }
     v = v.substr(1);

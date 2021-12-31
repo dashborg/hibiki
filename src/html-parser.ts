@@ -121,7 +121,11 @@ class HtmlParser {
                 let styleMap = this.parseStyleAttr(attr.value);
                 node.style = styleMap;
             }
-            if (name.startsWith("style-")) {
+            else if (name.endsWith(":style")) {
+                node.morestyles = node.morestyles || {};
+                node.morestyles[name] = this.parseStyleAttr(attr.value);
+            }
+            else if (name.startsWith("style-")) {
                 node.morestyles = node.morestyles || {};
                 node.morestyles[name] = this.parseStyleAttr(attr.value);
             }

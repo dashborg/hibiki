@@ -69,7 +69,12 @@ function formatVal(val : any, format : string) : string {
     let rtn = null;
     try {
         if (format == null || format == "") {
-            rtn = String(val);
+            if (val instanceof HibikiBlob) {
+                rtn = blobPrintStr(val);
+            }
+            else {
+                rtn = String(val);
+            }
         }
         else if (format == "json") {
             rtn = JsonStringify(val, 2);

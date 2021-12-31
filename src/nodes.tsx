@@ -409,10 +409,10 @@ class RawHtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnvi
         let isMulti = !!ctx.resolveAttr("multiple");
         let newValue : (string | string[]) = null;
         if (isMulti) {
-            newValue = Array.from(event.target.selectedOptions, (option) => option.value);
+            newValue = Array.from(e.target.selectedOptions, (option : HTMLOptionElement) => option.value);
         }
         else {
-            newValue = event.target.value;
+            newValue = e.target.value;
         }
         ctx.handleOnChange(newValue);
         if (hasBindPath) {

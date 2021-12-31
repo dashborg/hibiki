@@ -163,7 +163,11 @@ function setParams(method : string, url : URL, fetchInit : Record<string, any>, 
         throw new Error("Invalid @data, must be an object: type=" + typeof(atData));
     }
     let params = Object.assign({}, (atData ?? {}), stripAtKeys(data));
+    let encoding = unpackArg(data, "@encoding");
     if (method == "GET" || method == "DELETE") {
+        if (encoding != null && encoding != "url") {
+            console.log(sprintf("WARNING, @enc=%s is ignored for GET/DELETE requests, only 'url' is supported", encoding));
+        }
         for (let key in params) {
             let val = params[key];
             if (val == null || typeof(val) == "function") {
@@ -179,7 +183,6 @@ function setParams(method : string, url : URL, fetchInit : Record<string, any>, 
         }
         return;
     }
-    let encoding = unpackArg(data, "@encoding");
     if (encoding == null || encoding == "json") {
         fetchInit.headers.set("Content-Type", "application/json");
         fetchInit.body = JSON.stringify(params, jsonReplacer);
