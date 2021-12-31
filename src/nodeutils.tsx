@@ -427,7 +427,7 @@ function makeHandlers(node : HibikiNode, handlerPrefixes? : string[]) : Record<s
         for (let i=0; i<node.list.length; i++) {
             let subNode = node.list[i];
             if (subNode.tag == "define-handler" && subNode.attrs != null && subNode.attrs.name != null) {
-                let hname = subNode.attrs.name;
+                let hname = DataCtx.rawAttrStr(subNode.attrs.name);
                 let prefixOk = false;
                 for (let j=0; j<handlerPrefixes.length; j++) {
                     if (hname.startsWith(sprintf("//@%s/", handlerPrefixes[j]))) {
@@ -469,4 +469,15 @@ function firstSubNodeByTag(node : HibikiNode, tag : string) : HibikiNode {
     return null;
 }
 
-export {BLOCKED_ELEMS, INLINE_ELEMS, SPECIAL_ATTRS, BLOB_ATTRS, SUBMIT_ELEMS, MANAGED_ATTRS, renderTextSpan, renderTextData, makeNodeVar, makeChildrenVar, parseArgsDecl, parseAutomerge, handleConvertType, automerge, makeHandlers, subNodesByTag, firstSubNodeByTag, getManagedType};
+function getRawAttrs(node : HibikiNode) : Record<string, string> {
+    if (node == null || node.attrs == null) {
+        return {};
+    }
+    let rtn : Record<string, string> = {};
+    for (let attrName in node.attrs) {
+        rtn[attrName] = DataCtx.rawAttrStr(node.attrs[attrName]);
+    }
+    return rtn;
+}
+
+export {BLOCKED_ELEMS, INLINE_ELEMS, SPECIAL_ATTRS, BLOB_ATTRS, SUBMIT_ELEMS, MANAGED_ATTRS, renderTextSpan, renderTextData, makeNodeVar, makeChildrenVar, parseArgsDecl, parseAutomerge, handleConvertType, automerge, makeHandlers, subNodesByTag, firstSubNodeByTag, getManagedType, getRawAttrs};

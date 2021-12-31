@@ -2,16 +2,15 @@
 
 import * as mobx from "mobx";
 import {v4 as uuidv4} from 'uuid';
-import nearley from "nearley";
-import hibikiGrammar from "./hibiki-grammar.js";
 import {DataEnvironment} from "./state";
 import {sprintf} from "sprintf-js";
 import {parseHtml} from "./html-parser";
 import {RtContext, getShortEMsg, HibikiError} from "./error";
 import {makeUrlParamsFromObject, SYM_PROXY, SYM_FLATTEN, isObject, stripAtKeys, unpackPositionalArgs, nodeStr, parseHandler, fullPath, blobPrintStr} from "./utils";
-import {PathPart, PathType, PathUnionType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue, HandlerBlock} from "./types";
+import {PathPart, PathType, PathUnionType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue, HandlerBlock, NodeAttrType} from "./types";
 import {HibikiRequest} from "./request";
 import type {EHandlerType} from "./state";
+import {doParse} from "./hibiki-parser";
 
 declare var window : any;
 
@@ -27,6 +26,7 @@ type HExpr = {
     key?     : HExpr,
     path?    : PathType,
     valexpr? : HExpr,
+    sourcestr? : string,
 };
 
 type HIteratorExpr = {
@@ -63,6 +63,16 @@ class HibikiBlob {
     makeDataUrl() : string {
         return "data:" + this.mimetype + ";base64," + this.data;
     }
+}
+
+function rawAttrStr(attr : NodeAttrType) : string {
+    if (attr == null) {
+        return null;
+    }
+    if (typeof(attr) == "string") {
+        return attr;
+    }
+    return attr.sourcestr;
 }
 
 function formatVal(val : any, format : string) : string {
@@ -1909,28 +1919,6 @@ function JsonEqual(v1 : any, v2 : any) : boolean {
     return JsonStringify(v1) == JsonStringify(v2);
 }
 
-function doParse(str : string, nonTerm : string) : any {
-    let nonTermLogStr = nonTerm.replace("ext_", "");
-    let g = nearley.Grammar.fromCompiled(hibikiGrammar);
-    g.ParserStart = g.start = nonTerm;
-    let parser = new nearley.Parser(g);
-    try {
-        parser.feed(str);
-    }
-    catch (e) {
-        let emsg = getShortEMsg(e);
-        throw new Error(emsg);
-    }
-    if (parser.results == null || parser.results.length == null || parser.results.length == 0) {
-        throw new Error(sprintf("Error parsing %s, unterminated expr", nonTermLogStr));
-    }
-    if (parser.results.length > 1) {
-        console.log(sprintf("Ambiguous parse of %s: ", nonTermLogStr), str, parser.results);
-    }
-    let parseResult = parser.results[0];
-    return parseResult;
-}
-
 function ParseStaticCallStatement(str : string) : HAction {
     let callAction : HAction = doParse(str, "ext_callStatementNoAssign");
     return callAction;
@@ -1999,12 +1987,6 @@ function convertSimpleType(typeName : string, value : string, defaultValue : any
     return value;
 }
 
-export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, BoundValue, ParseLValuePath, ParseLValuePathThrow, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, evalActionStr, ParseIteratorExpr, ParseIteratorExprThrow, makeIteratorFromExpr};
+export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, BoundValue, ParseLValuePath, ParseLValuePathThrow, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, evalActionStr, ParseIteratorExpr, ParseIteratorExprThrow, makeIteratorFromExpr, rawAttrStr};
 
 export type {PathType, HAction, HExpr, HIteratorExpr};
-
-
-
-
-
-

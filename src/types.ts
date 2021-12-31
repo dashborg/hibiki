@@ -4,12 +4,15 @@ import type {HibikiState} from "./state";
 import type {RtContext, HibikiError} from "./error";
 import type {HibikiRequest} from "./request";
 import * as mobx from "mobx";
-import type {HAction} from "./datactx";
+import type {HAction, HExpr} from "./datactx";
+
+type NodeAttrType = string | HExpr;
 
 type HibikiNode = {
     tag    : string,
     text?  : string,
-    attrs? : Record<string, string>,
+    attrs? : Record<string, NodeAttrType>,
+    handlers? : Record<string, HAction[]>,
     list?  : HibikiNode[],
     style? : Record<string, string>,
     morestyles? : Record<string, Record<string, string>>,
@@ -170,4 +173,4 @@ interface HibikiExtState {
     initialize(force : boolean);
 };
 
-export type {HibikiNode, HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, ComponentType, LibraryType, HibikiRequest, Hibiki, HibikiAction, HibikiActionString, HibikiActionValue, HibikiExtState, EventType, HandlerValType, JSFuncType, AppModuleConfig, FetchHookFn, CsrfHookFn, ReactClass, HandlerPathType, ErrorCallbackFn, EventCallbackFn, HtmlParserOpts, LibComponentType, HandlerBlock};
+export type {HibikiNode, HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, ComponentType, LibraryType, HibikiRequest, Hibiki, HibikiAction, HibikiActionString, HibikiActionValue, HibikiExtState, EventType, HandlerValType, JSFuncType, AppModuleConfig, FetchHookFn, CsrfHookFn, ReactClass, HandlerPathType, ErrorCallbackFn, EventCallbackFn, HtmlParserOpts, LibComponentType, HandlerBlock, NodeAttrType};

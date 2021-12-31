@@ -1,7 +1,7 @@
 // Copyright 2021 Dashborg Inc
 
 import * as mobx from "mobx";
-import {HibikiNode, Hibiki, HandlerPathType} from "./types";
+import {HibikiNode, Hibiki, HandlerPathType, NodeAttrType} from "./types";
 import {sprintf} from "sprintf-js";
 import type {HibikiBlob} from "./datactx";
 
@@ -335,7 +335,7 @@ function evalDeepTextContent(node : HibikiNode, throwError : boolean) : any {
     if (text == "") {
         return null;
     }
-    let format = rawAttr(node, "format");
+    let format = rawAttrFromNode(node, "format");
     try {
         if (format == null || format == "json") {
             return JSON.parse(text);
@@ -358,11 +358,21 @@ function evalDeepTextContent(node : HibikiNode, throwError : boolean) : any {
     }
 }
 
-function rawAttr(node : HibikiNode, attrName : string) : string {
+function rawAttrFromNode(node : HibikiNode, attrName : string) : string {
     if (node == null || node.attrs == null) {
         return null;
     }
-    return node.attrs[attrName];
+    return rawAttrStr(node.attrs[attrName]);
+}
+
+function rawAttrStr(attr : NodeAttrType) : string {
+    if (attr == null) {
+        return null;
+    }
+    if (typeof(attr) == "string") {
+        return attr;
+    }
+    return attr.sourcestr;
 }
 
 function nodeStr(node : HibikiNode) : string {
@@ -567,5 +577,5 @@ function base64ToArray(b64 : string) : Uint8Array {
     return arr;
 }
 
-export {jsonRespHandler, parseUrlParams, valToString, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, makeUrlParamsFromObject, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, rawAttr, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs, blobPrintStr, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy, valInArray};
+export {jsonRespHandler, parseUrlParams, valToString, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, makeUrlParamsFromObject, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs, blobPrintStr, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy, valInArray};
 

@@ -14,7 +14,7 @@ import dayjsRelativeTime from "dayjs/plugin/relativeTime";
 import dayjsUtc from "dayjs/plugin/utc";
 import dayjsRelative from "dayjs/plugin/relativeTime";
 
-import type {HibikiNode, ComponentType, LibraryType, HibikiExtState, LibComponentType} from "./types";
+import type {HibikiNode, ComponentType, LibraryType, HibikiExtState, LibComponentType, NodeAttrType} from "./types";
 import {DBCtx} from "./dbctx";
 import * as DataCtx from "./datactx";
 import {HibikiState, DataEnvironment, getAttributes, getAttribute, getStyleMap} from "./state";
@@ -707,11 +707,11 @@ class CustomNode extends React.Component<{node : HibikiNode, component : Compone
         let ctx = new DBCtx(this);
         let component = this.props.component;
         let implNode = component.node;
-        let rawImplAttrs = implNode.attrs || {};
+        let rawImplAttrs : Record<string, NodeAttrType> = implNode.attrs || {};
         let nodeVar = NodeUtils.makeNodeVar(ctx);
         let childrenVar = NodeUtils.makeChildrenVar(ctx.dataenv, ctx.node);
-        let argDecls = NodeUtils.parseArgsDecl(rawImplAttrs.args);
-        let componentName = rawImplAttrs.name;
+        let argDecls = NodeUtils.parseArgsDecl(DataCtx.rawAttrStr(rawImplAttrs.args));
+        let componentName = DataCtx.rawAttrStr(rawImplAttrs.name);
         let nodeDataBox = ctx.dataenv.dbstate.NodeDataMap.get(ctx.uuid);
         if (nodeDataBox == null) {
             let uuidName = "id_" + ctx.uuid.replace(/-/g, "_");
@@ -738,7 +738,7 @@ class CustomNode extends React.Component<{node : HibikiNode, component : Compone
         let childEnv = eventDE.makeChildEnv(specials, envOpts);
         if (initialize && rawImplAttrs.defaults != null) {
             try {
-                DataCtx.ParseAndCreateContextThrow(rawImplAttrs.defaults, "c", childEnv, sprintf("<define-component %s>:defaults", componentName));
+                DataCtx.ParseAndCreateContextThrow(DataCtx.rawAttrStr(rawImplAttrs.defaults), "c", childEnv, sprintf("<define-component %s>:defaults", componentName));
             }
             catch (e) {
                 console.log(sprintf("ERROR parsing/executing 'defaults' in <define-component %s>", componentName), e);

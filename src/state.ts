@@ -5,7 +5,7 @@ import md5 from "md5";
 import {sprintf} from "sprintf-js";
 import {boundMethod} from 'autobind-decorator'
 import {v4 as uuidv4} from 'uuid';
-import type {HibikiNode, ComponentType, LibraryType, HibikiConfig, HibikiHandlerModule, HibikiAction, EventType, HandlerValType, JSFuncType, CsrfHookFn, FetchHookFn, Hibiki, ErrorCallbackFn, HtmlParserOpts, HandlerBlock} from "./types";
+import type {HibikiNode, ComponentType, LibraryType, HibikiConfig, HibikiHandlerModule, HibikiAction, EventType, HandlerValType, JSFuncType, CsrfHookFn, FetchHookFn, Hibiki, ErrorCallbackFn, HtmlParserOpts, HandlerBlock, NodeAttrType} from "./types";
 import * as DataCtx from "./datactx";
 import {isObject, textContent, SYM_PROXY, SYM_FLATTEN, nodeStr, callHook, getHibiki, parseHandler, fullPath, parseUrlParams, smartDecodeParams} from "./utils";
 import {subNodesByTag, firstSubNodeByTag} from "./nodeutils";
@@ -49,7 +49,7 @@ function createDepPromise(libName : string, srcUrl : string, state : HibikiState
     let srcs = [];
     for (let i=0; i<scriptTags.length; i++) {
         let stag = scriptTags[i];
-        let attrs = stag.attrs || {};
+        let attrs = NodeUtils.getRawAttrs(stag);
         if (attrs.type != null && attrs.type != "text/javascript") {
             continue;
         }
@@ -69,14 +69,15 @@ function createDepPromise(libName : string, srcUrl : string, state : HibikiState
     let linkTags = subNodesByTag(libNode, "link");
     for (let i=0; i<linkTags.length; i++) {
         let ltag = linkTags[i];
-        if (ltag.attrs == null || ltag.attrs.rel != "stylesheet" || ltag.attrs.href == null) {
+        let attrs = NodeUtils.getRawAttrs(ltag);
+        if (attrs.rel != "stylesheet" || attrs.href == null) {
             continue;
         }
-        let cssUrl = ltag.attrs.href;
-        if (ltag.attrs.relative) {
+        let cssUrl = attrs.href;
+        if (attrs.relative) {
             cssUrl = new URL(cssUrl, srcUrl).toString();
         }
-        let p = state.loadCssLink(cssUrl, !ltag.attrs.async);
+        let p = state.loadCssLink(cssUrl, !attrs.async);
         parr.push(p);
         srcs.push("[css]" + cssUrl);
     }
@@ -87,19 +88,20 @@ function createDepPromise(libName : string, srcUrl : string, state : HibikiState
     let importTags = subNodesByTag(libNode, "import-library");
     for (let i=0; i<importTags.length; i++) {
         let itag = importTags[i];
-        if (itag.attrs == null || itag.attrs.src == null || itag.attrs.src == "") {
+        let attrs = NodeUtils.getRawAttrs(itag);
+        if (attrs.src == null || attrs.src == "") {
             console.log("Invalid <import-library> tag, no src attribute");
             continue;
         }
-        if (itag.attrs == null || itag.attrs.prefix == null || itag.attrs.prefix == "") {
+        if (attrs.prefix == null || attrs.prefix == "") {
             console.log(sprintf("Invalid <import-library> tag src[%s], no prefix attribute", itag.attrs.src));
             continue;
         }
-        let libUrl = itag.attrs.src;
-        if (itag.attrs.relative) {
+        let libUrl = attrs.src;
+        if (attrs.relative) {
             libUrl = new URL(libUrl, srcUrl).toString();
         }
-        let p = state.ComponentLibrary.importLibrary(libName, itag.attrs.src, itag.attrs.prefix, !itag.attrs.async);
+        let p = state.ComponentLibrary.importLibrary(libName, attrs.src, attrs.prefix, !attrs.async);
         parr.push(p);
         srcs.push("[library]" + libUrl);
     }
@@ -530,7 +532,7 @@ class ComponentLibrary {
             return resp.text();
         })
         .then((rtext) => {
-            let defNode = parseHtml(rtext, {});
+            let defNode = parseHtml(rtext, null, {});
             let libNode = firstSubNodeByTag(defNode, "define-library");
             if (libNode == null) {
                 throw new Error(sprintf("No top-level <define-library> found"));
@@ -602,20 +604,21 @@ class ComponentLibrary {
             if (h.tag != "define-component") {
                 continue;
             }
-            if (!h.attrs || !h.attrs["name"]) {
+            let attrs = NodeUtils.getRawAttrs(h);
+            if (attrs["name"] == null) {
                 console.log("define-component tag without a name, skipping");
                 continue;
             }
-            let name = h.attrs["name"];
+            let name = attrs.name;
             if (libObj.libComponents[name]) {
                 console.log(sprintf("cannot redefine component %s/%s", libName, name));
                 continue;
             }
-            if (h.attrs.react) {
+            if (attrs.react) {
                 libObj.libComponents[name] = {componentType: "react-custom", reactimpl: mobx.observable.box(null)};
                 continue;
             }
-            if (h.attrs.native) {
+            if (attrs.native) {
                 libObj.libComponents[name] = {componentType: "hibiki-native", impl: mobx.observable.box(null)};
                 continue;
             }
@@ -1281,20 +1284,22 @@ const STYLE_UNITLESS_NUMBER = { // from react
 };
 
 // return type is not necessarily string :/
-function resolveAttrVal(k : string, v : string, dataenv : DataEnvironment, opts : any) : string {
+function resolveAttrVal(k : string, v : NodeAttrType, dataenv : DataEnvironment, opts : any) : string {
     opts = opts || {};
     if (v == null || v == "") {
         return null;
     }
-    if (!v.startsWith("*")) {
+    if (typeof(v) == "string") {
         return v;
     }
-    if (v == "*" || v == "**") {
-        return v;
+    let resolvedVal = null;
+    try {
+        resolvedVal = DataCtx.evalExprAst(v, dataenv);
     }
-    v = v.substr(1);
-    let rtContext = opts.rtContext || sprintf("Resolving Attribute '%s'", k);
-    let resolvedVal = DataCtx.EvalSimpleExpr(v, dataenv, rtContext);
+    catch (e) {
+        console.log(sprintf("ERROR resolving attribute '%s' expression\n\"%s\"\n", k, v.sourcestr), e.toString());
+        return null;
+    }
     if (resolvedVal instanceof DataCtx.LValue) {
         resolvedVal = resolvedVal.get();
     }

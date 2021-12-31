@@ -207,15 +207,11 @@ class DBCtx {
         if (!this.node.attrs) {
             return null;
         }
-        return this.node.attrs[attrName];
+        return DataCtx.rawAttrStr(this.node.attrs[attrName]);
     }
 
     isEditMode() : boolean {
         return false;
-    }
-
-    getRawAttrs() : {[e : string] : string} {
-        return this.node.attrs || {};
     }
 
     resolveStyleMap(styleAttr : string, initStyles? : any) : any {
