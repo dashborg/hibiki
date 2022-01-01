@@ -7,7 +7,7 @@ import {DBCtx} from "./dbctx";
 import type {HibikiNode, HandlerValType} from "./types";
 import * as DataCtx from "./datactx";
 import {sprintf} from "sprintf-js";
-import {isObject, textContent} from "./utils";
+import {isObject, textContent, rawAttrFromNode} from "./utils";
 import {getAttribute} from "./state";
 import {DataEnvironment} from "./state";
 
@@ -426,18 +426,26 @@ function makeHandlers(node : HibikiNode, handlerPrefixes? : string[]) : Record<s
     if (handlerPrefixes != null && node.list != null) {
         for (let i=0; i<node.list.length; i++) {
             let subNode = node.list[i];
-            if (subNode.tag == "define-handler" && subNode.attrs != null && subNode.attrs.name != null) {
-                let hname = DataCtx.rawAttrStr(subNode.attrs.name);
-                let prefixOk = false;
-                for (let j=0; j<handlerPrefixes.length; j++) {
-                    if (hname.startsWith(sprintf("//@%s/", handlerPrefixes[j]))) {
-                        prefixOk = true;
-                        break;
-                    }
+            if (subNode.tag != "define-handler") {
+                continue;
+            }
+            let attrs = getRawAttrs(subNode);
+            if (attrs.name == null) {
+                continue;
+            }
+            if (subNode.handlers == null || subNode.handlers["handler"] == null) {
+                continue;
+            }
+            let hname = attrs.name;
+            let prefixOk = false;
+            for (let j=0; j<handlerPrefixes.length; j++) {
+                if (hname.startsWith(sprintf("//@%s/", handlerPrefixes[j]))) {
+                    prefixOk = true;
+                    break;
                 }
-                if (prefixOk) {
-                    handlers[hname] = {handlerStr: textContent(subNode), node: subNode};
-                }
+            }
+            if (prefixOk) {
+                handlers[hname] = {handlerStr: textContent(subNode), actions: subNode.handlers["handler"], node: subNode};
             }
         }
     }

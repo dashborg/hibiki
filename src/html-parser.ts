@@ -6,6 +6,7 @@ import merge from "lodash/merge";
 import {sprintf} from "sprintf-js";
 import {doParse} from "./hibiki-parser";
 import type {HAction, HExpr} from "./datactx";
+import {textContent, rawAttrFromNode} from "./utils";
 
 const styleAttrPartRe = new RegExp("^(style(?:-[a-z][a-z0-9-])?)\\.(.*)");
 
@@ -81,7 +82,8 @@ class HtmlParser {
         if (text == null || text == "") {
             return null;
         }
-        if (this.opts.noInlineText || parentTag == "script" || parentTag == "define-handler") {
+        if (this.opts.noInlineText
+            || parentTag == "script" || parentTag == "define-handler" || parentTag.startsWith("hibiki-")) {
             return {tag: "#text", text: text};
         }
         if (text.indexOf("{{") == -1) {
@@ -153,6 +155,10 @@ class HtmlParser {
             node.attrs[name] = value;
             return;
         }
+        if (node.tag == "define-component" || node.tag == "define-handler" || node.tag == "import-library" || node.tag.startsWith("hibiki-")) {
+            node.attrs[name] = value;
+            return;
+        }
         let exprStr = value.substr(1).trim();
         try {
             let exprAst : HExpr = doParse(exprStr, "ext_fullExpr");
@@ -161,6 +167,24 @@ class HtmlParser {
         }
         catch (e) {
             console.log(sprintf("ERROR evaluating attribute '%s' in <%s>\n\"%s\"\n", name, node.tag, exprStr), e.toString());
+        }
+    }
+
+    parseHandlerText(node : HibikiNode) {
+        let nameAttr = rawAttrFromNode(node, "name");
+        let handlerText = textContent(node);
+        if (handlerText.trim() == "") {
+            return;
+        }
+        try {
+            let block : HAction[] = doParse(handlerText + ";", "ext_statementBlock");
+            if (node.handlers == null) {
+                node.handlers = {};
+            }
+            node.handlers["handler"] = block;
+        }
+        catch (e) {
+            console.log(sprintf("ERROR parsing define-handler name=%s\n<<<\n%s\n>>>\n", nameAttr, handlerText), e.toString());
         }
     }
 
@@ -196,10 +220,14 @@ class HtmlParser {
         if (list != null) {
             node.list = list;
         }
-        pctx.tagStack.pop();
         if (node.tag == "script" && node.attrs != null && (node.attrs["type"] == "application/json" || node.attrs["type"] == "text/plain") && node.list != null && node.list.length == 1 && node.list[0].tag == "#text") {
+            pctx.tagStack.pop();
             return node.list[0];
         }
+        if (node.tag == "define-handler") {
+            this.parseHandlerText(node);
+        }
+        pctx.tagStack.pop();
         return node;
     }
 
