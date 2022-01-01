@@ -13,6 +13,7 @@ type HibikiNode = {
     text?  : string,
     attrs? : Record<string, NodeAttrType>,
     handlers? : Record<string, HAction[]>,
+    bindings? : Record<string, PathType>,
     list?  : HibikiNode[],
     style? : Record<string, string>,
     morestyles? : Record<string, Record<string, string>>,

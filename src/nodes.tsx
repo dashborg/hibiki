@@ -35,6 +35,11 @@ window.dayjs = dayjs;
 let welcomeMessage = false;
 let usageFired = false;
 
+type HibikiReactProps = {
+    node : HibikiNode,
+    dataenv : DataEnvironment,
+};
+
 @mobxReact.observer
 class ErrorMsg extends React.Component<{message: string}, {}> {
     render() {
@@ -230,7 +235,7 @@ function staticEvalTextNode(node : HibikiNode, dataenv : DataEnvironment) : stri
 }
 
 @mobxReact.observer
-class AnyNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
+class AnyNode extends React.Component<HibikiReactProps, {}> {
     nodeType : string = "unknown";
 
     renderForeach(ctx : DBCtx) : any {
@@ -317,7 +322,7 @@ class AnyNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironm
 }
 
 @mobxReact.observer
-class CustomReactNode extends React.Component<{node : HibikiNode, component : ComponentType, dataenv : DataEnvironment}, {}> {
+class CustomReactNode extends React.Component<HibikiReactProps & {component : ComponentType}, {}> {
     componentDidMount() {
         let ctx = new DBCtx(this);
         if (ctx.isEditMode()) {
@@ -357,7 +362,7 @@ async function convertBlobArray(blobArr : Blob[]) : Promise<DataCtx.HibikiBlob[]
 }
 
 @mobxReact.observer
-class RawHtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
+class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
     constructor(props : any) {
         super(props);
         let ctx = new DBCtx(this);
@@ -697,7 +702,7 @@ class RawHtmlNode extends React.Component<{node : HibikiNode, dataenv : DataEnvi
 }
 
 @mobxReact.observer
-class CustomNode extends React.Component<{node : HibikiNode, component : ComponentType, dataenv : DataEnvironment}, {}> {
+class CustomNode extends React.Component<HibikiReactProps & {component : ComponentType}, {}> {
     constructor(props : any) {
         super(props);
         this.makeCustomChildEnv(true);
@@ -831,14 +836,14 @@ function componentRootProxy(nodeDataLV : DataCtx.ObjectLValue, resolvedAttrs : {
 }
 
 @mobxReact.observer
-class TextNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
+class TextNode extends React.Component<HibikiReactProps, {}> {
     render() {
         return NodeUtils.renderTextData(this.props.node, this.props.dataenv);
     }
 }
 
 @mobxReact.observer
-class IfNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
+class IfNode extends React.Component<HibikiReactProps, {}> {
     render() {
         let ctx = new DBCtx(this);
         let condition = true;
@@ -855,7 +860,7 @@ class IfNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironme
 }
 
 @mobxReact.observer
-class FragmentNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
+class FragmentNode extends React.Component<HibikiReactProps, {}> {
     render() {
         let ctx = new DBCtx(this);
         return <NodeList list={ctx.node.list} ctx={ctx}/>;
@@ -863,7 +868,7 @@ class FragmentNode extends React.Component<{node : HibikiNode, dataenv : DataEnv
 }
 
 @mobxReact.observer
-class ForEachNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
+class ForEachNode extends React.Component<HibikiReactProps, {}> {
     render() {
         let ctx = new DBCtx(this);
         let foreachText = ctx.resolveAttr("expr");
@@ -893,7 +898,7 @@ class ForEachNode extends React.Component<{node : HibikiNode, dataenv : DataEnvi
 }
 
 @mobxReact.observer
-class ScriptNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
+class ScriptNode extends React.Component<HibikiReactProps, {}> {
     render() {
         let ctx = new DBCtx(this);
         let blobsrc = ctx.resolveAttr("blobsrc");
@@ -916,7 +921,7 @@ class ScriptNode extends React.Component<{node : HibikiNode, dataenv : DataEnvir
 }
 
 @mobxReact.observer
-class DateFormatNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
+class DateFormatNode extends React.Component<HibikiReactProps, {}> {
     render() {
         let ctx = new DBCtx(this);
         let dataLV = ctx.resolveData("data", false);
@@ -985,13 +990,13 @@ class DateFormatNode extends React.Component<{node : HibikiNode, dataenv : DataE
 }
 
 @mobxReact.observer
-class NopNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
+class NopNode extends React.Component<HibikiReactProps, {}> {
     render() {
         return null;
     }
 }
 
-class RunHandlerNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
+class RunHandlerNode extends React.Component<HibikiReactProps, {}> {
     componentDidMount() {
         let ctx = new DBCtx(this);
         ctx.handleEvent("run");
@@ -1003,7 +1008,7 @@ class RunHandlerNode extends React.Component<{node : HibikiNode, dataenv : DataE
 }
 
 @mobxReact.observer
-class WithContextNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
+class WithContextNode extends React.Component<HibikiReactProps, {}> {
     render() {
         let ctx = new DBCtx(this);
         let contextattr = ctx.resolveAttr("context");
@@ -1021,7 +1026,7 @@ class WithContextNode extends React.Component<{node : HibikiNode, dataenv : Data
 }
 
 @mobxReact.observer
-class ChildrenNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
+class ChildrenNode extends React.Component<HibikiReactProps, {}> {
     render() {
         let ctx = new DBCtx(this);
         let dataLV = ctx.resolveData("data", false);
@@ -1051,7 +1056,7 @@ class ChildrenNode extends React.Component<{node : HibikiNode, dataenv : DataEnv
 }
 
 @mobxReact.observer
-class DynNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
+class DynNode extends React.Component<HibikiReactProps, {}> {
     curHtml : string = null;
     curHtmlObj : HibikiNode = null;
 
@@ -1084,7 +1089,7 @@ class DynNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironm
     }
 }
 
-class SimpleQueryNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
+class SimpleQueryNode extends React.Component<HibikiReactProps, {}> {
     refreshCount : mobx.IObservableValue<number>;
     callNum : number = 0;
     autorunDisposer : () => void = null;
@@ -1191,7 +1196,7 @@ class SimpleQueryNode extends React.Component<{node : HibikiNode, dataenv : Data
 }
 
 @mobxReact.observer
-class InlineDataNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}> {
+class InlineDataNode extends React.Component<HibikiReactProps> {
     constructor(props : any) {
         super(props);
     }
@@ -1231,17 +1236,8 @@ class InlineDataNode extends React.Component<{node : HibikiNode, dataenv : DataE
     }
 }
 
-class RenderLogNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
-    render() {
-        let ctx = new DBCtx(this);
-        let dataLV = ctx.resolveData("data", false);
-        console.log("Hibiki RenderLog", DataCtx.demobx(dataLV.get()));
-        return null;
-    }
-}
-
 @mobxReact.observer
-class DataSorterNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
+class DataSorterNode extends React.Component<HibikiReactProps, {}> {
     autorunDisposer : () => void = null;
 
     sortcolComputed : mobx.IComputedValue<string>;
@@ -1356,7 +1352,7 @@ class DataSorterNode extends React.Component<{node : HibikiNode, dataenv : DataE
 }
 
 @mobxReact.observer
-class DataPagerNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
+class DataPagerNode extends React.Component<HibikiReactProps, {}> {
     autorunDisposer : () => void = null;
     dataComputed : mobx.IComputedValue<any[]>;
     dataIsNullComputed : mobx.IComputedValue<boolean>;
@@ -1482,19 +1478,6 @@ class DataPagerNode extends React.Component<{node : HibikiNode, dataenv : DataEn
     }
 }
 
-class SimpleTableNode extends React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}> {
-    render() {
-        return (
-            <table>
-                <thead>
-                </thead>
-                <tbody>
-                </tbody>
-            </table>
-        );
-    }
-}
-
 @mobxReact.observer
 class DashElemNode extends React.Component<{ctx : DBCtx, extClass? : string, extStyle? : any}, {}> {
     render() {
@@ -1546,10 +1529,8 @@ addCoreComponent("h-withcontext", WithContextNode);
 addCoreComponent("h-children", ChildrenNode);
 addCoreComponent("h-data", SimpleQueryNode);
 addCoreComponent("h-inlinedata", InlineDataNode);
-addCoreComponent("h-renderlog", RenderLogNode);
 addCoreComponent("h-datasorter", DataSorterNode);
 addCoreComponent("h-datapager", DataPagerNode);
-addCoreComponent("h-table", SimpleTableNode);
 addCoreComponent("h-fragment", FragmentNode);
 
 export {HibikiRootNode, CORE_LIBRARY};

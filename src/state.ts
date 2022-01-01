@@ -1315,6 +1315,7 @@ function resolveAttrVal(k : string, v : NodeAttrType, dataenv : DataEnvironment,
     if (NodeUtils.BLOB_ATTRS[k] && resolvedVal instanceof DataCtx.HibikiBlob) {
         return (resolvedVal as any);
     }
+    resolvedVal = DataCtx.demobx(resolvedVal);
     if (opts.style && typeof(resolvedVal) == "number") {
         if (!STYLE_UNITLESS_NUMBER[k]) {
             resolvedVal = String(resolvedVal) + "px";

@@ -1,7 +1,7 @@
 // Copyright 2021 Dashborg Inc
 
 import camelCase from "camelcase";
-import type {HibikiNode, HtmlParserOpts} from "./types";
+import type {HibikiNode, HtmlParserOpts, PathType} from "./types";
 import merge from "lodash/merge";
 import {sprintf} from "sprintf-js";
 import {doParse} from "./hibiki-parser";
@@ -78,7 +78,7 @@ class HtmlParser {
         return rtn;
     }
 
-    parseText(parentTag : string, text : string) : HibikiNode | HibikiNode[] {
+    parseText(parentTag : string, text : string, pctx : ParseContext) : HibikiNode | HibikiNode[] {
         if (text == null || text == "") {
             return null;
         }
@@ -97,13 +97,15 @@ class HtmlParser {
             }
             else {
                 let tval = part.text.trim();
-                return {tag: "h-text", attrs: {bind: tval}};
+                let node : HibikiNode = {tag: "h-text", attrs: {}};
+                this.parseStandardAttr(node, {name: "bind", value: tval}, pctx);
+                return node;
             }
         });
         return parts;
     }
 
-    parseStyleAttr(node : HibikiNode, attr : Attr) : boolean {
+    parseStyleAttr(node : HibikiNode, attr : Attr, pctx : ParseContext) : boolean {
         let name = attr.name.toLowerCase();
         if (name == "style") {
             node.attrs[name] = attr.value;
@@ -124,7 +126,7 @@ class HtmlParser {
         return false;
     }
 
-    parseHandlerAttr(node : HibikiNode, attr : Attr) : boolean {
+    parseHandlerAttr(node : HibikiNode, attr : Attr, pctx : ParseContext) : boolean {
         let name = attr.name.toLowerCase();
         if (!name.endsWith(".handler")) {
             return false;
@@ -145,13 +147,38 @@ class HtmlParser {
         return true;
     }
 
-    parseStandardAttr(node : HibikiNode, attr : Attr, pctx : ParseContext) {
+    parseBindPathAttr(node : HibikiNode, attr : Attr, pctx : ParseContext) : boolean {
+        let name = attr.name.toLowerCase();
+        if (!name.endsWith(".bindpath")) {
+            return false;
+        }
+        let value = attr.value;
+        if (value.trim() == "") {
+            return true;
+        }
+        node.attrs[name] = value;
+        try {
+            let path : PathType = doParse(value, "ext_lvaluePath");
+            if (node.bindings == null) {
+                node.bindings = {};
+            }
+            node.bindings[name.substr(0, name.length-9)] = path;
+        }
+        catch (e) {
+            console.log(sprintf("ERROR evaluating '%s' in <%s>\n\"%s\"\n", name, node.tag, attr.value), e.toString());
+        }
+        node.attrs[name] = value;
+        return true;
+    }
+
+    parseStandardAttr(node : HibikiNode, attr : {name : string, value : string}, pctx : ParseContext) {
         let name = attr.name.toLowerCase();
         let value = attr.value;
         if (value == "" && name != "value") {
             value = "1";
         }
-        if (!value.startsWith("*") || value == "*" || value == "**") {
+        let isBind = (name == "bind");
+        if (!isBind && (!value.startsWith("*") || value == "*" || value == "**")) {
             node.attrs[name] = value;
             return;
         }
@@ -159,7 +186,7 @@ class HtmlParser {
             node.attrs[name] = value;
             return;
         }
-        let exprStr = value.substr(1).trim();
+        let exprStr = (isBind ? value : value.substr(1).trim());
         try {
             let exprAst : HExpr = doParse(exprStr, "ext_fullExpr");
             exprAst.sourcestr = value;
@@ -190,7 +217,7 @@ class HtmlParser {
 
     parseHtmlNode(parentTag : string, htmlNode : Node, pctx : ParseContext) : HibikiNode | HibikiNode[] {
         if (htmlNode.nodeType == 3 || htmlNode.nodeType == 4) {  // TEXT_NODE, CDATA_SECTION_NODE
-            return this.parseText(parentTag, htmlNode.textContent);
+            return this.parseText(parentTag, htmlNode.textContent, pctx);
         }
         if (htmlNode.nodeType == 8) { // COMMENT_NODE
             let node = {tag: "#comment", text: htmlNode.textContent};
@@ -208,10 +235,13 @@ class HtmlParser {
         }
         for (let i=0; i<nodeAttrs.length; i++) {
             let attr = nodeAttrs.item(i);
-            if (this.parseStyleAttr(node, attr)) {
+            if (this.parseStyleAttr(node, attr, pctx)) {
                 continue;
             }
-            else if (this.parseHandlerAttr(node, attr)) {
+            else if (this.parseHandlerAttr(node, attr, pctx)) {
+                continue;
+            }
+            else if (this.parseBindPathAttr(node, attr, pctx)) {
                 continue;
             }
             this.parseStandardAttr(node, attr, pctx);

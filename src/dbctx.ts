@@ -334,6 +334,13 @@ class DBCtx {
         return;
     }
 
+    isAttrBound(attrName : string) : boolean {
+        if (this.node.bindings == null) {
+            return false;
+        }
+        return (this.node.bindings[attrName] != null);
+    }
+
     resolveAttrData(dataName : string, writeable : boolean) : DataCtx.LValue {
         if (this.hasAttr(dataName + ".bindpath")) {
             return this._getBindPathLV(dataName + ".bindpath");
@@ -366,8 +373,7 @@ class DBCtx {
             if (writeable) {
                 console.log(sprintf("Warning: %s=\"%s\" specified for writeable '%s' value (making read-only)", "bind", this.getRawAttr("bind"), dataName));
             }
-            let attrval = this.resolveAttr("bind");
-            let dataVal = this.evalExpr(attrval, true);
+            let dataVal = this.resolveAttr("bind", {raw: true});
             if (dataVal instanceof DataCtx.LValue) {
                 return dataVal;
             }
