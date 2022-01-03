@@ -168,8 +168,7 @@ function renderTextSpan(text : string, style : any) : any {
 function renderTextData(node : HibikiNode, dataenv : DataEnvironment, onlyText? : boolean) : any {
     let ctx = new DBCtx(null, node, dataenv);
     let style = ctx.resolveStyleMap("style");
-    let dataLV = ctx.resolveData("data", false);
-    let bindVal : HibikiVal = DataCtx.demobx(dataLV.get());
+    let bindVal = DataCtx.demobx(ctx.resolveAttrVal("bind"));
     let rtn : string = null;
     if (bindVal == null) {
         rtn = ctx.resolveAttrStr("nulltext");
@@ -313,8 +312,8 @@ function handleConvertType(ctx : DBCtx, value : string) : any {
     if (convertType == null) {
         return;
     }
-    let convertLV = ctx.resolveData("convertoutput", true);
-    let convertErrorLV = ctx.resolveData("converterror", true);
+    let convertLV = ctx.resolveLValueAttr("convertoutput");
+    let convertErrorLV = ctx.resolveLValueAttr("converterror");
     try {
         let subType = null;
         if (convertType.startsWith("json:") || convertType.startsWith("jseval:")) {
@@ -351,13 +350,21 @@ function handleConvertType(ctx : DBCtx, value : string) : any {
         else {
             convertedVal = DataCtx.convertSimpleType(convertType, value, ctx.resolveAttrVal("converterrorvalue"));
         }
-        convertLV.set(convertedVal);
-        convertErrorLV.set(null);
+        if (convertLV != null) {
+            convertLV.set(convertedVal);
+        }
+        if (convertErrorLV != null) {
+            convertErrorLV.set(null);
+        }
     }
     catch (e) {
         let errObj = {message: sprintf("Error converting value: %s", e), err: e};
-        convertLV.set(null);
-        convertErrorLV.set(errObj);
+        if (convertLV != null) {
+            convertLV.set(null);
+        }
+        if (convertErrorLV != null) {
+            convertErrorLV.set(errObj);
+        }
     }
     return value;
 }

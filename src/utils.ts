@@ -134,6 +134,27 @@ function isObject(v : any) : boolean {
     return typeof(v) == "object";
 }
 
+function subMapKey(v : HibikiVal, mapKey : string) : HibikiVal {
+    if (v == null || !isObject(v)) {
+        return null;
+    }
+    if (v instanceof Map || mobx.isObservableMap(v)) {
+        return v.get(mapKey);
+    }
+    return v[mapKey];
+}
+
+function subArrayIndex(v : HibikiVal, arrIdx : number) : HibikiVal {
+    if (v == null || !mobx.isArrayLike(v)) {
+        return null;
+    }
+    let arr : HibikiVal[] = (v as HibikiVal[]);
+    if (arrIdx < 0 || arr.length < arrIdx) {
+        return null;
+    }
+    return arr[arrIdx];
+}
+
 function setSS(key : string, val : any) {
     try {
         let sto = window.sessionStorage;
@@ -639,5 +660,5 @@ const STYLE_KEY_MAP = {
     "fullcenter": {flex: true},
 };
 
-export {jsonRespHandler, parseUrlParams, valToString, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, makeUrlParamsFromObject, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs, blobPrintStr, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy, valInArray, rawAttrFromNode, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP};
+export {jsonRespHandler, parseUrlParams, valToString, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, makeUrlParamsFromObject, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs, blobPrintStr, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy, valInArray, rawAttrFromNode, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP, subMapKey, subArrayIndex};
 

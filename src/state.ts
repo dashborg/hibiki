@@ -5,7 +5,7 @@ import md5 from "md5";
 import {sprintf} from "sprintf-js";
 import {boundMethod} from 'autobind-decorator'
 import {v4 as uuidv4} from 'uuid';
-import type {HibikiNode, ComponentType, LibraryType, HibikiConfig, HibikiHandlerModule, HibikiAction, EventType, HandlerValType, JSFuncType, CsrfHookFn, FetchHookFn, Hibiki, ErrorCallbackFn, HtmlParserOpts, HandlerBlock, NodeAttrType} from "./types";
+import type {HibikiNode, ComponentType, LibraryType, HibikiConfig, HibikiHandlerModule, HibikiAction, EventType, HandlerValType, JSFuncType, CsrfHookFn, FetchHookFn, Hibiki, ErrorCallbackFn, HtmlParserOpts, HandlerBlock, NodeAttrType, HibikiVal} from "./types";
 import * as DataCtx from "./datactx";
 import {isObject, textContent, SYM_PROXY, SYM_FLATTEN, nodeStr, callHook, getHibiki, parseHandler, fullPath, parseUrlParams, smartDecodeParams, blobPrintStr} from "./utils";
 import {subNodesByTag, firstSubNodeByTag} from "./nodeutils";
@@ -793,7 +793,7 @@ class HibikiState {
     DataNodeStates = {};
     ResourceCache = {};
     HasRendered = false;
-    NodeDataMap : Map<string, mobx.IObservableValue<any>> = new Map();  // TODO clear on unmount
+    NodeDataMap : Map<string, mobx.IObservableValue<HibikiVal>> = new Map();  // TODO clear on unmount
     ExtHtmlObj : mobx.ObservableMap<string,any> = mobx.observable.map({}, {name: "ExtHtmlObj", deep: false});
     Config : HibikiConfig = {};
     PageName : mobx.IObservableValue<string> = mobx.observable.box("default", {name: "PageName"});

@@ -331,33 +331,23 @@ class DBCtx {
         return null;
     }
 
-    resolveData(dataName : string, writeable : boolean) : DataCtx.LValue {
-        if (dataName == "data" && this.hasAttr("bind")) {
-            if (writeable) {
-                console.log(sprintf("Warning: %s=\"%s\" specified for writeable '%s' value (making read-only)", "bind", this.getRawAttr("bind"), dataName));
-            }
-            let dataVal = this.resolveAttrVal("bind");
-            if (dataVal instanceof DataCtx.LValue) {
-                return dataVal;
-            }
-            return DataCtx.CreateReadOnlyLValue(dataVal, "readonly:" + this.node.tag + "#" + "bind");
-        }
-        let attrData = this.resolveAttrData(dataName, writeable);
-        if (attrData != null) {
-            return attrData;
-        }
-        if (writeable) {
-            return this.getNodeLValueRoot().subMapKey(dataName);
-        }
-        return DataCtx.CreateReadOnlyLValue(null, "readonly-null:" + this.node.tag + "#" + dataName);
-    }
-
     registerUuid() {
         this.dataenv.dbstate.NodeUuidMap.set(this.uuid, this);
     }
 
     unregisterUuid() {
         this.dataenv.dbstate.NodeUuidMap.delete(this.uuid);
+        this.dataenv.dbstate.NodeDataMap.delete(this.uuid);
+    }
+
+    getNodeDataLV(compName : string) : DataCtx.ObjectLValue {
+        let box = this.dataenv.dbstate.NodeDataMap.get(this.uuid);
+        if (box == null) {
+            let uuidName = "id_" + this.uuid.replace(/-/g, "_");
+            box = mobx.observable.box({_hibiki: {"customtag": compName, uuid: this.uuid}}, {name: uuidName});
+            this.dataenv.dbstate.NodeDataMap.set(this.uuid, box);
+        }
+        return new DataCtx.ObjectLValue(null, box);
     }
 }
 

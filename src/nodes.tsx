@@ -18,7 +18,7 @@ import type {HibikiNode, ComponentType, LibraryType, HibikiExtState, LibComponen
 import {DBCtx} from "./dbctx";
 import * as DataCtx from "./datactx";
 import {HibikiState, DataEnvironment} from "./state";
-import {valToString, valToInt, valToFloat, resolveNumber, isObject, textContent, SYM_PROXY, SYM_FLATTEN, jseval, nodeStr, getHibiki, addToArrayDupCheck, removeFromArray, valInArray, blobPrintStr} from "./utils";
+import {valToString, valToInt, valToFloat, resolveNumber, isObject, textContent, SYM_PROXY, SYM_FLATTEN, jseval, nodeStr, getHibiki, addToArrayDupCheck, removeFromArray, valInArray, blobPrintStr, subMapKey} from "./utils";
 import {parseHtml} from "./html-parser";
 import * as NodeUtils from "./nodeutils";
 import {RtContext, HibikiError} from "./error";
@@ -484,7 +484,6 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
         let formValueLV = ctx.resolveLValueAttr("formvalue");
         if (formValueLV != null) {
             // 2-way data-binding
-            let formValueLV = ctx.resolveData("formvalue", true);
             let radioValue = ctx.resolveAttrStr("value") ?? "on";
             let checked = (formValueLV.get() == radioValue);
             elemProps["checked"] = checked;
@@ -691,16 +690,10 @@ class CustomNode extends React.Component<HibikiReactProps & {component : Compone
         let childrenVar = NodeUtils.makeChildrenVar(ctx.dataenv, ctx.node);
         let argDecls = NodeUtils.parseArgsDecl(DataCtx.rawAttrStr(rawImplAttrs.args));
         let componentName = DataCtx.rawAttrStr(rawImplAttrs.name);
-        let nodeDataBox = ctx.dataenv.dbstate.NodeDataMap.get(ctx.uuid);
-        if (nodeDataBox == null) {
-            let uuidName = "id_" + ctx.uuid.replace(/-/g, "_");
-            nodeDataBox = mobx.observable.box({_hibiki: {"customtag": componentName, uuid: ctx.uuid}}, {name: uuidName});
-            ctx.dataenv.dbstate.NodeDataMap.set(ctx.uuid, nodeDataBox);
-        }
         let ctxHandlers = NodeUtils.makeHandlers(ctx.node);
         let eventCtx = sprintf("%s", nodeStr(ctx.node));
         let eventDE = ctx.dataenv.makeChildEnv(null, {eventBoundary: "hard", handlers: ctxHandlers, htmlContext: eventCtx});
-        let nodeDataLV = new DataCtx.ObjectLValue(null, nodeDataBox);
+        let nodeDataLV = ctx.getNodeDataLV(componentName);
         let specials : Record<string, any> = {};
         specials.children = childrenVar;
         specials.node = nodeVar;
@@ -762,6 +755,18 @@ class CustomNode extends React.Component<HibikiReactProps & {component : Compone
             return <React.Fragment>{rtnElems}</React.Fragment>
         }
     }
+}
+
+function argsProxy() {
+    let traps = {
+        get: (obj : any, prop : string | symbol) : any => {
+            return null;
+        },
+        set: (obj : any, prop : string, value : any) : boolean => {
+            return true;
+        },
+    };
+    return new Proxy({}, traps);
 }
 
 function componentRootProxy(nodeDataLV : DataCtx.ObjectLValue, resolvedAttrs : {[e : string] : any}) : {[e : string] : any} {
@@ -867,8 +872,7 @@ class ScriptNode extends React.Component<HibikiReactProps, {}> {
 class DateFormatNode extends React.Component<HibikiReactProps, {}> {
     render() {
         let ctx = new DBCtx(this);
-        let dataLV = ctx.resolveData("data", false);
-        let bindVal = DataCtx.demobx(dataLV.get());
+        let bindVal = DataCtx.demobx(ctx.resolveAttrVal("bind"));
         let modeAttr = ctx.resolveAttrStr("mode");
         let nulltext = ctx.resolveAttrStr("nulltext");
         let style = ctx.resolveStyleMap("style");
@@ -1082,8 +1086,10 @@ class SimpleQueryNode extends React.Component<HibikiReactProps, {}> {
                     console.log(sprintf("%s not setting stale data return", nodeStr(ctx.node)));
                     return;
                 }
-                let outputLV = ctx.resolveData("output", true);
-                outputLV.set(queryRtn);
+                let outputLV = ctx.resolveLValueAttr("output");
+                if (outputLV != null) {
+                    outputLV.set(queryRtn);
+                }
                 setTimeout(() => ctx.handleEvent("load", {value: queryRtn}), 10);
             }).catch((e) => {
                 let errObj = new HibikiError(e.toString(), e, rtctx);
@@ -1168,8 +1174,10 @@ class InlineDataNode extends React.Component<HibikiReactProps> {
                 let evalVal = jseval(text);
                 setData = evalVal;
             }
-            let outputLV = ctx.resolveData("output", true);
-            outputLV.set(setData);
+            let outputLV = ctx.resolveLValueAttr("output");
+            if (outputLV != null) {
+                outputLV.set(setData);
+            }
         } catch (e) {
             console.log(sprintf("ERROR parsing %s value", nodeStr(ctx.node)), e);
         }
@@ -1194,18 +1202,19 @@ class DataSorterNode extends React.Component<HibikiReactProps, {}> {
         let self = this;
         this.sortcolComputed = mobx.computed(() => {
             let ctx = new DBCtx(self);
-            let columnLV = ctx.resolveData("sortspec", false).subMapKey("column");
-            return DataCtx.valToStr(DataCtx.demobx(columnLV.get()));
+            let sortSpec = ctx.resolveAttrVal("sortspec");
+            let column = subMapKey(sortSpec, "column");
+            return DataCtx.valToStr(column);
         });
 
         this.sortascComputed = mobx.computed(() => {
             let ctx = new DBCtx(self);
-            let sortSpecLV = ctx.resolveData("sortspec", false)
-            if (sortSpecLV.get() == null) {
+            let sortSpec = ctx.resolveAttrVal("sortspec");
+            if (sortSpec == null) {
                 return true;
             }
-            let ascLV = sortSpecLV.subMapKey("asc");
-            return !!ascLV.get();
+            let asc = subMapKey(sortSpec, "asc");
+            return !!asc;
         });
     }
     
@@ -1215,24 +1224,31 @@ class DataSorterNode extends React.Component<HibikiReactProps, {}> {
         let sortcol = this.sortcolComputed.get();
         let sortasc = this.sortascComputed.get();
 
-        let data = null;
+        let data : mobx.IObservableArray<HibikiVal> = null;
         let sortInPlace = !!ctx.resolveAttrStr("inplace");
         if (sortInPlace) {
-            let valueLV = ctx.resolveData("data", true);
-            data = valueLV.get();
-            if (data == null) {
+            let attrData = ctx.resolveAttrVal("data");
+            if (attrData == null) {
                 return;
             }
-            if (!mobx.isObservableArray(data)) {
+            if (!mobx.isObservableArray(attrData)) {
                 console.log(sprintf("%s value is not an array lvalue", nodeStr(ctx.node)));
                 return;
             }
+            data = attrData;
         }
         else {
-            let dataLV = ctx.resolveData("data", false);
-            data = dataLV.get();
-            if (data == null || !mobx.isArrayLike(data)) {
-                data = [];
+            let attrData = ctx.resolveAttrVal("data");
+            if (attrData == null || !mobx.isArrayLike(attrData)) {
+                data = mobx.observable([]);
+            }
+            else {
+                if (!mobx.isObservableArray(attrData)) {
+                    data = mobx.observable(attrData);
+                }
+                else {
+                    data = attrData;
+                }
             }
         }
         mobx.action(() => {
@@ -1274,8 +1290,10 @@ class DataSorterNode extends React.Component<HibikiReactProps, {}> {
                 data.replace(sortedData);
             }
             else {
-                let valueLV = ctx.resolveData("output", true);
-                valueLV.set(sortedData);
+                let outputLV = ctx.resolveLValueAttr("output");
+                if (outputLV != null) {
+                    outputLV.set(sortedData);
+                }
             }
         })();
     }
@@ -1307,23 +1325,23 @@ class DataPagerNode extends React.Component<HibikiReactProps, {}> {
     constructor(props : any) {
         super(props);
         let ctx = new DBCtx(this);
-        let curpageLV = ctx.resolveData("pagespec", true).subMapKey("curpage");
-        if (curpageLV.get() == null && ctx.hasAttr("curpage.default")) {
-            let defaultCurpage = ctx.resolveAttrVal("curpage.default");
-            curpageLV.set(defaultCurpage);
+        let pageSpecLV = ctx.resolveLValueAttr("pagespec");
+        if (pageSpecLV != null) {
+            let curpageLV = pageSpecLV.subMapKey("curpage");
+            if (curpageLV.get() == null && ctx.hasAttr("curpage.default")) {
+                let defaultCurpage = ctx.resolveAttrVal("curpage.default");
+                curpageLV.set(defaultCurpage);
+            }
         }
         let self = this;
-
         this.dataIsNullComputed = mobx.computed(() => {
-            let dataLV = ctx.resolveData("data", false);
-            let data = dataLV.get();
+            let data = ctx.resolveAttrVal("data");
             return (data == null);
         }, {name: "data-isnull"});
             
         this.dataComputed = mobx.computed(() => {
             let ctx = new DBCtx(self);
-            let dataLV = ctx.resolveData("data", false);
-            let data = dataLV.get();
+            let data = ctx.resolveAttrVal("data");
             if (data == null || !mobx.isArrayLike(data)) {
                 data = [];
             }
@@ -1342,8 +1360,9 @@ class DataPagerNode extends React.Component<HibikiReactProps, {}> {
         
         this.curpageComputed = mobx.computed(() => {
             let ctx = new DBCtx(self);
-            let curpageLV = ctx.resolveData("pagespec", true).subMapKey("curpage");
-            let curpage = resolveNumber(DataCtx.demobx(curpageLV.get()), (val) => (val >= 0), 0);
+            let pageSpec = ctx.resolveAttrVal("pagespec");
+            let curpageRaw = subMapKey(pageSpec, "curpage");
+            let curpage = resolveNumber(DataCtx.demobx(curpageRaw), (val) => (val >= 0), 0);
             if (curpage < 0) {
                 curpage = 0;
             }
@@ -1373,8 +1392,11 @@ class DataPagerNode extends React.Component<HibikiReactProps, {}> {
         let dataIsNull = this.dataIsNullComputed.get();
         if (dataIsNull) {
             setTimeout(mobx.action(() => {
-                let nodataLV = ctx.resolveData("pagespec", true).subMapKey("nodata");
-                nodataLV.set(true);
+                let pageSpecLV = ctx.resolveLValueAttr("pagespec");
+                if (pageSpecLV != null) {
+                    let nodataLV = pageSpecLV.subMapKey("nodata");
+                    nodataLV.set(true);
+                }
             }), 0);
             return;
         }
@@ -1400,10 +1422,14 @@ class DataPagerNode extends React.Component<HibikiReactProps, {}> {
         };
         setTimeout(mobx.action(() => {
             let output = data.slice(curpage*pagesize, (curpage+1)*pagesize);
-            let valueLV = ctx.resolveData("output", true);
-            valueLV.set(output);
-            let pageSpecLV = ctx.resolveData("pagespec", true);
-            pageSpecLV.set(pageSpec);
+            let outputLV = ctx.resolveLValueAttr("output");
+            if (outputLV != null) {
+                outputLV.set(output);
+            }
+            let pageSpecLV = ctx.resolveLValueAttr("pagespec");
+            if (pageSpecLV != null) {
+                pageSpecLV.set(pageSpec);
+            }
         }), 0);
     }
 
