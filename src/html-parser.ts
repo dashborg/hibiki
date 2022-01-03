@@ -5,10 +5,17 @@ import type {HibikiNode, HtmlParserOpts, PathType} from "./types";
 import merge from "lodash/merge";
 import {sprintf} from "sprintf-js";
 import {doParse} from "./hibiki-parser";
-import type {HAction, HExpr} from "./datactx";
+import type {HAction, HExpr, HIteratorExpr} from "./datactx";
 import {textContent, rawAttrFromNode} from "./utils";
 
 const styleAttrPartRe = new RegExp("^(style(?:-[a-z][a-z0-9-])?)\\.(.*)");
+
+const PARSED_ATTRS = {
+    "bind": true,
+    "if": true,
+    "foreach": true,
+    "condition": true,
+};
 
 type ParseContext = {
     sourceName : string,
@@ -177,20 +184,27 @@ class HtmlParser {
         if (value == "" && name != "value") {
             value = "1";
         }
-        let isBind = (name == "bind");
-        if (!isBind && (!value.startsWith("*") || value == "*" || value == "**")) {
+        let isParsed = PARSED_ATTRS[name];
+        if (!isParsed && (!value.startsWith("*") || value == "*" || value == "**")) {
             node.attrs[name] = value;
             return;
         }
-        if (node.tag == "define-component" || node.tag == "define-handler" || node.tag == "import-library" || node.tag.startsWith("hibiki-")) {
+        if (node.tag == "define-component" || node.tag == "define-handler" || node.tag == "import-library" || node.tag == "define-vars" || node.tag.startsWith("hibiki-")) {
             node.attrs[name] = value;
             return;
         }
-        let exprStr = (isBind ? value : value.substr(1).trim());
+        let exprStr = (isParsed ? value : value.substr(1).trim());
         try {
-            let exprAst : HExpr = doParse(exprStr, "ext_fullExpr");
-            exprAst.sourcestr = value;
-            node.attrs[name] = exprAst;
+            if (name == "foreach") {
+                let iterExprAst : HIteratorExpr = doParse(exprStr, "ext_iteratorExpr");
+                iterExprAst.sourcestr = value;
+                node.foreachAttr = iterExprAst;
+            }
+            else {
+                let exprAst : HExpr = doParse(exprStr, "ext_fullExpr");
+                exprAst.sourcestr = value;
+                node.attrs[name] = exprAst;
+            }
         }
         catch (e) {
             console.log(sprintf("ERROR evaluating attribute '%s' in <%s>\n\"%s\"\n", name, node.tag, exprStr), e.toString());

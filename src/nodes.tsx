@@ -150,13 +150,12 @@ function baseRenderHtmlChildren(list : HibikiNode[], dataenv : DataEnvironment, 
         else if (child.tag == "if-break") {
             // withcontext?
             let ifBreakCtx = new DBCtx(null, child, dataenv);
-            let condition = true;
-            let cattr = ifBreakCtx.resolveAttr("condition");
-            if (cattr != null) {
-                let conditionVal = ifBreakCtx.evalExpr(cattr);
-                condition = !!conditionVal;
+            let [ifAttr, exists] = ifBreakCtx.resolveAttrValPair("condition");
+            if (!exists) {
+                rtn.push(<ErrorMsg message="<if-break> requires 'condition' attribute"/>);
+                continue;
             }
-            if (!condition) {
+            if (!ifAttr) {
                 continue;
             }
             rtn.push(<AnyNode node={child} dataenv={dataenv}/>);
@@ -164,7 +163,7 @@ function baseRenderHtmlChildren(list : HibikiNode[], dataenv : DataEnvironment, 
         }
         else if (child.tag == "define-vars") {
             let setCtx = new DBCtx(null, child, dataenv);
-            let contextAttr = setCtx.resolveAttr("context");
+            let contextAttr = setCtx.resolveAttrStr("context");
             if (contextAttr == null) {
                 rtn.push(<ErrorMsg message="<define-vars> no context attribute"/>);
                 continue;
@@ -182,14 +181,6 @@ function baseRenderHtmlChildren(list : HibikiNode[], dataenv : DataEnvironment, 
             let attrs = child.attrs || {};
             if (!isRoot) {
                 rtn.push(<ErrorMsg message={"<define-handler> is only allowed at root of <hibiki>, <page>, or <define-component> nodes"}/>);
-                continue;
-            }
-            if (attrs["if"] != null || attrs["foreach"] != null) {
-                rtn.push(<ErrorMsg message={"<define-handler> does not support 'if' or 'foreach' attributes"}/>);
-                continue;
-            }
-            if (attrs.name == null || attrs.name == "") {
-                rtn.push(<ErrorMsg message={"<define-handler> requires 'name' attribute"}/>);
                 continue;
             }
             continue;
@@ -222,10 +213,9 @@ function staticEvalTextNode(node : HibikiNode, dataenv : DataEnvironment) : stri
     if (tagName != "h-text") {
         return nodeStr(node);
     }
-    if (!ctx.isEditMode() && ctx.hasAttr("if")) {
-        let ifText = ctx.resolveAttr("if");
-        let ifExpr = ctx.evalExpr(ifText);
-        if (!ifExpr) {
+    if (!ctx.isEditMode()) {
+        let [ifAttr, exists] = ctx.resolveAttrValPair("if");
+        if (exists && !ifAttr) {
             return null;
         }
     }
@@ -240,12 +230,7 @@ class AnyNode extends React.Component<HibikiReactProps, {}> {
 
     renderForeach(ctx : DBCtx) : any {
         let node = ctx.node;
-        let foreachText = ctx.resolveAttr("foreach");
-        let iteratorExpr = DataCtx.ParseIteratorExpr(foreachText);
-        if (iteratorExpr == null) {
-            return <ErrorMsg message={sprintf("%s invalid foreach attribute", nodeStr(ctx.node))}/>;
-        }
-        let iterator = DataCtx.makeIteratorFromExpr(iteratorExpr, ctx.dataenv);
+        let iterator = DataCtx.makeIteratorFromExpr(node.foreachAttr, ctx.dataenv);
         let rtnContent = [];
         let index = 0;
         for (let ctxVars of iterator) {
@@ -267,13 +252,12 @@ class AnyNode extends React.Component<HibikiReactProps, {}> {
         if (tagName.startsWith("hibiki-")) {
             return null;
         }
-        if (!iterating && !ctx.isEditMode() && ctx.hasAttr("foreach")) {
-            return this.renderForeach(ctx);
-        }
-        if (!ctx.isEditMode() && ctx.hasAttr("if")) {
-            let ifText = ctx.resolveAttr("if");
-            let ifExpr = ctx.evalExpr(ifText);
-            if (!ifExpr) {
+        if (!ctx.isEditMode()) {
+            if (!iterating && node.foreachAttr != null) {
+                return this.renderForeach(ctx);
+            }
+            let [ifAttr, ifExists] = ctx.resolveAttrValPair("if");
+            if (ifExists && !ifAttr) {
                 return null;
             }
         }
@@ -847,13 +831,11 @@ class TextNode extends React.Component<HibikiReactProps, {}> {
 class IfNode extends React.Component<HibikiReactProps, {}> {
     render() {
         let ctx = new DBCtx(this);
-        let condition = true;
-        let cattr = ctx.resolveAttr("condition");
-        if (cattr != null) {
-            let conditionVal = ctx.evalExpr(cattr);
-            condition = !!conditionVal;
+        let [condAttr, exists] = ctx.resolveAttrValPair("condition");
+        if (!exists) {
+            return <ErrorMsg message={sprintf("<%s> node requires 'condition' attribute", ctx.node.tag)}/>
         }
-        if (!condition) {
+        if (!condAttr) {
             return null;
         }
         return <NodeList list={ctx.node.list} ctx={ctx}/>;
@@ -865,36 +847,6 @@ class FragmentNode extends React.Component<HibikiReactProps, {}> {
     render() {
         let ctx = new DBCtx(this);
         return <NodeList list={ctx.node.list} ctx={ctx}/>;
-    }
-}
-
-@mobxReact.observer
-class ForEachNode extends React.Component<HibikiReactProps, {}> {
-    render() {
-        let ctx = new DBCtx(this);
-        let foreachText = ctx.resolveAttr("expr");
-        let iteratorExpr = DataCtx.ParseIteratorExpr(foreachText);
-        if (iteratorExpr == null) {
-            return <ErrorMsg message={sprintf("Invalid <h-foreach> expr attribute")}/>;
-        }
-        let iterator = DataCtx.makeIteratorFromExpr(iteratorExpr, ctx.dataenv);
-        let rtnElems = [];
-        let index = 0;
-        for (let ctxVars of iterator) {
-            let htmlContext = sprintf("<h-foreach>:%d", index);
-            let childEnv = ctx.dataenv.makeChildEnv(ctxVars, {htmlContext: htmlContext});
-            let childElements = baseRenderHtmlChildren(ctx.node.list, childEnv, false);
-            if (childElements != null) {
-                rtnElems.push(...childElements);
-            }
-            index++;
-        }
-        if (rtnElems.length == 0) {
-            return null;
-        }
-        return (
-            <React.Fragment>{rtnElems}</React.Fragment>
-        );
     }
 }
 
@@ -1510,7 +1462,7 @@ let CORE_LIBRARY : LibraryType = {
 
 addCoreComponent("if", IfNode);
 addCoreComponent("if-break", IfNode);
-addCoreComponent("foreach", ForEachNode);
+addCoreComponent("foreach", FragmentNode);
 addCoreComponent("script", ScriptNode);
 
 addCoreComponent("define-vars", NopNode);
@@ -1520,7 +1472,7 @@ addCoreComponent("import-library", NopNode);
 
 addCoreComponent("h-if", IfNode);
 addCoreComponent("h-if-break", IfNode);
-addCoreComponent("h-foreach", ForEachNode);
+addCoreComponent("h-foreach", FragmentNode);
 addCoreComponent("h-text", TextNode);
 addCoreComponent("h-script", ScriptNode);
 addCoreComponent("h-dateformat", DateFormatNode);

@@ -4,7 +4,7 @@ import * as mobx from "mobx";
 import * as React from "react";
 
 import {DBCtx} from "./dbctx";
-import type {HibikiNode, HandlerValType} from "./types";
+import type {HibikiNode, HandlerValType, HibikiVal} from "./types";
 import * as DataCtx from "./datactx";
 import {sprintf} from "sprintf-js";
 import {isObject, textContent, rawAttrFromNode} from "./utils";
@@ -169,13 +169,14 @@ function renderTextData(node : HibikiNode, dataenv : DataEnvironment, onlyText? 
     let ctx = new DBCtx(null, node, dataenv);
     let style = ctx.resolveStyleMap("style");
     let dataLV = ctx.resolveData("data", false);
-    let bindVal = DataCtx.demobx(dataLV.get());
-    if (bindVal == null && ctx.hasAttr("nulltext")) {
-        let nullText = ctx.resolveAttr("nulltext");
-        let rtn = DataCtx.formatVal(nullText, null);
-        return renderTextSpan(rtn, style);
+    let bindVal : HibikiVal = DataCtx.demobx(dataLV.get());
+    let rtn : string = null;
+    if (bindVal == null) {
+        rtn = ctx.resolveAttrStr("nulltext");
     }
-    let rtn = DataCtx.formatVal(bindVal, ctx.resolveAttr("format"));
+    else {
+        rtn = DataCtx.formatVal(bindVal, ctx.resolveAttrStr("format"));
+    }
     if (onlyText) {
         return rtn;
     }

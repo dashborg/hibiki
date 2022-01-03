@@ -191,13 +191,28 @@ class DBCtx {
         return this.dataenv.evalExpr(expr, keepMobx);
     }
 
+    resolveAttrStr(attrName : string) : string {
+        return DataCtx.getAttributeStr(this.node, attrName, this.dataenv);
+    }
+
+    resolveAttrVal(attrName : string) : HibikiVal {
+        let [rval, exists] = DataCtx.getAttributeValPair(this.node, attrName, this.dataenv);
+        return rval;
+    }
+
+    resolveAttrValPair(attrName : string) : [HibikiVal, boolean] {
+        return DataCtx.getAttributeValPair(this.node, attrName, this.dataenv);
+    }
+
     hasAttr(attrName : string) : boolean {
-        return this.node.attrs && this.node.attrs[attrName] != null;
+        let [rval, exists] = DataCtx.getAttributeValPair(this.node, attrName, this.dataenv);
+        return exists;
     }
 
     resolveAttr(attrName : string, opts? : any) : any {
         if (opts && opts.raw) {
-            return DataCtx.getAttributeVal(this.node, attrName, this.dataenv, opts);
+            let [rval, exists] = DataCtx.getAttributeValPair(this.node, attrName, this.dataenv, opts);
+            return rval;
         }
         else {
             return DataCtx.getAttributeStr(this.node, attrName, this.dataenv, opts);

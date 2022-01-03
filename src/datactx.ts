@@ -30,9 +30,10 @@ type HExpr = {
 };
 
 type HIteratorExpr = {
-    data     : HExpr,
-    itemvar? : string,
-    keyvar?  : string,
+    data       : HExpr,
+    itemvar?   : string,
+    keyvar?    : string,
+    sourcestr? : string,
 }
 
 type HAction = {
@@ -120,10 +121,11 @@ type ResolveOpts = {
     rtContext? : string,
 };
 
+// turns empty string into null
 function resolveAttrStr(k : string, v : NodeAttrType, dataenv : DataEnvironment, opts? : ResolveOpts) : string {
     opts = opts ?? {};
-    let resolvedVal = resolveAttrVal(k, v, dataenv, opts);
-    if (resolvedVal == null || resolvedVal === false || resolvedVal == "") {
+    let [resolvedVal, exists] = resolveAttrVal(k, v, dataenv, opts);
+    if (!exists || resolvedVal == null || resolvedVal === false || resolvedVal == "") {
         return null;
     }
     if (resolvedVal === true) {
@@ -155,13 +157,14 @@ function valToStr(v : HibikiVal) : string {
     return String(v);
 }
 
-function resolveAttrVal(k : string, v : NodeAttrType, dataenv : DataEnvironment, opts? : ResolveOpts) : HibikiVal {
+// returns [value, exists]
+function resolveAttrVal(k : string, v : NodeAttrType, dataenv : DataEnvironment, opts? : ResolveOpts) : [HibikiVal, boolean] {
     opts = opts || {};
-    if (v == null || v == "") {
-        return null;
+    if (v == null) {
+        return [null, false];
     }
     if (typeof(v) == "string") {
-        return v;
+        return [v, true];
     }
     let resolvedVal : HibikiValEx = null;
     try {
@@ -173,17 +176,18 @@ function resolveAttrVal(k : string, v : NodeAttrType, dataenv : DataEnvironment,
         return null;
     }
     if (resolvedVal instanceof LValue) {
-        return resolvedVal.get();
+        resolvedVal = resolvedVal.get();
     }
-    else if (typeof(resolvedVal) == "symbol" || resolvedVal instanceof Symbol) {
+    if (typeof(resolvedVal) == "symbol" || resolvedVal instanceof Symbol) {
         if (resolvedVal == SYM_NOATTR) {
-            return null;
+            return [null, false];
         }
-        return resolvedVal.toString();
+        return [resolvedVal.toString(), true];
     }
-    else {
-        return resolvedVal;
+    if (resolvedVal instanceof LValue) { // satisfy typescript
+        return ["[lvalue]", true];
     }
+    return [resolvedVal, true];
 }
 
 function getAttributeStr(node : HibikiNode, attrName : string, dataenv : DataEnvironment, opts? : ResolveOpts) : string {
@@ -200,18 +204,14 @@ function getAttributeStr(node : HibikiNode, attrName : string, dataenv : DataEnv
     return rval;
 }
 
-function getAttributeVal(node : HibikiNode, attrName : string, dataenv : DataEnvironment, opts? : ResolveOpts) : HibikiVal {
+function getAttributeValPair(node : HibikiNode, attrName : string, dataenv : DataEnvironment, opts? : ResolveOpts) : [HibikiVal, boolean] {
     if (!node || !node.attrs || node.attrs[attrName] == null) {
-        return null;
+        return [null, false];
     }
     opts = opts || {};
     opts.rtContext = sprintf("resolving attribute '%s' in <%s>", attrName, node.tag);
     let aval = node.attrs[attrName];
-    let rval = resolveAttrVal(attrName, aval, dataenv, opts);
-    if (rval == null) {
-        return null;
-    }
-    return rval;
+    return resolveAttrVal(attrName, aval, dataenv, opts);
 }
 
 function resolveStrAttrs(node : HibikiNode, dataenv : DataEnvironment) : Record<string, string> {
@@ -239,8 +239,8 @@ function resolveValAttrs(node : HibikiNode, dataenv : DataEnvironment) : Record<
     for (let [k,v] of Object.entries(node.attrs)) {
         let opts : ResolveOpts = {};
         opts.rtContext = sprintf("resolving attribute '%s' in %s", k, nodeStr(node));
-        let rval = resolveAttrVal(k, v, dataenv, opts);
-        if (rval == null) {
+        let [rval, exists] = resolveAttrVal(k, v, dataenv, opts);
+        if (!exists) {
             continue;
         }
         rtn[k] = rval;
@@ -248,7 +248,7 @@ function resolveValAttrs(node : HibikiNode, dataenv : DataEnvironment) : Record<
     return rtn;
 }
 
-function formatVal(val : any, format : string) : string {
+function formatVal(val : HibikiVal, format : string) : string {
     let rtn = null;
     try {
         if (format == null || format == "") {
@@ -1315,7 +1315,7 @@ function demobxInternal(v : any) : [any, boolean] {
     return [v, false];
 }
 
-function demobx(v : any) : any {
+function demobx<T>(v : T) : T {
     let [rtn, updated] = demobxInternal(v);
     return rtn;
 }
@@ -2100,21 +2100,6 @@ function ParseStaticCallStatement(str : string) : HAction {
     return callAction;
 }
 
-function ParseIteratorExprThrow(str : string) : HIteratorExpr {
-    let iterExpr : HIteratorExpr = doParse(str, "ext_iteratorExpr");
-    return iterExpr;
-}
-
-function ParseIteratorExpr(str : string) : HIteratorExpr {
-    try {
-        return ParseIteratorExprThrow(str);
-    }
-    catch (e) {
-        console.log("ERROR during ParseIteratorExpr [[" + str + "]]", e);
-        return null;
-    }
-}
-
 function ParseLValuePathThrow(str : string, dataenv : DataEnvironment) : LValue {
     let lvalue = doParse(str, "ext_lvaluePath");
     return new BoundLValue(lvalue, dataenv);
@@ -2163,6 +2148,6 @@ function convertSimpleType(typeName : string, value : string, defaultValue : any
     return value;
 }
 
-export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, BoundValue, ParseLValuePath, ParseLValuePathThrow, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, evalActionStr, ParseIteratorExpr, ParseIteratorExprThrow, makeIteratorFromExpr, rawAttrStr, resolveAttrStr, resolveAttrVal, resolveStrAttrs, resolveValAttrs, getStyleMap, getAttributeStr, getAttributeVal, valToStr};
+export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, BoundValue, ParseLValuePath, ParseLValuePathThrow, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, evalActionStr, makeIteratorFromExpr, rawAttrStr, resolveStrAttrs, resolveValAttrs, getStyleMap, getAttributeStr, getAttributeValPair, valToStr};
 
 export type {PathType, HAction, HExpr, HIteratorExpr};

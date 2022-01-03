@@ -4,7 +4,7 @@ import type {HibikiState} from "./state";
 import type {RtContext, HibikiError} from "./error";
 import type {HibikiRequest} from "./request";
 import * as mobx from "mobx";
-import type {HAction, HExpr, HibikiBlob, LValue} from "./datactx";
+import type {HAction, HExpr, HibikiBlob, LValue, HIteratorExpr} from "./datactx";
 
 type NodeAttrType = string | HExpr;
 
@@ -15,6 +15,7 @@ type HibikiNode = {
     tag    : string,
     text?  : string,
     attrs? : Record<string, NodeAttrType>,
+    foreachAttr? : HIteratorExpr,
     handlers? : Record<string, HAction[]>,
     bindings? : Record<string, PathType>,
     list?  : HibikiNode[],
