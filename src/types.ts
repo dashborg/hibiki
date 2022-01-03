@@ -8,8 +8,7 @@ import type {HAction, HExpr, HibikiBlob, LValue, HIteratorExpr} from "./datactx"
 
 type NodeAttrType = string | HExpr;
 
-type HibikiVal = string | number | boolean | {[k : string] : HibikiVal} | HibikiVal[] | HibikiBlob;
-type HibikiValEx = HibikiVal | LValue | symbol;
+type HibikiVal = string | number | boolean | {[k : string] : HibikiVal} | HibikiVal[] | HibikiBlob | HibikiNode;
 
 type HibikiNode = {
     tag    : string,
@@ -179,5 +178,5 @@ interface HibikiExtState {
     initialize(force : boolean);
 };
 
-export type {HibikiNode, HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, ComponentType, LibraryType, HibikiRequest, Hibiki, HibikiAction, HibikiActionString, HibikiActionValue, HibikiExtState, EventType, HandlerValType, JSFuncType, AppModuleConfig, FetchHookFn, CsrfHookFn, ReactClass, HandlerPathType, ErrorCallbackFn, EventCallbackFn, HtmlParserOpts, LibComponentType, HandlerBlock, NodeAttrType, HibikiVal, HibikiValEx};
+export type {HibikiNode, HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, ComponentType, LibraryType, HibikiRequest, Hibiki, HibikiAction, HibikiActionString, HibikiActionValue, HibikiExtState, EventType, HandlerValType, JSFuncType, AppModuleConfig, FetchHookFn, CsrfHookFn, ReactClass, HandlerPathType, ErrorCallbackFn, EventCallbackFn, HtmlParserOpts, LibComponentType, HandlerBlock, NodeAttrType, HibikiVal};
 

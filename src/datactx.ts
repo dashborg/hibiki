@@ -6,8 +6,8 @@ import {DataEnvironment} from "./state";
 import {sprintf} from "sprintf-js";
 import {parseHtml} from "./html-parser";
 import {RtContext, getShortEMsg, HibikiError} from "./error";
-import {makeUrlParamsFromObject, SYM_PROXY, SYM_FLATTEN, SYM_NOATTR, isObject, stripAtKeys, unpackPositionalArgs, nodeStr, parseHandler, fullPath, blobPrintStr, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP} from "./utils";
-import {PathPart, PathType, PathUnionType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue, HandlerBlock, NodeAttrType, HibikiVal, HibikiValEx, HibikiNode} from "./types";
+import {makeUrlParamsFromObject, SYM_PROXY, SYM_FLATTEN, isObject, stripAtKeys, unpackPositionalArgs, nodeStr, parseHandler, fullPath, blobPrintStr, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP} from "./utils";
+import {PathPart, PathType, PathUnionType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue, HandlerBlock, NodeAttrType, HibikiVal, HibikiNode} from "./types";
 import {HibikiRequest} from "./request";
 import type {EHandlerType} from "./state";
 import {doParse} from "./hibiki-parser";
@@ -15,6 +15,9 @@ import {doParse} from "./hibiki-parser";
 declare var window : any;
 
 const MAX_ARRAY_SIZE = 10000;
+const SYM_NOATTR = Symbol("noattr");
+
+type HibikiValEx = HibikiVal | LValue | symbol;
 
 type HExpr = {
     etype    : string,
@@ -124,7 +127,7 @@ type ResolveOpts = {
 // turns empty string into null
 function resolveAttrStr(k : string, v : NodeAttrType, dataenv : DataEnvironment, opts? : ResolveOpts) : string {
     opts = opts ?? {};
-    let [resolvedVal, exists] = resolveAttrVal(k, v, dataenv, opts);
+    let [resolvedVal, exists] = resolveAttrValPair(k, v, dataenv, opts);
     if (!exists || resolvedVal == null || resolvedVal === false || resolvedVal == "") {
         return null;
     }
@@ -158,7 +161,7 @@ function valToStr(v : HibikiVal) : string {
 }
 
 // returns [value, exists]
-function resolveAttrVal(k : string, v : NodeAttrType, dataenv : DataEnvironment, opts? : ResolveOpts) : [HibikiVal, boolean] {
+function resolveAttrValPair(k : string, v : NodeAttrType, dataenv : DataEnvironment, opts? : ResolveOpts) : [HibikiVal, boolean] {
     opts = opts || {};
     if (v == null) {
         return [null, false];
@@ -176,7 +179,7 @@ function resolveAttrVal(k : string, v : NodeAttrType, dataenv : DataEnvironment,
         return null;
     }
     if (resolvedVal instanceof LValue) {
-        resolvedVal = resolvedVal.get();
+        resolvedVal = resolvedVal.getEx();
     }
     if (typeof(resolvedVal) == "symbol" || resolvedVal instanceof Symbol) {
         if (resolvedVal == SYM_NOATTR) {
@@ -190,45 +193,47 @@ function resolveAttrVal(k : string, v : NodeAttrType, dataenv : DataEnvironment,
     return [resolvedVal, true];
 }
 
+function resolveLValueAttr(node : HibikiNode, attrName : string, dataenv : DataEnvironment) : LValue {
+    if (node.bindings == null || node.bindings[attrName] == null) {
+        return null;
+    }
+    let rtn = new BoundLValue(node.bindings[attrName], dataenv);
+    if (rtn.getEx() == SYM_NOATTR) {
+        return null;
+    }
+    return rtn;
+}
+
 function getAttributeStr(node : HibikiNode, attrName : string, dataenv : DataEnvironment, opts? : ResolveOpts) : string {
-    if (!node || !node.attrs || node.attrs[attrName] == null) {
+    let [hval, exists] = getAttributeValPair(node, attrName, dataenv, opts);
+    if (!exists) {
         return null;
     }
-    opts = opts || {};
-    opts.rtContext = sprintf("resolving attribute '%s' in <%s>", attrName, node.tag);
-    let aval = node.attrs[attrName];
-    let rval = resolveAttrStr(attrName, aval, dataenv, opts);
-    if (rval == null) {
-        return null;
-    }
-    return rval;
+    return valToStr(hval);
 }
 
 function getAttributeValPair(node : HibikiNode, attrName : string, dataenv : DataEnvironment, opts? : ResolveOpts) : [HibikiVal, boolean] {
-    if (!node || !node.attrs || node.attrs[attrName] == null) {
+    if (!node) {
+        return [null, false];
+    }
+    if (node.bindings && node.bindings[attrName] != null) {
+        let lv = new BoundLValue(node.bindings[attrName], dataenv);
+        let rtnVal = lv.getEx();
+        if (rtnVal != SYM_NOATTR) {
+            return [exValToVal(rtnVal), true];
+        }
+        else {
+            rtnVal = null;
+            // fall-through, see if attrs[attrName] exists
+        }
+    }
+    if (!node.attrs || node.attrs[attrName] == null) {
         return [null, false];
     }
     opts = opts || {};
     opts.rtContext = sprintf("resolving attribute '%s' in <%s>", attrName, node.tag);
     let aval = node.attrs[attrName];
-    return resolveAttrVal(attrName, aval, dataenv, opts);
-}
-
-function resolveStrAttrs(node : HibikiNode, dataenv : DataEnvironment) : Record<string, string> {
-    if (node.attrs == null) {
-        return {};
-    }
-    let rtn = {};
-    for (let [k,v] of Object.entries(node.attrs)) {
-        let opts : ResolveOpts = {};
-        opts.rtContext = sprintf("resolving attribute '%s' in %s", k, nodeStr(node));
-        let rval = resolveAttrStr(k, v, dataenv, opts);
-        if (rval == null) {
-            continue;
-        }
-        rtn[k] = rval;
-    }
-    return rtn;
+    return resolveAttrValPair(attrName, aval, dataenv, opts);
 }
 
 function resolveValAttrs(node : HibikiNode, dataenv : DataEnvironment) : Record<string, HibikiVal> {
@@ -236,14 +241,33 @@ function resolveValAttrs(node : HibikiNode, dataenv : DataEnvironment) : Record<
         return {};
     }
     let rtn = {};
-    for (let [k,v] of Object.entries(node.attrs)) {
-        let opts : ResolveOpts = {};
-        opts.rtContext = sprintf("resolving attribute '%s' in %s", k, nodeStr(node));
-        let [rval, exists] = resolveAttrVal(k, v, dataenv, opts);
-        if (!exists) {
-            continue;
+    if (node.bindings != null) {
+        for (let key in node.bindings) {
+            let [val, exists] = getAttributeValPair(node, key, dataenv);
+            if (exists) {
+                rtn[key] = val;
+            }
         }
-        rtn[k] = rval;
+    }
+    if (node.attrs != null) {
+        for (let key in node.attrs) {
+            if (key in rtn) {
+                continue;
+            }
+            let [val, exists] = getAttributeValPair(node, key, dataenv);
+            if (exists) {
+                rtn[key] = val;
+            }
+        }
+    }
+    return rtn;
+}
+
+function resolveStrAttrs(node : HibikiNode, dataenv : DataEnvironment) : Record<string, string> {
+    let vals = resolveValAttrs(node, dataenv);
+    let rtn : Record<string, string> = {};
+    for (let key in vals) {
+        rtn[key] = valToStr(vals[key]);
     }
     return rtn;
 }
@@ -371,8 +395,9 @@ function* makeIteratorFromExpr(iteratorExpr : HIteratorExpr, dataenv : DataEnvir
 }
 
 abstract class LValue {
-    abstract get() : any;
-    abstract set(newVal : any);
+    abstract get() : HibikiVal;
+    abstract getEx() : HibikiValEx;
+    abstract set(newVal : HibikiValEx);
     abstract subArrayIndex(index : number) : LValue;
     abstract subMapKey(key : string) : LValue;
 }
@@ -387,12 +412,16 @@ class BoundLValue extends LValue {
         this.dataenv = dataenv;
     }
 
-    get() : any {
+    get() : HibikiVal {
+        return exValToVal(this.getEx());
+    }
+    
+    getEx() : HibikiValEx {
         let staticPath = evalPath(this.path, this.dataenv);
         return ResolvePath(staticPath, this.dataenv);
     }
 
-    set(newVal : any) {
+    set(newVal : HibikiValEx) {
         let staticPath = evalPath(this.path, this.dataenv);
         SetPath(staticPath, this.dataenv, newVal);
     }
@@ -410,6 +439,19 @@ class BoundLValue extends LValue {
     }
 }
 
+function exValToVal(exVal : HibikiValEx) : HibikiVal {
+    if (exVal instanceof LValue) {
+        return exVal.get();
+    }
+    if (exVal == SYM_NOATTR) {
+        return null;
+    }
+    if (typeof(exVal) == "symbol" || exVal instanceof Symbol) {
+        return exVal.toString();
+    }
+    return exVal;
+}
+
 class ReadOnlyLValue extends LValue {
     wrappedLV : LValue;
 
@@ -418,11 +460,15 @@ class ReadOnlyLValue extends LValue {
         this.wrappedLV = lv;
     }
 
-    get() : any {
-        return this.wrappedLV.get();
+    get() : HibikiVal {
+        return exValToVal(this.getEx());
     }
 
-    set(newVal : any) {
+    getEx() : HibikiValEx {
+        return this.wrappedLV.getEx();
+    }
+
+    set(newVal : HibikiValEx) {
         return;
     }
 
@@ -459,11 +505,15 @@ class ObjectLValue extends LValue {
         this.root = root;
     }
 
-    get() : any {
+    get() : HibikiVal {
+        return exValToVal(this.getEx());
+    }
+
+    getEx() : HibikiValEx {
         return quickObjectResolvePath(this.path, this.root.get());
     }
 
-    set(newVal : any) {
+    set(newVal : HibikiValEx) {
         this.root.set(quickObjectSetPath(this.path, this.root.get(), newVal));
     }
 
@@ -477,183 +527,6 @@ class ObjectLValue extends LValue {
         let newpath = this.path.slice();
         newpath.push({pathtype: "map", pathkey: key});
         return new ObjectLValue(newpath, this.root);
-    }
-}
-
-class BoundValue {
-    isroot : boolean;
-    rootbox : mobx.IObservableValue<any>;
-    parent : BoundValue;
-    pathpart : PathPart;
-    isconst : boolean;
-
-    constructor(parent : BoundValue, pp : PathPart) {
-        if (parent == null) {
-            this.isroot = true;
-            this.rootbox = mobx.observable.box(null);
-            return;
-        }
-        else {
-            this.parent = parent;
-            this.pathpart = pp;
-        }
-    }
-
-    subArray(index : number) : BoundValue {
-        return new BoundValue(this, {pathtype: "array", pathindex: index});
-    }
-
-    subMap(key : string) : BoundValue {
-        return new BoundValue(this, {pathtype: "map", pathkey: key});
-    }
-
-    isConst() : boolean {
-        if (this.isroot) {
-            return this.isconst;
-        }
-        return this.parent.isConst();
-    }
-
-    pathString() : string {
-        if (this.isroot) {
-            return "$";
-        }
-        let pathstr = this.parent.pathString();
-        if (this.pathpart.pathtype == "array") {
-            return sprintf("%s[%d]", pathstr, this.pathpart.pathindex);
-        }
-        return sprintf("%s.%s", pathstr, this.pathpart.pathkey);
-    }
-
-    get() : any {
-        if (this.isroot) {
-            return this.rootbox.get();
-        }
-        let pval = this.parent.get();
-        if (pval == null) {
-            return null;
-        }
-        let pp = this.pathpart;
-        if (pp.pathtype == "array") {
-            let index = pp.pathindex;
-            if (index < 0) {
-                return null;
-            }
-            if (!mobx.isArrayLike(pval)) {
-                return null;
-            }
-            if (index >= pval.length) {
-                return null;
-            }
-            return pval[index];
-        }
-        if (pp.pathtype == "map") {
-            let pathkey = pp.pathkey;
-            if (pathkey == null) {
-                return null;
-            }
-            if (!isObject(pval)) {
-                return null;
-            }
-            if (pval instanceof Map || mobx.isObservableMap(pval)) {
-                return pval.get(pathkey);
-            }
-            return pval[pathkey];
-        }
-        throw new Error("invalid pathtype=" + pp.pathtype);
-    }
-
-    getWithIntention(itype : string) : any {
-        if (itype != "array" && itype != "map") {
-            return null;
-        }
-        let ival = (itype == "array" ? [] : {});
-        let val = null;
-        if (this.isroot) {
-            val = this.rootbox.get();
-            if (val == null) {
-                this.rootbox.set(ival);
-                return this.rootbox.get();
-            }
-            return rtnIfType(val, itype);
-        }
-        let pp = this.pathpart;
-        val = this.parent.getWithIntention(pp.pathtype);
-        if (val == null) {
-            return null;
-        }
-        if (pp.pathtype == "array") {
-            if (!mobx.isArrayLike(val)) {
-                return null;
-            }
-            if (pp.pathindex < 0 || pp.pathindex > MAX_ARRAY_SIZE) {
-                return null;
-            }
-            if (mobx.isObservableArray(val) && pp.pathindex >= val.length) {
-                val.length = pp.pathindex;
-            }
-            let rtn = val[pp.pathindex];
-            if (rtn == null) {
-                val[pp.pathindex] = ival;
-                return val[pp.pathindex];
-            }
-            return rtnIfType(rtn, itype);
-        }
-        else {  // itype == "map"
-            if (!isObject(val)) {
-                return null;
-            }
-            if (val instanceof Map || mobx.isObservableMap(val)) {
-                let rtn = val.get(pp.pathkey);
-                if (rtn == null) {
-                    val.set(pp.pathkey, ival);
-                    return val.get(pp.pathkey);
-                }
-                return rtnIfType(rtn, itype);
-            }
-            else {
-                let rtn = val[pp.pathkey];
-                if (rtn == null) {
-                    val[pp.pathkey] = ival;
-                    return val[pp.pathkey];
-                }
-                return rtnIfType(rtn, itype);
-            }
-        }
-    }
-
-    set(newval : any) : boolean {
-        if (this.isConst()) {
-            return false;
-        }
-        if (this.isroot) {
-            this.rootbox.set(newval);
-            return true;
-        }
-        let pp = this.pathpart;
-        let pval = this.parent.getWithIntention(pp.pathtype);
-        if (pval == null) {
-            return false;
-        }
-        if (pp.pathtype == "array") {
-            if (pp.pathindex < 0 || pp.pathindex > MAX_ARRAY_SIZE) {
-                return false;
-            }
-            if (mobx.isObservableArray(pval) && pp.pathindex >= pval.length) {
-                pval.length = pp.pathindex;
-            }
-            pval[pp.pathindex] = newval;
-            return true;
-        }
-        else {  // pathtype == "map"
-            if (pval instanceof Map || mobx.isObservableMap(pval)) {
-                pval.set(pp.pathkey, newval);
-            }
-            else {
-                pval[pp.pathkey] = newval;
-            }
-            return true;
-        }
     }
 }
 
@@ -1404,7 +1277,7 @@ function evalExprAst(exprAst : HExpr, dataenv : DataEnvironment) : any {
         let staticPath = evalPath(exprAst.path, dataenv);
         let val = internalResolvePath(staticPath, null, dataenv, 0);
         if (val instanceof LValue) {
-            return val.get();
+            return val.getEx();
         }
         return val;
     }
@@ -2127,7 +2000,7 @@ function evalAssignLVThrow(lvalue : PathType, dataenv : DataEnvironment) {
     return lvaluePath;
 }
 
-function convertSimpleType(typeName : string, value : string, defaultValue : any) : any {
+function convertSimpleType(typeName : string, value : string, defaultValue : HibikiVal) : HibikiVal {
     if (typeName == "string") {
         return value;
     }
@@ -2148,6 +2021,6 @@ function convertSimpleType(typeName : string, value : string, defaultValue : any
     return value;
 }
 
-export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, BoundValue, ParseLValuePath, ParseLValuePathThrow, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, evalActionStr, makeIteratorFromExpr, rawAttrStr, resolveStrAttrs, resolveValAttrs, getStyleMap, getAttributeStr, getAttributeValPair, valToStr};
+export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, ParseLValuePath, ParseLValuePathThrow, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, evalActionStr, makeIteratorFromExpr, rawAttrStr, resolveStrAttrs, resolveValAttrs, getStyleMap, getAttributeStr, getAttributeValPair, valToStr, exValToVal, resolveLValueAttr};
 
 export type {PathType, HAction, HExpr, HIteratorExpr};

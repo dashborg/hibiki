@@ -176,7 +176,7 @@ class DBCtx {
     }
 
     getHtmlTagName() : string {
-        let tagName = this.resolveAttr("component") ?? this.node.tag;
+        let tagName = this.resolveAttrStr("component") ?? this.node.tag;
         if (tagName.startsWith("html-")) {
             tagName = tagName.substr(5);
         }
@@ -209,14 +209,8 @@ class DBCtx {
         return exists;
     }
 
-    resolveAttr(attrName : string, opts? : any) : any {
-        if (opts && opts.raw) {
-            let [rval, exists] = DataCtx.getAttributeValPair(this.node, attrName, this.dataenv, opts);
-            return rval;
-        }
-        else {
-            return DataCtx.getAttributeStr(this.node, attrName, this.dataenv, opts);
-        }
+    hasHandler(handlerName : string) : boolean {
+        return (this.node.handlers != null && this.node.handlers[handlerName] != null);
     }
 
     resolveAttrVals() : Record<string, HibikiVal> {
@@ -318,60 +312,20 @@ class DBCtx {
         return new DataCtx.ObjectLValue(null, nodeData);
     }
 
-    _getBindPathLV(attrName : string) : DataCtx.LValue {
-        let attrval = this.resolveAttr(attrName, {raw: true});
-        if (attrval instanceof DataCtx.LValue) {
-            return attrval;
-        }
-        if (attrval == null) {
-            return DataCtx.CreateReadOnlyLValue(null, "bindpath-null:" + this.node.tag + "#" + attrName);
-        }
-        if (typeof(attrval) != "string") {
-            console.log(sprintf("Warning: Invalid %s=\"%s\": typeof expr is not a string was '%s'", attrName, this.getRawAttr(attrName), typeof(attrval)));
-            return DataCtx.CreateReadOnlyLValue(null, "bindpath-error:" + this.node.tag + "#" + attrName);
-        }
-        try {
-            let lvalue = DataCtx.ParseLValuePathThrow(attrval, this.dataenv);
-            let value = lvalue.get();
-            if (value instanceof DataCtx.LValue) {
-                return value;
-            }
-            return lvalue;
-        }
-        catch(e) {
-            let emsg = DataCtx.getShortEMsg(e);
-            console.log(sprintf("Warning: Invalid %s=\"%s\": %s", attrName, this.getRawAttr(attrName), emsg));
-            return DataCtx.CreateReadOnlyLValue(null, "bindpath-error:" + this.node.tag + "#" + attrName);
-        }
-    }
-
-    setDefaultForData(dataName : string) {
-        if (dataName == "value" && this.hasAttr("defaultvalue")) {
-            let lv = this.resolveData(dataName, true);
-            if (lv.get() == null) {
-                let defValue = this.resolveAttr("defaultvalue", {raw: true});
-                lv.set(defValue);
-            }
-        }
-        else if (this.hasAttr(dataName + ".default")) {
-            let lv = this.resolveData(dataName, true);
-            if (lv.get() == null) {
-                let defValue = this.resolveAttr(dataName + ".default", {raw: true});
-                lv.set(defValue);
-            }
-        }
-        return;
+    resolveLValueAttr(dataName : string) : DataCtx.LValue {
+        return DataCtx.resolveLValueAttr(this.node, dataName, this.dataenv);
     }
 
     resolveAttrData(dataName : string, writeable : boolean) : DataCtx.LValue {
-        if (this.hasAttr(dataName + ".bindpath")) {
-            return this._getBindPathLV(dataName + ".bindpath");
+        let lvrtn = this.resolveLValueAttr(dataName);
+        if (lvrtn != null) {
+            return lvrtn;
         }
         if (this.hasAttr(dataName)) {
             if (writeable) {
                 console.log(sprintf("Warning: %s=\"%s\" specified for writeable '%s' value (making read-only)", dataName, this.getRawAttr(dataName), dataName));
             }
-            let dataVal = this.resolveAttr(dataName, {raw: true});
+            let dataVal = this.resolveAttrVal(dataName);
             return DataCtx.CreateReadOnlyLValue(dataVal, "readonly:" + this.node.tag + "#" + dataName);
         }
         return null;
@@ -382,7 +336,7 @@ class DBCtx {
             if (writeable) {
                 console.log(sprintf("Warning: %s=\"%s\" specified for writeable '%s' value (making read-only)", "bind", this.getRawAttr("bind"), dataName));
             }
-            let dataVal = this.resolveAttr("bind", {raw: true});
+            let dataVal = this.resolveAttrVal("bind");
             if (dataVal instanceof DataCtx.LValue) {
                 return dataVal;
             }

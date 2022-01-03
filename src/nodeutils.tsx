@@ -309,7 +309,7 @@ function parseAutomerge(amAttr : string) : any[] {
 }
 
 function handleConvertType(ctx : DBCtx, value : string) : any {
-    let convertType = ctx.resolveAttr("converttype");
+    let convertType = ctx.resolveAttrStr("converttype");
     if (convertType == null) {
         return;
     }
@@ -322,35 +322,36 @@ function handleConvertType(ctx : DBCtx, value : string) : any {
             convertType = fields[0];
             subType = fields[1];
         }
+        let convertedVal : HibikiVal = null;
         if (convertType == "json" || convertType == "jseval") {
             if (value == null || value == "") {
-                value = null;
+                convertedVal = null;
             }
             else if (convertType == "json") {
-                value = JSON.parse(value);
+                convertedVal = JSON.parse(value);
             }
             else {
                 let evalVal = eval("(" + value + ")");
                 if (typeof(evalVal) == "function") {
                     evalVal = evalVal();
                 }
-                value = evalVal;
+                convertedVal = evalVal;
             }
             if (subType == "array") {
-                if (value != null && !mobx.isArrayLike(value)) {
+                if (convertedVal != null && !mobx.isArrayLike(convertedVal)) {
                     throw new Error("JSON value is not an array");
                 }
             }
             if (subType == "map" || subType == "struct") {
-                if (value != null && !isObject(value)) {
+                if (convertedVal != null && !isObject(convertedVal)) {
                     throw new Error("JSON value is not an object");
                 }
             }
         }
         else {
-            value = DataCtx.convertSimpleType(convertType, value, ctx.resolveAttr("converterrorvalue"));
+            convertedVal = DataCtx.convertSimpleType(convertType, value, ctx.resolveAttrVal("converterrorvalue"));
         }
-        convertLV.set(value);
+        convertLV.set(convertedVal);
         convertErrorLV.set(null);
     }
     catch (e) {

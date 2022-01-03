@@ -1,7 +1,7 @@
 // Copyright 2021 Dashborg Inc
 
 import * as mobx from "mobx";
-import {HibikiNode, Hibiki, HandlerPathType, NodeAttrType} from "./types";
+import {HibikiNode, Hibiki, HandlerPathType, NodeAttrType, HibikiVal} from "./types";
 import {sprintf} from "sprintf-js";
 import type {HibikiBlob} from "./datactx";
 
@@ -10,7 +10,6 @@ declare var window : any;
 const ssFeClientIdKey = "hibiki-feclientid";
 const SYM_PROXY = Symbol("proxy");
 const SYM_FLATTEN = Symbol("flatten");
-const SYM_NOATTR = Symbol("noattr");
 
 function spliceCopy(arr : any[], ...rest : any[]) {
     if (arr == null || !mobx.isArrayLike(arr)) {
@@ -22,7 +21,7 @@ function spliceCopy(arr : any[], ...rest : any[]) {
     return newArr;
 }
 
-function addToArrayDupCheck(arr : any[], val : any) : any[] {
+function addToArrayDupCheck(arr : HibikiVal, val : any) : HibikiVal[] {
     if (arr == null || !mobx.isArrayLike(arr)) {
         arr = [];
     }
@@ -35,7 +34,7 @@ function addToArrayDupCheck(arr : any[], val : any) : any[] {
     return arr;
 }
 
-function removeFromArray(arr : any[], val : any) : any[] {
+function removeFromArray(arr : HibikiVal, val : any) : HibikiVal {
     if (arr == null || !mobx.isArrayLike(arr)) {
         return arr;
     }
@@ -48,7 +47,7 @@ function removeFromArray(arr : any[], val : any) : any[] {
     return arr;
 }
 
-function valInArray(arr : any[], val : any) : boolean {
+function valInArray(arr : HibikiVal, val : any) : boolean {
     if (arr == null || !mobx.isArrayLike(arr)) {
         return false;
     }
@@ -640,5 +639,5 @@ const STYLE_KEY_MAP = {
     "fullcenter": {flex: true},
 };
 
-export {jsonRespHandler, parseUrlParams, valToString, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, makeUrlParamsFromObject, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, SYM_NOATTR, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs, blobPrintStr, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy, valInArray, rawAttrFromNode, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP};
+export {jsonRespHandler, parseUrlParams, valToString, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, makeUrlParamsFromObject, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs, blobPrintStr, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy, valInArray, rawAttrFromNode, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP};
 

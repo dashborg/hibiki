@@ -263,7 +263,7 @@ class AnyNode extends React.Component<HibikiReactProps, {}> {
         }
         let dataenv = ctx.dataenv;
         let dbstate = dataenv.dbstate;
-        let compName = ctx.resolveAttr("component") ?? tagName;
+        let compName = ctx.resolveAttrStr("component") ?? tagName;
         let component = dbstate.ComponentLibrary.findComponent(compName, dataenv.getLibContext());
         if (component != null) {
             if (component.componentType == "react-custom") {
@@ -357,15 +357,15 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
         if (ctx.isEditMode()) {
             return;
         }
-        if (ctx.hasAttr("mount.handler")) {
+        if (ctx.hasHandler("mount")) {
             ctx.handleEvent("mount");
         }
     }
 
     @boundMethod handleFileOnChange(e) {
         let ctx = new DBCtx(this);
-        let isMultiple = !!ctx.resolveAttr("multiple");
-        let hasBindPath = ctx.hasAttr("value.bindpath");
+        let isMultiple = !!ctx.resolveAttrStr("multiple");
+        let valueLV = ctx.resolveLValueAttr("value");
         let p = convertBlobArray(e.target.files);
         p.then((hblobArr) => {
             if (isMultiple) {
@@ -373,8 +373,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
                     hblobArr = null;
                 }
                 ctx.handleOnChange(hblobArr);
-                if (hasBindPath) {
-                    let valueLV = ctx.resolveData("value", true);
+                if (valueLV != null) {
                     valueLV.set(hblobArr);
                 }
             }
@@ -384,8 +383,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
                     blob = hblobArr[0];
                 }
                 ctx.handleOnChange(blob);
-                if (hasBindPath) {
-                    let valueLV = ctx.resolveData("value", true);
+                if (valueLV != null) {
                     valueLV.set(blob);
                 }
             }
@@ -394,8 +392,8 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
 
     @boundMethod handleSelectOnChange(e) {
         let ctx = new DBCtx(this);
-        let hasBindPath = ctx.hasAttr("value.bindpath");
-        let isMulti = !!ctx.resolveAttr("multiple");
+        let valueLV = ctx.resolveLValueAttr("value");
+        let isMulti = !!ctx.resolveAttrStr("multiple");
         let newValue : (string | string[]) = null;
         if (isMulti) {
             newValue = Array.from(e.target.selectedOptions, (option : HTMLOptionElement) => option.value);
@@ -404,49 +402,44 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
             newValue = e.target.value;
         }
         ctx.handleOnChange(newValue);
-        if (hasBindPath) {
-            let valueLV = ctx.resolveData("value", true);
+        if (valueLV != null) {
             valueLV.set(newValue);
         }
     }
 
     @boundMethod handleValueOnChange(e) {
         let ctx = new DBCtx(this);
-        let hasBindPath = ctx.hasAttr("value.bindpath");
+        let valueLV = ctx.resolveLValueAttr("value");
         let newValue = e.target.value;
         NodeUtils.handleConvertType(ctx, newValue);
         ctx.handleOnChange(newValue);
-        if (hasBindPath) {
-            let valueLV = ctx.resolveData("value", true);
+        if (valueLV != null) {
             valueLV.set(newValue);
         }
     }
 
     @boundMethod handleRadioOnChange(e) {
         let ctx = new DBCtx(this);
-        let hasBindPath = ctx.hasAttr("formvalue.bindpath");
+        let formValueLV = ctx.resolveLValueAttr("formvalue");
         let newValue = e.target.checked;
         ctx.handleOnChange(newValue);
-        if (hasBindPath) {
-            let formValueLV = ctx.resolveData("formvalue", true);
-            let radioValue = ctx.resolveAttr("value") ?? "on";
+        if (formValueLV != null) {
+            let radioValue = ctx.resolveAttrStr("value") ?? "on";
             formValueLV.set(radioValue);
         }
     }
 
     @boundMethod handleCheckboxOnChange(e) {
         let ctx = new DBCtx(this);
-        let hasCheckedBindPath = ctx.hasAttr("checked.bindpath");
-        let hasFormValueBindPath = ctx.hasAttr("formvalue.bindpath");
+        let checkedLV = ctx.resolveLValueAttr("checked");
+        let formValueLV = ctx.resolveLValueAttr("formvalue");
         let newValue = e.target.checked;
         ctx.handleOnChange(newValue);
-        if (hasCheckedBindPath) {
-            let checkedLV = ctx.resolveData("checked", true);
+        if (checkedLV != null) {
             checkedLV.set(newValue);
         }
-        else if (hasFormValueBindPath) {
-            let formValueLV = ctx.resolveData("formvalue", true);
-            let checkboxValue = ctx.resolveAttr("value") ?? "on";
+        else if (formValueLV != null) {
+            let checkboxValue = ctx.resolveAttrStr("value") ?? "on";
             if (newValue) {
                 let newFormValue = addToArrayDupCheck(formValueLV.get(), checkboxValue);
                 formValueLV.set(newFormValue);
@@ -460,23 +453,22 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
     }
 
     setupManagedValue(ctx : DBCtx, elemProps : Record<string, any>) {
-        let isBound = !!ctx.resolveAttr("bound");
-        let hasBindPath = ctx.hasAttr("value.bindpath");
-        if (hasBindPath) {
+        let isBound = !!ctx.resolveAttrStr("bound");
+        let valueLV = ctx.resolveLValueAttr("value");
+        if (valueLV != null) {
             // 2-way data-binding
-            let valueLV = ctx.resolveData("value", true);
             elemProps["onChange"] = this.handleValueOnChange;
             elemProps["value"] = valueLV.get() ?? "";
         }
         else if (isBound) {
             // 1-way data-binding
-            let value = ctx.resolveAttr("value");
+            let value = ctx.resolveAttrStr("value");
             elemProps["onChange"] = this.handleValueOnChange;
             elemProps["value"] = value ?? "";
         }
         else {
             // not managed
-            let value = ctx.resolveAttr("value");
+            let value = ctx.resolveAttrStr("value");
             if (value != null) {
                 elemProps["defaultValue"] = value;
             }
@@ -488,25 +480,25 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
     }
 
     setupManagedRadio(ctx : DBCtx, elemProps : Record<string, any>) {
-        let isBound = !!ctx.resolveAttr("bound");
-        let hasBindPath = ctx.hasAttr("formvalue.bindpath");
-        if (hasBindPath) {
+        let isBound = !!ctx.resolveAttrStr("bound");
+        let formValueLV = ctx.resolveLValueAttr("formvalue");
+        if (formValueLV != null) {
             // 2-way data-binding
             let formValueLV = ctx.resolveData("formvalue", true);
-            let radioValue = ctx.resolveAttr("value") ?? "on";
+            let radioValue = ctx.resolveAttrStr("value") ?? "on";
             let checked = (formValueLV.get() == radioValue);
             elemProps["checked"] = checked;
             elemProps["onChange"] = this.handleRadioOnChange;
         }
         else if (isBound) {
             // 1-way data-binding
-            let checked = ctx.resolveAttr("checked");
+            let checked = ctx.resolveAttrStr("checked");
             elemProps["checked"] = !!checked;
             elemProps["onChange"] = this.handleRadioOnChange;
         }
         else {
             // not managed
-            let checked = ctx.resolveAttr("checked");
+            let checked = ctx.resolveAttrStr("checked");
             if (checked) {
                 elemProps["defaultChecked"] = true;
             }
@@ -514,32 +506,30 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
     }
 
     setupManagedCheckbox(ctx : DBCtx, elemProps : Record<string, any>) {
-        let isBound = !!ctx.resolveAttr("bound");
-        let hasCheckedBindPath = ctx.hasAttr("checked.bindpath");
-        let hasFormValueBindPath = ctx.hasAttr("formvalue.bindpath");
-        if (hasCheckedBindPath) {
+        let isBound = !!ctx.resolveAttrStr("bound");
+        let checkedLV = ctx.resolveLValueAttr("checked");
+        let formValueLV = ctx.resolveLValueAttr("formvalue");
+        if (checkedLV != null) {
             // 2-way simple data-binding
-            let checkedLV = ctx.resolveData("checked", true);
             elemProps["checked"] = !!checkedLV.get();
             elemProps["onChange"] = this.handleCheckboxOnChange;
         }
-        else if (hasFormValueBindPath) {
+        else if (formValueLV != null) {
             // 2-way group data-binding
-            let formValueLV = ctx.resolveData("formvalue", true);
-            let checkboxValue = ctx.resolveAttr("value") ?? "on";
+            let checkboxValue = ctx.resolveAttrStr("value") ?? "on";
             let checked = valInArray(formValueLV.get(), checkboxValue);
             elemProps["checked"] = checked;
             elemProps["onChange"] = this.handleCheckboxOnChange;
         }
         else if (isBound) {
             // 1-way data-binding
-            let checked = ctx.resolveAttr("checked");
+            let checked = ctx.resolveAttrStr("checked");
             elemProps["checked"] = !!checked;
             elemProps["onChange"] = this.handleCheckboxOnChange;
         }
         else {
             // not managed
-            let checked = ctx.resolveAttr("checked");
+            let checked = ctx.resolveAttrStr("checked");
             if (checked) {
                 elemProps["defaultChecked"] = true;
             }
@@ -547,12 +537,11 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
     }
 
     setupManagedSelect(ctx : DBCtx, elemProps : Record<string, any>) {
-        let isBound = !!ctx.resolveAttr("bound");
-        let hasBindPath = ctx.hasAttr("value.bindpath");
-        let isMulti = !!ctx.resolveAttr("multiple");
-        if (hasBindPath) {
+        let isBound = !!ctx.resolveAttrStr("bound");
+        let valueLV = ctx.resolveLValueAttr("value");
+        let isMulti = !!ctx.resolveAttrStr("multiple");
+        if (valueLV != null) {
             // 2-way data-binding
-            let valueLV = ctx.resolveData("value", true);
             elemProps["onChange"] = this.handleSelectOnChange;
             if (isMulti) {
                 elemProps["value"] = valueLV.get() ?? [];
@@ -563,7 +552,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
         }
         else if (isBound) {
             // 1-way data-binding
-            let value = ctx.resolveAttr("value");
+            let value = ctx.resolveAttrStr("value");
             elemProps["onChange"] = this.handleSelectOnChange;
             if (isMulti) {
                 elemProps["value"] = value ?? [];
@@ -620,11 +609,11 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
         
         if (!ctx.isEditMode()) {
             // forms are managed if submit.handler
-            if (tagName == "form" && ctx.hasAttr("submit.handler")) {
+            if (tagName == "form" && ctx.hasHandler("submit")) {
                 elemProps.onSubmit = ctx.handleOnSubmit;
             }
 
-            if (ctx.hasAttr("click.handler")) {
+            if (ctx.hasHandler("click")) {
                 elemProps.onClick = ctx.handleOnClick;
                 // anchors with click.handler work like links (not locations)
                 if (tagName == "a" && elemProps["href"] == null) {
@@ -854,10 +843,9 @@ class FragmentNode extends React.Component<HibikiReactProps, {}> {
 class ScriptNode extends React.Component<HibikiReactProps, {}> {
     render() {
         let ctx = new DBCtx(this);
-        let blobsrc = ctx.resolveAttr("blobsrc");
-        let srcAttr = ctx.resolveAttr("src");
-        let isSync = ctx.resolveAttr("sync")
-        if (blobsrc == null && srcAttr == null) {
+        let srcAttr = ctx.resolveAttrVal("src");
+        let isSync = !ctx.resolveAttrStr("async")
+        if (srcAttr == null) {
             let scriptText = textContent(ctx.node);
             if (scriptText == null || scriptText.trim() == "") {
                 return null;
@@ -865,10 +853,12 @@ class ScriptNode extends React.Component<HibikiReactProps, {}> {
             ctx.dataenv.dbstate.queueScriptText(scriptText, isSync);
             return null;
         }
-        if (blobsrc != null) {
-            srcAttr = blobsrc.makeDataUrl();
+        if (srcAttr instanceof DataCtx.HibikiBlob) {
+            ctx.dataenv.dbstate.queueScriptSrc(srcAttr.makeDataUrl(), isSync);
         }
-        ctx.dataenv.dbstate.queueScriptSrc(srcAttr, isSync);
+        else {
+            ctx.dataenv.dbstate.queueScriptSrc(DataCtx.valToStr(srcAttr), isSync);
+        }
         return null;
     }
 }
@@ -879,8 +869,8 @@ class DateFormatNode extends React.Component<HibikiReactProps, {}> {
         let ctx = new DBCtx(this);
         let dataLV = ctx.resolveData("data", false);
         let bindVal = DataCtx.demobx(dataLV.get());
-        let modeAttr = ctx.resolveAttr("mode");
-        let nulltext = ctx.resolveAttr("nulltext");
+        let modeAttr = ctx.resolveAttrStr("mode");
+        let nulltext = ctx.resolveAttrStr("nulltext");
         let style = ctx.resolveStyleMap("style");
         if (typeof(bindVal) == "string" && modeAttr == "parse") {
             try {
@@ -889,8 +879,8 @@ class DateFormatNode extends React.Component<HibikiReactProps, {}> {
                 return NodeUtils.renderTextSpan("invalid", style);
             }
         }
-        let relativeAttr = !!ctx.resolveAttr("relative");
-        let durationAttr = ctx.resolveAttr("duration");
+        let relativeAttr = !!ctx.resolveAttrStr("relative");
+        let durationAttr = ctx.resolveAttrStr("duration");
         if (typeof(bindVal) == "string") {
             bindVal = parseFloat(bindVal);
         }
@@ -906,7 +896,7 @@ class DateFormatNode extends React.Component<HibikiReactProps, {}> {
         let text = null;
         try {
             let val = bindVal;
-            let formatAttr = ctx.resolveAttr("format");
+            let formatAttr = ctx.resolveAttrStr("format");
             if (modeAttr == "s") {
                 val = val * 1000;
             }
@@ -964,7 +954,7 @@ class RunHandlerNode extends React.Component<HibikiReactProps, {}> {
 class WithContextNode extends React.Component<HibikiReactProps, {}> {
     render() {
         let ctx = new DBCtx(this);
-        let contextattr = ctx.resolveAttr("context");
+        let contextattr = ctx.resolveAttrStr("context");
         if (contextattr == null) {
             return <ErrorMsg message={sprintf("%s no context attribute", nodeStr(ctx.node))}/>;
         }
@@ -982,8 +972,7 @@ class WithContextNode extends React.Component<HibikiReactProps, {}> {
 class ChildrenNode extends React.Component<HibikiReactProps, {}> {
     render() {
         let ctx = new DBCtx(this);
-        let dataLV = ctx.resolveData("data", false);
-        let children = dataLV.get();
+        let children = ctx.resolveAttrVal("bind");
         if (children == null) {
             if (ctx.node.list == null) {
                 return null;
@@ -994,13 +983,16 @@ class ChildrenNode extends React.Component<HibikiReactProps, {}> {
             }
             return <React.Fragment>{rtnElems}</React.Fragment>;
         }
+        if (!mobx.isArrayLike(children)) {
+            return <ErrorMsg message={sprintf("%s bind expression is not an array", nodeStr(ctx.node))}/>;
+        }
         for (let i=0; i<children.length; i++) {
-            let c = children[i];
+            let c = (children[i] as HibikiNode);
             if (c == null || c.tag == null) {
                 return <ErrorMsg message={sprintf("%s bad child node @ index:%d", nodeStr(ctx.node), i)}/>;
             }
         }
-        let rtnElems = baseRenderHtmlChildren(children, ctx.dataenv, false);
+        let rtnElems = baseRenderHtmlChildren(children as HibikiNode[], ctx.dataenv, false);
         if (rtnElems == null) {
             return null;
         }
@@ -1015,8 +1007,7 @@ class DynNode extends React.Component<HibikiReactProps, {}> {
 
     render() {
         let ctx = new DBCtx(this);
-        let dataLV = ctx.resolveData("data", false);
-        let bindVal = DataCtx.demobx(dataLV.get());
+        let bindVal = ctx.resolveAttrStr("data");
         if (bindVal == null) {
             return null;
         }
@@ -1054,13 +1045,13 @@ class SimpleQueryNode extends React.Component<HibikiReactProps, {}> {
         this.refreshCount = mobx.observable.box(0, {name: "refreshCount"});
         this.nameComputed = mobx.computed(() => {
             let ctx = new DBCtx(self);
-            let name = ctx.resolveAttr("name");
+            let name = ctx.resolveAttrStr("name");
             if (name != null) {
                 return name;
             }
             try {
                 let ctx = new DBCtx(self);
-                let queryStr = ctx.resolveAttr("query");
+                let queryStr = ctx.resolveAttrStr("query");
                 let callAction = DataCtx.ParseStaticCallStatement(queryStr);
                 let handler = DataCtx.evalExprAst(callAction.callpath, ctx.dataenv);
                 return handler || "invalid-query";
@@ -1074,11 +1065,11 @@ class SimpleQueryNode extends React.Component<HibikiReactProps, {}> {
     executeQuery(ctx : DBCtx, curCallNum : number) {
         let dbstate = ctx.dataenv.dbstate;
         let rtctx = new RtContext();
-        let name = ctx.resolveAttr("name");
+        let name = ctx.resolveAttrStr("name");
         // TODO register handlerName/handlerEnv for error bubbling
         rtctx.pushContext(sprintf("Evaluating %s (in %s)", nodeStr(ctx.node), ctx.dataenv.getFullHtmlContext()), null);
         try {
-            let queryStr = ctx.resolveAttr("query");
+            let queryStr = ctx.resolveAttrStr("query");
             if (queryStr == null) {
                 return;
             }
@@ -1134,7 +1125,7 @@ class SimpleQueryNode extends React.Component<HibikiReactProps, {}> {
     
     render() {
         let ctx = new DBCtx(this);
-        let queryStr = ctx.resolveAttr("query");
+        let queryStr = ctx.resolveAttrStr("query");
         if (queryStr == null) {
             return <ErrorMsg message={sprintf("%s without query attribute", nodeStr(ctx.node))}/>;
         }
@@ -1159,7 +1150,7 @@ class InlineDataNode extends React.Component<HibikiReactProps> {
         if (ctx.isEditMode()) {
             return;
         }
-        let format = ctx.resolveAttr("format");
+        let format = ctx.resolveAttrStr("format");
         if (format == null) {
             format = "json";
         }
@@ -1204,7 +1195,7 @@ class DataSorterNode extends React.Component<HibikiReactProps, {}> {
         this.sortcolComputed = mobx.computed(() => {
             let ctx = new DBCtx(self);
             let columnLV = ctx.resolveData("sortspec", false).subMapKey("column");
-            return DataCtx.demobx(columnLV.get());
+            return DataCtx.valToStr(DataCtx.demobx(columnLV.get()));
         });
 
         this.sortascComputed = mobx.computed(() => {
@@ -1225,7 +1216,7 @@ class DataSorterNode extends React.Component<HibikiReactProps, {}> {
         let sortasc = this.sortascComputed.get();
 
         let data = null;
-        let sortInPlace = ctx.resolveAttr("inplace");
+        let sortInPlace = !!ctx.resolveAttrStr("inplace");
         if (sortInPlace) {
             let valueLV = ctx.resolveData("data", true);
             data = valueLV.get();
@@ -1318,7 +1309,7 @@ class DataPagerNode extends React.Component<HibikiReactProps, {}> {
         let ctx = new DBCtx(this);
         let curpageLV = ctx.resolveData("pagespec", true).subMapKey("curpage");
         if (curpageLV.get() == null && ctx.hasAttr("curpage.default")) {
-            let defaultCurpage = ctx.resolveAttr("curpage.default", {raw: true});
+            let defaultCurpage = ctx.resolveAttrVal("curpage.default");
             curpageLV.set(defaultCurpage);
         }
         let self = this;
@@ -1346,7 +1337,7 @@ class DataPagerNode extends React.Component<HibikiReactProps, {}> {
 
         this.pagesizeComputed = mobx.computed(() => {
             let ctx = new DBCtx(self);
-            return resolveNumber(ctx.resolveAttr("pagesize"), (val) => (val > 0), 10);
+            return resolveNumber(ctx.resolveAttrVal("pagesize"), (val) => (val > 0), 10);
         }, {name: "pagesize"});
         
         this.curpageComputed = mobx.computed(() => {
