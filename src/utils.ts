@@ -10,6 +10,7 @@ declare var window : any;
 const ssFeClientIdKey = "hibiki-feclientid";
 const SYM_PROXY = Symbol("proxy");
 const SYM_FLATTEN = Symbol("flatten");
+const SYM_NOATTR = Symbol("noattr");
 
 function spliceCopy(arr : any[], ...rest : any[]) {
     if (arr == null || !mobx.isArrayLike(arr)) {
@@ -577,5 +578,67 @@ function base64ToArray(b64 : string) : Uint8Array {
     return arr;
 }
 
-export {jsonRespHandler, parseUrlParams, valToString, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, makeUrlParamsFromObject, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs, blobPrintStr, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy, valInArray, rawAttrFromNode};
+const STYLE_UNITLESS_NUMBER = { // from react
+    "animation-iteration-count": true,
+    "border-image-outset": true,
+    "border-image-slice": true,
+    "border-image-width": true,
+    "box-flex": true,
+    "box-flex-group": true,
+    "box-ordinal-group": true,
+    "column-count": true,
+    columns: true,
+    flex: true,
+    "flex-grow": true,
+    "flex-positive": true,
+    "flex-shrink": true,
+    "flex-negative": true,
+    "flex-order": true,
+    "grid-row": true,
+    "grid-row-end": true,
+    "grid-row-span": true,
+    "grid-row-start": true,
+    "grid-column": true,
+    "grid-column-end": true,
+    "grid-column-span": true,
+    "grid-column-start": true,
+    "font-weight": true,
+    "line-clamp": true,
+    "line-height": true,
+    opacity: true,
+    order: true,
+    orphans: true,
+    tabsize: true,
+    widows: true,
+    "z-index": true,
+    zoom: true,
+    
+    // svg-related properties
+    "fill-opacity": true,
+    "flood-opacity": true,
+    "stop-opacity": true,
+    "stroke-dasharray": true,
+    "stroke-dashoffset": true,
+    "stroke-miterlimit": true,
+    "stroke-opacity": true,
+    "stroke-width": true,
+};
+
+const STYLE_KEY_MAP = {
+    "bold": {key: "fontWeight", val: "bold"},
+    "italic": {key: "fontStyle", val: "italic"},
+    "underline": {key: "textDecoration", val: "underline"},
+    "strike": {key: "textDecoration", val: "line-through"},
+    "pre": {key: "whiteSpace", val: "pre"},
+    "fixedfont": {key: "fontFamily", val: "\"courier new\", fixed"},
+    "grow": {key: "flex", val: "1 0 0"},
+    "noshrink": {key: "flexShrink", val: "0"},
+    "shrink": {key: "flexShrink", val: "1"},
+    "scroll": {key: "overflow", val: "scroll"},
+    "center": {flex: true, key: "justifyContent", val: "center"},
+    "xcenter": {flex: true, key: "alignItems", val: "center"},
+    "fullcenter": {flex: true},
+};
+
+export {jsonRespHandler, parseUrlParams, valToString, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, makeUrlParamsFromObject, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, SYM_NOATTR, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs, blobPrintStr, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy, valInArray, rawAttrFromNode, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP};
 

@@ -6,8 +6,8 @@ import {DataEnvironment} from "./state";
 import {sprintf} from "sprintf-js";
 import {parseHtml} from "./html-parser";
 import {RtContext, getShortEMsg, HibikiError} from "./error";
-import {makeUrlParamsFromObject, SYM_PROXY, SYM_FLATTEN, isObject, stripAtKeys, unpackPositionalArgs, nodeStr, parseHandler, fullPath, blobPrintStr} from "./utils";
-import {PathPart, PathType, PathUnionType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue, HandlerBlock, NodeAttrType} from "./types";
+import {makeUrlParamsFromObject, SYM_PROXY, SYM_FLATTEN, SYM_NOATTR, isObject, stripAtKeys, unpackPositionalArgs, nodeStr, parseHandler, fullPath, blobPrintStr, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP} from "./utils";
+import {PathPart, PathType, PathUnionType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue, HandlerBlock, NodeAttrType, HibikiVal, HibikiValEx, HibikiNode} from "./types";
 import {HibikiRequest} from "./request";
 import type {EHandlerType} from "./state";
 import {doParse} from "./hibiki-parser";
@@ -73,6 +73,179 @@ function rawAttrStr(attr : NodeAttrType) : string {
         return attr;
     }
     return attr.sourcestr;
+}
+
+function getStyleMap(node : HibikiNode, styleName : string, dataenv : DataEnvironment, initStyles? : any) : any {
+    let rtn = initStyles || {};
+    let styleMap : {[v : string] : string}= null;
+    if (styleName == "style") {
+        styleMap = node.style;
+    } else {
+        if (node.morestyles != null) {
+            styleMap = node.morestyles[styleName];
+        }
+    }
+    if (styleMap == null) {
+        return rtn;
+    }
+    for (let [k,v] of Object.entries(styleMap)) {
+        let opts = {
+            style: true,
+            rtContext: sprintf("resolving style property '%s' in attribute '%s' in <%s>", k, styleName, node.tag),
+        };
+        let rval = resolveAttrStr(k, v, dataenv, opts);
+        if (rval == null) {
+            continue;
+        }
+        let skm = STYLE_KEY_MAP[k];
+        if (skm != null) {
+            if (skm.flex) {
+                rtn.display = "flex";
+            }
+            if (k == "fullcenter") {
+                rtn.justifyContent = "center";
+                rtn.alignItems = "center";
+                continue;
+            }
+            rtn[skm.key] = skm.val;
+            continue;
+        }
+        rtn[k] = rval;
+    }
+    return rtn;
+}
+
+type ResolveOpts = {
+    style? : boolean,
+    rtContext? : string,
+};
+
+function resolveAttrStr(k : string, v : NodeAttrType, dataenv : DataEnvironment, opts? : ResolveOpts) : string {
+    opts = opts ?? {};
+    let resolvedVal = resolveAttrVal(k, v, dataenv, opts);
+    if (resolvedVal == null || resolvedVal === false || resolvedVal == "") {
+        return null;
+    }
+    if (resolvedVal === true) {
+        resolvedVal = 1;
+    }
+    if (resolvedVal instanceof HibikiBlob) {
+        return blobPrintStr(resolvedVal);
+    }
+    resolvedVal = demobx(resolvedVal);
+    if (opts.style && typeof(resolvedVal) == "number") {
+        if (!STYLE_UNITLESS_NUMBER[k]) {
+            resolvedVal = String(resolvedVal) + "px";
+        }
+    }
+    return String(resolvedVal);
+}
+
+function valToStr(v : HibikiVal) : string {
+    if (v == null || v === false || v == "") {
+        return null;
+    }
+    if (v === true) {
+        v = 1;
+    }
+    if (v instanceof HibikiBlob) {
+        return blobPrintStr(v);
+    }
+    v = demobx(v);
+    return String(v);
+}
+
+function resolveAttrVal(k : string, v : NodeAttrType, dataenv : DataEnvironment, opts? : ResolveOpts) : HibikiVal {
+    opts = opts || {};
+    if (v == null || v == "") {
+        return null;
+    }
+    if (typeof(v) == "string") {
+        return v;
+    }
+    let resolvedVal : HibikiValEx = null;
+    try {
+        resolvedVal = evalExprAst(v, dataenv);
+    }
+    catch (e) {
+        let rtContext = opts.rtContext ?? "resolving attribute '%s'";
+        console.log(sprintf("ERROR %s expression\n\"%s\"\n", rtContext, k, v.sourcestr), e.toString());
+        return null;
+    }
+    if (resolvedVal instanceof LValue) {
+        return resolvedVal.get();
+    }
+    else if (typeof(resolvedVal) == "symbol" || resolvedVal instanceof Symbol) {
+        if (resolvedVal == SYM_NOATTR) {
+            return null;
+        }
+        return resolvedVal.toString();
+    }
+    else {
+        return resolvedVal;
+    }
+}
+
+function getAttributeStr(node : HibikiNode, attrName : string, dataenv : DataEnvironment, opts? : ResolveOpts) : string {
+    if (!node || !node.attrs || node.attrs[attrName] == null) {
+        return null;
+    }
+    opts = opts || {};
+    opts.rtContext = sprintf("resolving attribute '%s' in <%s>", attrName, node.tag);
+    let aval = node.attrs[attrName];
+    let rval = resolveAttrStr(attrName, aval, dataenv, opts);
+    if (rval == null) {
+        return null;
+    }
+    return rval;
+}
+
+function getAttributeVal(node : HibikiNode, attrName : string, dataenv : DataEnvironment, opts? : ResolveOpts) : HibikiVal {
+    if (!node || !node.attrs || node.attrs[attrName] == null) {
+        return null;
+    }
+    opts = opts || {};
+    opts.rtContext = sprintf("resolving attribute '%s' in <%s>", attrName, node.tag);
+    let aval = node.attrs[attrName];
+    let rval = resolveAttrVal(attrName, aval, dataenv, opts);
+    if (rval == null) {
+        return null;
+    }
+    return rval;
+}
+
+function resolveStrAttrs(node : HibikiNode, dataenv : DataEnvironment) : Record<string, string> {
+    if (node.attrs == null) {
+        return {};
+    }
+    let rtn = {};
+    for (let [k,v] of Object.entries(node.attrs)) {
+        let opts : ResolveOpts = {};
+        opts.rtContext = sprintf("resolving attribute '%s' in %s", k, nodeStr(node));
+        let rval = resolveAttrStr(k, v, dataenv, opts);
+        if (rval == null) {
+            continue;
+        }
+        rtn[k] = rval;
+    }
+    return rtn;
+}
+
+function resolveValAttrs(node : HibikiNode, dataenv : DataEnvironment) : Record<string, HibikiVal> {
+    if (node.attrs == null) {
+        return {};
+    }
+    let rtn = {};
+    for (let [k,v] of Object.entries(node.attrs)) {
+        let opts : ResolveOpts = {};
+        opts.rtContext = sprintf("resolving attribute '%s' in %s", k, nodeStr(node));
+        let rval = resolveAttrVal(k, v, dataenv, opts);
+        if (rval == null) {
+            continue;
+        }
+        rtn[k] = rval;
+    }
+    return rtn;
 }
 
 function formatVal(val : any, format : string) : string {
@@ -1394,6 +1567,9 @@ function evalExprAst(exprAst : HExpr, dataenv : DataEnvironment) : any {
             throw new Error(sprintf("Invalid expression op type: '%s'", exprAst.op));
         }
     }
+    else if (exprAst.etype == "noattr") {
+        return SYM_NOATTR;
+    }
     else {
         console.log("NO ETYPE", exprAst);
         throw new Error(sprintf("Invalid expression etype: '%s'", exprAst.etype));
@@ -1987,6 +2163,6 @@ function convertSimpleType(typeName : string, value : string, defaultValue : any
     return value;
 }
 
-export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, BoundValue, ParseLValuePath, ParseLValuePathThrow, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, evalActionStr, ParseIteratorExpr, ParseIteratorExprThrow, makeIteratorFromExpr, rawAttrStr};
+export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, BoundValue, ParseLValuePath, ParseLValuePathThrow, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, evalActionStr, ParseIteratorExpr, ParseIteratorExprThrow, makeIteratorFromExpr, rawAttrStr, resolveAttrStr, resolveAttrVal, resolveStrAttrs, resolveValAttrs, getStyleMap, getAttributeStr, getAttributeVal, valToStr};
 
 export type {PathType, HAction, HExpr, HIteratorExpr};

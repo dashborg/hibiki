@@ -14,10 +14,10 @@ import dayjsRelativeTime from "dayjs/plugin/relativeTime";
 import dayjsUtc from "dayjs/plugin/utc";
 import dayjsRelative from "dayjs/plugin/relativeTime";
 
-import type {HibikiNode, ComponentType, LibraryType, HibikiExtState, LibComponentType, NodeAttrType} from "./types";
+import type {HibikiNode, ComponentType, LibraryType, HibikiExtState, LibComponentType, NodeAttrType, HibikiVal} from "./types";
 import {DBCtx} from "./dbctx";
 import * as DataCtx from "./datactx";
-import {HibikiState, DataEnvironment, getAttributes, getAttribute, getStyleMap} from "./state";
+import {HibikiState, DataEnvironment} from "./state";
 import {valToString, valToInt, valToFloat, resolveNumber, isObject, textContent, SYM_PROXY, SYM_FLATTEN, jseval, nodeStr, getHibiki, addToArrayDupCheck, removeFromArray, valInArray, blobPrintStr} from "./utils";
 import {parseHtml} from "./html-parser";
 import * as NodeUtils from "./nodeutils";
@@ -598,11 +598,11 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
         let ctx = new DBCtx(this);
         let tagName = ctx.getHtmlTagName();
         let elemProps : Record<string, any> = {};
-        let attrs = ctx.resolveAttrs();
-        let typeAttr = attrs["type"];
+        let attrVals : Record<string, HibikiVal> = ctx.resolveAttrVals();
+        let typeAttr = DataCtx.valToStr(attrVals["type"]);
         let managedType = NodeUtils.getManagedType(tagName, typeAttr);
         let managedAttrs = NodeUtils.MANAGED_ATTRS[managedType] ?? {};
-        for (let [k,v] of Object.entries(attrs)) {
+        for (let [k,v] of Object.entries(attrVals)) {
             k = k.toLowerCase();
             if (NodeUtils.SPECIAL_ATTRS[k] || managedAttrs[k]) {
                 continue;
@@ -611,10 +611,6 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
                 continue;
             }
             if (k.endsWith(".bindpath") || k.endsWith(".handler") || k.endsWith(".default")) {
-                continue;
-            }
-            if (k == "download" && v == "1") {
-                elemProps["download"] = "";
                 continue;
             }
             if (v instanceof DataCtx.HibikiBlob) {
@@ -627,7 +623,12 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
                 }
                 continue;
             }
-            elemProps[k] = v;
+            let strVal = DataCtx.valToStr(v);
+            if (k == "download" && strVal == "1") {
+                elemProps["download"] = "";
+                continue;
+            }
+            elemProps[k] = strVal;
         }
         if (!managedAttrs["value"] && elemProps["value"] == null && ctx.getRawAttr("value") == "") {
             elemProps["value"] = "";
@@ -669,12 +670,12 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
             }
         }
         // automerge
-        this.doAutomerge(ctx, attrs, elemProps);
+        this.doAutomerge(ctx, attrVals, elemProps);
         let elemChildren = ctxRenderHtmlChildren(ctx);
         return React.createElement(tagName, elemProps, elemChildren);
     }
 
-    doAutomerge(ctx : DBCtx, attrs : Record<string, any>, elemProps : Record<string, any>) {
+    doAutomerge(ctx : DBCtx, attrs : Record<string, HibikiVal>, elemProps : Record<string, any>) {
         let style = ctx.resolveStyleMap("style");
         let cnMap = ctx.resolveCnMap("class");
         let automergeAttrs = {
@@ -683,7 +684,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
             disabled: null,
         };
         if (attrs.automerge != null) {
-            let automergeArr = NodeUtils.parseAutomerge(attrs.automerge);
+            let automergeArr = NodeUtils.parseAutomerge(DataCtx.valToStr(attrs.automerge));
             for (let i=0; i<automergeArr.length; i++) {
                 let amParams = automergeArr[i];
                 NodeUtils.automerge(ctx, automergeAttrs, amParams.name, amParams.opts);

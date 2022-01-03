@@ -3,10 +3,10 @@
 import * as mobx from "mobx";
 import * as DataCtx from "./datactx";
 import { v4 as uuidv4 } from 'uuid';
-import {DataEnvironment, getAttribute, getAttributes, getStyleMap} from "./state";
+import {DataEnvironment} from "./state";
 import {sprintf} from "sprintf-js";
 import {boundMethod} from 'autobind-decorator'
-import {HibikiNode} from "./types";
+import {HibikiNode, HibikiVal} from "./types";
 import * as NodeUtils from "./nodeutils";
 import {nodeStr} from "./utils";
 import {RtContext} from "./error";
@@ -28,7 +28,7 @@ let NODASHELEM = {
 };
 
 function resolveCnMapEx(node : HibikiNode, dataenv : DataEnvironment, classAttr : string, moreClasses : string) {
-    let classAttrVal = getAttribute(node, classAttr, dataenv) || "";
+    let classAttrVal = DataCtx.getAttributeStr(node, classAttr, dataenv) || "";
     let classVal = (moreClasses || "") + " " + classAttrVal;
     let rawCnArr = classVal.split(/\s+/);
     let cnMap = {};
@@ -80,7 +80,7 @@ function resolveCnMapEx(node : HibikiNode, dataenv : DataEnvironment, classAttr 
                 continue;
             }
             let kval = k.substr(classAttr.length+1);
-            let rval = getAttribute(node, k, dataenv);
+            let rval = DataCtx.getAttributeStr(node, k, dataenv);
             if (rval) {
                 cnMap[kval] = true;
             }
@@ -196,11 +196,25 @@ class DBCtx {
     }
 
     resolveAttr(attrName : string, opts? : any) : any {
-        return getAttribute(this.node, attrName, this.dataenv, opts);
+        if (opts && opts.raw) {
+            return DataCtx.getAttributeVal(this.node, attrName, this.dataenv, opts);
+        }
+        else {
+            return DataCtx.getAttributeStr(this.node, attrName, this.dataenv, opts);
+        }
     }
 
-    resolveAttrs(opts? : any) : any {
-        return getAttributes(this.node, this.dataenv, opts);
+    resolveAttrVals() : Record<string, HibikiVal> {
+        return DataCtx.resolveValAttrs(this.node, this.dataenv);
+    }
+
+    resolveAttrs(opts? : {raw? : boolean}) : any {
+        if (opts && opts.raw) {
+            return DataCtx.resolveValAttrs(this.node, this.dataenv);
+        }
+        else {
+            return DataCtx.resolveStrAttrs(this.node, this.dataenv);
+        }
     }
 
     getRawAttr(attrName : string) : string {
@@ -215,7 +229,7 @@ class DBCtx {
     }
 
     resolveStyleMap(styleAttr : string, initStyles? : any) : any {
-        return getStyleMap(this.node, styleAttr, this.dataenv, initStyles);
+        return DataCtx.getStyleMap(this.node, styleAttr, this.dataenv, initStyles);
     }
 
     resolveCnMap(classAttr : string, moreClasses? : string) {
@@ -334,13 +348,6 @@ class DBCtx {
         return;
     }
 
-    isAttrBound(attrName : string) : boolean {
-        if (this.node.bindings == null) {
-            return false;
-        }
-        return (this.node.bindings[attrName] != null);
-    }
-
     resolveAttrData(dataName : string, writeable : boolean) : DataCtx.LValue {
         if (this.hasAttr(dataName + ".bindpath")) {
             return this._getBindPathLV(dataName + ".bindpath");
@@ -353,19 +360,6 @@ class DBCtx {
             return DataCtx.CreateReadOnlyLValue(dataVal, "readonly:" + this.node.tag + "#" + dataName);
         }
         return null;
-    }
-
-    hasDataAttr(dataName : string) : boolean {
-        if (dataName == "data" && this.hasAttr("bind")) {
-            return true;
-        }
-        if (this.hasAttr(dataName)) {
-            return true;
-        }
-        if (this.hasAttr(dataName + ".bindpath")) {
-            return true;
-        }
-        return false;
     }
 
     resolveData(dataName : string, writeable : boolean) : DataCtx.LValue {

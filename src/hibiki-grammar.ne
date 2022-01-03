@@ -54,6 +54,7 @@ let lexer = moo.states({
                         KW_TRUE: "true",
                         KW_FALSE: "false",
                         KW_NULL: "null",
+                        KW_NOATTR: "noattr",
                         KW_CALLHANDLER: "callhandler",
                         KW_SETRETURN: "setreturn",
                         KW_INVALIDATE: "invalidate",
@@ -443,6 +444,7 @@ literalVal ->
     | %KW_TRUE   {% (data) => ({etype: "literal", val: true}) %}
     | %KW_FALSE  {% (data) => ({etype: "literal", val: false}) %}
     | %KW_NULL   {% (data) => ({etype: "literal", val: null}) %}
+    | %KW_NOATTR {% (data) => ({etype: "noattr"}) %}
 
 pathExprNonTerm ->
       globalPathExpr  {% id %}
@@ -514,6 +516,7 @@ idOrKeyword ->
     | %KW_TRUE   {% id %}
     | %KW_FALSE  {% id %}
     | %KW_NULL   {% id %}
+    | %KW_NOATTR {% id %}
     | %KW_FIRE   {% id %}
     | %KW_NOP    {% id %}
     | %KW_BUBBLE {% id %}

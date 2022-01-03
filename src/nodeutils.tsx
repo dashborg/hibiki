@@ -8,7 +8,6 @@ import type {HibikiNode, HandlerValType} from "./types";
 import * as DataCtx from "./datactx";
 import {sprintf} from "sprintf-js";
 import {isObject, textContent, rawAttrFromNode} from "./utils";
-import {getAttribute} from "./state";
 import {DataEnvironment} from "./state";
 
 let BLOCKED_ELEMS = {
@@ -246,7 +245,7 @@ function makeChildrenVar(dataenv : DataEnvironment, node : HibikiNode) : any {
             rtn.bytag[tagname] = [];
         }
         rtn.bytag[tagname].push(n);
-        let slotname = getAttribute(n, "slot", dataenv);
+        let slotname = DataCtx.getAttributeStr(n, "slot", dataenv);
         if (slotname != null) {
             if (rtn.byslot[slotname] == null) {
                 rtn.byslot[slotname] = [];

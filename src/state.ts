@@ -7,7 +7,7 @@ import {boundMethod} from 'autobind-decorator'
 import {v4 as uuidv4} from 'uuid';
 import type {HibikiNode, ComponentType, LibraryType, HibikiConfig, HibikiHandlerModule, HibikiAction, EventType, HandlerValType, JSFuncType, CsrfHookFn, FetchHookFn, Hibiki, ErrorCallbackFn, HtmlParserOpts, HandlerBlock, NodeAttrType} from "./types";
 import * as DataCtx from "./datactx";
-import {isObject, textContent, SYM_PROXY, SYM_FLATTEN, nodeStr, callHook, getHibiki, parseHandler, fullPath, parseUrlParams, smartDecodeParams} from "./utils";
+import {isObject, textContent, SYM_PROXY, SYM_FLATTEN, nodeStr, callHook, getHibiki, parseHandler, fullPath, parseUrlParams, smartDecodeParams, blobPrintStr} from "./utils";
 import {subNodesByTag, firstSubNodeByTag} from "./nodeutils";
 import {RtContext, HibikiError} from "./error";
 import {HibikiRequest} from "./request";
@@ -1237,180 +1237,6 @@ class HibikiState {
     }
 }
 
-const STYLE_UNITLESS_NUMBER = { // from react
-    "animation-iteration-count": true,
-    "border-image-outset": true,
-    "border-image-slice": true,
-    "border-image-width": true,
-    "box-flex": true,
-    "box-flex-group": true,
-    "box-ordinal-group": true,
-    "column-count": true,
-    columns: true,
-    flex: true,
-    "flex-grow": true,
-    "flex-positive": true,
-    "flex-shrink": true,
-    "flex-negative": true,
-    "flex-order": true,
-    "grid-row": true,
-    "grid-row-end": true,
-    "grid-row-span": true,
-    "grid-row-start": true,
-    "grid-column": true,
-    "grid-column-end": true,
-    "grid-column-span": true,
-    "grid-column-start": true,
-    "font-weight": true,
-    "line-clamp": true,
-    "line-height": true,
-    opacity: true,
-    order: true,
-    orphans: true,
-    tabsize: true,
-    widows: true,
-    "z-index": true,
-    zoom: true,
-
-    // svg-related properties
-    "fill-opacity": true,
-    "flood-opacity": true,
-    "stop-opacity": true,
-    "stroke-dasharray": true,
-    "stroke-dashoffset": true,
-    "stroke-miterlimit": true,
-    "stroke-opacity": true,
-    "stroke-width": true,
-};
-
-// return type is not necessarily string :/
-function resolveAttrVal(k : string, v : NodeAttrType, dataenv : DataEnvironment, opts : any) : string {
-    opts = opts || {};
-    if (v == null || v == "") {
-        return null;
-    }
-    if (typeof(v) == "string") {
-        return v;
-    }
-    let resolvedVal = null;
-    try {
-        resolvedVal = DataCtx.evalExprAst(v, dataenv);
-    }
-    catch (e) {
-        console.log(sprintf("ERROR resolving attribute '%s' expression\n\"%s\"\n", k, v.sourcestr), e.toString());
-        return null;
-    }
-    if (resolvedVal instanceof DataCtx.LValue) {
-        resolvedVal = resolvedVal.get();
-    }
-    if (opts.raw) {
-        return resolvedVal;
-    }
-    if (resolvedVal == null || resolvedVal === false || resolvedVal == "") {
-        return null;
-    }
-    if (resolvedVal === true) {
-        resolvedVal = 1;
-    }
-    if (NodeUtils.BLOB_ATTRS[k] && resolvedVal instanceof DataCtx.HibikiBlob) {
-        return (resolvedVal as any);
-    }
-    resolvedVal = DataCtx.demobx(resolvedVal);
-    if (opts.style && typeof(resolvedVal) == "number") {
-        if (!STYLE_UNITLESS_NUMBER[k]) {
-            resolvedVal = String(resolvedVal) + "px";
-        }
-    }
-    return String(resolvedVal);
-}
-
-function getAttributes(node : HibikiNode, dataenv : DataEnvironment, opts? : any) : any {
-    if (node.attrs == null) {
-        return {};
-    }
-    opts = opts || {};
-    let rtn = {};
-    for (let [k,v] of Object.entries(node.attrs)) {
-        opts.rtContext = sprintf("Resolving attribute '%s' in <%s>", k, node.tag);
-        let rval = resolveAttrVal(k, v, dataenv, opts);
-        if (rval == null) {
-            continue;
-        }
-        rtn[k] = rval;
-    }
-    return rtn;
-}
-
-function getAttribute(node : HibikiNode, attrName : string, dataenv : DataEnvironment, opts? : any) : any {
-    if (!node || !node.attrs || node.attrs[attrName] == null) {
-        return null;
-    }
-    opts = opts || {};
-    opts.rtContext = sprintf("Resolving attribute '%s' in <%s>", attrName, node.tag);
-    let val = node.attrs[attrName];
-    let rval = resolveAttrVal(attrName, val, dataenv, opts);
-    if (rval == null) {
-        return null;
-    }
-    return rval;
-}
-
-const STYLE_KEY_MAP = {
-    "bold": {key: "fontWeight", val: "bold"},
-    "italic": {key: "fontStyle", val: "italic"},
-    "underline": {key: "textDecoration", val: "underline"},
-    "strike": {key: "textDecoration", val: "line-through"},
-    "pre": {key: "whiteSpace", val: "pre"},
-    "fixedfont": {key: "fontFamily", val: "\"courier new\", fixed"},
-    "grow": {key: "flex", val: "1 0 0"},
-    "noshrink": {key: "flexShrink", val: "0"},
-    "shrink": {key: "flexShrink", val: "1"},
-    "scroll": {key: "overflow", val: "scroll"},
-    "center": {flex: true, key: "justifyContent", val: "center"},
-    "xcenter": {flex: true, key: "alignItems", val: "center"},
-    "fullcenter": {flex: true},
-};
-
-function getStyleMap(node : HibikiNode, styleName : string, dataenv : DataEnvironment, initStyles? : any) : any {
-    let rtn = initStyles || {};
-    let styleMap : {[v : string] : string}= null;
-    if (styleName == "style") {
-        styleMap = node.style;
-    } else {
-        if (node.morestyles != null) {
-            styleMap = node.morestyles[styleName];
-        }
-    }
-    if (styleMap == null) {
-        return rtn;
-    }
-    for (let [k,v] of Object.entries(styleMap)) {
-        let opts = {
-            style: true,
-            rtContext: sprintf("Resolve style property '%s' in attribute '%s' in <%s>", k, styleName, node.tag),
-        };
-        let rval = resolveAttrVal(k, v, dataenv, opts);
-        if (rval == null) {
-            continue;
-        }
-        let skm = STYLE_KEY_MAP[k];
-        if (skm != null) {
-            if (skm.flex) {
-                rtn.display = "flex";
-            }
-            if (k == "fullcenter") {
-                rtn.justifyContent = "center";
-                rtn.alignItems = "center";
-                continue;
-            }
-            rtn[skm.key] = skm.val;
-            continue;
-        }
-        rtn[k] = rval;
-    }
-    return rtn;
-}
-
 function hasHtmlRR(rra : any[]) : boolean {
     if (rra == null) {
         return false;
@@ -1424,5 +1250,5 @@ function hasHtmlRR(rra : any[]) : boolean {
     return false;
 }
 
-export {HibikiState, DataEnvironment, getAttributes, getAttribute, getStyleMap, HibikiExtState};
+export {HibikiState, DataEnvironment, HibikiExtState};
 export type {EHandlerType};
