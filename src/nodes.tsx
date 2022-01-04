@@ -18,7 +18,7 @@ import type {HibikiNode, ComponentType, LibraryType, HibikiExtState, LibComponen
 import {DBCtx} from "./dbctx";
 import * as DataCtx from "./datactx";
 import {HibikiState, DataEnvironment} from "./state";
-import {valToString, valToInt, valToFloat, resolveNumber, isObject, textContent, SYM_PROXY, SYM_FLATTEN, jseval, nodeStr, getHibiki, addToArrayDupCheck, removeFromArray, valInArray, blobPrintStr, subMapKey} from "./utils";
+import {valToString, valToInt, valToFloat, resolveNumber, isObject, textContent, SYM_PROXY, SYM_FLATTEN, jseval, nodeStr, getHibiki, addToArrayDupCheck, removeFromArray, valInArray, blobPrintStr, subMapKey, unbox} from "./utils";
 import {parseHtml} from "./html-parser";
 import * as NodeUtils from "./nodeutils";
 import {RtContext, HibikiError} from "./error";
@@ -688,7 +688,6 @@ class CustomNode extends React.Component<HibikiReactProps & {component : Compone
         let rawImplAttrs : Record<string, NodeAttrType> = implNode.attrs || {};
         let nodeVar = NodeUtils.makeNodeVar(ctx);
         let childrenVar = NodeUtils.makeChildrenVar(ctx.dataenv, ctx.node);
-        let argDecls = NodeUtils.parseArgsDecl(DataCtx.rawAttrStr(rawImplAttrs.args));
         let componentName = DataCtx.rawAttrStr(rawImplAttrs.name);
         let ctxHandlers = NodeUtils.makeHandlers(ctx.node);
         let eventCtx = sprintf("%s", nodeStr(ctx.node));
@@ -697,11 +696,11 @@ class CustomNode extends React.Component<HibikiReactProps & {component : Compone
         let specials : Record<string, any> = {};
         specials.children = childrenVar;
         specials.node = nodeVar;
-        let resolvedAttrs = {};
+        let resolvedAttrs = ctx.resolveLValueAttrs();
         let handlers = NodeUtils.makeHandlers(implNode, ["event"]);
-        let crootProxy = componentRootProxy(nodeDataLV, resolvedAttrs);
         let envOpts = {
-            componentRoot: crootProxy,
+            componentRoot: unbox(ctx.getNodeData(componentName)),
+            argsRoot: resolvedAttrs,
             handlers: handlers,
             htmlContext: sprintf("<define-component %s>", componentName),
             libContext: component.libName,
@@ -714,12 +713,6 @@ class CustomNode extends React.Component<HibikiReactProps & {component : Compone
             }
             catch (e) {
                 console.log(sprintf("ERROR parsing/executing 'defaults' in <define-component %s>", componentName), e);
-            }
-        }
-        for (let key in argDecls) {
-            let resolvedAttr = ctx.resolveAttrData(key, argDecls[key]);
-            if (resolvedAttr != null) {
-                resolvedAttrs[key] = resolvedAttr;
             }
         }
         return childEnv;
@@ -755,63 +748,6 @@ class CustomNode extends React.Component<HibikiReactProps & {component : Compone
             return <React.Fragment>{rtnElems}</React.Fragment>
         }
     }
-}
-
-function argsProxy() {
-    let traps = {
-        get: (obj : any, prop : string | symbol) : any => {
-            return null;
-        },
-        set: (obj : any, prop : string, value : any) : boolean => {
-            return true;
-        },
-    };
-    return new Proxy({}, traps);
-}
-
-function componentRootProxy(nodeDataLV : DataCtx.ObjectLValue, resolvedAttrs : {[e : string] : any}) : {[e : string] : any} {
-    let traps = {
-        get: (obj : any, prop : string | symbol) : any => {
-            if (prop == null) {
-                return null;
-            }
-            if (prop == SYM_PROXY) {
-                return true;
-            }
-            if (prop == SYM_FLATTEN) {
-                let rtn = {};
-                Object.assign(rtn, nodeDataLV.root.get());
-                Object.assign(rtn, resolvedAttrs);
-                return rtn;
-            }
-            if (prop in resolvedAttrs) {
-                return resolvedAttrs[prop.toString()];
-            }
-            return nodeDataLV.subMapKey(prop.toString()).get();
-        },
-        set: (obj : any, prop : string, value : any) : boolean => {
-            if (prop == null) {
-                return true;
-            }
-            if (prop in resolvedAttrs) {
-                let lv = resolvedAttrs[prop];
-                if (lv instanceof DataCtx.LValue) {
-                    if (lv == value) {
-                        return true;
-                    }
-                    lv.set(value);
-                    return true;
-                }
-                else {
-                    console.log(sprintf("Cannot set component-data '%s', read-only attribute was passed", prop));
-                    return true;
-                }
-            }
-            nodeDataLV.subMapKey(prop).set(value);
-            return true;
-        },
-    };
-    return new Proxy({}, traps);
 }
 
 @mobxReact.observer

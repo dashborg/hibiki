@@ -5,9 +5,9 @@ import md5 from "md5";
 import {sprintf} from "sprintf-js";
 import {boundMethod} from 'autobind-decorator'
 import {v4 as uuidv4} from 'uuid';
-import type {HibikiNode, ComponentType, LibraryType, HibikiConfig, HibikiHandlerModule, HibikiAction, EventType, HandlerValType, JSFuncType, CsrfHookFn, FetchHookFn, Hibiki, ErrorCallbackFn, HtmlParserOpts, HandlerBlock, NodeAttrType, HibikiVal} from "./types";
+import type {HibikiNode, ComponentType, LibraryType, HibikiConfig, HibikiHandlerModule, HibikiAction, EventType, HandlerValType, JSFuncType, CsrfHookFn, FetchHookFn, Hibiki, ErrorCallbackFn, HtmlParserOpts, HandlerBlock, NodeAttrType, HibikiVal, HibikiValObj} from "./types";
 import * as DataCtx from "./datactx";
-import {isObject, textContent, SYM_PROXY, SYM_FLATTEN, nodeStr, callHook, getHibiki, parseHandler, fullPath, parseUrlParams, smartDecodeParams, blobPrintStr} from "./utils";
+import {isObject, textContent, SYM_PROXY, SYM_FLATTEN, nodeStr, callHook, getHibiki, parseHandler, fullPath, parseUrlParams, smartDecodeParams, blobPrintStr, unbox} from "./utils";
 import {subNodesByTag, firstSubNodeByTag} from "./nodeutils";
 import {RtContext, HibikiError} from "./error";
 import {HibikiRequest} from "./request";
@@ -31,13 +31,6 @@ function eventBubbles(event : string) : boolean {
         return false;
     }
     return true;
-}
-
-function unbox(data : any) : any {
-    if (mobx.isBoxedObservable(data)) {
-        return data.get();
-    }
-    return data;
 }
 
 function createDepPromise(libName : string, srcUrl : string, state : HibikiState, libNode : HibikiNode) : [Promise<any>, string[]] {
@@ -109,7 +102,8 @@ function createDepPromise(libName : string, srcUrl : string, state : HibikiState
 }
 
 type DataEnvironmentOpts = {
-    componentRoot? : {[e : string] : any},
+    componentRoot? : HibikiVal,
+    argsRoot? : Record<string, HibikiVal | DataCtx.LValue>,
     description? : string,
     handlers? : Record<string, HandlerValType>,
     htmlContext? : string,
@@ -123,7 +117,8 @@ class DataEnvironment {
     dbstate : HibikiState;
     specials : Record<string, any>;
     handlers : Record<string, HandlerValType>;
-    componentRoot : Record<string, any>;
+    componentRoot : HibikiVal;
+    argsRoot? : Record<string, HibikiVal | DataCtx.LValue>;
     htmlContext : string;
     libContext : string;
     description : string;
@@ -141,6 +136,7 @@ class DataEnvironment {
         this.blockLocalData = false;
         if (opts != null) {
             this.componentRoot = opts.componentRoot;
+            this.argsRoot = opts.argsRoot;
             this.description = opts.description;
             this.handlers = opts.handlers || {};
             this.htmlContext = opts.htmlContext;
@@ -194,7 +190,7 @@ class DataEnvironment {
         return rtn;
     }
 
-    resolveRoot(rootName : string, opts?: {caret? : number}) : any {
+    resolveRoot(rootName : string, opts?: {caret? : number}) : HibikiVal | Record<string, HibikiVal | DataCtx.LValue> {
         opts = opts || {};
         if (opts.caret != null && opts.caret < 0 || opts.caret > 1) {
             throw new Error("Invalid caret value, must be 0 or 1");
@@ -209,7 +205,8 @@ class DataEnvironment {
             return null;
         }
         if (rootName == "nodedata") {
-            return this.dbstate.NodeDataMap;
+            // this is Map<string, IObservableValue<HibikiVal>>, not quite compatible, but works for read-only
+            return (this.dbstate.NodeDataMap as any);
         }
         if (rootName == "context") {
             let ref : DataEnvironment = this;
@@ -240,6 +237,9 @@ class DataEnvironment {
         }
         if (rootName == "c" || rootName == "component") {
             return this.getComponentRoot();
+        }
+        if (rootName == "args") {
+            return this.getArgsRoot();
         }
         else {
             if (rootName in this.dbstate.DataRoots) {
@@ -373,7 +373,7 @@ class DataEnvironment {
         return lv;
     }
 
-    getComponentRoot() : {[e : string] : any} {
+    getComponentRoot() : HibikiVal {
         if (this.componentRoot != null) {
             return this.componentRoot;
         }
@@ -381,6 +381,16 @@ class DataEnvironment {
             return null;
         }
         return this.parent.getComponentRoot();
+    }
+
+    getArgsRoot() : Record<string, HibikiVal | DataCtx.LValue> {
+        if (this.argsRoot != null) {
+            return this.argsRoot;
+        }
+        if (this.parent == null) {
+            return null;
+        }
+        return this.parent.getArgsRoot();
     }
 
     getContextStack() : any[] {
@@ -804,7 +814,7 @@ class HibikiState {
     NodeUuidMap : Map<string, DBCtx> = new Map();
     
     Modules : Record<string, HibikiHandlerModule> = {};
-    DataRoots : Record<string, mobx.IObservableValue<any>>;
+    DataRoots : Record<string, mobx.IObservableValue<HibikiValObj>>;
 
     constructor() {
         this.DataRoots = {};

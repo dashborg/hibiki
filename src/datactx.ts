@@ -263,6 +263,33 @@ function resolveValAttrs(node : HibikiNode, dataenv : DataEnvironment) : Record<
     return rtn;
 }
 
+function resolveLValueAttrs(node : HibikiNode, dataenv : DataEnvironment) : Record<string, (HibikiVal | LValue)> {
+    if (node.attrs == null) {
+        return {};
+    }
+    let rtn = {};
+    if (node.bindings != null) {
+        for (let key in node.bindings) {
+            let lvalue = resolveLValueAttr(node, key, dataenv);
+            if (lvalue != null) {
+                rtn[key] = lvalue;
+            }
+        }
+    }
+    if (node.attrs != null) {
+        for (let key in node.attrs) {
+            if (key in rtn) {
+                continue;
+            }
+            let [val, exists] = getAttributeValPair(node, key, dataenv);
+            if (exists) {
+                rtn[key] = val;
+            }
+        }
+    }
+    return rtn;
+}
+
 function resolveStrAttrs(node : HibikiNode, dataenv : DataEnvironment) : Record<string, string> {
     let vals = resolveValAttrs(node, dataenv);
     let rtn : Record<string, string> = {};
@@ -816,12 +843,17 @@ function setPathWrapper(op : string, path : PathType, dataenv : DataEnvironment,
         internalSetPath(dataenv, op, path, irData, setData, 1);
         return;
     }
+    else if (rootpp.pathkey == "args") {
+        let irData = dataenv.resolveRoot("args");
+        internalSetPath(dataenv, op, path, irData, setData, 1);
+        return;
+    }
     else {
         if (allowContext) {
-            throw new Error(sprintf("Cannot SetPath except $data ($), $state, $c, or $context (@) roots, path=%s", StringPath(path)));
+            throw new Error(sprintf("Cannot SetPath except $data ($), $state, $args, $c, or $context (@) roots, path=%s", StringPath(path)));
         }
         else {
-            throw new Error(sprintf("Cannot SetPath except $data ($), $state, roots, path=%s", StringPath(path)));
+            throw new Error(sprintf("Cannot SetPath except $data ($), $state, $args, or $c, path=%s", StringPath(path)));
         }
     }
     
@@ -1026,7 +1058,8 @@ function MapReplacer(key : string, value : any) : any {
         return blobPrintStr(this[key]);
     }
     else if (this[key] instanceof LValue) {
-        return this[key].get();
+        let rtn = this[key].get();
+        return demobx(rtn);
     }
     else if (this[key] instanceof DataEnvironment) {
         return "[DataEnvironment]";
@@ -2021,6 +2054,6 @@ function convertSimpleType(typeName : string, value : string, defaultValue : Hib
     return value;
 }
 
-export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, ParseLValuePath, ParseLValuePathThrow, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, evalActionStr, makeIteratorFromExpr, rawAttrStr, resolveStrAttrs, resolveValAttrs, getStyleMap, getAttributeStr, getAttributeValPair, valToStr, exValToVal, resolveLValueAttr};
+export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, ParseLValuePath, ParseLValuePathThrow, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, evalActionStr, makeIteratorFromExpr, rawAttrStr, resolveStrAttrs, resolveValAttrs, getStyleMap, getAttributeStr, getAttributeValPair, valToStr, exValToVal, resolveLValueAttr, resolveLValueAttrs};
 
 export type {PathType, HAction, HExpr, HIteratorExpr};

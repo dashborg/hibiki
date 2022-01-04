@@ -316,6 +316,10 @@ class DBCtx {
         return DataCtx.resolveLValueAttr(this.node, dataName, this.dataenv);
     }
 
+    resolveLValueAttrs() : Record<string, (HibikiVal | DataCtx.LValue)> {
+        return DataCtx.resolveLValueAttrs(this.node, this.dataenv);
+    }
+
     resolveAttrData(dataName : string, writeable : boolean) : DataCtx.LValue {
         let lvrtn = this.resolveLValueAttr(dataName);
         if (lvrtn != null) {
@@ -338,6 +342,16 @@ class DBCtx {
     unregisterUuid() {
         this.dataenv.dbstate.NodeUuidMap.delete(this.uuid);
         this.dataenv.dbstate.NodeDataMap.delete(this.uuid);
+    }
+
+    getNodeData(compName : string) : mobx.IObservableValue<HibikiVal> {
+        let box = this.dataenv.dbstate.NodeDataMap.get(this.uuid);
+        if (box == null) {
+            let uuidName = "id_" + this.uuid.replace(/-/g, "_");
+            box = mobx.observable.box({_hibiki: {"customtag": compName, uuid: this.uuid}}, {name: uuidName});
+            this.dataenv.dbstate.NodeDataMap.set(this.uuid, box);
+        }
+        return box;
     }
 
     getNodeDataLV(compName : string) : DataCtx.ObjectLValue {
