@@ -97,7 +97,7 @@ class HibikiRootNode extends React.Component<{hibikiState : HibikiExtState}, {}>
             rootClasses += "rootdiv dashelem col";
         }
         let cnMap = ctx.resolveCnMap("class", rootClasses);
-        let style = ctx.resolveStyleMap("style");
+        let style = ctx.resolveStyleMap();
         this.renderingDBState = ctx.dataenv.dbstate;
         return (
             <div style={style} className={cn(cnMap)}>
@@ -645,7 +645,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
             }
         }
 
-        let style = ctx.resolveStyleMap("style");
+        let style = ctx.resolveStyleMap();
         let cnMap = ctx.resolveCnMap("class");
         if (Object.keys(style).length > 0) {
             elemProps["style"] = style;
@@ -661,7 +661,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
     }
 
     doAutomerge(ctx : DBCtx, attrs : Record<string, HibikiVal>, elemProps : Record<string, any>) {
-        let style = ctx.resolveStyleMap("style");
+        let style = ctx.resolveStyleMap();
         let cnMap = ctx.resolveCnMap("class");
         let automergeAttrs = {
             style: style,
@@ -824,7 +824,7 @@ class DateFormatNode extends React.Component<HibikiReactProps, {}> {
         let bindVal = DataCtx.demobx(ctx.resolveAttrVal("bind"));
         let modeAttr = ctx.resolveAttrStr("mode");
         let nulltext = ctx.resolveAttrStr("nulltext");
-        let style = ctx.resolveStyleMap("style");
+        let style = ctx.resolveStyleMap();
         if (typeof(bindVal) == "string" && modeAttr == "parse") {
             try {
                 bindVal = parseFloat(dayjs(bindVal).format("x"));
@@ -1402,7 +1402,7 @@ class DashElemNode extends React.Component<{ctx : DBCtx, extClass? : string, ext
     render() {
         let ctx = this.props.ctx;
         let cnMap = ctx.resolveCnMap("class", this.props.extClass);
-        let style = ctx.resolveStyleMap("style", this.props.extStyle);
+        let style = ctx.resolveStyleMap(this.props.extStyle);
         return (
             <div className={cn(cnMap, "dashelem")} style={style}>
                 {this.props.children}

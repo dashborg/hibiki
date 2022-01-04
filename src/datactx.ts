@@ -81,15 +81,22 @@ function rawAttrStr(attr : NodeAttrType) : string {
     return attr.sourcestr;
 }
 
-function getStyleMap(node : HibikiNode, styleName : string, dataenv : DataEnvironment, initStyles? : any) : any {
-    let rtn = initStyles || {};
+function getNonAmStyleMap(node : HibikiNode, ns : string, dataenv : DataEnvironment, initStyles? : any) : Record<string, string> {
+    let rtn = initStyles ?? {};
     let styleMap : Record<string, NodeAttrType> = null;
-    if (styleName == "style") {
+    let styleAttr : string = null;
+    if (ns === "self") {
         styleMap = node.style;
-    } else {
-        if (node.morestyles != null) {
-            styleMap = node.morestyles[styleName];
+        styleAttr = "style";
+    }
+    else if (node.morestyles != null) {
+        if (ns === "root") {
+            styleAttr = ":style";
         }
+        else {
+            styleAttr = ns + ":style";
+        }
+        styleMap = node.morestyles[styleAttr];
     }
     if (styleMap == null) {
         return rtn;
@@ -97,7 +104,7 @@ function getStyleMap(node : HibikiNode, styleName : string, dataenv : DataEnviro
     for (let [k,v] of Object.entries(styleMap)) {
         let opts = {
             style: true,
-            rtContext: sprintf("resolving style property '%s' in attribute '%s' in <%s>", k, styleName, node.tag),
+            rtContext: sprintf("resolving style property '%s' in attribute '%s' in %s", k, styleAttr, nodeStr(node)),
         };
         let rval = resolveAttrStr(k, v, dataenv, opts);
         if (rval == null) {
@@ -118,6 +125,39 @@ function getStyleMap(node : HibikiNode, styleName : string, dataenv : DataEnviro
         }
         rtn[k] = rval;
     }
+    return rtn;
+}
+
+function getStyleMap(node : HibikiNode, ns : string, dataenv : DataEnvironment, initStyles? : any) : Record<string, any> {
+    ns = ns ?? "self";
+    let am = checkSingleAutoMerge(node, "style", ns);
+
+    // check includeForce automerge
+    if (am[1].length > 0) {
+        let [amStyles, exists] = resolveAutoMergePair(am[1], "@style", dataenv);
+        if (exists) {
+            if (!isObject(amStyles)) {
+                return null;
+            }
+            return amStyles as Record<string, any>;
+        }
+    }
+
+    // get base node style (includes initStyles)
+    let rtn = getNonAmStyleMap(node, ns, dataenv, initStyles);
+
+    // check include automerge
+    if (am[0].length > 0) {
+        let [amStyles, exists] = resolveAutoMergePair(am[0], "@style", dataenv);
+        if (exists && amStyles != null && isObject(amStyles)) {
+            let amStyleMap = amStyles as Record<string, any>;
+            // automerge styles will always merge. overwrites existing entries in styleMap
+            for (let styleKey in amStyleMap) {
+                rtn[styleKey] = amStyleMap[styleKey];
+            }
+        }
+    }
+    
     return rtn;
 }
 
@@ -238,7 +278,7 @@ const NON_ARGS_ATTRS = {
 };
 
 // returns [includeSources[], includeForceSources[]]
-function checkSingleAutoMerge(node : HibikiNode, attrName : string) : [string[], string[]] {
+function checkSingleAutoMerge(node : HibikiNode, attrName : string, ns : string) : [string[], string[]] {
     if (node.automerge == null || NON_ARGS_ATTRS[attrName]) {
         return [[], []];
     }
@@ -246,7 +286,7 @@ function checkSingleAutoMerge(node : HibikiNode, attrName : string) : [string[],
     let rtn : [string[], string[]] = [[], []];
     for (let i=0; i<node.automerge.length; i++) {
         let amExpr = node.automerge[i];
-        if (amExpr.dest !== "self") {
+        if (amExpr.dest !== ns) {
             continue;
         }
         let include = false;
@@ -298,7 +338,7 @@ function getAttributeValPair(node : HibikiNode, attrName : string, dataenv : Dat
     }
 
     // check forceInclude automerge
-    let am = checkSingleAutoMerge(node, attrName);
+    let am = checkSingleAutoMerge(node, attrName, "self");
     if (am[1].length > 0) {
         let [amVal, exists] = resolveAutoMergePair(am[1], attrName, dataenv);
         if (exists) {
@@ -449,7 +489,8 @@ function resolveArgsRoot(node : HibikiNode, dataenv : DataEnvironment) : Record<
     }
     if (node.morestyles != null) {
         for (let key in node.morestyles) {
-            let styleMap = getStyleMap(node, key, dataenv);
+            let styleNs = key.replace(":style", "");
+            let styleMap = getStyleMap(node, styleNs, dataenv);
             let styleName = key.replace(":style", ":@style");
             _assignToArgsRoot(rtn, styleName, styleMap, true);
         }

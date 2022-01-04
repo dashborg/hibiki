@@ -165,7 +165,7 @@ function renderTextSpan(text : string, style : any) : any {
 
 function renderTextData(node : HibikiNode, dataenv : DataEnvironment, onlyText? : boolean) : any {
     let ctx = new DBCtx(null, node, dataenv);
-    let style = ctx.resolveStyleMap("style");
+    let style = ctx.resolveStyleMap();
     let bindVal = DataCtx.demobx(ctx.resolveAttrVal("bind"));
     let rtn : string = null;
     let nullTextAttr : string = null;
@@ -218,17 +218,6 @@ function makeNodeVar(ctx : DBCtx) : any {
     for (let cnAttr in classAttrs) {
         rtn.cnmap[cnAttr] = ctx.resolveCnMap(cnAttr);
     }
-
-    // styles
-    if (node.style != null) {
-        rtn.stylemap["style"] = ctx.resolveStyleMap("style");
-    }
-    if (node.morestyles != null) {
-        for (let sn in node.morestyles) {
-            rtn.stylemap[sn] = ctx.resolveStyleMap(sn);
-        }
-    }
-    
     return rtn;
 }
 

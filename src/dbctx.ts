@@ -230,8 +230,12 @@ class DBCtx {
         return false;
     }
 
-    resolveStyleMap(styleAttr : string, initStyles? : any) : any {
-        return DataCtx.getStyleMap(this.node, styleAttr, this.dataenv, initStyles);
+    resolveNsStyleMap(ns : string, initStyles? : any) : any {
+        return DataCtx.getStyleMap(this.node, ns, this.dataenv, initStyles);
+    }
+
+    resolveStyleMap(initStyles? : Record<string, any>) : any {
+        return DataCtx.getStyleMap(this.node, "self", this.dataenv, initStyles);
     }
 
     resolveCnMap(classAttr : string, moreClasses? : string) {
