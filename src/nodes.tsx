@@ -696,11 +696,11 @@ class CustomNode extends React.Component<HibikiReactProps & {component : Compone
         let specials : Record<string, any> = {};
         specials.children = childrenVar;
         specials.node = nodeVar;
-        let resolvedAttrs = ctx.resolveLValueAttrs();
+        let argsRoot = ctx.resolveArgsRoot();
         let handlers = NodeUtils.makeHandlers(implNode, ["event"]);
         let envOpts = {
             componentRoot: unbox(ctx.getNodeData(componentName)),
-            argsRoot: resolvedAttrs,
+            argsRoot: argsRoot,
             handlers: handlers,
             htmlContext: sprintf("<define-component %s>", componentName),
             libContext: component.libName,

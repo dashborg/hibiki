@@ -25,7 +25,7 @@ type ParseContext = {
 
 function parseSingleAutomerge(amVal : string) : AutoMergeExpr {
     if (amVal == "1") {
-        return {source: null, include: {"all": true}, exclude: {}};
+        return {source: "self", include: {"all": true}, exclude: {}};
     }
     let atPos = amVal.indexOf("@");
     if (atPos == -1) {
@@ -52,7 +52,7 @@ function parseAutoMerge(amAttr : string) : AutoMergeExpr[] {
         return null;
     }
     if (amAttr == "" || amAttr == "1") {
-        return [{source: null, include: {"all": true}, exclude: {}}];
+        return [{source: "self", include: {"all": true}, exclude: {}}];
     }
     let amVals = amAttr.split(",");
     let rtn : AutoMergeExpr[] = [];

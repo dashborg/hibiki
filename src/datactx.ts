@@ -275,21 +275,57 @@ function resolveValAttrs(node : HibikiNode, dataenv : DataEnvironment) : Record<
     return rtn;
 }
 
-function resolveArgsRoot(node : HibikiNode, dataenv : DataEnvironment) : Record<string, HibikiValEx> {
-    return null;
+function _assignToArgsRoot(argsRoot : Record<string, HibikiValEx>, key : string, val : HibikiValEx, addToNs : boolean) {
+    argsRoot[key] = val;
+    if (val instanceof LValue) {
+        if (argsRoot["@bound"] == null) {
+            argsRoot["@bound"] = {};
+        }
+        argsRoot["@bound"][key] = true;
+    }
+    if (!addToNs) {
+        return false;
+    }
+    let colonIdx = key.indexOf(":");
+    if (colonIdx === -1) {
+        if (argsRoot["@ns"]["self"] == null) {
+            argsRoot["@ns"]["self"] = {};
+        }
+        _assignToArgsRoot(argsRoot["@ns"]["self"], key, val, false);
+    }
+    else if (colonIdx === 0) {
+        if (key.length === 1) {
+            return;
+        }
+        if (argsRoot["@ns"]["root"] == null) {
+            argsRoot["@ns"]["root"] = {};
+        }
+        _assignToArgsRoot(argsRoot["@ns"]["root"], key.substr(1), val, false);
+    }
+    else {
+        let fields = key.split(":", 2);
+        let ns = fields[0];
+        let nskey = fields[1];
+        if (nskey === "") {
+            return;
+        }
+        if (argsRoot["@ns"][ns] == null) {
+            argsRoot["@ns"][ns] = {};
+        }
+        _assignToArgsRoot(argsRoot["@ns"][ns], nskey, val, false);
+    }
 }
 
-function resolveLValueAttrs(node : HibikiNode, dataenv : DataEnvironment) : Record<string, HibikiValEx> {
+function resolveArgsRoot(node : HibikiNode, dataenv : DataEnvironment) : Record<string, HibikiValEx> {
     if (node.attrs == null) {
         return {};
     }
-    let rtn = {"@bound": {}};
+    let rtn = {"@bound": {}, "@ns": {}};
     if (node.bindings != null) {
         for (let key in node.bindings) {
             let lvalue = resolveLValueAttr(node, key, dataenv);
             if (lvalue != null) {
-                rtn[key] = lvalue;
-                rtn["@bound"][key] = true;
+                _assignToArgsRoot(rtn, key, lvalue, true);
             }
         }
     }
@@ -300,7 +336,7 @@ function resolveLValueAttrs(node : HibikiNode, dataenv : DataEnvironment) : Reco
             }
             let [val, exists] = getAttributeValPair(node, key, dataenv);
             if (exists) {
-                rtn[key] = val;
+                _assignToArgsRoot(rtn, key, val, true);
             }
         }
     }
@@ -2121,6 +2157,6 @@ function convertSimpleType(typeName : string, value : string, defaultValue : Hib
     return value;
 }
 
-export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, evalActionStr, makeIteratorFromExpr, rawAttrStr, resolveStrAttrs, resolveValAttrs, getStyleMap, getAttributeStr, getAttributeValPair, valToStr, exValToVal, resolveLValueAttr, resolveLValueAttrs, SYM_NOATTR};
+export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, evalActionStr, makeIteratorFromExpr, rawAttrStr, resolveStrAttrs, resolveValAttrs, getStyleMap, getAttributeStr, getAttributeValPair, valToStr, exValToVal, resolveLValueAttr, resolveArgsRoot, SYM_NOATTR};
 
 export type {PathType, HAction, HExpr, HIteratorExpr};

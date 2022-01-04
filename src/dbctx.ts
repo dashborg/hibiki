@@ -319,8 +319,8 @@ class DBCtx {
         return DataCtx.resolveLValueAttr(this.node, dataName, this.dataenv);
     }
 
-    resolveLValueAttrs() : Record<string, HibikiValEx> {
-        return DataCtx.resolveLValueAttrs(this.node, this.dataenv);
+    resolveArgsRoot() : Record<string, HibikiValEx> {
+        return DataCtx.resolveArgsRoot(this.node, this.dataenv);
     }
 
     resolveAttrData(dataName : string, writeable : boolean) : DataCtx.LValue {
