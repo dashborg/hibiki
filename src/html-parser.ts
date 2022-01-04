@@ -147,6 +147,7 @@ class HtmlParser {
                 let tval = part.text.trim();
                 let node : HibikiNode = {tag: "h-text", attrs: {}};
                 this.parseStandardAttr(node, {name: "bind", value: tval}, pctx);
+                this.parseStandardAttr(node, {name: "inline", value: "1"}, pctx);
                 return node;
             }
         });
@@ -204,7 +205,6 @@ class HtmlParser {
         if (value.trim() == "") {
             return true;
         }
-        node.attrs[name] = value;
         try {
             let path : HExpr = doParse(value, "ext_fullPathExpr");
             path.sourcestr = value;
@@ -216,7 +216,6 @@ class HtmlParser {
         catch (e) {
             console.log(sprintf("ERROR evaluating '%s' in <%s>\n\"%s\"\n", name, node.tag, attr.value), e.toString());
         }
-        node.attrs[name] = value;
         return true;
     }
 

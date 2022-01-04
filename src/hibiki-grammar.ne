@@ -495,7 +495,9 @@ pathPartAny ->
 
 pathPartBareMap -> idOrKeyword {% (data) => ({pathtype: "map", pathkey: data[0].value}) %}
 
-pathPartDot -> %DOT idOrKeyword {% (data) => ({pathtype: "map", pathkey: data[1].value}) %}
+pathPartDot ->
+      %DOT idOrKeyword {% (data) => ({pathtype: "map", pathkey: data[1].value}) %}
+    | %DOT %ATID       {% (data) => ({pathtype: "map", pathkey: "@" + data[1].value}) %}
 
 pathPartDyn ->
       pathPartDynSimple {% id %}

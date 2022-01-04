@@ -170,8 +170,12 @@ function renderTextData(node : HibikiNode, dataenv : DataEnvironment, onlyText? 
     let style = ctx.resolveStyleMap("style");
     let bindVal = DataCtx.demobx(ctx.resolveAttrVal("bind"));
     let rtn : string = null;
+    let nullTextAttr : string = null;
     if (bindVal == null) {
-        rtn = ctx.resolveAttrStr("nulltext");
+        nullTextAttr = ctx.resolveAttrStr("nulltext");
+    }
+    if (bindVal == null && nullTextAttr != null) {
+        rtn = nullTextAttr;
     }
     else {
         rtn = DataCtx.formatVal(bindVal, ctx.resolveAttrStr("format"));

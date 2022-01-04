@@ -825,10 +825,10 @@ class DateFormatNode extends React.Component<HibikiReactProps, {}> {
             bindVal = parseFloat(bindVal);
         }
         if (bindVal == null) {
-            return NodeUtils.renderTextSpan(nulltext || "null", style);
+            return NodeUtils.renderTextSpan(nulltext ?? "null", style);
         }
         if (bindVal == 0 && !durationAttr) {
-            return NodeUtils.renderTextSpan(nulltext || "null", style);
+            return NodeUtils.renderTextSpan(nulltext ?? "null", style);
         }
         if (typeof(bindVal) != "number" || isNaN(bindVal)) {
             return NodeUtils.renderTextSpan("invalid", style);

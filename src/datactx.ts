@@ -180,7 +180,7 @@ function resolveAttrValPair(k : string, v : NodeAttrType, dataenv : DataEnvironm
     catch (e) {
         let rtContext = opts.rtContext ?? "resolving attribute '%s'";
         console.log(sprintf("ERROR %s expression\n\"%s\"\n", rtContext, k, v.sourcestr), e.toString());
-        return null;
+        return [null, true];
     }
     if (resolvedVal instanceof LValue) {
         resolvedVal = resolvedVal.getEx();
@@ -281,12 +281,13 @@ function resolveLValueAttrs(node : HibikiNode, dataenv : DataEnvironment) : Reco
     if (node.attrs == null) {
         return {};
     }
-    let rtn = {};
+    let rtn = {"@bound": {}};
     if (node.bindings != null) {
         for (let key in node.bindings) {
             let lvalue = resolveLValueAttr(node, key, dataenv);
             if (lvalue != null) {
                 rtn[key] = lvalue;
+                rtn["@bound"][key] = true;
             }
         }
     }
@@ -768,7 +769,7 @@ function internalResolvePath(path : PathType, irData : any, dataenv : DataEnviro
         if ((irData instanceof Map) || mobx.isObservableMap(irData)) {
             return internalResolvePath(path, irData.get(pp.pathkey), dataenv, level+1);
         }
-        if (path[0].pathtype == "root" && path[0].pathkey == "args" && !(pp.pathkey in irData)) {
+        if (level == 1 && path[0].pathtype == "root" && path[0].pathkey == "args" && !(pp.pathkey in irData)) {
             // special case, NOATTR for undefined values off $args root
             return SYM_NOATTR;
         }
@@ -1115,6 +1116,12 @@ function MapReplacer(key : string, value : any) : any {
     }
     else if (this[key] instanceof HibikiRequest) {
         return "[HibikiRequest]";
+    }
+    else if (this[key] == SYM_NOATTR) {
+        return null;
+    }
+    else if (typeof(this[key]) == "symbol" || this[key] instanceof Symbol) {
+        return this[key].toString();
     }
     else {
         return value;

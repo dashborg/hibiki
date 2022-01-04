@@ -444,6 +444,7 @@ var grammar = {
     {"name": "pathPartAny", "symbols": ["pathPartDyn"], "postprocess": id},
     {"name": "pathPartBareMap", "symbols": ["idOrKeyword"], "postprocess": (data) => ({pathtype: "map", pathkey: data[0].value})},
     {"name": "pathPartDot", "symbols": [(lexer.has("DOT") ? {type: "DOT"} : DOT), "idOrKeyword"], "postprocess": (data) => ({pathtype: "map", pathkey: data[1].value})},
+    {"name": "pathPartDot", "symbols": [(lexer.has("DOT") ? {type: "DOT"} : DOT), (lexer.has("ATID") ? {type: "ATID"} : ATID)], "postprocess": (data) => ({pathtype: "map", pathkey: "@" + data[1].value})},
     {"name": "pathPartDyn", "symbols": ["pathPartDynSimple"], "postprocess": id},
     {"name": "pathPartDynSimple", "symbols": [(lexer.has("LBRACK") ? {type: "LBRACK"} : LBRACK), "fullExpr", (lexer.has("RBRACK") ? {type: "RBRACK"} : RBRACK)], "postprocess":  (data) => {
             let expr = data[1];
