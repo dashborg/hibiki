@@ -5,7 +5,7 @@ import md5 from "md5";
 import {sprintf} from "sprintf-js";
 import {boundMethod} from 'autobind-decorator'
 import {v4 as uuidv4} from 'uuid';
-import type {HibikiNode, ComponentType, LibraryType, HibikiConfig, HibikiHandlerModule, HibikiAction, EventType, HandlerValType, JSFuncType, CsrfHookFn, FetchHookFn, Hibiki, ErrorCallbackFn, HtmlParserOpts, HandlerBlock, NodeAttrType, HibikiVal, HibikiValObj} from "./types";
+import type {HibikiNode, ComponentType, LibraryType, HibikiConfig, HibikiHandlerModule, HibikiAction, EventType, HandlerValType, JSFuncType, CsrfHookFn, FetchHookFn, Hibiki, ErrorCallbackFn, HtmlParserOpts, HandlerBlock, NodeAttrType, HibikiVal, HibikiValEx} from "./types";
 import * as DataCtx from "./datactx";
 import {isObject, textContent, SYM_PROXY, SYM_FLATTEN, nodeStr, callHook, getHibiki, parseHandler, fullPath, parseUrlParams, smartDecodeParams, blobPrintStr, unbox} from "./utils";
 import {subNodesByTag, firstSubNodeByTag} from "./nodeutils";
@@ -103,7 +103,7 @@ function createDepPromise(libName : string, srcUrl : string, state : HibikiState
 
 type DataEnvironmentOpts = {
     componentRoot? : HibikiVal,
-    argsRoot? : Record<string, HibikiVal | DataCtx.LValue>,
+    argsRoot? : Record<string, HibikiValEx>,
     description? : string,
     handlers? : Record<string, HandlerValType>,
     htmlContext? : string,
@@ -118,7 +118,7 @@ class DataEnvironment {
     specials : Record<string, any>;
     handlers : Record<string, HandlerValType>;
     componentRoot : HibikiVal;
-    argsRoot? : Record<string, HibikiVal | DataCtx.LValue>;
+    argsRoot? : Record<string, HibikiValEx>;
     htmlContext : string;
     libContext : string;
     description : string;
@@ -190,7 +190,7 @@ class DataEnvironment {
         return rtn;
     }
 
-    resolveRoot(rootName : string, opts?: {caret? : number}) : HibikiVal | Record<string, HibikiVal | DataCtx.LValue> {
+    resolveRoot(rootName : string, opts?: {caret? : number}) : HibikiVal | Record<string, HibikiValEx> {
         opts = opts || {};
         if (opts.caret != null && opts.caret < 0 || opts.caret > 1) {
             throw new Error("Invalid caret value, must be 0 or 1");
@@ -378,7 +378,7 @@ class DataEnvironment {
         return this.parent.getComponentRoot();
     }
 
-    getArgsRoot() : Record<string, HibikiVal | DataCtx.LValue> {
+    getArgsRoot() : Record<string, HibikiValEx> {
         if (this.argsRoot != null) {
             return this.argsRoot;
         }
@@ -812,7 +812,7 @@ class HibikiState {
     NodeUuidMap : Map<string, DBCtx> = new Map();
     
     Modules : Record<string, HibikiHandlerModule> = {};
-    DataRoots : Record<string, mobx.IObservableValue<HibikiValObj>>;
+    DataRoots : Record<string, mobx.IObservableValue<HibikiVal>>;
 
     constructor() {
         this.DataRoots = {};

@@ -7,7 +7,7 @@ import {sprintf} from "sprintf-js";
 import {parseHtml} from "./html-parser";
 import {RtContext, getShortEMsg, HibikiError} from "./error";
 import {makeUrlParamsFromObject, SYM_PROXY, SYM_FLATTEN, isObject, stripAtKeys, unpackPositionalArgs, nodeStr, parseHandler, fullPath, blobPrintStr, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP} from "./utils";
-import {PathPart, PathType, PathUnionType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue, HandlerBlock, NodeAttrType, HibikiVal, HibikiNode} from "./types";
+import {PathPart, PathType, PathUnionType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue, HandlerBlock, NodeAttrType, HibikiVal, HibikiNode, HibikiValEx} from "./types";
 import {HibikiRequest} from "./request";
 import type {EHandlerType} from "./state";
 import {doParse} from "./hibiki-parser";
@@ -20,8 +20,6 @@ const SYM_NOATTR = Symbol("noattr");
 type RtContextOpts = {
     rtContext? : string,
 };
-
-type HibikiValEx = HibikiVal | LValue | symbol;
 
 type HExpr = {
     etype    : string,
@@ -277,7 +275,11 @@ function resolveValAttrs(node : HibikiNode, dataenv : DataEnvironment) : Record<
     return rtn;
 }
 
-function resolveLValueAttrs(node : HibikiNode, dataenv : DataEnvironment) : Record<string, (HibikiVal | LValue)> {
+function resolveArgsRoot(node : HibikiNode, dataenv : DataEnvironment) : Record<string, HibikiValEx> {
+    return null;
+}
+
+function resolveLValueAttrs(node : HibikiNode, dataenv : DataEnvironment) : Record<string, HibikiValEx> {
     if (node.attrs == null) {
         return {};
     }
