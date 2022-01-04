@@ -83,7 +83,7 @@ function rawAttrStr(attr : NodeAttrType) : string {
 
 function getStyleMap(node : HibikiNode, styleName : string, dataenv : DataEnvironment, initStyles? : any) : any {
     let rtn = initStyles || {};
-    let styleMap : {[v : string] : string}= null;
+    let styleMap : Record<string, NodeAttrType> = null;
     if (styleName == "style") {
         styleMap = node.style;
     } else {
@@ -100,6 +100,7 @@ function getStyleMap(node : HibikiNode, styleName : string, dataenv : DataEnviro
             rtContext: sprintf("resolving style property '%s' in attribute '%s' in <%s>", k, styleName, node.tag),
         };
         let rval = resolveAttrStr(k, v, dataenv, opts);
+        console.log("resolveAttrStyle", k, v, rval);
         if (rval == null) {
             continue;
         }
@@ -276,7 +277,10 @@ function resolveValAttrs(node : HibikiNode, dataenv : DataEnvironment) : Record<
 }
 
 function _assignToArgsRoot(argsRoot : Record<string, HibikiValEx>, key : string, val : HibikiValEx, addToNs : boolean) {
-    argsRoot[key] = val;
+    let noAdd = (addToNs && key.endsWith("@style")) || key.endsWith(".handler");
+    if (!noAdd) {
+        argsRoot[key] = val;
+    }
     if (val instanceof LValue) {
         if (argsRoot["@bound"] == null) {
             argsRoot["@bound"] = {};
@@ -338,6 +342,16 @@ function resolveArgsRoot(node : HibikiNode, dataenv : DataEnvironment) : Record<
             if (exists) {
                 _assignToArgsRoot(rtn, key, val, true);
             }
+        }
+    }
+    if (node.style != null) {
+        _assignToArgsRoot(rtn, "@style", node.style, true);
+    }
+    if (node.morestyles != null) {
+        for (let key in node.morestyles) {
+            let styleMap = getStyleMap(node, key, dataenv);
+            let styleName = key.replace(":style", ":@style");
+            _assignToArgsRoot(rtn, styleName, styleMap, true);
         }
     }
     return rtn;

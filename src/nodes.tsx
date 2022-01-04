@@ -641,8 +641,18 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
                 }
             }
         }
+
+        let style = ctx.resolveStyleMap("style");
+        let cnMap = ctx.resolveCnMap("class");
+        if (Object.keys(style).length > 0) {
+            elemProps["style"] = style;
+        }
+        if (Object.keys(cnMap).length > 0) {
+            elemProps["className"] = cn(cnMap);
+        }
+        
         // automerge
-        this.doAutomerge(ctx, attrVals, elemProps);
+        // this.doAutomerge(ctx, attrVals, elemProps);
         let elemChildren = ctxRenderHtmlChildren(ctx);
         return React.createElement(tagName, elemProps, elemChildren);
     }

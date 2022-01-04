@@ -71,11 +71,9 @@ let SPECIAL_ATTRS = {
     "if": true,
     "foreach": true,
     "eid": true,
-    "disabled": true,
     "ref": true,
     "bind": true,
     "handler": true,
-    "blobsrc": true,
     "defaultvalue": true,
 };
 

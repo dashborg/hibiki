@@ -1,7 +1,7 @@
 // Copyright 2021 Dashborg Inc
 
 import camelCase from "camelcase";
-import type {HibikiNode, HtmlParserOpts, PathType, AutoMergeExpr} from "./types";
+import type {HibikiNode, HtmlParserOpts, PathType, AutoMergeExpr, AutoFireExpr, NodeAttrType} from "./types";
 import merge from "lodash/merge";
 import {sprintf} from "sprintf-js";
 import {doParse} from "./hibiki-parser";
@@ -76,6 +76,19 @@ function parseSingleAutomerge(amVal : string) : AutoMergeExpr {
     return rtn;
 }
 
+function parseSingleAutofire(amVal : string) : AutoFireExpr {
+    if (amVal === "1") {
+        return {source: "self", dest: "self", include: {"all": true}};
+    }
+    let [source, dest, parts] = splitAmVal(amVal);
+    let rtn : AutoFireExpr = {source: source, dest: dest, include: {}};
+    for (let i=0; i<parts.length; i++) {
+        let partStr = parts[i].toLowerCase();
+        rtn.include[partStr] = true;
+    }
+    return rtn;
+}
+
 function parseAutoMerge(amAttr : string) : AutoMergeExpr[] {
     if (amAttr == null) {
         return null;
@@ -88,6 +101,22 @@ function parseAutoMerge(amAttr : string) : AutoMergeExpr[] {
     for (let i=0; i<amVals.length; i++) {
         let amVal = amVals[i].trim();
         rtn.push(parseSingleAutomerge(amVal));
+    }
+    return rtn;
+}
+
+function parseAutoFire(amAttr : string) : AutoFireExpr[] {
+    if (amAttr == null) {
+        return null;
+    }
+    if (amAttr === "" || amAttr === "1") {
+        return [{source: "self", dest: "self", include: {"all": true}}];
+    }
+    let amVals = amAttr.split(",");
+    let rtn : AutoFireExpr[] = [];
+    for (let i=0; i<amVals.length; i++) {
+        let amVal = amVals[i].trim();
+        rtn.push(parseSingleAutofire(amVal));
     }
     return rtn;
 }
@@ -115,8 +144,8 @@ class HtmlParser {
         this.opts = opts ?? {};
     }
     
-    parseStyle(styleAttr : string) : Record<string, string> {
-        let rtn : Record<string, string> = {};
+    parseStyle(node : HibikiNode, styleAttrName : string, styleAttr : string, pctx : ParseContext) : Record<string, NodeAttrType> {
+        let rtn : Record<string, NodeAttrType> = {};
         if (styleAttr == null) {
             return rtn;
         }
@@ -150,7 +179,10 @@ class HtmlParser {
                 styleKey = styleKey[0].toUpperCase() + styleKey.substr(1);
             }
             styleVal = styleVal.trim();
-            rtn[styleKey] = styleVal;
+            let styleExpr = this.parseExpr(node, styleKey, styleVal, styleAttrName, pctx);
+            if (styleExpr != null) {
+                rtn[styleKey] = styleExpr;
+            }
         }
         return rtn;
     }
@@ -175,62 +207,52 @@ class HtmlParser {
             else {
                 let tval = part.text.trim();
                 let node : HibikiNode = {tag: "h-text", attrs: {}};
-                this.parseStandardAttr(node, {name: "bind", value: tval}, pctx);
-                this.parseStandardAttr(node, {name: "inline", value: "1"}, pctx);
+                this.parseStandardAttr(node, "bind", tval, pctx);
+                this.parseStandardAttr(node, "inline", "1", pctx);
                 return node;
             }
         });
         return parts;
     }
 
-    parseStyleAttr(node : HibikiNode, attr : Attr, pctx : ParseContext) : boolean {
-        let name = attr.name.toLowerCase();
+    parseStyleAttr(node : HibikiNode, name : string, value : string, pctx : ParseContext) : boolean {
         if (name === "style") {
-            node.attrs[name] = attr.value;
-            let styleMap = this.parseStyle(attr.value);
+            let styleMap = this.parseStyle(node, name, value, pctx);
             node.style = styleMap;
             return true;
         }
         else if (name.endsWith(":style")) {
             node.morestyles = node.morestyles || {};
-            node.morestyles[name] = this.parseStyle(attr.value);
-            return true;
-        }
-        else if (name.startsWith("style-")) {
-            node.morestyles = node.morestyles || {};
-            node.morestyles[name] = this.parseStyle(attr.value);
+            node.morestyles[name] = this.parseStyle(node, name, value, pctx);
             return true;
         }
         return false;
     }
 
-    parseHandlerAttr(node : HibikiNode, attr : Attr, pctx : ParseContext) : boolean {
-        let name = attr.name.toLowerCase();
+    parseHandlerAttr(node : HibikiNode, name : string, value : string, pctx : ParseContext) : boolean {
         if (!name.endsWith(".handler")) {
             return false;
         }
-        node.attrs[name] = attr.value;
+        node.attrs[name] = value;
         let handlerName = name.substr(0, name.length-8);
         if (node.handlers == null) {
             node.handlers = {};
         }
-        let blockStr = attr.value + ";";
+        let blockStr = value + ";";
         try {
             let block : HAction[] = doParse(blockStr, "ext_statementBlock");
             node.handlers[handlerName] = block;
         }
         catch (e) {
-            console.log(sprintf("ERROR evaluating '%s' in <%s>\n\"%s\"\n", name, node.tag, attr.value), e.toString());
+            console.log(sprintf("ERROR evaluating '%s' in <%s>\n\"%s\"\n", name, node.tag, value), e.toString());
         }
         return true;
     }
 
-    parseBindPathAttr(node : HibikiNode, attr : Attr, pctx : ParseContext) : boolean {
-        let name = attr.name.toLowerCase();
+    parseBindPathAttr(node : HibikiNode, name : string, value : string, pctx : ParseContext) : boolean {
         if (!name.endsWith(".bindpath")) {
             return false;
         }
-        let value = attr.value;
         if (value.trim() === "") {
             return true;
         }
@@ -243,46 +265,73 @@ class HtmlParser {
             node.bindings[name.substr(0, name.length-9)] = path;
         }
         catch (e) {
-            console.log(sprintf("ERROR evaluating '%s' in <%s>\n\"%s\"\n", name, node.tag, attr.value), e.toString());
+            console.log(sprintf("ERROR evaluating '%s' in <%s>\n\"%s\"\n", name, node.tag, value), e.toString());
         }
         return true;
     }
 
-    parseStandardAttr(node : HibikiNode, attr : {name : string, value : string}, pctx : ParseContext) {
-        let name = attr.name.toLowerCase();
-        let value = attr.value;
-        if (value === "" && name !== "value") {
-            value = "1";
-        }
-        let isParsed = PARSED_ATTRS[name];
+    parseExpr(node : HibikiNode, name : string, value : string, styleAttrName : string, pctx : ParseContext) : NodeAttrType {
+        let isParsed = (styleAttrName == null) && PARSED_ATTRS[name];
         if (!isParsed && (!value.startsWith("*") || value === "*" || value === "**")) {
-            node.attrs[name] = value;
-            return;
-        }
-        if (node.tag === "define-component" || node.tag === "define-handler" || node.tag === "import-library" || node.tag === "define-vars" || node.tag.startsWith("hibiki-")) {
-            node.attrs[name] = value;
-            return;
+            return value;
         }
         let exprStr = (isParsed ? value : value.substr(1).trim());
         try {
-            if (name === "foreach") {
-                let iterExprAst : HIteratorExpr = doParse(exprStr, "ext_iteratorExpr");
-                iterExprAst.sourcestr = value;
-                node.foreachAttr = iterExprAst;
-            }
-            else if (name === "automerge") {
-                node.automerge = parseAutoMerge(value);
-                console.log("AUTOMERGE", value, node.automerge);
-            }
-            else {
-                let exprAst : HExpr = doParse(exprStr, "ext_fullExpr");
-                exprAst.sourcestr = value;
-                node.attrs[name] = exprAst;
-            }
+            let exprAst : HExpr = doParse(exprStr, "ext_fullExpr");
+            exprAst.sourcestr = value;
+            return exprAst;
         }
         catch (e) {
-            console.log(sprintf("ERROR evaluating attribute '%s' in <%s>\n\"%s\"\n", name, node.tag, exprStr), e.toString());
+            if (styleAttrName != null) {
+                console.log(sprintf("ERROR evaluating style property '%s' in <%s>@%s\n\"%s\"\n", name, node.tag, styleAttrName, exprStr), e.toString());
+            }
+            else {
+                console.log(sprintf("ERROR evaluating attribute <%s>@%s\n\"%s\"\n", node.tag, name, exprStr), e.toString());
+            }
+            return null;
         }
+    }
+
+    parseRawTagAttr(node : HibikiNode, attrName : string, attrValue : string, pctx : ParseContext) : boolean {
+        if (node.tag === "define-component" || node.tag === "define-handler" || node.tag === "import-library" || node.tag === "define-vars" || node.tag.startsWith("hibiki-")) {
+            node.attrs[attrName] = attrValue;
+            return true;
+        }
+        return false;
+    }
+
+    parseAutoAttrs(node : HibikiNode, attrName : string, attrValue : string, pctx : ParseContext) {
+        if (attrValue === "") {
+            attrValue = "1";
+        }
+        if (attrName == "automerge") {
+            node.automerge = parseAutoMerge(attrValue);
+        }
+        if (attrName == "autofire") {
+            node.autofire = parseAutoFire(attrValue);
+        }
+    }
+
+    parseForeachAttr(node : HibikiNode, attrName : string, attrValue : string, pctx : ParseContext) {
+        try {
+            let iterExprAst : HIteratorExpr = doParse(attrValue, "ext_iteratorExpr");
+            iterExprAst.sourcestr = attrValue;
+            node.foreachAttr = iterExprAst;
+        }
+        catch (e) {
+            console.log(sprintf("ERROR evaluating foreach attribute <%s>@%s\n\"%s\"\n", node.tag, attrName, attrValue), e.toString());
+        }
+    }
+
+    parseStandardAttr(node : HibikiNode, name : string, value : string, pctx : ParseContext) {
+        if (value === "" && name !== "value") {
+            value = "1";
+        }
+        let attrExpr = this.parseExpr(node, name, value, null, pctx);
+        if (attrExpr == null) {
+            return;
+        }
+        node.attrs[name] = attrExpr;
     }
 
     parseHandlerText(node : HibikiNode) {
@@ -323,16 +372,29 @@ class HtmlParser {
         }
         for (let i=0; i<nodeAttrs.length; i++) {
             let attr = nodeAttrs.item(i);
-            if (this.parseStyleAttr(node, attr, pctx)) {
+            let attrName = attr.name.toLowerCase();
+            let attrValue = attr.value;
+            if (this.parseRawTagAttr(node, attrName, attrValue, pctx)) {
                 continue;
             }
-            else if (this.parseHandlerAttr(node, attr, pctx)) {
+            if (this.parseStyleAttr(node, attrName, attrValue, pctx)) {
                 continue;
             }
-            else if (this.parseBindPathAttr(node, attr, pctx)) {
+            else if (this.parseHandlerAttr(node, attrName, attrValue, pctx)) {
                 continue;
             }
-            this.parseStandardAttr(node, attr, pctx);
+            else if (this.parseBindPathAttr(node, attrName, attrValue, pctx)) {
+                continue;
+            }
+            else if (attrName == "automerge" || attrName == "autofire") {
+                this.parseAutoAttrs(node, attrName, attrValue, pctx);
+                continue;
+            }
+            else if (attrName == "foreach") {
+                this.parseForeachAttr(node, attrName, attrValue, pctx);
+                continue;
+            }
+            this.parseStandardAttr(node, attrName, attrValue, pctx);
         }
         let list = this.parseNodeChildren(node.tag, htmlNode, pctx);
         if (list != null) {
