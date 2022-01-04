@@ -17,7 +17,7 @@ type HibikiNode = {
     attrs? : Record<string, NodeAttrType>,
     foreachAttr? : HIteratorExpr,
     handlers? : Record<string, HAction[]>,
-    bindings? : Record<string, PathType>,
+    bindings? : Record<string, HExpr>,
     list?  : HibikiNode[],
     style? : Record<string, string>,
     morestyles? : Record<string, Record<string, string>>,

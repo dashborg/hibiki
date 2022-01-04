@@ -165,7 +165,8 @@ class HtmlParser {
         }
         node.attrs[name] = value;
         try {
-            let path : PathType = doParse(value, "ext_lvaluePath");
+            let path : HExpr = doParse(value, "ext_fullPathExpr");
+            path.sourcestr = value;
             if (node.bindings == null) {
                 node.bindings = {};
             }

@@ -193,15 +193,29 @@ function resolveAttrValPair(k : string, v : NodeAttrType, dataenv : DataEnvironm
     return [resolvedVal, true];
 }
 
-function resolveLValueAttr(node : HibikiNode, attrName : string, dataenv : DataEnvironment) : LValue {
+function resolveLValueAttrParts(node : HibikiNode, attrName : string, dataenv : DataEnvironment) : [LValue, HibikiValEx, boolean] {
     if (node.bindings == null || node.bindings[attrName] == null) {
-        return null;
+        return [null, null, false];
     }
-    let rtn = new BoundLValue(node.bindings[attrName], dataenv);
-    if (rtn.getEx() == SYM_NOATTR) {
-        return null;
+    let pathExpr = node.bindings[attrName];
+    let pathVal = evalPathExprAst(pathExpr, dataenv);
+    if (typeof(pathVal) == "symbol" || pathVal instanceof Symbol) {
+        if (pathVal == SYM_NOATTR) {
+            return [null, null, false];
+        }
+        throw new Error(sprintf("Invalid path expression symbol: %s", pathVal.toString()));
     }
-    return rtn;
+    let lvRtn = new BoundLValue(pathVal, dataenv);
+    let exVal = lvRtn.getEx();
+    if (exVal == SYM_NOATTR) {
+        return [null, null, false];
+    }
+    return [lvRtn, exVal, true];
+}
+
+function resolveLValueAttr(node : HibikiNode, attrName : string, dataenv : DataEnvironment) : LValue {
+    let [lvalue, val, exists] = resolveLValueAttrParts(node, attrName, dataenv);
+    return lvalue;
 }
 
 function getAttributeStr(node : HibikiNode, attrName : string, dataenv : DataEnvironment, opts? : ResolveOpts) : string {
@@ -217,15 +231,11 @@ function getAttributeValPair(node : HibikiNode, attrName : string, dataenv : Dat
         return [null, false];
     }
     if (node.bindings && node.bindings[attrName] != null) {
-        let lv = new BoundLValue(node.bindings[attrName], dataenv);
-        let rtnVal = lv.getEx();
-        if (rtnVal != SYM_NOATTR) {
+        let [lv, rtnVal, exists] = resolveLValueAttrParts(node, attrName, dataenv);
+        if (exists) {
             return [exValToVal(rtnVal), true];
         }
-        else {
-            rtnVal = null;
-            // fall-through, see if attrs[attrName] exists
-        }
+        // fall-through, see if attrs[attrName] exists
     }
     if (!node.attrs || node.attrs[attrName] == null) {
         return [null, false];
@@ -685,6 +695,9 @@ function internalResolvePath(path : PathType, irData : any, dataenv : DataEnviro
     if (level >= path.length) {
         return irData;
     }
+    if (irData == SYM_NOATTR) {
+        return irData;
+    }
     let pp = path[level];
     if (pp.pathtype == "root") {
         if (level != 0) {
@@ -733,6 +746,10 @@ function internalResolvePath(path : PathType, irData : any, dataenv : DataEnviro
         }
         if ((irData instanceof Map) || mobx.isObservableMap(irData)) {
             return internalResolvePath(path, irData.get(pp.pathkey), dataenv, level+1);
+        }
+        if (path[0].pathtype == "root" && path[0].pathkey == "args" && !(pp.pathkey in irData)) {
+            // special case, NOATTR for undefined values off $args root
+            return SYM_NOATTR;
         }
         return internalResolvePath(path, irData[pp.pathkey], dataenv, level+1);
     }
@@ -1302,6 +1319,30 @@ function evalExprArray(exprArray : HExpr[], dataenv : DataEnvironment) : any[] {
     return rtn;
 }
 
+function evalPathExprAst(exprAst : HExpr, dataenv : DataEnvironment) : (PathType | symbol) {
+    if (exprAst.etype == "path") {
+        return exprAst.path;
+    }
+    if (exprAst.etype == "noattr") {
+        return SYM_NOATTR;
+    }
+    if (exprAst.etype == "op") {
+        if (exprAst.op == "?:") {
+            let econd = evalExprAst(exprAst.exprs[0], dataenv);
+            if (econd) {
+                return evalPathExprAst(exprAst.exprs[1], dataenv);
+            }
+            else {
+                return evalPathExprAst(exprAst.exprs[2], dataenv);
+            }
+        }
+        else {
+            new Error(sprintf("Invalid path expression op type: '%s'", exprAst.op));
+        }
+    }
+    throw new Error(sprintf("Invalid path expression etype: '%s'", exprAst.etype));
+}
+
 function evalExprAst(exprAst : HExpr, dataenv : DataEnvironment) : any {
     if (exprAst == null) {
         return null;
@@ -1477,7 +1518,7 @@ function evalExprAst(exprAst : HExpr, dataenv : DataEnvironment) : any {
         return SYM_NOATTR;
     }
     else {
-        console.log("NO ETYPE", exprAst);
+        console.log("BAD ETYPE", exprAst);
         throw new Error(sprintf("Invalid expression etype: '%s'", exprAst.etype));
     }
 }
@@ -2006,21 +2047,6 @@ function ParseStaticCallStatement(str : string) : HAction {
     return callAction;
 }
 
-function ParseLValuePathThrow(str : string, dataenv : DataEnvironment) : LValue {
-    let lvalue = doParse(str, "ext_lvaluePath");
-    return new BoundLValue(lvalue, dataenv);
-}
-
-function ParseLValuePath(str : string, dataenv : DataEnvironment) {
-    try {
-        return ParseLValuePathThrow(str, dataenv);
-    }
-    catch (e) {
-        console.log("ERROR during ParseLValuePath [[" + str + "]]", e);
-        return null;
-    }
-}
-
 function evalAssignLVThrow(lvalue : PathType, dataenv : DataEnvironment) {
     let lvaluePath = evalPath(lvalue, dataenv);
     if (lvaluePath == null || lvaluePath.length == 0) {
@@ -2054,6 +2080,6 @@ function convertSimpleType(typeName : string, value : string, defaultValue : Hib
     return value;
 }
 
-export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, ParseLValuePath, ParseLValuePathThrow, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, evalActionStr, makeIteratorFromExpr, rawAttrStr, resolveStrAttrs, resolveValAttrs, getStyleMap, getAttributeStr, getAttributeValPair, valToStr, exValToVal, resolveLValueAttr, resolveLValueAttrs};
+export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, evalActionStr, makeIteratorFromExpr, rawAttrStr, resolveStrAttrs, resolveValAttrs, getStyleMap, getAttributeStr, getAttributeValPair, valToStr, exValToVal, resolveLValueAttr, resolveLValueAttrs, SYM_NOATTR};
 
 export type {PathType, HAction, HExpr, HIteratorExpr};

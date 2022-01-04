@@ -132,7 +132,7 @@ var grammar = {
     {"name": "ext_statementBlock", "symbols": ["statementBlock"], "postprocess": id},
     {"name": "ext_callStatementNoAssign", "symbols": ["callStatementNoAssign"], "postprocess": id},
     {"name": "ext_contextAssignList", "symbols": ["contextAssignList"], "postprocess": id},
-    {"name": "ext_lvaluePath", "symbols": ["lvaluePath"], "postprocess": id},
+    {"name": "ext_fullPathExpr", "symbols": ["fullPathExpr"], "postprocess": id},
     {"name": "ext_pathExprNonTerm", "symbols": ["pathExprNonTerm"], "postprocess": id},
     {"name": "ext_iteratorExpr", "symbols": ["iteratorExpr"], "postprocess": id},
     {"name": "fullExpr", "symbols": ["filterExpr"], "postprocess": id},
@@ -307,6 +307,12 @@ var grammar = {
             return [setop, data[1]];
         } },
     {"name": "lvaluePath", "symbols": ["pathExprNonTerm"], "postprocess": (data) => { return data[0].path }},
+    {"name": "fullPathExpr", "symbols": ["ternaryPathExpr"], "postprocess": id},
+    {"name": "ternaryPathExpr", "symbols": [(lexer.has("KW_NOATTR") ? {type: "KW_NOATTR"} : KW_NOATTR)], "postprocess": (data) => ({etype: "noattr"})},
+    {"name": "ternaryPathExpr", "symbols": ["pathExprNonTerm"], "postprocess": id},
+    {"name": "ternaryPathExpr", "symbols": ["fullExpr", (lexer.has("QUESTION") ? {type: "QUESTION"} : QUESTION), "fullPathExpr", (lexer.has("COLON") ? {type: "COLON"} : COLON), "fullPathExpr"], "postprocess":  (data) => {
+            return {etype: "op", op: "?:", exprs: [data[0], data[2], data[4]]};
+        } },
     {"name": "filterExpr", "symbols": ["ternaryExpr"], "postprocess": id},
     {"name": "filterExpr", "symbols": ["ternaryExpr", (lexer.has("PIPE") ? {type: "PIPE"} : PIPE), "idOrKeyword", "namedCallParams"], "postprocess":  (data) => {
             return {etype: "filter", filter: data[2].value, exprs: [data[0], data[3]]};

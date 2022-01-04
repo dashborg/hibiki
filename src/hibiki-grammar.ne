@@ -133,7 +133,7 @@ ext_fullExpr              -> fullExpr              {% id %}
 ext_statementBlock        -> statementBlock        {% id %}
 ext_callStatementNoAssign -> callStatementNoAssign {% id %}
 ext_contextAssignList     -> contextAssignList     {% id %}
-ext_lvaluePath            -> lvaluePath            {% id %}
+ext_fullPathExpr          -> fullPathExpr          {% id %}
 ext_pathExprNonTerm       -> pathExprNonTerm       {% id %}
 ext_iteratorExpr          -> iteratorExpr          {% id %}
 
@@ -329,6 +329,15 @@ lvalue ->
 
 # PathType
 lvaluePath -> pathExprNonTerm {% (data) => { return data[0].path } %}
+
+fullPathExpr -> ternaryPathExpr {% id %}
+
+ternaryPathExpr ->
+      %KW_NOATTR         {% (data) => ({etype: "noattr"}) %}
+    | pathExprNonTerm    {% id %}
+    | fullExpr %QUESTION fullPathExpr %COLON fullPathExpr {% (data) => {
+          return {etype: "op", op: "?:", exprs: [data[0], data[2], data[4]]};
+      } %}
 
 filterExpr -> 
       ternaryExpr {% id %}

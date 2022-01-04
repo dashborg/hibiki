@@ -368,11 +368,6 @@ class DataEnvironment {
         return this.parent.getContextKey(contextkey);
     }
 
-    makeLValue(path : string) : DataCtx.LValue {
-        let lv = DataCtx.ParseLValuePath(path, this);
-        return lv;
-    }
-
     getComponentRoot() : HibikiVal {
         if (this.componentRoot != null) {
             return this.componentRoot;
