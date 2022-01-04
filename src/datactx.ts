@@ -100,7 +100,6 @@ function getStyleMap(node : HibikiNode, styleName : string, dataenv : DataEnviro
             rtContext: sprintf("resolving style property '%s' in attribute '%s' in <%s>", k, styleName, node.tag),
         };
         let rval = resolveAttrStr(k, v, dataenv, opts);
-        console.log("resolveAttrStyle", k, v, rval);
         if (rval == null) {
             continue;
         }

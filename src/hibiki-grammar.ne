@@ -300,14 +300,22 @@ invalidateStatement -> %KW_INVALIDATE optCallParams {% (data) => {
 nopStatement -> %KW_NOP (%LPAREN %RPAREN):? {% (data) => ({actiontype: "nop"}) %}
 
 bubbleStatement ->
-    %KW_BUBBLE %DASHGT idOrKeyword namedCallParams {% (data) => {
-        let rtn = {actiontype: "fireevent", bubble: true, event: {etype: "literal", val: data[2].value}, data: data[3]};
+    %KW_BUBBLE %DASHGT (idOrKeyword %COLON):? idOrKeyword namedCallParams {% (data) => {
+        let eventName = data[3].value;
+        if (data[2] != null) {
+            eventName = data[2][0].value + ":" + eventName;
+        }
+        let rtn = {actiontype: "fireevent", bubble: true, event: {etype: "literal", val: eventName}, data: data[4]};
         return rtn;
     } %}
 
 fireStatement ->
-    %KW_FIRE %DASHGT idOrKeyword namedCallParams {% (data) => {
-        let rtn = {actiontype: "fireevent", event: {etype: "literal", val: data[2].value}, data: data[3]};
+    %KW_FIRE %DASHGT (idOrKeyword %COLON):? idOrKeyword namedCallParams {% (data) => {
+        let eventName = data[3].value;
+        if (data[2] != null) {
+            eventName = data[2][0].value + ":" + eventName;
+        }
+        let rtn = {actiontype: "fireevent", event: {etype: "literal", val: eventName}, data: data[4]};
         return rtn;
     } %}
 

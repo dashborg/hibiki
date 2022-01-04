@@ -285,12 +285,26 @@ var grammar = {
     {"name": "nopStatement$ebnf$1", "symbols": ["nopStatement$ebnf$1$subexpression$1"], "postprocess": id},
     {"name": "nopStatement$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
     {"name": "nopStatement", "symbols": [(lexer.has("KW_NOP") ? {type: "KW_NOP"} : KW_NOP), "nopStatement$ebnf$1"], "postprocess": (data) => ({actiontype: "nop"})},
-    {"name": "bubbleStatement", "symbols": [(lexer.has("KW_BUBBLE") ? {type: "KW_BUBBLE"} : KW_BUBBLE), (lexer.has("DASHGT") ? {type: "DASHGT"} : DASHGT), "idOrKeyword", "namedCallParams"], "postprocess":  (data) => {
-            let rtn = {actiontype: "fireevent", bubble: true, event: {etype: "literal", val: data[2].value}, data: data[3]};
+    {"name": "bubbleStatement$ebnf$1$subexpression$1", "symbols": ["idOrKeyword", (lexer.has("COLON") ? {type: "COLON"} : COLON)]},
+    {"name": "bubbleStatement$ebnf$1", "symbols": ["bubbleStatement$ebnf$1$subexpression$1"], "postprocess": id},
+    {"name": "bubbleStatement$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
+    {"name": "bubbleStatement", "symbols": [(lexer.has("KW_BUBBLE") ? {type: "KW_BUBBLE"} : KW_BUBBLE), (lexer.has("DASHGT") ? {type: "DASHGT"} : DASHGT), "bubbleStatement$ebnf$1", "idOrKeyword", "namedCallParams"], "postprocess":  (data) => {
+            let eventName = data[3].value;
+            if (data[2] != null) {
+                eventName = data[2][0].value + ":" + eventName;
+            }
+            let rtn = {actiontype: "fireevent", bubble: true, event: {etype: "literal", val: eventName}, data: data[4]};
             return rtn;
         } },
-    {"name": "fireStatement", "symbols": [(lexer.has("KW_FIRE") ? {type: "KW_FIRE"} : KW_FIRE), (lexer.has("DASHGT") ? {type: "DASHGT"} : DASHGT), "idOrKeyword", "namedCallParams"], "postprocess":  (data) => {
-            let rtn = {actiontype: "fireevent", event: {etype: "literal", val: data[2].value}, data: data[3]};
+    {"name": "fireStatement$ebnf$1$subexpression$1", "symbols": ["idOrKeyword", (lexer.has("COLON") ? {type: "COLON"} : COLON)]},
+    {"name": "fireStatement$ebnf$1", "symbols": ["fireStatement$ebnf$1$subexpression$1"], "postprocess": id},
+    {"name": "fireStatement$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
+    {"name": "fireStatement", "symbols": [(lexer.has("KW_FIRE") ? {type: "KW_FIRE"} : KW_FIRE), (lexer.has("DASHGT") ? {type: "DASHGT"} : DASHGT), "fireStatement$ebnf$1", "idOrKeyword", "namedCallParams"], "postprocess":  (data) => {
+            let eventName = data[3].value;
+            if (data[2] != null) {
+                eventName = data[2][0].value + ":" + eventName;
+            }
+            let rtn = {actiontype: "fireevent", event: {etype: "literal", val: eventName}, data: data[4]};
             return rtn;
         } },
     {"name": "logStatement", "symbols": [(lexer.has("KW_LOG") ? {type: "KW_LOG"} : KW_LOG), "callParams"], "postprocess": (data) => ({actiontype: "log", data: {etype: "array", exprs: data[1]}})},

@@ -472,6 +472,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
             if (value != null) {
                 elemProps["defaultValue"] = value;
             }
+            elemProps["onChange"] = this.handleValueOnChange;
         }
     }
 
@@ -501,6 +502,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
             if (checked) {
                 elemProps["defaultChecked"] = true;
             }
+            elemProps["onChange"] = this.handleRadioOnChange;
         }
     }
 
@@ -532,6 +534,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
             if (checked) {
                 elemProps["defaultChecked"] = true;
             }
+            elemProps["onChange"] = this.handleCheckboxOnChange;
         }
     }
 
@@ -562,7 +565,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
         }
         else {
             // not managed
-            // nothing
+            elemProps["onChange"] = this.handleSelectOnChange;
         }
     }
     
