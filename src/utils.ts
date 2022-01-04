@@ -81,13 +81,6 @@ function parseUrlParams() : Record<string,string> {
     return paramsObj;
 }
 
-function valToString(val : any) : string {
-    if (val == null) {
-        return "";
-    }
-    return val.toString();
-}
-
 function valToInt(val : any, def : number) : number {
     if (val == null) {
         return def;
@@ -182,6 +175,25 @@ function getSS(key : string) : any {
     }
 }
 
+function valToString(val : HibikiVal) : string {
+    if (val == null) {
+        return "null";
+    }
+    if (typeof(val) == "string" || typeof(val) == "number" || typeof(val) == "boolean" || typeof(val) == "symbol" || typeof(val) == "bigint") {
+        return val.toString();
+    }
+    if (typeof(val) == "function") {
+        return "[Function]";
+    }
+    if (mobx.isArrayLike(val)) {
+        return "[Array]";
+    }
+    if ((val as any)._type === "HibikiBlob") {
+        return blobPrintStr(val as HibikiBlob);
+    }
+    return "[Object object]";
+}
+
 function makeUrlParamsFromObject(params : any) : string {
     let urlparams = "";
     if (params == null || !isObject(params)) {
@@ -194,7 +206,7 @@ function makeUrlParamsFromObject(params : any) : string {
         if (val == null) {
             continue;
         }
-        let strVal = val.toString();
+        let strVal = valToString(val);
         if (!first) {
             urlparams = urlparams + "&";
         }

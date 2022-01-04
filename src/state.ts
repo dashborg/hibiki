@@ -24,7 +24,7 @@ type CallHandlerOptsType = {
 type EHandlerType = {handler : HandlerBlock, node : HibikiNode, dataenv : DataEnvironment};
 
 function eventBubbles(event : string) : boolean {
-    if (event == "load") {
+    if (event === "load") {
         return false;
     }
     if (event.startsWith("x")) {
@@ -43,7 +43,7 @@ function createDepPromise(libName : string, srcUrl : string, state : HibikiState
     for (let i=0; i<scriptTags.length; i++) {
         let stag = scriptTags[i];
         let attrs = NodeUtils.getRawAttrs(stag);
-        if (attrs.type != null && attrs.type != "text/javascript") {
+        if (attrs.type != null && attrs.type !== "text/javascript") {
             continue;
         }
         if (attrs.src == null) {
@@ -63,7 +63,7 @@ function createDepPromise(libName : string, srcUrl : string, state : HibikiState
     for (let i=0; i<linkTags.length; i++) {
         let ltag = linkTags[i];
         let attrs = NodeUtils.getRawAttrs(ltag);
-        if (attrs.rel != "stylesheet" || attrs.href == null) {
+        if (attrs.rel !== "stylesheet" || attrs.href == null) {
             continue;
         }
         let cssUrl = attrs.href;
@@ -82,11 +82,11 @@ function createDepPromise(libName : string, srcUrl : string, state : HibikiState
     for (let i=0; i<importTags.length; i++) {
         let itag = importTags[i];
         let attrs = NodeUtils.getRawAttrs(itag);
-        if (attrs.src == null || attrs.src == "") {
+        if (attrs.src == null || attrs.src === "") {
             console.log("Invalid <import-library> tag, no src attribute");
             continue;
         }
-        if (attrs.prefix == null || attrs.prefix == "") {
+        if (attrs.prefix == null || attrs.prefix === "") {
             console.log(sprintf("Invalid <import-library> tag src[%s], no prefix attribute", itag.attrs.src));
             continue;
         }
@@ -141,7 +141,7 @@ class DataEnvironment {
             this.handlers = opts.handlers || {};
             this.htmlContext = opts.htmlContext;
             this.libContext = opts.libContext;
-            if (opts.eventBoundary == "soft" || opts.eventBoundary == "hard") {
+            if (opts.eventBoundary === "soft" || opts.eventBoundary === "hard") {
                 this.eventBoundary = opts.eventBoundary;
             }
             this.blockLocalData = opts.blockLocalData;
@@ -172,19 +172,19 @@ class DataEnvironment {
         let env : DataEnvironment = this;
         let rtn = "";
         while (env != null) {
-            if (env.htmlContext != null && env.htmlContext != "<define-vars>") {
-                if (rtn == "") {
+            if (env.htmlContext != null && env.htmlContext !== "<define-vars>") {
+                if (rtn === "") {
                     rtn = env.htmlContext;
                 }
                 else {
-                    if (env.htmlContext != "<root>") {
+                    if (env.htmlContext !== "<root>") {
                         rtn = env.htmlContext + " | " + rtn;
                     }
                 }
             }
             env = env.parent;
         }
-        if (rtn == "") {
+        if (rtn === "") {
             return "<unknown>";
         }
         return rtn;
@@ -195,20 +195,20 @@ class DataEnvironment {
         if (opts.caret != null && opts.caret < 0 || opts.caret > 1) {
             throw new Error("Invalid caret value, must be 0 or 1");
         }
-        if (rootName == "global" || rootName == "data") {
+        if (rootName === "global" || rootName === "data") {
             return unbox(this.dbstate.DataRoots["global"]);
         }
-        if (rootName == "state") {
+        if (rootName === "state") {
             return unbox(this.dbstate.DataRoots["state"]);
         }
-        if (rootName == "null") {
+        if (rootName === "null") {
             return null;
         }
-        if (rootName == "nodedata") {
+        if (rootName === "nodedata") {
             // this is Map<string, IObservableValue<HibikiVal>>, not quite compatible, but works for read-only
             return (this.dbstate.NodeDataMap as any);
         }
-        if (rootName == "context") {
+        if (rootName === "context") {
             let ref : DataEnvironment = this;
             if (opts.caret) {
                 for (let i=0; i<opts.caret && ref != null; i++) {
@@ -220,7 +220,7 @@ class DataEnvironment {
             }
             return ref.getContextProxy();
         }
-        if (rootName == "currentcontext") {
+        if (rootName === "currentcontext") {
             let ref : DataEnvironment = this;
             if (opts.caret) {
                 for (let i=0; i<opts.caret && ref != null; i++) {
@@ -232,13 +232,13 @@ class DataEnvironment {
             }
             return ref.specials;
         }
-        if (rootName == "contextstack") {
+        if (rootName === "contextstack") {
             return this.getContextStack();
         }
-        if (rootName == "c" || rootName == "component") {
+        if (rootName === "c" || rootName === "component") {
             return this.getComponentRoot();
         }
-        if (rootName == "args") {
+        if (rootName === "args") {
             return this.getArgsRoot();
         }
         else {
@@ -256,10 +256,10 @@ class DataEnvironment {
                 if (prop == null) {
                     return null;
                 }
-                if (prop == SYM_PROXY) {
+                if (prop === SYM_PROXY) {
                     return true;
                 }
-                if (prop == SYM_FLATTEN) {
+                if (prop === SYM_FLATTEN) {
                     return self.getSquashedContext();
                 }
                 return self.getContextKey(prop.toString());
@@ -287,10 +287,10 @@ class DataEnvironment {
     printStack() {
         let jsonSpecials = DataCtx.JsonStringify(this.specials);
         let deType = "";
-        if (this.eventBoundary == "hard") {
+        if (this.eventBoundary === "hard") {
             deType = "--|";
         }
-        else if (this.eventBoundary == "soft") {
+        else if (this.eventBoundary === "soft") {
             deType = "-*|";
         }
         else {
@@ -311,11 +311,11 @@ class DataEnvironment {
         let env : DataEnvironment = this;;
         let evHandlerName = sprintf("//@event/%s", event);
         while (env != null) {
-            if (env.eventBoundary == "hard") {
+            if (env.eventBoundary === "hard") {
                 return env;
             }
-            if (event != null && env.eventBoundary == "soft") {
-                if (event == "*" || env.handlers[evHandlerName] != null) {
+            if (event != null && env.eventBoundary === "soft") {
+                if (event === "*" || env.handlers[evHandlerName] != null) {
                     return env;
                 }
             }
@@ -429,7 +429,7 @@ class DataEnvironment {
     }
 
     evalExpr(expr : string, keepMobx? : boolean) : any {
-        if (expr == null || expr == "") {
+        if (expr == null || expr === "") {
             return null;
         }
         let rtn = DataCtx.EvalSimpleExpr(expr, this);
@@ -494,7 +494,7 @@ class ComponentLibrary {
             console.log("Hibiki registerReactComponentImpl component '%s/%s' not found", libName, componentName);
             return;
         }
-        if (ctype.componentType != "react-custom") {
+        if (ctype.componentType !== "react-custom") {
             console.log("Hibiki registerReactComponentImpl component '%s/%s' is type 'react'", libName, componentName);
             return;
         }
@@ -512,7 +512,7 @@ class ComponentLibrary {
             console.log("Hibiki registerNativeComponentImpl component '%s/%s' not found", libName, componentName);
             return;
         }
-        if (ctype.componentType != "hibiki-native") {
+        if (ctype.componentType !== "hibiki-native") {
             console.log("Hibiki registerNativeComponentImpl component '%s/%s' is type 'native'", libName, componentName);
             return;
         }
@@ -520,7 +520,7 @@ class ComponentLibrary {
     }
 
     importLibrary(libContext : string, srcUrl : string, prefix : string, sync : boolean) : Promise<boolean> {
-        if (srcUrl == null || srcUrl == "") {
+        if (srcUrl == null || srcUrl === "") {
             return Promise.resolve(true);
         }
         if (this.importedUrls[srcUrl]) {
@@ -609,7 +609,7 @@ class ComponentLibrary {
             return;
         }
         for (let h of htmlobj.list) {
-            if (h.tag != "define-component") {
+            if (h.tag !== "define-component") {
                 continue;
             }
             let attrs = NodeUtils.getRawAttrs(h);
@@ -637,7 +637,7 @@ class ComponentLibrary {
     }
 
     rawImportLib(libContext : string, libName : string, prefix : string) {
-        if (prefix == "local") {
+        if (prefix === "local") {
             throw new Error("Cannot import library with reserved 'local' prefix");
         }
         let libObj = this.libs[libName];
@@ -645,7 +645,7 @@ class ComponentLibrary {
             console.log("Hibiki Error invalid component library in rawImportLib", libName);
             return;
         }
-        if (libContext == null || (libContext != "@main" && this.libs[libContext] == null)) {
+        if (libContext == null || (libContext !== "@main" && this.libs[libContext] == null)) {
             console.log("Hibiki Error invalid libContext in rawImportLib", libContext);
         }
         for (let name in libObj.libComponents) {
@@ -656,12 +656,12 @@ class ComponentLibrary {
             let cpath = libName + ":" + name;
             let importName = (prefix == null ? "" : prefix + "-") + name;
             let origComp = this.components[importName];
-            if (origComp != null && (origComp.libName != libName || origComp.name != name)) {
+            if (origComp != null && (origComp.libName !== libName || origComp.name !== name)) {
                 console.log(sprintf("Conflicting import %s %s:%s (discarding %s:%s)", importName, origComp.libName, origComp.name, libName, name));
                 continue;
             }
             let ctype = {componentType: newComp.componentType, libName: libName, name: name, impl: newComp.impl, reactimpl: newComp.reactimpl, node: newComp.node};
-            if (libContext == "@main") {
+            if (libContext === "@main") {
                 this.components[importName] = ctype;
             }
             else {
@@ -710,7 +710,7 @@ class ComponentLibrary {
                 node: comp.node,
             };
         }
-        if (libContext == null || libContext == "@main") {
+        if (libContext == null || libContext === "@main") {
             return this.components[tagName];
         }
         let libObj = this.libs[libContext];
@@ -966,7 +966,7 @@ class HibikiState {
         }
         let hibiki = getHibiki();
         let mreg = hibiki.ModuleRegistry;
-        if (libContext == null || libContext == "@main") {
+        if (libContext == null || libContext === "@main") {
             this.Modules["lib-" + prefix] = new mreg["lib"](this, {libContext: libName});
         }
         else {
@@ -997,7 +997,7 @@ class HibikiState {
             this.reportErrorObj(event.datacontext.error);
         }
         else {
-            if (event.event != "init") {
+            if (event.event !== "init") {
                 console.log(sprintf("Hibiki unhandled event %s", event.event), event.datacontext, rtctx);
             }
         }
@@ -1029,7 +1029,7 @@ class HibikiState {
     }
 
     findPage(pageName? : string) : HibikiNode {
-        if (pageName == null || pageName == "") {
+        if (pageName == null || pageName === "") {
             pageName = "default";
         }
         let htmlobj = this.HtmlObj.get();
@@ -1039,7 +1039,7 @@ class HibikiState {
         let starTag = null;
         let hasPages = false;
         for (let h of htmlobj.list) {
-            if (h.tag != "page") {
+            if (h.tag !== "page") {
                 continue;
             }
             hasPages = true;
@@ -1050,7 +1050,7 @@ class HibikiState {
             if (tagNameAttr == pageName) {
                 return h;
             }
-            if (tagNameAttr == "*" && starTag == null) {
+            if (tagNameAttr === "*" && starTag == null) {
                 starTag = h;
             }
         }
@@ -1069,7 +1069,7 @@ class HibikiState {
             return null;
         }
         for (let h of htmlobj.list) {
-            if ((h.tag == "script" || h.tag == "h-script") && h.attrs != null && h.attrs["name"] == scriptName) {
+            if ((h.tag === "script" || h.tag === "h-script") && h.attrs != null && h.attrs["name"] === scriptName) {
                 return h;
             }
         }
@@ -1090,10 +1090,10 @@ class HibikiState {
     async callHandlerWithReq(req : HibikiRequest) : Promise<HandlerBlock> {
         let moduleName = req.callpath.module;
         let module : HibikiHandlerModule;
-        if (moduleName == null || moduleName == "") {
+        if (moduleName == null || moduleName === "") {
             throw new Error(sprintf("Invalid handler, no module specified path: %s", fullPath(req.callpath)));
         }
-        else if (req.libContext == null || req.libContext == "@main") {
+        else if (req.libContext == null || req.libContext === "@main") {
             module = this.Modules[moduleName];
         }
         else {
@@ -1150,7 +1150,7 @@ class HibikiState {
     }
 
     @mobx.action invalidateRegex(queryReStr : string) {
-        if (queryReStr == null || queryReStr == "") {
+        if (queryReStr == null || queryReStr === "") {
             this.invalidateAll();
             return;
         }
@@ -1251,7 +1251,7 @@ function hasHtmlRR(rra : any[]) : boolean {
     }
     for (let i=0; i<rra.length; i++) {
         let rr = rra[i];
-        if (rr.type == "html") {
+        if (rr.type === "html") {
             return true;
         }
     }
