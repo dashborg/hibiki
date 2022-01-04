@@ -27,6 +27,7 @@ type HibikiNode = {
 
 type AutoMergeExpr = {
     source : string,
+    dest : string,
     include? : Record<string, boolean>,
     includeForce? : Record<string, boolean>,
     exclude? : Record<string, boolean>,

@@ -23,25 +23,54 @@ type ParseContext = {
     tagStack : string[],
 }
 
+// returns [source, dest, parts]
+function splitAmVal(amVal : string) : [string, string, string[]] {
+    let match = amVal.match(/^(?:([a-zA-Z0-9]+)(?:=>([a-zA-Z0-9]+))?)?(?:@(.*))?$/);
+    if (match == null) {
+        return null;
+    }
+    let [_, source, dest, rest] = match;
+    if (source == null) {
+        source = "self";
+    }
+    if (dest == null) {
+        dest = "self";
+    }
+    if (rest == null) {
+        rest = "all";
+    }
+    return [source, dest, rest.split("|")];
+}
+
 function parseSingleAutomerge(amVal : string) : AutoMergeExpr {
-    if (amVal == "1") {
-        return {source: "self", include: {"all": true}, exclude: {}};
+    if (amVal === "1") {
+        return {source: "self", dest: "self", include: {"all": true}};
     }
-    let atPos = amVal.indexOf("@");
-    if (atPos == -1) {
-        return {source: amVal, include: {all: true}, exclude: {}};
-    }
-    let fields = amVal.split("@", 2);
-    let rtn : AutoMergeExpr = {source: fields[0], include: {}, exclude: {}};
-    let parts = fields[1].split("|");
+    let [source, dest, parts] = splitAmVal(amVal);
+    let rtn : AutoMergeExpr = {source: source, dest: dest};
     for (let i=0; i<parts.length; i++) {
-        if (parts[i].startsWith("-")) {
-            if (parts[i].length > 1) {
-                rtn.exclude[parts[i].substr(1)] = true;
+        let partStr = parts[i].toLowerCase();
+        if (partStr.startsWith("-")) {
+            if (!rtn.exclude) {
+                rtn.exclude = {};
+            }
+            if (partStr.length > 1) {
+                rtn.exclude[partStr.substr(1)] = true;
+            }
+        }
+        else if (partStr.startsWith("!")) {
+            if (!rtn.includeForce) {
+                rtn.includeForce = {};
+            }
+            if (partStr.length > 1) {
+                rtn.includeForce[partStr.substr(1)] = true;
             }
         }
         else {
-            rtn.include[parts[i]] = true;
+            if (!rtn.include) {
+                rtn.include = {};
+            }
+            rtn.include[partStr] = true;
         }
     }
     return rtn;
@@ -51,8 +80,8 @@ function parseAutoMerge(amAttr : string) : AutoMergeExpr[] {
     if (amAttr == null) {
         return null;
     }
-    if (amAttr == "" || amAttr == "1") {
-        return [{source: "self", include: {"all": true}, exclude: {}}];
+    if (amAttr === "" || amAttr === "1") {
+        return [{source: "self", dest: "self", include: {"all": true}}];
     }
     let amVals = amAttr.split(",");
     let rtn : AutoMergeExpr[] = [];
@@ -66,12 +95,12 @@ function parseAutoMerge(amAttr : string) : AutoMergeExpr[] {
 function escapeBrackets(text : string) {
     let lbpos = text.indexOf("{\\{");
     let rbpos = text.indexOf("}\\}");
-    if (lbpos != -1) {
+    if (lbpos !== -1) {
         text = text.replace(/{(\\{)+/g, (t) => {
             return t.replace(/\\/g, "");
         });
     }
-    if (rbpos != -1) {
+    if (rbpos !== -1) {
         text = text.replace(/}(\\})+/g, (t) => {
             return t.replace(/\\/g, "");
         });
@@ -92,18 +121,18 @@ class HtmlParser {
             return rtn;
         }
         styleAttr = styleAttr.trim();
-        if (styleAttr == "") {
+        if (styleAttr === "") {
             return rtn;
         }
         let parts = styleAttr.split(";");
         for (let part of parts) {
             part = part.trim();
-            if (part == "") {
+            if (part === "") {
                 continue;
             }
             let cpos = part.indexOf(":");
             let styleKey : string, styleVal : string;
-            if (cpos == -1) {
+            if (cpos === -1) {
                 styleKey = part;
                 styleVal = "1";
             }
@@ -111,7 +140,7 @@ class HtmlParser {
                 styleKey = part.substr(0, cpos);
                 styleVal = part.substr(cpos+1);
             }
-            if (styleKey == "") {
+            if (styleKey === "") {
                 continue;
             }
             let initialHypen = styleKey.startsWith("-");
@@ -127,19 +156,19 @@ class HtmlParser {
     }
 
     parseText(parentTag : string, text : string, pctx : ParseContext) : HibikiNode | HibikiNode[] {
-        if (text == null || text == "") {
+        if (text == null || text === "") {
             return null;
         }
         if (this.opts.noInlineText
-            || parentTag == "script" || parentTag == "define-handler" || parentTag.startsWith("hibiki-")) {
+            || parentTag === "script" || parentTag === "define-handler" || parentTag.startsWith("hibiki-")) {
             return {tag: "#text", text: text};
         }
-        if (text.indexOf("{{") == -1) {
+        if (text.indexOf("{{") === -1) {
             return {tag: "#text", text: escapeBrackets(text)};
         }
         let textParts = parseDelimitedSections(text, "{{", "}}");
         let parts : HibikiNode[] = textParts.map((part) => {
-            if (part.parttype == "plain") {
+            if (part.parttype === "plain") {
                 let tval = escapeBrackets(part.text);
                 return {tag: "#text", text: tval};
             }
@@ -156,7 +185,7 @@ class HtmlParser {
 
     parseStyleAttr(node : HibikiNode, attr : Attr, pctx : ParseContext) : boolean {
         let name = attr.name.toLowerCase();
-        if (name == "style") {
+        if (name === "style") {
             node.attrs[name] = attr.value;
             let styleMap = this.parseStyle(attr.value);
             node.style = styleMap;
@@ -202,7 +231,7 @@ class HtmlParser {
             return false;
         }
         let value = attr.value;
-        if (value.trim() == "") {
+        if (value.trim() === "") {
             return true;
         }
         try {
@@ -222,27 +251,28 @@ class HtmlParser {
     parseStandardAttr(node : HibikiNode, attr : {name : string, value : string}, pctx : ParseContext) {
         let name = attr.name.toLowerCase();
         let value = attr.value;
-        if (value == "" && name != "value") {
+        if (value === "" && name !== "value") {
             value = "1";
         }
         let isParsed = PARSED_ATTRS[name];
-        if (!isParsed && (!value.startsWith("*") || value == "*" || value == "**")) {
+        if (!isParsed && (!value.startsWith("*") || value === "*" || value === "**")) {
             node.attrs[name] = value;
             return;
         }
-        if (node.tag == "define-component" || node.tag == "define-handler" || node.tag == "import-library" || node.tag == "define-vars" || node.tag.startsWith("hibiki-")) {
+        if (node.tag === "define-component" || node.tag === "define-handler" || node.tag === "import-library" || node.tag === "define-vars" || node.tag.startsWith("hibiki-")) {
             node.attrs[name] = value;
             return;
         }
         let exprStr = (isParsed ? value : value.substr(1).trim());
         try {
-            if (name == "foreach") {
+            if (name === "foreach") {
                 let iterExprAst : HIteratorExpr = doParse(exprStr, "ext_iteratorExpr");
                 iterExprAst.sourcestr = value;
                 node.foreachAttr = iterExprAst;
             }
-            else if (name == "automerge") {
+            else if (name === "automerge") {
                 node.automerge = parseAutoMerge(value);
+                console.log("AUTOMERGE", value, node.automerge);
             }
             else {
                 let exprAst : HExpr = doParse(exprStr, "ext_fullExpr");
@@ -258,7 +288,7 @@ class HtmlParser {
     parseHandlerText(node : HibikiNode) {
         let nameAttr = rawAttrFromNode(node, "name");
         let handlerText = textContent(node);
-        if (handlerText.trim() == "") {
+        if (handlerText.trim() === "") {
             return;
         }
         try {
@@ -274,14 +304,14 @@ class HtmlParser {
     }
 
     parseHtmlNode(parentTag : string, htmlNode : Node, pctx : ParseContext) : HibikiNode | HibikiNode[] {
-        if (htmlNode.nodeType == 3 || htmlNode.nodeType == 4) {  // TEXT_NODE, CDATA_SECTION_NODE
+        if (htmlNode.nodeType === 3 || htmlNode.nodeType === 4) {  // TEXT_NODE, CDATA_SECTION_NODE
             return this.parseText(parentTag, htmlNode.textContent, pctx);
         }
-        if (htmlNode.nodeType == 8) { // COMMENT_NODE
+        if (htmlNode.nodeType === 8) { // COMMENT_NODE
             let node = {tag: "#comment", text: htmlNode.textContent};
             return node;
         }
-        if (htmlNode.nodeType != 1) { // ELEMENT_NODE
+        if (htmlNode.nodeType !== 1) { // ELEMENT_NODE
             return null;
         }
         let tagName = (htmlNode as Element).tagName.toLowerCase();
@@ -308,11 +338,11 @@ class HtmlParser {
         if (list != null) {
             node.list = list;
         }
-        if (node.tag == "script" && node.attrs != null && (node.attrs["type"] == "application/json" || node.attrs["type"] == "text/plain") && node.list != null && node.list.length == 1 && node.list[0].tag == "#text") {
+        if (node.tag === "script" && node.attrs != null && (node.attrs["type"] === "application/json" || node.attrs["type"] === "text/plain") && node.list != null && node.list.length === 1 && node.list[0].tag === "#text") {
             pctx.tagStack.pop();
             return node.list[0];
         }
-        if (node.tag == "define-handler") {
+        if (node.tag === "define-handler") {
             this.parseHandlerText(node);
         }
         pctx.tagStack.pop();
@@ -321,7 +351,7 @@ class HtmlParser {
 
     parseNodeChildren(parentTag : string, htmlNode : Node, pctx : ParseContext) : HibikiNode[] {
         let nodeChildren = htmlNode.childNodes;
-        if (nodeChildren.length == 0) {
+        if (nodeChildren.length === 0) {
             return null;
         }
         let rtn = [];
@@ -351,7 +381,7 @@ class HtmlParser {
             elem.innerHTML = input;
         }
         let pctx = {sourceName : sourceName, tagStack: []};
-        let rootNode = (elem.tagName.toLowerCase() == "template" ? elem.content : elem);
+        let rootNode = (elem.tagName.toLowerCase() === "template" ? elem.content : elem);
         let rtn : HibikiNode = {tag: "#def", list: []};
         rtn.list = this.parseNodeChildren(rtn.tag, rootNode, pctx) || [];
         return rtn;
@@ -382,10 +412,10 @@ function parseDelimitedSections(text : string, openDelim : string, closeDelim : 
     while (textPos < text.length) {
         let startPos = text.indexOf(openDelim, textPos);
         let endPos = -1;
-        if (startPos != -1) {
+        if (startPos !== -1) {
             endPos = text.indexOf(closeDelim, startPos + openDelim.length);
         }
-        if (startPos == -1 || endPos == -1) {
+        if (startPos === -1 || endPos === -1) {
             let tval = text.substr(textPos);
             parts.push({parttype: "plain", text: tval});
             break;
