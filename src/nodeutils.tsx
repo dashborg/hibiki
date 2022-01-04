@@ -7,7 +7,7 @@ import {DBCtx} from "./dbctx";
 import type {HibikiNode, HandlerValType, HibikiVal} from "./types";
 import * as DataCtx from "./datactx";
 import {sprintf} from "sprintf-js";
-import {isObject, textContent, rawAttrFromNode} from "./utils";
+import {isObject, textContent, rawAttrFromNode, nodeStr} from "./utils";
 import {DataEnvironment} from "./state";
 
 let BLOCKED_ELEMS = {
@@ -395,7 +395,7 @@ type AutoMergeAttrsType = {
 };
 
 function automerge(ctx : DBCtx, automergeAttrs : AutoMergeAttrsType, subName : string, opts : any) {
-    let nodeVar = ctx.resolvePath("@node");
+    let nodeVar = ctx.resolvePath("@node", {rtContext: sprintf("automerge in %s", nodeStr(ctx.node))});
     if (nodeVar == null) {
         return;
     }

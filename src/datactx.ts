@@ -17,6 +17,10 @@ declare var window : any;
 const MAX_ARRAY_SIZE = 10000;
 const SYM_NOATTR = Symbol("noattr");
 
+type RtContextOpts = {
+    rtContext? : string,
+};
+
 type HibikiValEx = HibikiVal | LValue | symbol;
 
 type HExpr = {
@@ -205,7 +209,7 @@ function resolveLValueAttrParts(node : HibikiNode, attrName : string, dataenv : 
         }
         throw new Error(sprintf("Invalid path expression symbol: %s", pathVal.toString()));
     }
-    let lvRtn = new BoundLValue(pathVal, dataenv);
+    let lvRtn = new BoundLValue(pathVal, dataenv, sprintf("%s@%s", nodeStr(node), attrName));
     let exVal = lvRtn.getEx();
     if (exVal == SYM_NOATTR) {
         return [null, null, false];
@@ -437,16 +441,19 @@ abstract class LValue {
     abstract set(newVal : HibikiValEx);
     abstract subArrayIndex(index : number) : LValue;
     abstract subMapKey(key : string) : LValue;
+    abstract getRtContext() : string;
 }
 
 class BoundLValue extends LValue {
     path : PathType;
     dataenv : DataEnvironment
+    rtContext : string;
     
-    constructor(path : PathType, dataenv : DataEnvironment) {
+    constructor(path : PathType, dataenv : DataEnvironment, rtContext? : string) {
         super();
         this.path = path;
         this.dataenv = dataenv;
+        this.rtContext = rtContext;
     }
 
     get() : HibikiVal {
@@ -455,24 +462,28 @@ class BoundLValue extends LValue {
     
     getEx() : HibikiValEx {
         let staticPath = evalPath(this.path, this.dataenv);
-        return ResolvePath(staticPath, this.dataenv);
+        return ResolvePath(staticPath, this.dataenv, {rtContext: this.rtContext});
+    }
+
+    getRtContext() : string {
+        return this.rtContext;
     }
 
     set(newVal : HibikiValEx) {
         let staticPath = evalPath(this.path, this.dataenv);
-        SetPath(staticPath, this.dataenv, newVal);
+        SetPath(staticPath, this.dataenv, newVal, {rtContext: this.rtContext});
     }
 
     subArrayIndex(index : number) : LValue {
         let newpath = this.path.slice();
         newpath.push({pathtype: "array", pathindex: index});
-        return new BoundLValue(newpath, this.dataenv);
+        return new BoundLValue(newpath, this.dataenv, this.rtContext);
     }
 
     subMapKey(key : string) : LValue {
         let newpath = this.path.slice();
         newpath.push({pathtype: "map", pathkey: key});
-        return new BoundLValue(newpath, this.dataenv);
+        return new BoundLValue(newpath, this.dataenv, this.rtContext);
     }
 }
 
@@ -505,6 +516,10 @@ class ReadOnlyLValue extends LValue {
         return this.wrappedLV.getEx();
     }
 
+    getRtContext() : string {
+        return this.wrappedLV.getRtContext();
+    }
+
     set(newVal : HibikiValEx) {
         return;
     }
@@ -529,6 +544,7 @@ function CreateReadOnlyLValue(val : any, debugName : string) : LValue {
 class ObjectLValue extends LValue {
     path : PathType;
     root : mobx.IObservableValue<any>;
+    rtContext : string;
 
     constructor(path? : PathType, root? : mobx.IObservableValue<any>, name? : string) {
         super();
@@ -540,6 +556,7 @@ class ObjectLValue extends LValue {
         }
         this.path = path;
         this.root = root;
+        this.rtContext = name;
     }
 
     get() : HibikiVal {
@@ -548,6 +565,10 @@ class ObjectLValue extends LValue {
 
     getEx() : HibikiValEx {
         return quickObjectResolvePath(this.path, this.root.get());
+    }
+
+    getRtContext() : string {
+        return this.rtContext;
     }
 
     set(newVal : HibikiValEx) {
@@ -742,7 +763,7 @@ function internalResolvePath(path : PathType, irData : any, dataenv : DataEnviro
             return internalResolvePath(path, irData.subMapKey(pp.pathkey), dataenv, level+1);
         }
         if (typeof(irData) != "object") {
-            throw new Error(sprintf("Cannot resolve map key (non-object) in ResolvePath, path=%s, level=%d", StringPath(path), level));
+            throw new Error(sprintf("Cannot resolve map key (non-object) in ResolvePath, path=%s, level=%d, type=%s", StringPath(path), level, typeof(irData)));
         }
         if ((irData instanceof Map) || mobx.isObservableMap(irData)) {
             return internalResolvePath(path, irData.get(pp.pathkey), dataenv, level+1);
@@ -759,12 +780,16 @@ function internalResolvePath(path : PathType, irData : any, dataenv : DataEnviro
     return null;
 }
 
-function ResolvePath(pathUnion : PathUnionType, dataenv : DataEnvironment) : any {
+function ResolvePath(pathUnion : PathUnionType, dataenv : DataEnvironment, opts? : RtContextOpts) : any {
     try {
         return ResolvePathThrow(pathUnion, dataenv);
     }
     catch (e) {
-        console.log("ResolvePath Error", e);
+        let context = "";
+        if (opts && opts.rtContext != null) {
+            context = " | " + opts.rtContext;
+        }
+        console.log(sprintf("ResolvePath Error: %s%s", e.message, context));
         return null;
     }
 }
@@ -1014,12 +1039,16 @@ function internalSetPath(dataenv : DataEnvironment, op : string, path : PathType
 }
 
 // function SetPath(path : PathUnionType, localRoot : any, setData : any, globalRoot? : any) : any {
-function SetPath(path : PathUnionType, dataenv : DataEnvironment, setData : any) {
+function SetPath(path : PathUnionType, dataenv : DataEnvironment, setData : any, opts? : RtContextOpts) {
     try {
         SetPathThrow(path, dataenv, setData);
     }
     catch (e) {
-        console.log("SetPath Error", StringPath(path), e);
+        let context = "";
+        if (opts && opts.rtContext != null) {
+            context = " | " + opts.rtContext;
+        }
+        console.log(sprintf("SetPath Error: %s%s", e.message, context));
     }
 }
 

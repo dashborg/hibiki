@@ -183,8 +183,10 @@ class DBCtx {
         return tagName;
     }
 
-    resolvePath(path : string) : any {
-        return this.dataenv.resolvePath(path);
+    resolvePath(path : string, opts? : {rtContext? : string}) : any {
+        opts = opts ?? {};
+        let rtContext = opts.rtContext ?? "DBCtx.resolvePath";
+        return this.dataenv.resolvePath(path, {rtContext: rtContext});
     }
 
     evalExpr(expr : string, keepMobx? : boolean) : any {
@@ -245,8 +247,9 @@ class DBCtx {
         return resolveCnMapEx(this.node, this.dataenv, classAttr, moreClasses);
     }
 
-    setDataPath(path : string, value : any) {
-        this.dataenv.setDataPath(path, value);
+    setDataPath(path : string, value : any, rtContext? : string) {
+        rtContext = rtContext ?? "DBCtx.setDataPath";
+        this.dataenv.setDataPath(path, value, rtContext);
     }
 
     getEventDataenv() : DataEnvironment {

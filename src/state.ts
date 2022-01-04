@@ -413,16 +413,19 @@ class DataEnvironment {
         return rtn;
     }
 
-    resolvePath(path : string, keepMobx? : boolean) : any {
-        let rtn = DataCtx.ResolvePath(path, this);
-        if (!keepMobx) {
+    resolvePath(path : string, opts? : {keepMobx? : boolean, rtContext? : string}) : any {
+        opts = opts ?? {};
+        let rtContext = opts.rtContext ?? "DataEnvironment.resolvePath";
+        let rtn = DataCtx.ResolvePath(path, this, {rtContext: rtContext});
+        if (!opts.keepMobx) {
             rtn = DataCtx.demobx(rtn);
         }
         return rtn;
     }
 
-    setDataPath(path : string, data : any) {
-        DataCtx.SetPath(path, this, data);
+    setDataPath(path : string, data : any, rtContext? : string) {
+        rtContext = rtContext ?? "DataEnvironment.setDataPath";
+        DataCtx.SetPath(path, this, data, {rtContext: rtContext});
     }
 
     evalExpr(expr : string, keepMobx? : boolean) : any {
@@ -744,12 +747,12 @@ class HibikiExtState {
 
     setData(path : string, data : any) {
         let dataenv = this.state.rootDataenv();
-        dataenv.setDataPath(path, data);
+        dataenv.setDataPath(path, data, "HibikiExtState.setDataPath");
     }
 
     getData(path : string) : any {
         let dataenv = this.state.rootDataenv();
-        return dataenv.resolvePath(path, false);
+        return dataenv.resolvePath(path, {keepMobx: false, rtContext: "HibikiExtState.getData"});
     }
 
     executeHandlerBlock(actions : HandlerBlock, pure? : boolean) : Promise<any> {

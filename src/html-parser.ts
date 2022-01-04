@@ -1,7 +1,7 @@
 // Copyright 2021 Dashborg Inc
 
 import camelCase from "camelcase";
-import type {HibikiNode, HtmlParserOpts, PathType} from "./types";
+import type {HibikiNode, HtmlParserOpts, PathType, AutoMergeExpr} from "./types";
 import merge from "lodash/merge";
 import {sprintf} from "sprintf-js";
 import {doParse} from "./hibiki-parser";
@@ -15,11 +15,52 @@ const PARSED_ATTRS = {
     "if": true,
     "foreach": true,
     "condition": true,
+    "automerge": true,
 };
 
 type ParseContext = {
     sourceName : string,
     tagStack : string[],
+}
+
+function parseSingleAutomerge(amVal : string) : AutoMergeExpr {
+    if (amVal == "1") {
+        return {source: null, include: {"all": true}, exclude: {}};
+    }
+    let atPos = amVal.indexOf("@");
+    if (atPos == -1) {
+        return {source: amVal, include: {all: true}, exclude: {}};
+    }
+    let fields = amVal.split("@", 2);
+    let rtn : AutoMergeExpr = {source: fields[0], include: {}, exclude: {}};
+    let parts = fields[1].split("|");
+    for (let i=0; i<parts.length; i++) {
+        if (parts[i].startsWith("-")) {
+            if (parts[i].length > 1) {
+                rtn.exclude[parts[i].substr(1)] = true;
+            }
+        }
+        else {
+            rtn.include[parts[i]] = true;
+        }
+    }
+    return rtn;
+}
+
+function parseAutoMerge(amAttr : string) : AutoMergeExpr[] {
+    if (amAttr == null) {
+        return null;
+    }
+    if (amAttr == "" || amAttr == "1") {
+        return [{source: null, include: {"all": true}, exclude: {}}];
+    }
+    let amVals = amAttr.split(",");
+    let rtn : AutoMergeExpr[] = [];
+    for (let i=0; i<amVals.length; i++) {
+        let amVal = amVals[i].trim();
+        rtn.push(parseSingleAutomerge(amVal));
+    }
+    return rtn;
 }
 
 function escapeBrackets(text : string) {
@@ -200,6 +241,9 @@ class HtmlParser {
                 let iterExprAst : HIteratorExpr = doParse(exprStr, "ext_iteratorExpr");
                 iterExprAst.sourcestr = value;
                 node.foreachAttr = iterExprAst;
+            }
+            else if (name == "automerge") {
+                node.automerge = parseAutoMerge(value);
             }
             else {
                 let exprAst : HExpr = doParse(exprStr, "ext_fullExpr");

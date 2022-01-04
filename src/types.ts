@@ -21,7 +21,14 @@ type HibikiNode = {
     list?  : HibikiNode[],
     style? : Record<string, string>,
     morestyles? : Record<string, Record<string, string>>,
+    automerge? : AutoMergeExpr[],
 }
+
+type AutoMergeExpr = {
+    source : string,
+    include : Record<string, boolean>,
+    exclude : Record<string, boolean>,
+};
 
 type JSFuncType = {
     fn : (...args : any[]) => any,
@@ -179,5 +186,5 @@ interface HibikiExtState {
     initialize(force : boolean);
 };
 
-export type {HibikiNode, HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, ComponentType, LibraryType, HibikiRequest, Hibiki, HibikiAction, HibikiActionString, HibikiActionValue, HibikiExtState, EventType, HandlerValType, JSFuncType, AppModuleConfig, FetchHookFn, CsrfHookFn, ReactClass, HandlerPathType, ErrorCallbackFn, EventCallbackFn, HtmlParserOpts, LibComponentType, HandlerBlock, NodeAttrType, HibikiVal, HibikiValObj};
+export type {HibikiNode, HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, ComponentType, LibraryType, HibikiRequest, Hibiki, HibikiAction, HibikiActionString, HibikiActionValue, HibikiExtState, EventType, HandlerValType, JSFuncType, AppModuleConfig, FetchHookFn, CsrfHookFn, ReactClass, HandlerPathType, ErrorCallbackFn, EventCallbackFn, HtmlParserOpts, LibComponentType, HandlerBlock, NodeAttrType, HibikiVal, HibikiValObj, AutoMergeExpr};
 
