@@ -275,21 +275,26 @@ function resolveValAttrs(node : HibikiNode, dataenv : DataEnvironment) : Record<
     return rtn;
 }
 
-function _assignToArgsRoot(argsRoot : Record<string, HibikiValEx>, key : string, val : HibikiValEx, addToNs : boolean) {
-    let noAdd = (addToNs && key.endsWith("@style")) || key.endsWith(".handler");
-    if (!noAdd) {
-        argsRoot[key] = val;
-    }
+function _argsRootAddKey(argsRoot : Record<string, HibikiValEx>, key : string, val : HibikiValEx) {
+    argsRoot[key] = val;
     if (val instanceof LValue) {
         if (argsRoot["@bound"] == null) {
             argsRoot["@bound"] = {};
         }
         argsRoot["@bound"][key] = true;
     }
+}
+
+function _assignToArgsRoot(argsRoot : Record<string, HibikiValEx>, key : string, val : HibikiValEx, addToNs : boolean) {
+    let colonIdx = key.indexOf(":");
+    let noAdd = (colonIdx != -1);
+    // let noAdd = (addToNs && key.endsWith("@style")) || key.endsWith(".handler") || (colonIdx != -1);
+    if (!noAdd && !(key in argsRoot)) {
+        _argsRootAddKey(argsRoot, key, val);
+    }
     if (!addToNs) {
         return false;
     }
-    let colonIdx = key.indexOf(":");
     if (colonIdx === -1) {
         if (argsRoot["@ns"]["self"] == null) {
             argsRoot["@ns"]["self"] = {};
@@ -299,6 +304,10 @@ function _assignToArgsRoot(argsRoot : Record<string, HibikiValEx>, key : string,
     else if (colonIdx === 0) {
         if (key.length === 1) {
             return;
+        }
+        // root keys overwrite standard args keys (but do not get added to self)
+        if (!key.endsWith("@style")) {
+            _argsRootAddKey(argsRoot, key.substr(1), val);
         }
         if (argsRoot["@ns"]["root"] == null) {
             argsRoot["@ns"]["root"] = {};

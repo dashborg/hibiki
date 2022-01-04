@@ -352,7 +352,7 @@ class LocalModule {
         let handlerName = sprintf("//@local%s", req.callpath.url);
         let ide = this.state.pageDataenv();
         if (ide.handlers[handlerName] != null) {
-            return Promise.resolve({hibikihandler: ide.handlers[handlerName].handlerStr});
+            return Promise.resolve(ide.handlers[handlerName].block);
         }
         let handler = getHibiki().LocalHandlers[req.callpath.url];
         if (handler == null) {

@@ -340,7 +340,7 @@ class DataEnvironment {
         let evHandlerName = sprintf("//@event/%s", event.event);
         if ((evHandlerName in env.handlers) && !rtctx.isHandlerInStack(env, event.event)) {
             let hval = env.handlers[evHandlerName];
-            return {handler: {hibikihandler: hval.handlerStr}, node: hval.node, dataenv: env};
+            return {handler: hval.block, node: hval.node, dataenv: env};
         }
         if (env.parent == null) {
             return null;
@@ -679,7 +679,7 @@ class ComponentLibrary {
         if (libObj.handlers[handlerName] == null) {
             return null;
         }
-        return {hibikihandler: libObj.handlers[handlerName].handlerStr};
+        return libObj.handlers[handlerName].block;
     }
 
     findLocalHandler(handlerName : string, libContext : string) : (req : HibikiRequest) => Promise<any> {

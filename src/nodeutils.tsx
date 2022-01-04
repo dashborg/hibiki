@@ -94,19 +94,19 @@ let MANAGED_ATTRS = {
 };
 
 function getManagedType(tagName : string, typeName : string) : ("value" | "radio" | "checkbox" | "file" | "select" | null) {
-    if (tagName == "select") {
+    if (tagName === "select") {
         return "select";
     }
-    if (tagName == "textarea") {
+    if (tagName === "textarea") {
         return "value";
     }
-    if (tagName != "input") {
+    if (tagName !== "input") {
         return null;
     }
     if (UNMANAGED_INPUT_TYPES[typeName]) {
         return null;
     }
-    if (typeName == "radio" || typeName == "checkbox" || typeName == "file") {
+    if (typeName === "radio" || typeName === "checkbox" || typeName === "file") {
         return typeName;
     }
     return "value";
@@ -114,12 +114,12 @@ function getManagedType(tagName : string, typeName : string) : ("value" | "radio
 
 function getFilteredSubNodesByTag(ctx : DBCtx, tag : string) {
     let node = ctx.node;
-    if (node.list == null || node.list.length == 0) {
+    if (node.list == null || node.list.length === 0) {
         return [];
     }
     let rtn = [];
     for (let sn of node.list) {
-        if (sn.tag != tag) {
+        if (sn.tag !== tag) {
             continue;
         }
         rtn.push(sn);
@@ -128,12 +128,12 @@ function getFilteredSubNodesByTag(ctx : DBCtx, tag : string) {
 }
 
 function getSubNodesByTag(node : HibikiNode, tag : string) : HibikiNode[] {
-    if (node.list == null || node.list.length == 0) {
+    if (node.list == null || node.list.length === 0) {
         return [];
     }
     let rtn = [];
     for (let sn of node.list) {
-        if (sn.tag == tag) {
+        if (sn.tag === tag) {
             rtn.push(sn);
         }
     }
@@ -141,7 +141,7 @@ function getSubNodesByTag(node : HibikiNode, tag : string) : HibikiNode[] {
 }
 
 function filterSubNodes(node : HibikiNode, filterFn : (HibikiNode) => boolean) : HibikiNode[] {
-    if (node.list == null || node.list.length == 0) {
+    if (node.list == null || node.list.length === 0) {
         return [];
     }
     let rtn = [];
@@ -202,7 +202,7 @@ function makeNodeVar(ctx : DBCtx) : any {
     // classes
     let classAttrs = {};
     for (let attrkey in rtn.attrs) {
-        if (attrkey == "class") {
+        if (attrkey === "class") {
             classAttrs["class"] = true;
             continue;
         }
@@ -210,7 +210,7 @@ function makeNodeVar(ctx : DBCtx) : any {
             continue;
         }
         let dotIndex = attrkey.indexOf(".");
-        if (dotIndex != -1) {
+        if (dotIndex !== -1) {
             attrkey = attrkey.substr(0, dotIndex);
         }
         classAttrs[attrkey] = true;
@@ -233,7 +233,7 @@ function makeNodeVar(ctx : DBCtx) : any {
 }
 
 function makeChildrenVar(dataenv : DataEnvironment, node : HibikiNode) : any {
-    if (node == null || node.list == null || node.list.length == 0) {
+    if (node == null || node.list == null || node.list.length === 0) {
         return null;
     }
     let rtn : any = {};
@@ -260,13 +260,13 @@ function makeChildrenVar(dataenv : DataEnvironment, node : HibikiNode) : any {
 
 function parseArgsDecl(datatypes : string) : {[e : string] : boolean} {
     let rtn : {[e : string] : boolean} = {};
-    if (datatypes == null || datatypes.trim() == "") {
+    if (datatypes == null || datatypes.trim() === "") {
         return rtn;
     }
     let split = datatypes.split(/,/);
     for (let i=0; i<split.length; i++) {
         let field = split[i].trim();
-        if (field == "") {
+        if (field === "") {
             continue;
         }
         if (!field.match(/\*?[a-z][a-z0-9_]*/)) {
@@ -284,11 +284,11 @@ function parseArgsDecl(datatypes : string) : {[e : string] : boolean} {
 }
 
 function parseSingleAutomerge(amVal : string) : {name? : string, opts? : any} {
-    if (amVal == "1") {
+    if (amVal === "1") {
         return {name: null, opts: {all: true}};
     }
     let atPos = amVal.indexOf("@");
-    if (atPos == -1) {
+    if (atPos === -1) {
         return {name: amVal, opts: {all: true}};
     }
     else {
@@ -324,26 +324,26 @@ function handleConvertType(ctx : DBCtx, value : string) : any {
             subType = fields[1];
         }
         let convertedVal : HibikiVal = null;
-        if (convertType == "json" || convertType == "jseval") {
-            if (value == null || value == "") {
+        if (convertType === "json" || convertType === "jseval") {
+            if (value == null || value === "") {
                 convertedVal = null;
             }
-            else if (convertType == "json") {
+            else if (convertType === "json") {
                 convertedVal = JSON.parse(value);
             }
             else {
                 let evalVal = eval("(" + value + ")");
-                if (typeof(evalVal) == "function") {
+                if (typeof(evalVal) === "function") {
                     evalVal = evalVal();
                 }
                 convertedVal = evalVal;
             }
-            if (subType == "array") {
+            if (subType === "array") {
                 if (convertedVal != null && !mobx.isArrayLike(convertedVal)) {
                     throw new Error("JSON value is not an array");
                 }
             }
-            if (subType == "map" || subType == "struct") {
+            if (subType === "map" || subType === "struct") {
                 if (convertedVal != null && !isObject(convertedVal)) {
                     throw new Error("JSON value is not an object");
                 }
@@ -423,20 +423,20 @@ function automerge(ctx : DBCtx, automergeAttrs : AutoMergeAttrsType, subName : s
 }
 
 function makeHandlers(node : HibikiNode, handlerPrefixes? : string[]) : Record<string, HandlerValType> {
-    let handlers = {};
-    if (node.attrs != null) {
-        for (let key in node.attrs) {
-            if (key == "handler" || key.endsWith(".handler")) {
-                let eventName = key.replace(/\.handler$/, "");
-                let hname = sprintf("//@event/%s", eventName);
-                handlers[hname] = {handlerStr: node.attrs[key], node: node};
+    let handlers : Record<string, HandlerValType> = {};
+    if (node.handlers != null) {
+        for (let eventName in node.handlers) {
+            if (node.handlers[eventName] == null) {
+                continue;
             }
+            let hname = sprintf("//@event/%s", eventName);
+            handlers[hname] = {block: node.handlers[eventName], node: node};
         }
     }
     if (handlerPrefixes != null && node.list != null) {
         for (let i=0; i<node.list.length; i++) {
             let subNode = node.list[i];
-            if (subNode.tag != "define-handler") {
+            if (subNode.tag !== "define-handler") {
                 continue;
             }
             let attrs = getRawAttrs(subNode);
@@ -455,7 +455,7 @@ function makeHandlers(node : HibikiNode, handlerPrefixes? : string[]) : Record<s
                 }
             }
             if (prefixOk) {
-                handlers[hname] = {handlerStr: textContent(subNode), actions: subNode.handlers["handler"], node: subNode};
+                handlers[hname] = {block: subNode.handlers["handler"], node: subNode};
             }
         }
     }
@@ -468,7 +468,7 @@ function subNodesByTag(node : HibikiNode, tag : string) : HibikiNode[] {
     }
     let rtn = [];
     for (let i=0; i<node.list.length; i++) {
-        if (node.list[i].tag == tag) {
+        if (node.list[i].tag === tag) {
             rtn.push(node.list[i]);
         }
     }
@@ -480,7 +480,7 @@ function firstSubNodeByTag(node : HibikiNode, tag : string) : HibikiNode {
         return null;
     }
     for (let i=0; i<node.list.length; i++) {
-        if (node.list[i].tag == tag) {
+        if (node.list[i].tag === tag) {
             return node.list[i];
         }
     }

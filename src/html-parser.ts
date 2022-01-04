@@ -233,7 +233,6 @@ class HtmlParser {
         if (!name.endsWith(".handler")) {
             return false;
         }
-        node.attrs[name] = value;
         let handlerName = name.substr(0, name.length-8);
         if (node.handlers == null) {
             node.handlers = {};

@@ -58,8 +58,7 @@ type EventType = {
 };
 
 type HandlerValType = {
-    handlerStr : string,
-    actions? : HAction[],
+    block : HandlerBlock,
     node : HibikiNode,
 };
 
