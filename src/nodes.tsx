@@ -327,7 +327,7 @@ class CustomReactNode extends React.Component<HibikiReactProps & {component : Co
         if (reactImpl == null) {
             return null;
         }
-        let attrs = ctx.resolveAttrs({raw: true});
+        let attrs = ctx.resolveAttrVals();
         let nodeVar = NodeUtils.makeNodeVar(ctx);
         let htmlContext = sprintf("react:%s", nodeStr(ctx.node));
         let childEnv = ctx.dataenv.makeChildEnv({node: nodeVar}, {htmlContext: htmlContext, libContext: component.libName});

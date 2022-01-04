@@ -183,13 +183,13 @@ class DBCtx {
         return tagName;
     }
 
-    resolvePath(path : string, opts? : {rtContext? : string}) : any {
+    resolvePath(path : string, opts? : {rtContext? : string}) : HibikiVal {
         opts = opts ?? {};
         let rtContext = opts.rtContext ?? "DBCtx.resolvePath";
         return this.dataenv.resolvePath(path, {rtContext: rtContext});
     }
 
-    evalExpr(expr : string, keepMobx? : boolean) : any {
+    evalExpr(expr : string, keepMobx? : boolean) : HibikiVal {
         return this.dataenv.evalExpr(expr, keepMobx);
     }
 
@@ -219,15 +219,6 @@ class DBCtx {
         return DataCtx.resolveValAttrs(this.node, this.dataenv);
     }
 
-    resolveAttrs(opts? : {raw? : boolean}) : any {
-        if (opts && opts.raw) {
-            return DataCtx.resolveValAttrs(this.node, this.dataenv);
-        }
-        else {
-            return DataCtx.resolveStrAttrs(this.node, this.dataenv);
-        }
-    }
-
     getRawAttr(attrName : string) : string {
         if (!this.node.attrs) {
             return null;
@@ -247,7 +238,7 @@ class DBCtx {
         return resolveCnMapEx(this.node, this.dataenv, classAttr, moreClasses);
     }
 
-    setDataPath(path : string, value : any, rtContext? : string) {
+    setDataPath(path : string, value : HibikiVal, rtContext? : string) {
         rtContext = rtContext ?? "DBCtx.setDataPath";
         this.dataenv.setDataPath(path, value, rtContext);
     }
@@ -299,7 +290,7 @@ class DBCtx {
         return false;
     }
 
-    @boundMethod handleOnChange(newVal : any) : boolean {
+    @boundMethod handleOnChange(newVal : HibikiVal) : boolean {
         this.handleEvent("change", {value: newVal});
         return false;
     }

@@ -193,7 +193,7 @@ function makeNodeVar(ctx : DBCtx) : any {
     rtn.tag = ctx.getHtmlTagName();
     rtn.rawtag = ctx.node.tag;
     rtn._type = "HibikiNode";
-    rtn.attrs = ctx.resolveAttrs({raw: true});
+    rtn.attrs = ctx.resolveAttrVals();
     rtn.stylemap = {};
     rtn.uuid = ctx.uuid;
     rtn.dataenv = ctx.dataenv;
@@ -397,7 +397,7 @@ type AutoMergeAttrsType = {
 };
 
 function automerge(ctx : DBCtx, automergeAttrs : AutoMergeAttrsType, subName : string, opts : any) {
-    let nodeVar = ctx.resolvePath("@node", {rtContext: sprintf("automerge in %s", nodeStr(ctx.node))});
+    let nodeVar : any = ctx.resolvePath("@node", {rtContext: sprintf("automerge in %s", nodeStr(ctx.node))});
     if (nodeVar == null) {
         return;
     }
