@@ -193,8 +193,6 @@ function makeNodeVar(ctx : DBCtx) : any {
     rtn.tag = ctx.getHtmlTagName();
     rtn.rawtag = ctx.node.tag;
     rtn._type = "HibikiNode";
-    rtn.attrs = ctx.resolveAttrVals();
-    rtn.stylemap = {};
     rtn.uuid = ctx.uuid;
     rtn.dataenv = ctx.dataenv;
     return rtn;
@@ -247,32 +245,6 @@ function parseArgsDecl(datatypes : string) : {[e : string] : boolean} {
             field = field.substr(1);
         }
         rtn[field] = isWriteable;
-    }
-    return rtn;
-}
-
-function parseSingleAutomerge(amVal : string) : {name? : string, opts? : any} {
-    if (amVal === "1") {
-        return {name: null, opts: {all: true}};
-    }
-    let atPos = amVal.indexOf("@");
-    if (atPos === -1) {
-        return {name: amVal, opts: {all: true}};
-    }
-    else {
-        let fields = amVal.split("@", 2);
-        let opts = {};
-        opts[fields[1]] = true;
-        return {name: fields[0], opts: opts};
-    }
-}
-
-function parseAutomerge(amAttr : string) : any[] {
-    let amVals = amAttr.split(",");
-    let rtn = [];
-    for (let i=0; i<amVals.length; i++) {
-        let amVal = amVals[i];
-        rtn.push(parseSingleAutomerge(amVal));
     }
     return rtn;
 }
@@ -337,57 +309,6 @@ function handleConvertType(ctx : DBCtx, value : string) : any {
         }
     }
     return value;
-}
-
-function _mergeCnMap(cnMap : {[e:string] : boolean}, initCnMap : {[e:string] : boolean}) : {[e:string] : boolean} {
-    let rtn : {[e:string] : boolean} = initCnMap || {};
-    for (let k in cnMap) {
-        rtn[k] = cnMap[k];
-    }
-    return rtn;
-}
-
-function _mergeStyles(styleMap : {[e:string] : any}, initStyles : {[e:string] : any}) : {[e:string] : any} {
-    let rtn : {[e:string] : any} = initStyles || {};
-    if (styleMap == null) {
-        return rtn;
-    }
-    for (let k in styleMap) {
-        rtn[k] = styleMap[k];
-    }
-    return rtn;
-}
-
-type AutoMergeAttrsType = {
-    style: {[e:string] : any},
-    cnMap: {[e:string] : boolean},
-    disabled: boolean,
-};
-
-function automerge(ctx : DBCtx, automergeAttrs : AutoMergeAttrsType, subName : string, opts : any) {
-    let nodeVar : any = ctx.resolvePath("@node", {rtContext: sprintf("automerge in %s", nodeStr(ctx.node))});
-    if (nodeVar == null) {
-        return;
-    }
-    if (opts.all || opts["class"]) {
-        let name = (subName ? "class-" + subName : "class");
-        let nodeVarCnMap = nodeVar.cnmap[name];
-        let mergedCnMap = _mergeCnMap(nodeVarCnMap, automergeAttrs.cnMap);
-        automergeAttrs.cnMap = mergedCnMap;
-    }
-    if (opts.all || opts["style"]) {
-        let styleName = (subName ? "style-" + subName : "style");
-        let nodeVarStyles = nodeVar.stylemap[styleName]
-        let mergedStyles = _mergeStyles(nodeVarStyles, automergeAttrs.style);
-        automergeAttrs.style = mergedStyles;
-    }
-    if (opts.all || opts["disabled"]) {
-        let name = (subName ? "disabled-" + subName : "disabled");
-        if (nodeVar.attrs.disabled) {
-            automergeAttrs.disabled = true;
-            automergeAttrs.cnMap["disabled"] = true;
-        }
-    }
 }
 
 function makeHandlers(node : HibikiNode, handlerPrefixes? : string[]) : Record<string, HandlerValType> {
@@ -466,4 +387,4 @@ function getRawAttrs(node : HibikiNode) : Record<string, string> {
     return rtn;
 }
 
-export {BLOCKED_ELEMS, INLINE_ELEMS, SPECIAL_ATTRS, BLOB_ATTRS, SUBMIT_ELEMS, MANAGED_ATTRS, renderTextSpan, renderTextData, makeNodeVar, makeChildrenVar, parseArgsDecl, parseAutomerge, handleConvertType, automerge, makeHandlers, subNodesByTag, firstSubNodeByTag, getManagedType, getRawAttrs};
+export {BLOCKED_ELEMS, INLINE_ELEMS, SPECIAL_ATTRS, BLOB_ATTRS, SUBMIT_ELEMS, MANAGED_ATTRS, renderTextSpan, renderTextData, makeNodeVar, makeChildrenVar, parseArgsDecl, handleConvertType, makeHandlers, subNodesByTag, firstSubNodeByTag, getManagedType, getRawAttrs};

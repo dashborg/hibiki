@@ -248,6 +248,8 @@ function getStyleMap(node : HibikiNode, ns : string, dataenv : DataEnvironment, 
 type ResolveOpts = {
     style? : boolean,
     rtContext? : string,
+    noAutoMerge? : boolean,
+    noBindings? : boolean,
 };
 
 // turns empty string into null
@@ -463,9 +465,10 @@ function getAttributeValPair(node : HibikiNode, attrName : string, dataenv : Dat
     if (!node) {
         return [null, false];
     }
+    opts = opts ?? {};
 
     // check forceInclude automerge
-    let am = checkSingleAutoMerge(node, attrName, "self");
+    let am = (opts.noAutoMerge ? [[], []] : checkSingleAutoMerge(node, attrName, "self"));
     if (am[1].length > 0) {
         let [amVal, exists] = resolveAutoMergePair(am[1], attrName, dataenv);
         if (exists) {
@@ -474,7 +477,7 @@ function getAttributeValPair(node : HibikiNode, attrName : string, dataenv : Dat
     }
 
     // check node.bindings
-    if (node.bindings && node.bindings[attrName] != null) {
+    if (!opts.noBindings && node.bindings && node.bindings[attrName] != null) {
         let [lv, rtnVal, exists] = resolveLValueAttrParts(node, attrName, dataenv);
         if (exists) {
             return [exValToVal(rtnVal), true];
@@ -504,14 +507,27 @@ function getAttributeValPair(node : HibikiNode, attrName : string, dataenv : Dat
     return [null, false];
 }
 
+function resolveForcedAutoMergeAttrs(node : HibikiNode, dataenv : DataEnvironment) : Record<string, HibikiVal> {
+    let rtn : Record<string, HibikiVal> = {};
+    return rtn;
+}
+
+function resolveAutoMergeAttrs(node : HibikiNode, dataenv : DataEnvironment) : Record<string, HibikiVal> {
+    let rtn : Record<string, HibikiVal> = {};
+    return rtn;
+}
+
 function resolveValAttrs(node : HibikiNode, dataenv : DataEnvironment) : Record<string, HibikiVal> {
     if (node.attrs == null) {
         return {};
     }
-    let rtn = {};
+    let rtn = resolveForcedAutoMergeAttrs(node, dataenv);
     if (node.bindings != null) {
         for (let key in node.bindings) {
-            let [val, exists] = getAttributeValPair(node, key, dataenv);
+            if (key in rtn) {
+                continue;
+            }
+            let [val, exists] = getAttributeValPair(node, key, dataenv, {noAutoMerge: true});
             if (exists) {
                 rtn[key] = val;
             }
@@ -522,11 +538,18 @@ function resolveValAttrs(node : HibikiNode, dataenv : DataEnvironment) : Record<
             if (key in rtn) {
                 continue;
             }
-            let [val, exists] = getAttributeValPair(node, key, dataenv);
+            let [val, exists] = getAttributeValPair(node, key, dataenv, {noAutoMerge: true, noBindings: true});
             if (exists) {
                 rtn[key] = val;
             }
         }
+    }
+    let amAttrs = resolveAutoMergeAttrs(node, dataenv);
+    for (let key in amAttrs) {
+        if (key in rtn) {
+            continue;
+        }
+        rtn[key] = amAttrs[key];
     }
     return rtn;
 }
