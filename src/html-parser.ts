@@ -27,7 +27,7 @@ type ParseContext = {
 function splitAmVal(amVal : string) : [string, string, string[]] {
     let match = amVal.match(/^(?:([a-zA-Z0-9]+)(?:=>([a-zA-Z0-9]+))?)?(?:@(.*))?$/);
     if (match == null) {
-        return null;
+        return [null, null, null];
     }
     let [_, source, dest, rest] = match;
     if (source == null) {
@@ -47,6 +47,9 @@ function parseSingleAutomerge(amVal : string) : AutoMergeExpr {
         return {source: "self", dest: "self", include: {"all": true}};
     }
     let [source, dest, parts] = splitAmVal(amVal);
+    if (source == null) {
+        return null;
+    }
     let rtn : AutoMergeExpr = {source: source, dest: dest};
     for (let i=0; i<parts.length; i++) {
         let partStr = parts[i].toLowerCase();
@@ -81,6 +84,9 @@ function parseSingleAutofire(amVal : string) : AutoFireExpr {
         return {source: "self", dest: "self", include: {"all": true}};
     }
     let [source, dest, parts] = splitAmVal(amVal);
+    if (source == null) {
+        return null;
+    }
     let rtn : AutoFireExpr = {source: source, dest: dest, include: {}};
     for (let i=0; i<parts.length; i++) {
         let partStr = parts[i].toLowerCase();
@@ -100,7 +106,10 @@ function parseAutoMerge(amAttr : string) : AutoMergeExpr[] {
     let rtn : AutoMergeExpr[] = [];
     for (let i=0; i<amVals.length; i++) {
         let amVal = amVals[i].trim();
-        rtn.push(parseSingleAutomerge(amVal));
+        let expr = parseSingleAutomerge(amVal);
+        if (expr != null) {
+            rtn.push(expr);
+        }
     }
     return rtn;
 }
@@ -116,7 +125,10 @@ function parseAutoFire(amAttr : string) : AutoFireExpr[] {
     let rtn : AutoFireExpr[] = [];
     for (let i=0; i<amVals.length; i++) {
         let amVal = amVals[i].trim();
-        rtn.push(parseSingleAutofire(amVal));
+        let expr = parseSingleAutofire(amVal);
+        if (expr != null) {
+            rtn.push(expr);
+        }
     }
     return rtn;
 }

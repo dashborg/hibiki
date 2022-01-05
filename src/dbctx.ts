@@ -11,87 +11,6 @@ import * as NodeUtils from "./nodeutils";
 import {nodeStr} from "./utils";
 import {RtContext} from "./error";
 
-let NODASHELEM = {
-    "tr": true,
-    "td": true,
-    "th": true,
-    "tbody": true,
-    "thead": true,
-    "option": true,
-
-    "html-tr": true,
-    "html-td": true,
-    "html-th": true,
-    "html-tbody": true,
-    "html-thead": true,
-    "html-option": true,
-};
-
-function resolveCnMapEx(node : HibikiNode, dataenv : DataEnvironment, classAttr : string, moreClasses : string) {
-    let classAttrVal = DataCtx.getAttributeStr(node, classAttr, dataenv) || "";
-    let classVal = (moreClasses || "") + " " + classAttrVal;
-    let rawCnArr = classVal.split(/\s+/);
-    let cnMap = {};
-    let noDashElem = false;
-    if (dataenv.dbstate.Ui != "dashborg") {
-        noDashElem = true;
-    }
-    for (let i=0; i<rawCnArr.length; i++) {
-        let val = rawCnArr[i].trim();
-        if (val == "") {
-            continue;
-        }
-        if (val == "no-dashelem" || val == "-dashelem") {
-            noDashElem = true;
-        }
-        if (val.startsWith("no-")) {
-            delete cnMap[val.substr(3)];
-            continue;
-        }
-        if (val.startsWith("-")) {
-            delete cnMap[val.substr(1)];
-            continue;
-        }
-        cnMap[val] = true;
-        if (val == "row") {
-            delete cnMap["col"];
-        }
-        if (val == "col") {
-            delete cnMap["row"];
-        }
-        if (val == "segments") {
-            delete cnMap["segment"];
-        }
-    }
-    if (cnMap["row"] || cnMap["col"]) {
-        cnMap["dashelem"] = true;
-    }
-    else if (cnMap["dashinline"]) {
-        delete cnMap["dashinline"];
-    }
-    else {
-        if (!noDashElem && !NODASHELEM[node.tag]) {
-            cnMap["dashelem"] = true;
-        }
-    }
-    if (node.attrs != null) {
-        for (let [k,v] of Object.entries(node.attrs)) {
-            if (!k.startsWith(classAttr + ".")) {
-                continue;
-            }
-            let kval = k.substr(classAttr.length+1);
-            let rval = DataCtx.getAttributeStr(node, k, dataenv);
-            if (rval) {
-                cnMap[kval] = true;
-            }
-            else {
-                delete cnMap[kval];
-            }
-        }
-    }
-    return cnMap;
-}
-
 async function convertFormData(formData : FormData) : Promise<Record<string, any>> {
     let params = {};
     for (let key of (formData as any).keys()) {
@@ -126,23 +45,6 @@ async function convertFormData(formData : FormData) : Promise<Record<string, any
     }
     return params;
 }
-
-// dbstate
-//   Components
-//   queueScriptSrc
-//   queueScriptText
-//   Ui
-//   setDataPath
-//   parseHtml
-//   reportError
-//   PanelDOMRoot
-//   unregisterDataNodeState
-//   queuePostScriptRunFn
-//   fireScriptsLoaded
-//   startPushStream
-//   callData
-//   findTemplate
-//   findScript
 
 class DBCtx {
     dataenv : DataEnvironment;
@@ -238,8 +140,12 @@ class DBCtx {
         return DataCtx.getStyleMap(this.node, "self", this.dataenv, initStyles);
     }
 
-    resolveCnMap(classAttr : string, moreClasses? : string) {
-        return resolveCnMapEx(this.node, this.dataenv, classAttr, moreClasses);
+    resolveNsCnArray(ns : string, moreClasses? : string) : Record<string, boolean>[] {
+        return DataCtx.resolveCnArray(this.node, ns, this.dataenv, moreClasses);
+    }
+
+    resolveCnArray(moreClasses? : string) : Record<string, boolean>[] {
+        return DataCtx.resolveCnArray(this.node, "self", this.dataenv, moreClasses);
     }
 
     setDataPath(path : string, value : HibikiVal, rtContext? : string) {
@@ -363,4 +269,4 @@ class DBCtx {
     }
 }
 
-export {DBCtx, resolveCnMapEx};
+export {DBCtx};

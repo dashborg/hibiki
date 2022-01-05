@@ -197,27 +197,6 @@ function makeNodeVar(ctx : DBCtx) : any {
     rtn.stylemap = {};
     rtn.uuid = ctx.uuid;
     rtn.dataenv = ctx.dataenv;
-    rtn.cnmap = {};
-
-    // classes
-    let classAttrs = {};
-    for (let attrkey in rtn.attrs) {
-        if (attrkey === "class") {
-            classAttrs["class"] = true;
-            continue;
-        }
-        if (!attrkey.startsWith("class-")) {
-            continue;
-        }
-        let dotIndex = attrkey.indexOf(".");
-        if (dotIndex !== -1) {
-            attrkey = attrkey.substr(0, dotIndex);
-        }
-        classAttrs[attrkey] = true;
-    }
-    for (let cnAttr in classAttrs) {
-        rtn.cnmap[cnAttr] = ctx.resolveCnMap(cnAttr);
-    }
     return rtn;
 }
 

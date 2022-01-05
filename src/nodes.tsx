@@ -92,15 +92,11 @@ class HibikiRootNode extends React.Component<{hibikiState : HibikiExtState}, {}>
         let node = this.getHibikiNode();
         let dataenv = this.getDataenv();
         let ctx = new DBCtx(null, node, dataenv);
-        let rootClasses = "";
-        if (ctx.dataenv.dbstate.Ui == "dashborg") {
-            rootClasses += "rootdiv dashelem col";
-        }
-        let cnMap = ctx.resolveCnMap("class", rootClasses);
+        let cnArr = ctx.resolveCnArray();
         let style = ctx.resolveStyleMap();
         this.renderingDBState = ctx.dataenv.dbstate;
         return (
-            <div style={style} className={cn(cnMap)}>
+            <div style={style} className={cn(cnArr)}>
                 <NodeList list={ctx.node.list} ctx={ctx} isRoot={true}/>
             </div>
         );
@@ -588,6 +584,9 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
             if (k.endsWith(".bindpath") || k.endsWith(".handler") || k.endsWith(".default")) {
                 continue;
             }
+            if (k.startsWith("class.") || k.indexOf(":class") != -1) {
+                continue;
+            }
             if (v instanceof DataCtx.HibikiBlob) {
                 console.log("hibikiblob", k, v);
                 if (NodeUtils.BLOB_ATTRS[k]) {
@@ -646,44 +645,15 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
         }
 
         let style = ctx.resolveStyleMap();
-        let cnMap = ctx.resolveCnMap("class");
+        let cnArr = ctx.resolveCnArray();
         if (Object.keys(style).length > 0) {
             elemProps["style"] = style;
         }
-        if (Object.keys(cnMap).length > 0) {
-            elemProps["className"] = cn(cnMap);
+        if (Object.keys(cnArr).length > 0) {
+            elemProps["className"] = cn(cnArr);
         }
-        
-        // automerge
-        // this.doAutomerge(ctx, attrVals, elemProps);
         let elemChildren = ctxRenderHtmlChildren(ctx);
         return React.createElement(tagName, elemProps, elemChildren);
-    }
-
-    doAutomerge(ctx : DBCtx, attrs : Record<string, HibikiVal>, elemProps : Record<string, any>) {
-        let style = ctx.resolveStyleMap();
-        let cnMap = ctx.resolveCnMap("class");
-        let automergeAttrs = {
-            style: style,
-            cnMap: cnMap,
-            disabled: null,
-        };
-        if (attrs.automerge != null) {
-            let automergeArr = NodeUtils.parseAutomerge(DataCtx.valToStr(attrs.automerge));
-            for (let i=0; i<automergeArr.length; i++) {
-                let amParams = automergeArr[i];
-                NodeUtils.automerge(ctx, automergeAttrs, amParams.name, amParams.opts);
-            }
-        }
-        if (Object.keys(automergeAttrs.style).length > 0) {
-            elemProps["style"] = automergeAttrs.style;
-        }
-        if (Object.keys(automergeAttrs.cnMap).length > 0) {
-            elemProps["className"] = cn(automergeAttrs.cnMap);
-        }
-        if (automergeAttrs.disabled != null) {
-            elemProps["disabled"] = automergeAttrs.disabled;
-        }
     }
 }
 
@@ -1401,10 +1371,10 @@ class DataPagerNode extends React.Component<HibikiReactProps, {}> {
 class DashElemNode extends React.Component<{ctx : DBCtx, extClass? : string, extStyle? : any}, {}> {
     render() {
         let ctx = this.props.ctx;
-        let cnMap = ctx.resolveCnMap("class", this.props.extClass);
+        let cnArr = ctx.resolveCnArray(this.props.extClass);
         let style = ctx.resolveStyleMap(this.props.extStyle);
         return (
-            <div className={cn(cnMap, "dashelem")} style={style}>
+            <div className={cn(cnArr, "dashelem")} style={style}>
                 {this.props.children}
             </div>
         );
