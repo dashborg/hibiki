@@ -7,7 +7,7 @@ import {sprintf} from "sprintf-js";
 import {parseHtml} from "./html-parser";
 import {RtContext, getShortEMsg, HibikiError} from "./error";
 import {makeUrlParamsFromObject, SYM_PROXY, SYM_FLATTEN, isObject, stripAtKeys, unpackPositionalArgs, nodeStr, parseHandler, fullPath, blobPrintStr, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP} from "./utils";
-import {PathPart, PathType, PathUnionType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue, HandlerBlock, NodeAttrType, HibikiVal, HibikiNode, HibikiValEx} from "./types";
+import {PathPart, PathType, PathUnionType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue, HandlerBlock, NodeAttrType, HibikiVal, HibikiNode, HibikiValEx, AutoMergeExpr} from "./types";
 import {HibikiRequest} from "./request";
 import type {EHandlerType} from "./state";
 import {doParse} from "./hibiki-parser";
@@ -375,17 +375,7 @@ function checkSingleAutoMerge(node : HibikiNode, attrName : string, ns : string)
         if (amExpr.dest !== ns) {
             continue;
         }
-        let include = false;
-        let includeForce = false;
-        if (amExpr.exclude != null && (amExpr.exclude[attrName] || amExpr.exclude["all"])) {
-            continue;
-        }
-        if (amExpr.include != null && (amExpr.include[attrName] || amExpr.include["all"])) {
-            include = true;
-        }
-        if (amExpr.includeForce != null && (amExpr.includeForce[attrName] || amExpr.includeForce["all"])) {
-            includeForce = true;
-        }
+        let [include, includeForce] = checkAMAttr(amExpr, attrName);
         if (includeForce) {
             rtn[1].push(amExpr.source);
         }
@@ -507,13 +497,58 @@ function getAttributeValPair(node : HibikiNode, attrName : string, dataenv : Dat
     return [null, false];
 }
 
-function resolveForcedAutoMergeAttrs(node : HibikiNode, dataenv : DataEnvironment) : Record<string, HibikiVal> {
-    let rtn : Record<string, HibikiVal> = {};
-    return rtn;
+
+// the order matters here.  first check for specific attr, then check for all.
+// start with exclude, then includeForce, then include.
+// returns [include, includeForced]
+function checkAMAttr(amExpr : AutoMergeExpr, attrName : string) : [boolean, boolean] {
+    if (amExpr.exclude != null && amExpr.exclude[attrName]) {
+        return [false, false];
+    }
+    if (amExpr.includeForce != null && amExpr.includeForce[attrName]) {
+        return [true, true];
+    }
+    if (amExpr.include != null && amExpr.include[attrName]) {
+        return [true, false];
+    }
+    if (amExpr.exclude != null && amExpr.exclude["all"]) {
+        return [false, false];
+    }
+    if (amExpr.includeForce != null && amExpr.includeForce["all"]) {
+        return [true, true];
+    }
+    if (amExpr.include != null && amExpr.include["all"]) {
+        return [true, false];
+    }
+    return [false, false];
 }
 
-function resolveAutoMergeAttrs(node : HibikiNode, dataenv : DataEnvironment) : Record<string, HibikiVal> {
+function resolveAutoMergeAttrs(node : HibikiNode, ns : string, dataenv : DataEnvironment, forced : boolean) : Record<string, HibikiVal> {
     let rtn : Record<string, HibikiVal> = {};
+    if (node.automerge == null || node.automerge.length === 0) {
+        return rtn;
+    }
+    let argsRoot = dataenv.getArgsRoot();
+    if (argsRoot == null || argsRoot["@ns"] == null || argsRoot["@ns"][ns] == null) {
+        return rtn;
+    }
+    let nsRoot = argsRoot["@ns"][ns];
+    for (let i=0; i<node.automerge.length; i++) {
+        let amExpr = node.automerge[i];
+        if (amExpr.dest != ns) {
+            continue;
+        }
+        for (let srcAttr in nsRoot) {
+            if (NON_ARGS_ATTRS[srcAttr] || srcAttr == "@style" || srcAttr == "class" || srcAttr.startsWith("class.")) {
+                continue;
+            }
+            let [include, includeForce] = checkAMAttr(amExpr, srcAttr, forced);
+            if (forced && includeForce || !forced && include && !includeForce) {
+                rtn[srcAttr] = nsRoot[srcAttr];
+            }
+        }
+    }
+    console.log("resolve am", node.tag, node.automerge);
     return rtn;
 }
 
@@ -521,10 +556,10 @@ function resolveValAttrs(node : HibikiNode, dataenv : DataEnvironment) : Record<
     if (node.attrs == null) {
         return {};
     }
-    let rtn = resolveForcedAutoMergeAttrs(node, dataenv);
+    let rtn = resolveAutoMergeAttrs(node, "self", dataenv, true);
     if (node.bindings != null) {
         for (let key in node.bindings) {
-            if (key in rtn) {
+            if (key in rtn || NON_ARGS_ATTRS[key]) {
                 continue;
             }
             let [val, exists] = getAttributeValPair(node, key, dataenv, {noAutoMerge: true});
@@ -535,7 +570,7 @@ function resolveValAttrs(node : HibikiNode, dataenv : DataEnvironment) : Record<
     }
     if (node.attrs != null) {
         for (let key in node.attrs) {
-            if (key in rtn) {
+            if (key in rtn || NON_ARGS_ATTRS[key]) {
                 continue;
             }
             let [val, exists] = getAttributeValPair(node, key, dataenv, {noAutoMerge: true, noBindings: true});
@@ -544,9 +579,9 @@ function resolveValAttrs(node : HibikiNode, dataenv : DataEnvironment) : Record<
             }
         }
     }
-    let amAttrs = resolveAutoMergeAttrs(node, dataenv);
+    let amAttrs = resolveAutoMergeAttrs(node, "self", dataenv, false);
     for (let key in amAttrs) {
-        if (key in rtn) {
+        if (key in rtn || NON_ARGS_ATTRS[key]) {
             continue;
         }
         rtn[key] = amAttrs[key];
