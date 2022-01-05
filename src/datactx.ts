@@ -321,7 +321,7 @@ function resolveAttrValPair(k : string, v : NodeAttrType, dataenv : DataEnvironm
     return [resolvedVal, true];
 }
 
-function resolveLValueAttrParts(node : HibikiNode, attrName : string, dataenv : DataEnvironment) : [LValue, HibikiValEx, boolean] {
+function resolveNonAmLValueAttrParts(node : HibikiNode, attrName : string, dataenv : DataEnvironment) : [LValue, HibikiValEx, boolean] {
     if (node.bindings == null || node.bindings[attrName] == null) {
         return [null, null, false];
     }
@@ -341,8 +341,65 @@ function resolveLValueAttrParts(node : HibikiNode, attrName : string, dataenv : 
     return [lvRtn, exVal, true];
 }
 
-function resolveLValueAttr(node : HibikiNode, attrName : string, dataenv : DataEnvironment) : LValue {
-    let [lvalue, val, exists] = resolveLValueAttrParts(node, attrName, dataenv);
+function resolveAutoMergeLValue(sourceArr : string[], attrName : string, dataenv : DataEnvironment) : LValue {
+    if (sourceArr == null || sourceArr.length == 0) {
+        return null;
+    }
+    let argsRoot = dataenv.getArgsRoot();
+    if (argsRoot == null || argsRoot["@ns"] == null) {
+        return null;
+    }
+    for (let i=0; i<sourceArr.length; i++) {
+        let source = sourceArr[i];
+        let nsArgs = argsRootSource(argsRoot, source);
+        if (nsArgs == null) {
+            continue;
+        }
+        if (attrName in nsArgs) {
+            let val = nsArgs[attrName];
+            if (val instanceof LValue) {
+                return val;
+            }
+        }
+    }
+    return null;
+}
+
+function resolveLValueAttrParts(node : HibikiNode, attrName : string, dataenv : DataEnvironment, opts? : ResolveOpts) : [LValue, HibikiValEx, boolean] {
+    opts = opts ?? {};
+    let am = (opts.noAutoMerge ? [[], []] : checkSingleAutoMerge(node, attrName, "self"));
+
+    if (am[1].length > 0) {
+        let lv = resolveAutoMergeLValue(am[1], attrName, dataenv);
+        if (lv != null) {
+            let exVal = lv.getEx();
+            if (exVal !== SYM_NOATTR) {
+                return [lv, exVal, true];
+            }
+        }
+    }
+
+    let [lvRtn, exVal, exists] = resolveNonAmLValueAttrParts(node, attrName, dataenv);
+    if (exists) {
+        return [lvRtn, exVal, true];
+    }
+    
+    if (am[0].length > 0) {
+        let lv = resolveAutoMergeLValue(am[0], attrName, dataenv);
+        if (lv != null) {
+            let exVal = lv.getEx();
+            if (exVal !== SYM_NOATTR) {
+                return [lv, exVal, true];
+            }
+        }
+    }
+
+    return [null, null, false];
+}
+
+function resolveLValueAttr(node : HibikiNode, attrName : string, dataenv : DataEnvironment, opts? : ResolveOpts) : LValue {
+    opts = opts ?? {};
+    let [lvalue, val, exists] = resolveLValueAttrParts(node, attrName, dataenv, opts);
     return lvalue;
 }
 
@@ -386,11 +443,18 @@ function checkSingleAutoMerge(node : HibikiNode, attrName : string, ns : string)
     return rtn;
 }
 
+function argsRootSource(argsRoot : Record<string, HibikiValEx>, source : string) : Record<string, HibikiValEx> {
+    if (argsRoot == null || argsRoot["@ns"] == null) {
+        return null;
+    }
+    return argsRoot["@ns"][source];
+}
+
 function resolveAutoMergeCnArraySingle(source : string, argsRoot : Record<string, HibikiValEx>) : [Record<string, boolean>[], boolean] {
     if (source == null || argsRoot == null || argsRoot["@ns"] == null || argsRoot["@ns"][source] == null) {
         return [null, false];
     }
-    let srcRoot = argsRoot["@ns"][source];
+    let srcRoot = argsRootSource(argsRoot, source);
     let exists = ("class" in srcRoot);
     let cnArr = makeCnArr(srcRoot["class"]);
     for (let [k,v] of Object.entries(srcRoot)) {
@@ -439,15 +503,14 @@ function resolveAutoMergePair(sourceArr : string[], attrName : string, dataenv :
     }
     for (let i=0; i<sourceArr.length; i++) {
         let source = sourceArr[i];
-        let nsArgs = argsRoot["@ns"][source];
+        let nsArgs = argsRootSource(argsRoot, source);
         if (nsArgs == null) {
             continue;
         }
         if (attrName in nsArgs) {
-            return [nsArgs[attrName], true];
+            return [exValToVal(nsArgs[attrName]), true];
         }
     }
-    
     return [null, false];
 }
 
@@ -468,7 +531,7 @@ function getAttributeValPair(node : HibikiNode, attrName : string, dataenv : Dat
 
     // check node.bindings
     if (!opts.noBindings && node.bindings && node.bindings[attrName] != null) {
-        let [lv, rtnVal, exists] = resolveLValueAttrParts(node, attrName, dataenv);
+        let [lv, rtnVal, exists] = resolveLValueAttrParts(node, attrName, dataenv, {noAutoMerge: true});
         if (exists) {
             return [exValToVal(rtnVal), true];
         }
@@ -532,7 +595,7 @@ function resolveAutoMergeAttrs(node : HibikiNode, ns : string, dataenv : DataEnv
     if (argsRoot == null || argsRoot["@ns"] == null || argsRoot["@ns"][ns] == null) {
         return rtn;
     }
-    let nsRoot = argsRoot["@ns"][ns];
+    let nsRoot = argsRootSource(argsRoot, ns);
     for (let i=0; i<node.automerge.length; i++) {
         let amExpr = node.automerge[i];
         if (amExpr.dest != ns) {
@@ -542,13 +605,12 @@ function resolveAutoMergeAttrs(node : HibikiNode, ns : string, dataenv : DataEnv
             if (NON_ARGS_ATTRS[srcAttr] || srcAttr == "@style" || srcAttr == "class" || srcAttr.startsWith("class.")) {
                 continue;
             }
-            let [include, includeForce] = checkAMAttr(amExpr, srcAttr, forced);
+            let [include, includeForce] = checkAMAttr(amExpr, srcAttr);
             if (forced && includeForce || !forced && include && !includeForce) {
-                rtn[srcAttr] = nsRoot[srcAttr];
+                rtn[srcAttr] = exValToVal(nsRoot[srcAttr]);
             }
         }
     }
-    console.log("resolve am", node.tag, node.automerge);
     return rtn;
 }
 
@@ -652,7 +714,7 @@ function resolveArgsRoot(node : HibikiNode, dataenv : DataEnvironment) : Record<
     let rtn = {"@bound": {}, "@ns": {}};
     if (node.bindings != null) {
         for (let key in node.bindings) {
-            let lvalue = resolveLValueAttr(node, key, dataenv);
+            let lvalue = resolveLValueAttr(node, key, dataenv, {noAutoMerge: true});
             if (lvalue != null) {
                 _assignToArgsRoot(rtn, key, lvalue, true);
             }
