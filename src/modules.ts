@@ -1,6 +1,6 @@
 // Copyright 2021 Dashborg Inc
 
-import {isObject, unpackPositionalArgs, stripAtKeys, getHibiki, fullPath, getSS, setSS, smartEncodeParam, unpackArg, unpackAtArgs, blobPrintStr, base64ToArray} from "./utils";
+import {isObject, unpackPositionalArgs, stripAtKeys, getHibiki, fullPath, getSS, setSS, smartEncodeParam, unpackArg, unpackAtArgs, blobPrintStr, base64ToArray, callHook} from "./utils";
 import {sprintf} from "sprintf-js";
 import type {HibikiState} from "./state";
 import type {AppModuleConfig, FetchHookFn, Hibiki, HibikiAction, HandlerPathType, HibikiExtState} from "./types";
@@ -154,6 +154,47 @@ function jsonReplacer(key : string, value : any) : any {
     return DataCtx.MapReplacer.bind(this)(key, value);
 }
 
+function DefaultCsrfHook() {
+    let csrfToken = null;
+    let csrfMwElem = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (csrfMwElem != null) {
+        csrfToken = (csrfMwElem as any).value;
+    }
+    let csrfMetaElem = document.querySelector("meta[name=csrf-token]");
+    if (csrfMetaElem != null) {
+        csrfToken = (csrfMetaElem as any).content;
+    }
+    return csrfToken;   
+}
+
+function setCsrfHeaders(state : HibikiState, url : URL, fetchInit : Record<string, any>, data : any) {
+    let csrfMethods = state.Config.csrfMethods ?? ["POST", "PUT", "PATCH"];
+    if (csrfMethods.indexOf(fetchInit.method) == -1) {
+        return;
+    }
+    let csrfToken = unpackArg(data, "@csrf");
+    if (csrfToken == null) {
+        csrfToken = state.Config.csrfToken;
+    }
+    if (csrfToken == null) {
+        csrfToken = callHook("CsrfHook", (state.Config.hooks.csrfHook ?? DefaultCsrfHook), url);
+    }
+    if (csrfToken == null) {
+        return;
+    }
+    let headerNames = this.Config.csrfHeaders ?? ["X-Csrf-Token", "X-CSRFToken"];
+    for (let h in headerNames) {
+        fetchInit.headers.set(h, csrfToken);
+    }
+    let paramNames = this.Config.csrfParams ?? [];
+    for (let p in paramNames) {
+        if (fetchInit["csrfParams"] == null) {
+            fetchInit["csrfParams"] = {};
+        }
+        fetchInit["csrfParams"][p] = csrfToken;
+    }
+}
+
 function setParams(method : string, url : URL, fetchInit : Record<string, any>, data : any) {
     if (data == null || !isObject(data)) {
         return;
@@ -162,7 +203,7 @@ function setParams(method : string, url : URL, fetchInit : Record<string, any>, 
     if (atData != null && !isObject(atData)) {
         throw new Error("Invalid @data, must be an object: type=" + typeof(atData));
     }
-    let params = Object.assign({}, (atData ?? {}), stripAtKeys(data));
+    let params = Object.assign({}, fetchInit["csrfParams"], (atData ?? {}), stripAtKeys(data));
     let encoding = unpackArg(data, "@encoding");
     if (method == "GET" || method == "DELETE") {
         if (encoding != null && encoding != "url") {
@@ -200,6 +241,10 @@ function setParams(method : string, url : URL, fetchInit : Record<string, any>, 
         throw new Error("Invalid @encoding specified (must be 'json', 'url', 'form', or 'multipart'): " + encoding);
     }
     return;
+}
+
+function runFetchHooks(state : HibikiState, url : URL, fetchInit : Record<string, any>) {
+    callHook("FetchHook", state.Config.hooks.fetchHook, url, fetchInit);
 }
 
 function buildFetchInit(req : HibikiRequest, defaultInit : any, defaultHeaders : Record<string, any>) : any{
@@ -250,8 +295,9 @@ class HttpModule {
         if (!VALID_METHODS[fetchInit.method]) {
             throw new Error(sprintf("Invalid method '%s' passed to http handler %s", fetchInit.method, fullPath(req.callpath)));
         }
+        setCsrfHeaders(this.state, url, fetchInit, req.data);
         setParams(fetchInit.method, url, fetchInit, req.data);
-        this.state.runFetchHooks(url, fetchInit);
+        runFetchHooks(this.state, url, fetchInit);
         let p = fetch(url.toString(), fetchInit).then((resp) => handleFetchResponse(url, resp));
         return p;
     }
@@ -319,8 +365,9 @@ class AppModule {
         if (!VALID_METHODS[fetchInit.method]) {
             throw new Error(sprintf("Invalid method '%s' passed to handler %s", fetchInit.method, fullPath(req.callpath)));
         }
+        setCsrfHeaders(this.state, url, fetchInit, req.data);
         setParams(fetchInit.method, url, fetchInit, req.data);
-        this.state.runFetchHooks(url, fetchInit);
+        runFetchHooks(this.state, url, fetchInit);
         let p = fetch(url.toString(), fetchInit).then((resp) => handleFetchResponse(url, resp));
         return p;
     }

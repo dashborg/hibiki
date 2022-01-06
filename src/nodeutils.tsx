@@ -2,6 +2,7 @@
 
 import * as mobx from "mobx";
 import * as React from "react";
+import * as cn from "classnames/dedupe";
 
 import {DBCtx} from "./dbctx";
 import type {HibikiNode, HandlerValType, HibikiVal} from "./types";
@@ -80,7 +81,6 @@ let SPECIAL_ATTRS = {
 let UNMANAGED_INPUT_TYPES = {
     "submit": true,
     "button": true,
-    "hidden": true,
     "reset": true,
     "image": true,
 };
@@ -93,7 +93,7 @@ let MANAGED_ATTRS = {
     "select": {"value": true, "defaultvalue": true},
 };
 
-function getManagedType(tagName : string, typeName : string) : ("value" | "radio" | "checkbox" | "file" | "select" | null) {
+function getManagedType(tagName : string, typeName : string) : ("value" | "radio" | "checkbox" | "file" | "select" | "hidden" | null) {
     if (tagName === "select") {
         return "select";
     }
@@ -106,7 +106,7 @@ function getManagedType(tagName : string, typeName : string) : ("value" | "radio
     if (UNMANAGED_INPUT_TYPES[typeName]) {
         return null;
     }
-    if (typeName === "radio" || typeName === "checkbox" || typeName === "file") {
+    if (typeName === "radio" || typeName === "checkbox" || typeName === "file" || typeName == "hidden") {
         return typeName;
     }
     return "value";

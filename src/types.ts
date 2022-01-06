@@ -101,7 +101,7 @@ type AppModuleConfig = {
 };
 
 type FetchHookFn = string | ((url : URL, fetchInit : Record<string, any>) => void);
-type CsrfHookFn = string | ((url : URL) => Record<string, string>);
+type CsrfHookFn = string | ((url : URL) => string);
 type ErrorCallbackFn = string | ((HibikiError) => void);
 type EventCallbackFn = string | ((EventType) => void);
 
@@ -121,6 +121,10 @@ type HibikiConfig = {
     noUsageImg? : boolean,
     noWelcomeMessage? : boolean,
     modules? : Record<string, ModuleConfig>,
+    csrfHeaders? : string[],
+    csrfParams? : string[],
+    csrfToken? : string,
+    csrfMethods? : string[],
 };
 
 type PathUnionType = string | PathType;

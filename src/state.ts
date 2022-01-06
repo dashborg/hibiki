@@ -5,7 +5,7 @@ import md5 from "md5";
 import {sprintf} from "sprintf-js";
 import {boundMethod} from 'autobind-decorator'
 import {v4 as uuidv4} from 'uuid';
-import type {HibikiNode, ComponentType, LibraryType, HibikiConfig, HibikiHandlerModule, HibikiAction, EventType, HandlerValType, JSFuncType, CsrfHookFn, FetchHookFn, Hibiki, ErrorCallbackFn, HtmlParserOpts, HandlerBlock, NodeAttrType, HibikiVal, HibikiValEx} from "./types";
+import type {HibikiNode, ComponentType, LibraryType, HibikiConfig, HibikiHandlerModule, HibikiAction, EventType, HandlerValType, JSFuncType, Hibiki, ErrorCallbackFn, HtmlParserOpts, HandlerBlock, NodeAttrType, HibikiVal, HibikiValEx} from "./types";
 import * as DataCtx from "./datactx";
 import {isObject, textContent, SYM_PROXY, SYM_FLATTEN, nodeStr, callHook, getHibiki, parseHandler, fullPath, parseUrlParams, smartDecodeParams, blobPrintStr, unbox} from "./utils";
 import {subNodesByTag, firstSubNodeByTag} from "./nodeutils";
@@ -772,24 +772,6 @@ class HibikiExtState {
     }
 }
 
-function DefaultCsrfHook() {
-    let csrfToken = null;
-    let csrfMwElem = document.querySelector('[name=csrfmiddlewaretoken]');
-    if (csrfMwElem != null) {
-        csrfToken = (csrfMwElem as any).value;
-    }
-    let csrfMetaElem = document.querySelector("meta[name=csrf-token]");
-    if (csrfMetaElem != null) {
-        csrfToken = (csrfMetaElem as any).content;
-    }
-    if (csrfToken != null) {
-        return {
-            "X-Csrf-Token": csrfToken,
-            "X-CSRFToken": csrfToken,
-        };
-    }
-}
-
 class HibikiState {
     FeClientId : string = null;
     Ui : string = null;
@@ -807,8 +789,6 @@ class HibikiState {
     PageName : mobx.IObservableValue<string> = mobx.observable.box("default", {name: "PageName"});
     InitCallbacks : (() => void)[];
     JSFuncs : Record<string, JSFuncType>;
-    CsrfHook : CsrfHookFn;
-    FetchHook : FetchHookFn;
     NodeUuidMap : Map<string, DBCtx> = new Map();
     
     Modules : Record<string, HibikiHandlerModule> = {};
@@ -822,7 +802,6 @@ class HibikiState {
         this.InitCallbacks = [];
         let hibiki = getHibiki();
         this.JSFuncs = hibiki.JSFuncs;
-        this.CsrfHook = DefaultCsrfHook;
         window.addEventListener("popstate", this.popStateHandler);
     }
     
@@ -835,17 +814,6 @@ class HibikiState {
         };
         let rtctx = new RtContext();
         DataCtx.ExecuteHandlerBlock([action], false, this.pageDataenv(), rtctx, true);
-    }
-
-    runFetchHooks(url : URL, fetchInit : any) {
-        fetchInit.headers = fetchInit.headers || new Headers();
-        let csrfHeaders = callHook("CsrfHook", this.CsrfHook, url);
-        if (csrfHeaders != null) {
-            for (let h in csrfHeaders) {
-                fetchInit.headers.set(h, csrfHeaders[h]);
-            }
-        }
-        callHook("FetchHook", this.FetchHook, url, fetchInit);
     }
 
     setInitCallback(fn : () => void) {
@@ -919,13 +887,8 @@ class HibikiState {
     @mobx.action setConfig(config : HibikiConfig) {
         config = config ?? {};
         this.Config = config;
-        if (config.hooks != null) {
-            if (config.hooks.csrfHook != null) {
-                this.CsrfHook = config.hooks.csrfHook;
-            }
-            if (config.hooks.fetchHook != null) {
-                this.FetchHook = config.hooks.fetchHook;
-            }
+        if (config.hooks == null) {
+            config.hooks = {};
         }
         let hibiki = getHibiki();
         let mreg = hibiki.ModuleRegistry;

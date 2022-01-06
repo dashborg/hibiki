@@ -476,6 +476,16 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
         elemProps["onChange"] = this.handleFileOnChange;
     }
 
+    setupManagedHidden(ctx : DBCtx, elemProps : Record<string, any>) {
+        let formValueLV = ctx.resolveLValueAttr("formvalue");
+        if (formValueLV != null) {
+            let value = ctx.resolveAttrStr("value") ?? "";
+            if (DataCtx.valToStr(formValueLV.get()) !== value) {
+                setTimeout(() => formValueLV.set(value), 0);
+            }
+        }
+    }
+
     setupManagedRadio(ctx : DBCtx, elemProps : Record<string, any>) {
         let isBound = !!ctx.resolveAttrStr("bound");
         let formValueLV = ctx.resolveLValueAttr("formvalue");
@@ -638,6 +648,9 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
                 else if (managedType == "select") {
                     this.setupManagedSelect(ctx, elemProps);
                 }
+                else if (managedType == "hidden") {
+                    this.setupManagedHidden(ctx, elemProps);
+                }
                 else {
                     console.log("Invalid managedType", managedType);
                 }
@@ -795,11 +808,12 @@ class DateFormatNode extends React.Component<HibikiReactProps, {}> {
         let modeAttr = ctx.resolveAttrStr("mode");
         let nulltext = ctx.resolveAttrStr("nulltext");
         let style = ctx.resolveStyleMap();
+        let cnArr = ctx.resolveCnArray();
         if (typeof(bindVal) == "string" && modeAttr == "parse") {
             try {
                 bindVal = parseFloat(dayjs(bindVal).format("x"));
             } catch (e) {
-                return NodeUtils.renderTextSpan("invalid", style);
+                return NodeUtils.renderTextSpan("invalid", style, cn(cnArr));
             }
         }
         let relativeAttr = !!ctx.resolveAttrStr("relative");
@@ -808,13 +822,13 @@ class DateFormatNode extends React.Component<HibikiReactProps, {}> {
             bindVal = parseFloat(bindVal);
         }
         if (bindVal == null) {
-            return NodeUtils.renderTextSpan(nulltext ?? "null", style);
+            return NodeUtils.renderTextSpan(nulltext ?? "null", style, cn(cnArr));
         }
         if (bindVal == 0 && !durationAttr) {
-            return NodeUtils.renderTextSpan(nulltext ?? "null", style);
+            return NodeUtils.renderTextSpan(nulltext ?? "null", style, cn(cnArr));
         }
         if (typeof(bindVal) != "number" || isNaN(bindVal)) {
-            return NodeUtils.renderTextSpan("invalid", style);
+            return NodeUtils.renderTextSpan("invalid", style, cn(cnArr));
         }
         let text = null;
         try {
@@ -851,7 +865,7 @@ class DateFormatNode extends React.Component<HibikiReactProps, {}> {
         } catch (e) {
             text = "ERR[" + e + "]";
         }
-        return NodeUtils.renderTextSpan(text, style);
+        return NodeUtils.renderTextSpan(text, style, cn(cnArr));
     }
 }
 
