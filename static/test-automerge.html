@@ -16,6 +16,7 @@
       input:value.bindpath="$.form.name" input:style="color: red; font-weight: bold;" input:maxlength=10 input:class="extra"
       t4:style="color: blue; font-style: italic"
       t5:class.has-background-info-light="0" t5:class="has-text-weight-bold"
+      l2:class.test5 l2:class="-test1"
     >
     </local-level1>
 
@@ -38,7 +39,7 @@
         <div automerge="t2@class">automerge t2@class, +has-text-info</div>
         <div automerge="t3@!class" class="has-text-success">automerge t3@!class, has-text-weight-bold (no has-text-success)</div>
       </div>
-      <local-level2 automerge="input=>input,t4=>remap,t5=>t5@class" x="55"></local-level2>
+      <local-level2 class="test1 test2 test3" class.test2="0" class.test4 automerge="input=>input,t4=>remap,t5=>t5@class,l2@!class" x="55"></local-level2>
     </define-component>
 
     <define-component name="level2">

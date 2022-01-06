@@ -18,9 +18,27 @@ const PARSED_ATTRS = {
     "automerge": true,
 };
 
+const NON_BINDABLE_ATTRS = {
+    "bind": true,
+    "if": true,
+    "foreach": true,
+    "condition": true,
+    "automerge": true,
+    "style": true,
+    "class": true, // including all class.[class] attrs
+};
+
 type ParseContext = {
     sourceName : string,
     tagStack : string[],
+}
+
+function baseAttrName(attrName : string) : string {
+    let colonIdx = attrName.indexOf(":");
+    if (colonIdx === -1) {
+        return attrName;
+    }
+    return attrName.substr(colonIdx+1);
 }
 
 // returns [source, dest, parts]
@@ -262,6 +280,10 @@ class HtmlParser {
 
     parseBindPathAttr(node : HibikiNode, name : string, value : string, pctx : ParseContext) : boolean {
         if (!name.endsWith(".bindpath")) {
+            return false;
+        }
+        let baseName = baseAttrName(name);
+        if (NON_BINDABLE_ATTRS[baseName] || name.startsWith("class.")) {
             return false;
         }
         if (value.trim() === "") {

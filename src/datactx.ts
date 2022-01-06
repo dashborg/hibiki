@@ -663,7 +663,7 @@ function resolveValAttrs(node : HibikiNode, dataenv : DataEnvironment) : Record<
     return rtn;
 }
 
-function _assignToArgsRootNs(argsRoot : Record<string, HibikiValEx>, key : string, val : HibikiValEx) {
+function _assignToArgsRootNs(argsRoot : Record<string, HibikiValEx>, key : string, val : HibikiValEx, forced? : boolean) {
     let colonIdx = key.indexOf(":");
     let ns : string = null;
     let baseName : string = null;
@@ -692,6 +692,25 @@ function _assignToArgsRootNs(argsRoot : Record<string, HibikiValEx>, key : strin
         argsRoot["@ns"][ns] = {};
     }
     let nsRoot = argsRoot["@ns"][ns];
+    if (baseName == "class" || baseName.startsWith("class.")) {
+        if (!forced && nsRoot["@classlock"]) {
+            return;
+        }
+        if (forced) {
+            nsRoot["@classlock"] = true;
+        }
+        if (baseName == "class") {
+            console.log("CLASS", ns, val);
+            nsRoot["class"] = cn(nsRoot["class"], val);
+        }
+        else {
+            if (baseName in nsRoot) {
+                return;
+            }
+            nsRoot[baseName] = val;
+        }
+        return;
+    }
     if (baseName in nsRoot) {
         return;
     }
@@ -736,7 +755,7 @@ function resolveArgsRootAutoMerge(outputArgsRoot : Record<string, HibikiValEx>, 
                 else {
                     destAttrName = amExpr.dest + ":" + srcAttr;
                 }
-                _assignToArgsRootNs(outputArgsRoot, destAttrName, val);
+                _assignToArgsRootNs(outputArgsRoot, destAttrName, val, forced);
             }
         }
     }
@@ -748,7 +767,10 @@ function mergeArgsRootNs(argsRoot : Record<string, HibikiValEx>, ns : string) {
     }
     let nsRoot = argsRoot["@ns"][ns];
     for (let key in nsRoot) {
-        if (key == "@ns" || key == "@bound") {
+        if (key.startsWith("@")) {
+            continue;
+        }
+        if (key == "class" || key.startsWith("class.")) {
             continue;
         }
         argsRoot[key] = nsRoot[key];
@@ -785,21 +807,6 @@ function resolveArgsRoot(node : HibikiNode, dataenv : DataEnvironment) : Record<
             if (key in argsRoot || NON_ARGS_ATTRS[key]) {
                 continue;
             }
-            if (key.startsWith(":")) {
-                continue;
-            }
-            let [val, exists] = getAttributeValPair(node, key, dataenv, {noAutoMerge: true, noBindings: true});
-            if (exists) {
-                _assignToArgsRootNs(argsRoot, key, val);
-            }
-        }
-        for (let key in node.attrs) {
-            if (key in argsRoot || NON_ARGS_ATTRS[key]) {
-                continue;
-            }
-            if (!key.startsWith(":")) {
-                continue;
-            }
             let [val, exists] = getAttributeValPair(node, key, dataenv, {noAutoMerge: true, noBindings: true});
             if (exists) {
                 _assignToArgsRootNs(argsRoot, key, val);
@@ -821,9 +828,15 @@ function resolveArgsRoot(node : HibikiNode, dataenv : DataEnvironment) : Record<
     // automerge
     resolveArgsRootAutoMerge(argsRoot, node, dataenv, false);
 
-    // merge to $args from self, then overwrite with root.
+    // merge to $args from self, then overwrite with root.  does not merge "class" args
     mergeArgsRootNs(argsRoot, "self");
     mergeArgsRootNs(argsRoot, "root");
+
+    // specially compute class for argsRoot
+    let cnArr = resolveCnArray(node, "self", dataenv, null);
+    if (cnArr != null && cnArr.length > 0) {
+        argsRoot["class"] = cn(cnArr);
+    }
 
     return argsRoot;
 }
