@@ -418,6 +418,7 @@ const NON_ARGS_ATTRS = {
     "eid": true,
     "ref": true,
     "condition": true,
+    "automerge": true,
 };
 
 // returns [includeSources[], includeForceSources[]]
@@ -565,6 +566,12 @@ function getAttributeValPair(node : HibikiNode, attrName : string, dataenv : Dat
 // start with exclude, then includeForce, then include.
 // returns [include, includeForced]
 function checkAMAttr(amExpr : AutoMergeExpr, attrName : string) : [boolean, boolean] {
+    if (attrName == "@style") {
+        attrName = "style";
+    }
+    if (attrName.startsWith("class.")) {
+        attrName = "class";
+    }
     if (amExpr.exclude != null && amExpr.exclude[attrName]) {
         return [false, false];
     }
@@ -586,23 +593,23 @@ function checkAMAttr(amExpr : AutoMergeExpr, attrName : string) : [boolean, bool
     return [false, false];
 }
 
-function resolveAutoMergeAttrs(node : HibikiNode, ns : string, dataenv : DataEnvironment, forced : boolean) : Record<string, HibikiVal> {
+function resolveAutoMergeAttrs(node : HibikiNode, destNs : string, dataenv : DataEnvironment, forced : boolean) : Record<string, HibikiVal> {
     let rtn : Record<string, HibikiVal> = {};
     if (node.automerge == null || node.automerge.length === 0) {
         return rtn;
     }
     let argsRoot = dataenv.getArgsRoot();
-    if (argsRoot == null || argsRoot["@ns"] == null || argsRoot["@ns"][ns] == null) {
+    if (argsRoot == null || argsRoot["@ns"] == null) {
         return rtn;
     }
-    let nsRoot = argsRootSource(argsRoot, ns);
     for (let i=0; i<node.automerge.length; i++) {
         let amExpr = node.automerge[i];
-        if (amExpr.dest != ns) {
+        if (amExpr.dest != destNs) {
             continue;
         }
+        let nsRoot = argsRootSource(argsRoot, amExpr.source);
         for (let srcAttr in nsRoot) {
-            if (NON_ARGS_ATTRS[srcAttr] || srcAttr == "@style" || srcAttr == "class" || srcAttr.startsWith("class.")) {
+            if (NON_ARGS_ATTRS[srcAttr] || srcAttr.startsWith("@") || srcAttr == "class" || srcAttr.startsWith("class.")) {
                 continue;
             }
             let [include, includeForce] = checkAMAttr(amExpr, srcAttr);
@@ -614,8 +621,9 @@ function resolveAutoMergeAttrs(node : HibikiNode, ns : string, dataenv : DataEnv
     return rtn;
 }
 
+// no style, class is fully resolved.
 function resolveValAttrs(node : HibikiNode, dataenv : DataEnvironment) : Record<string, HibikiVal> {
-    if (node.attrs == null) {
+    if (node.attrs == null && node.automerge == null) {
         return {};
     }
     let rtn = resolveAutoMergeAttrs(node, "self", dataenv, true);
@@ -632,7 +640,7 @@ function resolveValAttrs(node : HibikiNode, dataenv : DataEnvironment) : Record<
     }
     if (node.attrs != null) {
         for (let key in node.attrs) {
-            if (key in rtn || NON_ARGS_ATTRS[key]) {
+            if (key in rtn || NON_ARGS_ATTRS[key] || key == "class" || key.startsWith("class.")) {
                 continue;
             }
             let [val, exists] = getAttributeValPair(node, key, dataenv, {noAutoMerge: true, noBindings: true});
@@ -647,6 +655,10 @@ function resolveValAttrs(node : HibikiNode, dataenv : DataEnvironment) : Record<
             continue;
         }
         rtn[key] = amAttrs[key];
+    }
+    let cnArr = resolveCnArray(node, "self", dataenv, null);
+    if (cnArr != null && cnArr.length > 0) {
+        rtn["class"] = cn(cnArr);
     }
     return rtn;
 }
@@ -708,7 +720,7 @@ function resolveArgsRootAutoMerge(outputArgsRoot : Record<string, HibikiValEx>, 
             continue;
         }
         for (let srcAttr in srcRoot) {
-            if (srcAttr.startsWith("@")) {
+            if (srcAttr.startsWith("@") && srcAttr != "@style") {
                 continue;
             }
             let [include, includeForce] = checkAMAttr(amExpr, srcAttr);
@@ -809,7 +821,7 @@ function resolveArgsRoot(node : HibikiNode, dataenv : DataEnvironment) : Record<
     // automerge
     resolveArgsRootAutoMerge(argsRoot, node, dataenv, false);
 
-    // merge
+    // merge to $args from self, then overwrite with root.
     mergeArgsRootNs(argsRoot, "self");
     mergeArgsRootNs(argsRoot, "root");
 

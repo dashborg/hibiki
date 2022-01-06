@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<script src="/hibiki-test.js"></script>
+<div class="container">
+  <template hibiki>
+    <hibiki-data>
+      {"color": "blue", "form": {"name": "mike"}}
+    </hibiki-data>
+    
+    <h1 class="title">AutoMerge Test</h1>
+    <local-level1
+      x="10" color="*$.color" style="color:blue;" :radio="root" radio="self"
+      class="has-text-weight-bold" class.has-text-success
+      t1:class.has-text-success="0"
+      t2:class.has-text-info
+      t3:class.has-text-weight-bold
+      input:value.bindpath="$.form.name" input:style="color: red; font-weight: bold;" input:maxlength=10 input:class="extra"
+      t4:style="color: blue; font-style: italic"
+      t5:class.has-background-info-light="0" t5:class="has-text-weight-bold"
+    >
+    </local-level1>
+
+    <define-component name="level1">
+      <div class="box content">
+        <h4 class="title is-4">Level 1</h4>
+        <ul>
+          <li>$.form={{ $args.@ns.input.value | format("json-compact") }}
+          <li>x={{ $args.x }} | 10
+          <li>color={{ $args.color }} | blue
+          <li>radio:
+            $args.radio="{{ $args.radio }}" |
+            $args.@ns.self.radio="{{ $args.@ns.self.radio }}" |
+            $args.@ns.root.radio="{{ $args.@ns.root.radio }}"
+        </ul>
+        <div automerge="@style" style="font-weight: bold;">automerge @style - color blue + bold</div>
+        <div automerge="@!style" style="font-weight: bold;">automerge @!style - color blue</div>
+        <div automerge="@class">automerge @class, has-text-weight-bold + has-text-success</div>
+        <div automerge="t1@class" class="has-text-success">automerge t1@class, -has-text-success</div>
+        <div automerge="t2@class">automerge t2@class, +has-text-info</div>
+        <div automerge="t3@!class" class="has-text-success">automerge t3@!class, has-text-weight-bold (no has-text-success)</div>
+      </div>
+      <local-level2 automerge="input=>input,t4=>remap,t5=>t5@class" x="55"></local-level2>
+    </define-component>
+
+    <define-component name="level2">
+      <div class="box content">
+        <h4 class="title is-4">Level 2</h4>
+        <input name="i1" class="input" automerge="input">
+        <br>
+        (text should be red+bold, maxlength=10)
+        <br>
+        <input name="i2" class="input" z="1" automerge="input@all|-style|-maxlength">
+        <br>
+        (text should be regular, no maxlength)
+        <br>
+        <div automerge="remap@style">blue+italic text</div>
+        <div automerge="t5" class="has-background-info-light p-3">not light blue background + bold</div>
+        <pre>{{$args|format("json")}}</pre>
+      </div>
+    </define-component>
+  </template>
+</div>
+
