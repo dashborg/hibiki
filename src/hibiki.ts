@@ -106,10 +106,14 @@ function loadTag(elem : HTMLElement) : HibikiExtState {
             renderNode = document.getElementById(forElemId);
         }
         if (renderNode == null) {
-            let siblingNode = document.createElement("div");
-            siblingNode.classList.add("hibiki-root");
-            elem.parentNode.insertBefore(siblingNode, elem.nextSibling); // insertAfter
-            renderNode = siblingNode;
+            renderNode = document.createElement("div");
+            renderNode.classList.add("hibiki-root");
+            if (elem.parentElement.tagName.toLowerCase() == "head") {
+                document.querySelector("body").prepend(renderNode);
+            }
+            else {
+                elem.parentNode.insertBefore(renderNode, elem.nextSibling); // insert after elem
+            }
         }
         let state = createState({}, elem, null);
         render(renderNode, state);
@@ -193,4 +197,9 @@ let hibiki : Hibiki = {
 
 window.Hibiki = hibiki;
 
-document.addEventListener("DOMContentLoaded", () => autoloadTags());
+if (document.readyState == "loading") {
+    document.addEventListener("DOMContentLoaded", () => autoloadTags());
+}
+else {
+    autoloadTags();
+}
