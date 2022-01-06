@@ -651,59 +651,103 @@ function resolveValAttrs(node : HibikiNode, dataenv : DataEnvironment) : Record<
     return rtn;
 }
 
-function _argsRootAddKey(argsRoot : Record<string, HibikiValEx>, key : string, val : HibikiValEx) {
-    argsRoot[key] = val;
-    if (val instanceof LValue) {
-        if (argsRoot["@bound"] == null) {
-            argsRoot["@bound"] = {};
-        }
-        argsRoot["@bound"][key] = true;
-    }
-}
-
-function _assignToArgsRoot(argsRoot : Record<string, HibikiValEx>, key : string, val : HibikiValEx, addToNs : boolean) {
-    if (NON_ARGS_ATTRS[key]) {
-        return;
-    }
+function _assignToArgsRootNs(argsRoot : Record<string, HibikiValEx>, key : string, val : HibikiValEx) {
     let colonIdx = key.indexOf(":");
-    let noAdd = (colonIdx != -1);
-    // let noAdd = (addToNs && key.endsWith("@style")) || key.endsWith(".handler") || (colonIdx != -1);
-    if (!noAdd && !(key in argsRoot)) {
-        _argsRootAddKey(argsRoot, key, val);
-    }
-    if (!addToNs) {
-        return false;
-    }
+    let ns : string = null;
+    let baseName : string = null;
     if (colonIdx === -1) {
-        if (argsRoot["@ns"]["self"] == null) {
-            argsRoot["@ns"]["self"] = {};
-        }
-        _assignToArgsRoot(argsRoot["@ns"]["self"], key, val, false);
+        ns = "self";
+        baseName = key;
     }
     else if (colonIdx === 0) {
         if (key.length === 1) {
             return;
         }
-        // root keys overwrite standard args keys (but do not get added to self)
-        if (!key.endsWith("@style")) {
-            _argsRootAddKey(argsRoot, key.substr(1), val);
-        }
-        if (argsRoot["@ns"]["root"] == null) {
-            argsRoot["@ns"]["root"] = {};
-        }
-        _assignToArgsRoot(argsRoot["@ns"]["root"], key.substr(1), val, false);
+        ns = "root";
+        baseName = key.substr(1);
     }
     else {
-        let fields = key.split(":", 2);
-        let ns = fields[0];
-        let nskey = fields[1];
-        if (nskey === "") {
+        ns = key.substr(0, colonIdx);
+        baseName = key.substr(colonIdx+1);
+        if (baseName == "") {
             return;
         }
-        if (argsRoot["@ns"][ns] == null) {
-            argsRoot["@ns"][ns] = {};
+    }
+    if (NON_ARGS_ATTRS[baseName]) {
+        return;
+    }
+    if (argsRoot["@ns"][ns] == null) {
+        argsRoot["@ns"][ns] = {};
+    }
+    let nsRoot = argsRoot["@ns"][ns];
+    if (baseName in nsRoot) {
+        return;
+    }
+    nsRoot[baseName] = val;
+    if (val instanceof LValue) {
+        if (nsRoot["@bound"] == null) {
+            nsRoot["@bound"] = {};
         }
-        _assignToArgsRoot(argsRoot["@ns"][ns], nskey, val, false);
+        nsRoot["@bound"][baseName] = true;
+    }
+}
+
+function resolveArgsRootAutoMerge(outputArgsRoot : Record<string, HibikiValEx>, node : HibikiNode, dataenv : DataEnvironment, forced : boolean) {
+    if (node.automerge == null || node.automerge.length === 0) {
+        return;
+    }
+    let argsRoot = dataenv.getArgsRoot();
+    if (argsRoot == null || argsRoot["@ns"] == null) {
+        return;
+    }
+
+    for (let i=0; i<node.automerge.length; i++) {
+        let amExpr = node.automerge[i];
+        let srcRoot = argsRootSource(argsRoot, amExpr.source);
+        if (srcRoot == null) {
+            continue;
+        }
+        for (let srcAttr in srcRoot) {
+            if (srcAttr.startsWith("@")) {
+                continue;
+            }
+            let [include, includeForce] = checkAMAttr(amExpr, srcAttr);
+            if (forced && includeForce || !forced && include && !includeForce) {
+                let val = srcRoot[srcAttr];
+                let destAttrName : string = null;
+                if (amExpr.dest === "self") {
+                    destAttrName = srcAttr;
+                }
+                else if (amExpr.dest === "root") {
+                    destAttrName = ":" + srcAttr;
+                }
+                else {
+                    destAttrName = amExpr.dest + ":" + srcAttr;
+                }
+                _assignToArgsRootNs(outputArgsRoot, destAttrName, val);
+            }
+        }
+    }
+}
+
+function mergeArgsRootNs(argsRoot : Record<string, HibikiValEx>, ns : string) {
+    if (argsRoot["@ns"][ns] == null) {
+        return;
+    }
+    let nsRoot = argsRoot["@ns"][ns];
+    for (let key in nsRoot) {
+        if (key == "@ns" || key == "@bound") {
+            continue;
+        }
+        argsRoot[key] = nsRoot[key];
+    }
+    if (nsRoot["@bound"] != null) {
+        if (argsRoot["@bound"] == null) {
+            argsRoot["@bound"] = {};
+        }
+        for (let key in nsRoot["@bound"]) {
+            argsRoot["@bound"][key] = nsRoot["@bound"][key];
+        }
     }
 }
 
@@ -711,38 +755,65 @@ function resolveArgsRoot(node : HibikiNode, dataenv : DataEnvironment) : Record<
     if (node.attrs == null) {
         return {};
     }
-    let rtn = {"@bound": {}, "@ns": {}};
+    let argsRoot = {"@ns": {}};
+
+    // forced automerge
+    resolveArgsRootAutoMerge(argsRoot, node, dataenv, true);
+    
     if (node.bindings != null) {
         for (let key in node.bindings) {
             let lvalue = resolveLValueAttr(node, key, dataenv, {noAutoMerge: true});
             if (lvalue != null) {
-                _assignToArgsRoot(rtn, key, lvalue, true);
+                _assignToArgsRootNs(argsRoot, key, lvalue);
             }
         }
     }
     if (node.attrs != null) {
         for (let key in node.attrs) {
-            if (key in rtn) {
+            if (key in argsRoot || NON_ARGS_ATTRS[key]) {
                 continue;
             }
-            let [val, exists] = getAttributeValPair(node, key, dataenv);
+            if (key.startsWith(":")) {
+                continue;
+            }
+            let [val, exists] = getAttributeValPair(node, key, dataenv, {noAutoMerge: true, noBindings: true});
             if (exists) {
-                _assignToArgsRoot(rtn, key, val, true);
+                _assignToArgsRootNs(argsRoot, key, val);
+            }
+        }
+        for (let key in node.attrs) {
+            if (key in argsRoot || NON_ARGS_ATTRS[key]) {
+                continue;
+            }
+            if (!key.startsWith(":")) {
+                continue;
+            }
+            let [val, exists] = getAttributeValPair(node, key, dataenv, {noAutoMerge: true, noBindings: true});
+            if (exists) {
+                _assignToArgsRootNs(argsRoot, key, val);
             }
         }
     }
     if (node.style != null) {
-        _assignToArgsRoot(rtn, "@style", node.style, true);
+        _assignToArgsRootNs(argsRoot, "@style", node.style);
     }
     if (node.morestyles != null) {
         for (let key in node.morestyles) {
             let styleNs = key.replace(":style", "");
             let styleMap = getStyleMap(node, styleNs, dataenv);
             let styleName = key.replace(":style", ":@style");
-            _assignToArgsRoot(rtn, styleName, styleMap, true);
+            _assignToArgsRootNs(argsRoot, styleName, styleMap);
         }
     }
-    return rtn;
+
+    // automerge
+    resolveArgsRootAutoMerge(argsRoot, node, dataenv, false);
+
+    // merge
+    mergeArgsRootNs(argsRoot, "self");
+    mergeArgsRootNs(argsRoot, "root");
+
+    return argsRoot;
 }
 
 function resolveStrAttrs(node : HibikiNode, dataenv : DataEnvironment) : Record<string, string> {
