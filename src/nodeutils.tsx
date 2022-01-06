@@ -153,12 +153,12 @@ function filterSubNodes(node : HibikiNode, filterFn : (HibikiNode) => boolean) :
     return DataCtx.demobx(rtn);
 }
 
-function renderTextSpan(text : string, style : any) : any {
+function renderTextSpan(text : string, style : any, className : string) : any {
     if (text === undefined) {
         text = null;
     }
-    if (style != null && Object.keys(style).length > 0) {
-        return <span style={style}>{text}</span>;
+    if (style != null && Object.keys(style).length > 0 || (className != null && className.trim() !== "")) {
+        return <span style={style} className={className}>{text}</span>;
     }
     return text;
 }
@@ -166,6 +166,7 @@ function renderTextSpan(text : string, style : any) : any {
 function renderTextData(node : HibikiNode, dataenv : DataEnvironment, onlyText? : boolean) : any {
     let ctx = new DBCtx(null, node, dataenv);
     let style = ctx.resolveStyleMap();
+    let cnArr = ctx.resolveCnArray();
     let bindVal = DataCtx.demobx(ctx.resolveAttrVal("bind"));
     let rtn : string = null;
     let nullTextAttr : string = null;
@@ -181,7 +182,7 @@ function renderTextData(node : HibikiNode, dataenv : DataEnvironment, onlyText? 
     if (onlyText) {
         return rtn;
     }
-    return renderTextSpan(rtn, style);
+    return renderTextSpan(rtn, style, cn(cnArr));
 }
 
 function makeNodeVar(ctx : DBCtx) : any {

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<script src="/hibiki-test.js"></script>
+<div class="container m-4">
+  <template hibiki>
+    <hibiki-data>
+      {"color": "blue", "name": "mike", "PI": 3.14159, "x": 55, "idx": 2, "arr": [1,1,2,3,5,8],
+       "point": {"x": 5, "y": 2}, "fruits1": ["apple"]}
+    </hibiki-data>
+    <div class="box content" style="background-color: *$.color; color: white">
+      <p>Blue background with white text.</p>
+      <p>Name is [{{$.name}}] [<h-text bind="$.name"></h-text>]</p>
+      <p>Formatting &pi;</p>
+      <ul>
+        <li><h-text bind="$.PI" format="%0.2f"></h-text> (2 decimals)
+        <li><h-text bind="$.PI" format="%0.2f" style="font-weight: bold;"></h-text> (2 decimals, bold)
+        <li>{{ $.PI | format("%0.3f") }} (3 decimals)
+        <li><h-text bind="$.PI" format="%0.3f" class="has-text-weight-bold"></h-text> (3 decimals, bold)
+        <li><h-text bind="$.empty" nulltext="(is empty)"></h-text> (nulltext)
+        <li><h-text bind="$.empty" nulltext="(is empty)" style="font-weight: bold;"></h-text> (nulltext, bold)
+      </ul>
+    </div>
+    <div class.box class.has-background-info-light>
+      class.[name] test, light blue background
+    </div>
+    <div class="has-background-info-light" class.box class.has-background-info-light="0">
+      class.[name] test, no background
+    </div>
+    <div class="box has-text-weight-bold -has-text-weight-bold" class.has-background-warning-light="*$.x == 55">
+      class.[name] test, light yellow background, not bold
+    </div>
+    <div class="box has-text-weight-bold no-has-text-weight-bold" class.has-background-warning-light="1">
+      class.[name] test, light yellow background, not bold<br>
+      JSON-point={{$.point | format("json")}} | json-compact point={{$.point | format("json-compact")}}
+    </div>
+    <div class="box content">
+      <p>Expressions</p>
+      <ul>
+        <li>2 + 4 = {{ 2 + 4 }}
+        <li>2 * 4 = {{ 2 * 4 }}
+        <li>2 / 4 = {{ 2 / 4 }}
+        <li>2 / 0 = {{ 2 / 0 }}
+        <li>7 % 2 = {{ 3 % 2 }}
+        <li>
+          5 > 2 = {{ 5 > 2 }} | 5 < 2 = {{ 5 < 2 }} | 5 >=2 {{ 5 >= 2 }} | 5 <= 2 {{ 5<= 2 }}
+          | 5 == 2 {{ 5 == 2 }} | 5 != 2 = {{ 5 != 2 }}
+        <li>
+          ?:(true-case) {{ "2" == 2 ? "true" : "false" }}
+        <li>
+          ?:(false-case) {{ 2 != 1+1 ? "true" : "false" }}
+        <li>null ?? "5" ?? "7" = {{ null ?? "5" ?? "7" }}
+        <li>-5.2={{ -5.2 }} | -5.2={{-5.2-1+1}}
+        <li>(+"5")+5={{+"5"+5}}
+        <li>noattr = {{noattr}}
+      </ul>
+    </div>
+    <div class="box content">
+      <div>
+        if-test
+        <input type="checkbox" checked.bindpath="$.checked">
+        <span if="$.checked">(checked)</span>
+        <span if="!$.checked">(not checked)</span>
+      </div>
+      <div>
+        simple foreach <span foreach="@v in $.arr">{{ @v }} </span>
+      </div>
+      <div>
+        foreach + if (expected 1,1,3,5,8)
+        <span foreach="(@v,@idx) in $.arr" if="@v != 2">{{ @v }}{{ (@idx != fn:len($.arr)-1) ? "," : "" }}</span>
+      </div>
+    </div>
+    <div class="box content">
+      <p>function test</p>
+      <ul>
+        <li>len 6={{ fn:len($.arr) }} | 0={{ fn:len(null) }} | 5={{ fn:len("hello") }} | 1={{ fn:len(5) }}
+        <li>indexOf 2={{ fn:indexof("hello", "ll") }}, -1={{ fn:indexof("hello", "bar") }}
+        <li>min 5={{ fn:min(88, 22, 5, 7) }}
+        <li>max 8={{ fn:max(5+3, 2, -77, 0) }}
+        <li>splice [1,3,5,8]={{ fn:splice($.arr, 1, 2) | format("json-compact") }}
+        <li>slice [3,5]={{ fn:slice($.arr, 3, 5) | format("json-compact") }}
+        <li>push [8,12]={{ fn:push([], 8, 12) | format("json-compact") }}
+        <li>pop [1,1,2,3]={{ fn:pop(fn:pop($.arr)) | format("json-compact") }}
+        <li>setadd ["apple"]={{ fn:setadd($.fruits1, "apple") | format("json-compact") }}
+          | ["apple","banana"]={{ fn:setadd($.fruits1, "banana") | format("json-compact") }}
+        <li>setremove []={{fn:setremove($.fruits1, "apple") | format("json-compact")}}
+        <li>sethas true={{fn:sethas($.fruits1, "apple")}} | false={{fn:sethas($.fruits1, "banana")}}
+        <li>int 55={{fn:int("55x")}} | float 55.5={{fn:float("55.2")+0.3}} | str 55={{fn:str(5)+5}}
+        <li>bool true={{fn:bool(5)}} | false={{fn:bool("")}}
+        <li>jsonparse 1,2,3={{(fn:jsonparse("[1,2,3]"))}}
+        <li>json {"x":22}={{fn:json({x: 22})}}
+        <li>ts = {{fn:ts()}} | <h-dateformat bind="fn:ts()"></h-dateformat>
+        <li>merge {"x":55,"z":5,"y":22}={{fn:merge({x: 55, z:10}, {y:22, z:5}) | format("json-compact")}}
+        <li>startswith true={{fn:startswith("banana", "ba")}} | false={{fn:startswith("apple", "ba")}}
+        <li>endswith true={{fn:endswith("banana", "na")}} | false={{fn:endswith("apple", "na")}}
+        <li>substr nan={{fn:substr("banana", 2, 3)}}
+        <li>sprintf [PI is 3.14] [{{fn:sprintf("PI is %0.2f", $.PI)}}]
+        <li>match 58={{fn:match("xyz58tt", "\\d+")}}
+          | ["5","8"]={{fn:match("xyz58tt", "(\\d)", "g") | format("json-compact")}}
+        <li>uuid = {{fn:uuid()}}
+        <li>split ["red","blue"]={{fn:split("red,blue", ",") | format("json-compact")}}
+      </ul>
+    </div>
+  </template>
+</div>
