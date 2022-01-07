@@ -24,6 +24,8 @@ type HibikiNode = {
     morestyles? : Record<string, Record<string, NodeAttrType>>,
     automerge? : AutoMergeExpr[],
     autofire? : AutoFireExpr[],
+    innerhtml? : string,
+    outerhtml? : string,
 }
 
 type AutoMergeExpr = {

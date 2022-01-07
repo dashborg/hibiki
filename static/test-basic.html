@@ -1,105 +1,385 @@
 <!DOCTYPE html>
 <script src="/hibiki-test.js"></script>
-<div class="container m-4">
+<div class="container m-4" style="min-width: 1400px;">
   <template hibiki>
     <hibiki-data>
       {"color": "blue", "name": "mike", "PI": 3.14159, "x": 55, "idx": 2, "arr": [1,1,2,3,5,8],
        "point": {"x": 5, "y": 2}, "fruits1": ["apple"]}
     </hibiki-data>
     <h1 class="title">Test Basic</h1>
-    <div class="box content" style="background-color: *$.color; color: white">
-      <p>Blue background with white text.</p>
-      <p>Name is [{{$.name}}] [<h-text bind="$.name"></h-text>]</p>
-      <p>Formatting &pi;</p>
-      <ul>
-        <li><h-text bind="$.PI" format="%0.2f"></h-text> (2 decimals)
-        <li><h-text bind="$.PI" format="%0.2f" style="font-weight: bold;"></h-text> (2 decimals, bold)
-        <li>{{ $.PI | format("%0.3f") }} (3 decimals)
-        <li><h-text bind="$.PI" format="%0.3f" class="has-text-weight-bold"></h-text> (3 decimals, bold)
-        <li><h-text bind="$.empty" nulltext="(is empty)"></h-text> (nulltext)
-        <li><h-text bind="$.empty" nulltext="(is empty)" style="font-weight: bold;"></h-text> (nulltext, bold)
-        <li>array 1,2,3={{[1,2,3]}}
-      </ul>
+    <div class="box">
+      <table class="table is-bordered test-output">
+        <thead>
+          <tr>
+            <th>Basic Formatting</th>
+            <th>Expected</th>
+            <th>Result</th>
+          </tr>
+        </thead>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{ $.name }}
+          </td>
+          <td slot="result">mike</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            <div style="height: 30px; background-color: *$.color;"></div>
+          </td>
+          <td slot="result">
+            <div style="height: 30px; background-color: blue;"></div>
+          </td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            <h-text bind="$.PI" format="%0.2f"></h-text>
+          </td>
+          <td slot="result">3.14</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            <h-text bind="$.PI" format="%0.3f"></h-text>
+          </td>
+          <td slot="result">3.142</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            <h-text bind="$.PI" format="%0.2f" style="font-weight: bold;"></h-text>
+          </td>
+          <td slot="result"><span style="font-weight: bold;">3.14</span></td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            <h-text bind="$.PI" format="%0.2f" class="has-text-weight-bold"></h-text>
+          </td>
+          <td slot="result"><span class="has-text-weight-bold">3.14</span></td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            <h-text bind="$.empty" nulltext="(is empty)"></h-text>
+          </td>
+          <td slot="result">(is empty)</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            <h-text bind="$.empty" nulltext="(is empty)" style="font-weight: bold;"></h-text>
+          </td>
+          <td slot="result"><span style="font-weight: bold">(is empty)</span></td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{ [1,2,3] }}
+          </td>
+          <td slot="result">1,2,3</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{ {x: 55, "name": "mike"} }}
+          </td>
+          <td slot="result">[Object object]</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{ {x: 55, "name": "mike"} | format("json-compact") }}
+          </td>
+          <td slot="result">{"x":55,"name","mike"}</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml style="text-align: left;">
+            <pre>{{ {x: 55, "name": "mike"} | format("json") }}</pre>
+          </td>
+          <td slot="result" style="text-align: left;">
+            <pre>{
+  "x": 55,
+  "name": "mike"
+}</pre>
+          </td>
+        </tr>
+      </table>
     </div>
-    <div class.box class.has-background-info-light>
-      class.[name] test, light blue background
+
+    <div class="box">
+      <table class="table is-bordered test-output">
+        <thead>
+          <tr>
+            <th>Expr</th>
+            <th>Expected</th>
+            <th>Result</th>
+          </tr>
+        </thead>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>{{ 2 + 4 }}</td>
+          <td slot="result">6</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>{{ 2 * 4 }}</td>
+          <td slot="result">8</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>{{ 2 / 4 }}</td>
+          <td slot="result">0.5</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>{{ 2 / 0 }}</td>
+          <td slot="result">Infinity</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>{{ 7 % 2 }}</td>
+          <td slot="result">1</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{ 5 > 2 }} | {{ 5 < 2 }} | {{ 5 >= 2 }}<br>
+{{ 5<= 2 }} | {{ 5 == 2 }} | {{ 5 != 2 }}
+          </td>
+          <td slot="result">true | false | true<br>false | false | true</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>{{ "2" == 2 ? "true" : "false" }} | {{ 2 != 1+1 ? "true" : "false" }}</td>
+          <td slot="result">true | false</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>{{ null ?? "5" ?? "7" }}</td>
+          <td slot="result">5</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>{{ -5.2 }} | {{-5.2-1+1}} | {{+"5"+5}}</td>
+          <td slot="result">-5.2 | -5.2 | 10</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>{{ noattr }}</td>
+          <td slot="result">null</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            <span foreach="@v in $.arr">{{ @v }} </span>
+          </td>
+          <td slot="result">1 1 2 3 5 8</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+<span foreach="(@v,@idx) in $.arr" if="@v != 2">
+  {{ @v }}{{ (@idx != fn:len($.arr)-1) ? "," : "" }}
+</span>
+          </td>
+          <td slot="result">1, 1, 3, 5, 8</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+<input type="checkbox" checked.bindpath="$.checked"><br>
+<span if="$.checked">(checked)</span>
+<span if="!$.checked">(not checked)</span>
+          </td>
+          <td slot="result">(dynamic)</td>
+        </tr>
+      </table>
     </div>
-    <div class="has-background-info-light" class.box class.has-background-info-light="0">
-      class.[name] test, no background
+
+    <div class="box">
+      <table class="table is-bordered test-output">
+        <thead>
+          <tr>
+            <th>Functions</th>
+            <th>Expected</th>
+            <th>Result</th>
+          </tr>
+        </thead>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>{{ fn:len($.arr) }}</td>
+          <td slot="result">6</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>{{ fn:indexof("hello", "ll") }} | {{ fn:indexof("hello", "bar") }}</td>
+          <td slot="result">2 | -1</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>{{ fn:min(88, 22, 5, 7) }}</td>
+          <td slot="result">5</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>{{ fn:max(5+3, 2, -77, 0) }}</td>
+          <td slot="result">8</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{ fn:splice($.arr, 1, 2) }}
+          </td>
+          <td slot="result">1,3,5,8</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{ fn:slice($.arr, 3, 5) }}
+          </td>
+          <td slot="result">3,5</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{ fn:push([], 8, 12) }}
+          </td>
+          <td slot="result">8, 12</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{ fn:pop(fn:pop($.arr)) }}
+          </td>
+          <td slot="result">1,1,2,3</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{ fn:slice($.arr, 3, 5) }}
+          </td>
+          <td slot="result">3,5</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{ fn:setadd($.fruits1, "apple") }}<br>
+{{ fn:setadd($.fruits1, "banana") }}
+          </td>
+          <td slot="result">apple<br>apple,banana</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{ fn:setremove($.fruits1, "apple") | format("json-compact") }}
+          </td>
+          <td slot="result">[]</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{ fn:sethas($.fruits1, "apple") }} | {{ fn:sethas($.fruits1, "banana") }}
+          </td>
+          <td slot="result">true | false</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{ fn:bool(5) }} | {{ fn:bool("") }}
+          </td>
+          <td slot="result">true | false</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{ fn:jsonparse("[1,2,3]") }}
+          </td>
+          <td slot="result">1,2,3</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{fn:json({x: 22})}}
+          </td>
+          <td slot="result">{"x":22}</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{fn:ts()}}<br>
+<h-dateformat bind="fn:ts()"></h-dateformat>
+          </td>
+          <td slot="result">(dynamic)</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{fn:merge({x: 55, z:10}, {y:22, z:5}) | format("json-compact")}}
+          </td>
+          <td slot="result">{"x":55,"z":5,"y":22}</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{fn:startswith("banana", "ba")}} | {{fn:startswith("apple", "ba")}}
+          </td>
+          <td slot="result">true | false</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{fn:endswith("banana", "na")}} | {{fn:endswith("apple", "na")}}
+          </td>
+          <td slot="result">true | false</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{fn:substr("banana", 2, 3)}}
+          </td>
+          <td slot="result">nan</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{fn:sprintf("PI is %0.2f", $.PI)}}
+          </td>
+          <td slot="result">PI is 3.14</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{fn:match("xyz58tt", "\\d+")}}<br>
+{{fn:match("xyz58tt", "(\\d)", "g")}}
+          </td>
+          <td slot="result">58<br>5,8</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{fn:substr(fn:uuid(), 0, 8)}}
+          </td>
+          <td slot="result">xxxxxxxx</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{fn:split("red,blue", ",") | format("json-compact")}}
+          </td>
+          <td slot="result">["red","blue"]</td>
+        </tr>
+      </table>
     </div>
-    <div class="box has-text-weight-bold -has-text-weight-bold" class.has-background-warning-light="*$.x == 55">
-      class.[name] test, light yellow background, not bold
+
+    <div class="box">
+      <table class="table is-bordered test-output">
+        <thead>
+          <tr>
+            <th>Functions</th>
+            <th>Expected</th>
+            <th>Result</th>
+          </tr>
+        </thead>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            <div class="box" class.bg-blue="1"></div>
+          </td>
+          <td slot="result">
+            <div class="box bg-blue"></div>
+          </td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            <div class="box" class.has-background-info-light="0"></div>
+          </td>
+          <td slot="result">
+            <div class="box"></div>
+          </td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+<div class="box bold -bold" class.bg-green="*$.x == 55">
+  green              
+</div>
+          </td>
+          <td slot="result">
+            <div class="box bg-green">green</div>
+          </td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+<div class="box bg-green no-bg-green" class.bold="1">
+  bold
+</div>
+          </td>
+          <td slot="result">
+            <div class="box bold">bold</div>
+          </td>
+        </tr>        
+      </table>
     </div>
-    <div class="box has-text-weight-bold no-has-text-weight-bold" class.has-background-warning-light="1">
-      class.[name] test, light yellow background, not bold<br>
-      JSON-point={{$.point | format("json")}} | json-compact point={{$.point | format("json-compact")}}
-    </div>
-    <div class="box content">
-      <p>Expressions</p>
-      <ul>
-        <li>2 + 4 = {{ 2 + 4 }}
-        <li>2 * 4 = {{ 2 * 4 }}
-        <li>2 / 4 = {{ 2 / 4 }}
-        <li>2 / 0 = {{ 2 / 0 }}
-        <li>7 % 2 = {{ 3 % 2 }}
-        <li>
-          5 > 2 = {{ 5 > 2 }} | 5 < 2 = {{ 5 < 2 }} | 5 >=2 {{ 5 >= 2 }} | 5 <= 2 {{ 5<= 2 }}
-          | 5 == 2 {{ 5 == 2 }} | 5 != 2 = {{ 5 != 2 }}
-        <li>
-          ?:(true-case) {{ "2" == 2 ? "true" : "false" }}
-        <li>
-          ?:(false-case) {{ 2 != 1+1 ? "true" : "false" }}
-        <li>null ?? "5" ?? "7" = {{ null ?? "5" ?? "7" }}
-        <li>-5.2={{ -5.2 }} | -5.2={{-5.2-1+1}}
-        <li>(+"5")+5={{+"5"+5}}
-        <li>noattr = {{noattr}}
-      </ul>
-    </div>
-    <div class="box content">
-      <div>
-        if-test
-        <input type="checkbox" checked.bindpath="$.checked">
-        <span if="$.checked">(checked)</span>
-        <span if="!$.checked">(not checked)</span>
-      </div>
-      <div>
-        simple foreach <span foreach="@v in $.arr">{{ @v }} </span>
-      </div>
-      <div>
-        foreach + if (expected 1,1,3,5,8)
-        <span foreach="(@v,@idx) in $.arr" if="@v != 2">{{ @v }}{{ (@idx != fn:len($.arr)-1) ? "," : "" }}</span>
-      </div>
-    </div>
-    <div class="box content">
-      <p>function test</p>
-      <ul>
-        <li>len 6={{ fn:len($.arr) }} | 0={{ fn:len(null) }} | 5={{ fn:len("hello") }} | 1={{ fn:len(5) }}
-        <li>indexOf 2={{ fn:indexof("hello", "ll") }}, -1={{ fn:indexof("hello", "bar") }}
-        <li>min 5={{ fn:min(88, 22, 5, 7) }}
-        <li>max 8={{ fn:max(5+3, 2, -77, 0) }}
-        <li>splice [1,3,5,8]={{ fn:splice($.arr, 1, 2) | format("json-compact") }}
-        <li>slice [3,5]={{ fn:slice($.arr, 3, 5) | format("json-compact") }}
-        <li>push [8,12]={{ fn:push([], 8, 12) | format("json-compact") }}
-        <li>pop [1,1,2,3]={{ fn:pop(fn:pop($.arr)) | format("json-compact") }}
-        <li>setadd ["apple"]={{ fn:setadd($.fruits1, "apple") | format("json-compact") }}
-          | ["apple","banana"]={{ fn:setadd($.fruits1, "banana") | format("json-compact") }}
-        <li>setremove []={{fn:setremove($.fruits1, "apple") | format("json-compact")}}
-        <li>sethas true={{fn:sethas($.fruits1, "apple")}} | false={{fn:sethas($.fruits1, "banana")}}
-        <li>int 55={{fn:int("55x")}} | float 55.5={{fn:float("55.2")+0.3}} | str 55={{fn:str(5)+5}}
-        <li>bool true={{fn:bool(5)}} | false={{fn:bool("")}}
-        <li>jsonparse 1,2,3={{(fn:jsonparse("[1,2,3]"))}}
-        <li>json {"x":22}={{fn:json({x: 22})}}
-        <li>ts = {{fn:ts()}} | <h-dateformat bind="fn:ts()"></h-dateformat>
-        <li>merge {"x":55,"z":5,"y":22}={{fn:merge({x: 55, z:10}, {y:22, z:5}) | format("json-compact")}}
-        <li>startswith true={{fn:startswith("banana", "ba")}} | false={{fn:startswith("apple", "ba")}}
-        <li>endswith true={{fn:endswith("banana", "na")}} | false={{fn:endswith("apple", "na")}}
-        <li>substr nan={{fn:substr("banana", 2, 3)}}
-        <li>sprintf [PI is 3.14] [{{fn:sprintf("PI is %0.2f", $.PI)}}]
-        <li>match 58={{fn:match("xyz58tt", "\\d+")}}
-          | ["5","8"]={{fn:match("xyz58tt", "(\\d)", "g") | format("json-compact")}}
-        <li>uuid = {{fn:uuid()}}
-        <li>split ["red","blue"]={{fn:split("red,blue", ",") | format("json-compact")}}
-      </ul>
-    </div>
+    
+    <define-component name="test-tr">
+      <html-tr>
+        <html-td><pre>{{fn:trim(@children.byslot.test[0].innerhtml)}}</pre></html-td>
+        <h-children bind="@children.byslot.result"></h-children>
+        <h-children bind="@children.byslot.test"></h-children>
+      </html-tr>
+    </define-component>
   </template>
 </div>

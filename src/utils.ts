@@ -177,7 +177,7 @@ function getSS(key : string) : any {
 
 function valToString(val : HibikiVal) : string {
     if (val == null) {
-        return "null";
+        return null;
     }
     if (typeof(val) == "string" || typeof(val) == "number" || typeof(val) == "boolean" || typeof(val) == "symbol" || typeof(val) == "bigint") {
         return val.toString();
@@ -211,7 +211,7 @@ function makeUrlParamsFromObject(params : any) : string {
             urlparams = urlparams + "&";
         }
         first = false;
-        urlparams += encodeURIComponent(key) + "=" + encodeURIComponent(val);
+        urlparams += encodeURIComponent(key) + "=" + encodeURIComponent(strVal);
     }
     if (urlparams == "?") {
         return "";

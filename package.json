@@ -60,6 +60,7 @@
     "typecheck": "tsc --jsx preserve --noEmit --esModuleInterop --target ES5 --experimentalDecorators --downlevelIteration src/hibiki.ts",
     "expr-grammar": "nearleyc src/hibiki-grammar.ne -o src/hibiki-grammar.js",
     "playground-css": "lessc ./playground/playground.less ./playground/playground.css",
-    "playground-server": "http-server ./playground -p 5002"
+    "playground-server": "http-server ./playground -p 5002",
+    "test-css": "lessc ./static/test.less ./static/test.css"
   }
 }

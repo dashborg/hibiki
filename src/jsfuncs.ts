@@ -227,6 +227,13 @@ function jsSprintf(format : string, ...rest : any[]) : string {
     return sprintf(format, ...rest);
 }
 
+function jsTrim(str : string) : string {
+    if (typeof(str) !== "string") {
+        return null;
+    }
+    return str.trim();
+}
+
 function jsStartsWith(str : string, ...rest : any[]) : boolean {
     if (str == null || typeof(str) != "string") {
         return false;
@@ -309,8 +316,6 @@ function jsUuid() : string {
     return uuidv4();
 }
 
-
-
 reg("len", jsLen, true);
 reg("indexof", jsIndexOf, true);
 reg("min", jsMin, false);
@@ -336,6 +341,7 @@ reg("jseval", jsEval, true);
 reg("js", jsJs, false);
 reg("substr", jsSubstr, true);
 reg("sprintf", jsSprintf, true);
+reg("trim", jsTrim, true);
 reg("startswith", jsStartsWith, true);
 reg("endswith", jsEndsWith, true);
 reg("match", jsMatch, true);

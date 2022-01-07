@@ -22,7 +22,15 @@ module.exports = {
                 use: {
                     loader: "babel-loader",
                     options: {
-                        presets: ["@babel/preset-env", "@babel/preset-react", "@babel/preset-typescript"],
+                        presets: [
+                            [
+                                "@babel/preset-env",
+                                {
+                                    targets: "defaults and not ie > 0 and not op_mini all and not op_mob > 0 and not kaios > 0 and not and_qq > 0 and not and_uc > 0 and not baidu > 0",
+                                },
+                            ],
+                            "@babel/preset-react",
+                            "@babel/preset-typescript"],
                         plugins: [
                             ["@babel/transform-runtime", {"regenerator": true}],
                             "@babel/plugin-transform-react-jsx",

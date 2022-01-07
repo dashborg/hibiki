@@ -858,7 +858,7 @@ function formatVal(val : HibikiVal, format : string) : string {
                 rtn = blobPrintStr(val);
             }
             else {
-                rtn = valToString(val);
+                rtn = valToString(val) ?? "null";
             }
         }
         else if (format === "json") {
@@ -1962,7 +1962,9 @@ function evalExprAstEx(exprAst : HExpr, dataenv : DataEnvironment) : HibikiValEx
         for (let i=0; i<exprAst.exprs.length; i++) {
             let k = evalExprAst(exprAst.exprs[i].key, dataenv);
             let v = evalExprAst(exprAst.exprs[i].valexpr, dataenv);
-            rtn[valToString(k)] = v;
+            if (k != null) {
+                rtn[valToString(k)] = v;
+            }
         }
         return rtn;
     }

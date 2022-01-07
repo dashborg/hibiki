@@ -308,7 +308,7 @@ class CustomReactNode extends React.Component<HibikiReactProps & {component : Co
         if (ctx.isEditMode()) {
             return;
         }
-        ctx.handleEvent("mount");
+        ctx.handleMountEvent();
     }
     
     render() {
@@ -353,9 +353,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
         if (ctx.isEditMode()) {
             return;
         }
-        if (ctx.hasHandler("mount")) {
-            ctx.handleEvent("mount");
-        }
+        ctx.handleMountEvent();
     }
 
     @boundMethod handleFileOnChange(e) {
@@ -719,7 +717,7 @@ class CustomNode extends React.Component<HibikiReactProps & {component : Compone
         if (ctx.isEditMode()) {
             return;
         }
-        ctx.handleEvent("mount");
+        ctx.handleMountEvent();
     }
 
     componentWillUnmount() {
@@ -944,7 +942,7 @@ class DynNode extends React.Component<HibikiReactProps, {}> {
 
     render() {
         let ctx = new DBCtx(this);
-        let bindVal = ctx.resolveAttrStr("data");
+        let bindVal = ctx.resolveAttrStr("bind");
         if (bindVal == null) {
             return null;
         }

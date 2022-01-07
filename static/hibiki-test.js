@@ -53,4 +53,5 @@ else {
 loadScriptQueue();
 writeStyleSheet("https://cdn.jsdelivr.net/npm/bulma@0.9.2/css/bulma.min.css");
 writeStyleSheet("https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css");
+writeStyleSheet("/test.css");
 

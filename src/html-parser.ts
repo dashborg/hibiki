@@ -279,7 +279,7 @@ class HtmlParser {
     }
 
     parseBindPathAttr(node : HibikiNode, name : string, value : string, pctx : ParseContext) : boolean {
-        if (!name.endsWith(".bindpath")) {
+        if (name !== "bindpath" && !name.endsWith(".bindpath")) {
             return false;
         }
         let baseName = baseAttrName(name);
@@ -295,7 +295,8 @@ class HtmlParser {
             if (node.bindings == null) {
                 node.bindings = {};
             }
-            node.bindings[name.substr(0, name.length-9)] = path;
+            let bindName = (name === "bindpath" ? name : name.substr(0, name.length-9));
+            node.bindings[bindName] = path;
         }
         catch (e) {
             console.log(sprintf("ERROR evaluating '%s' in <%s>\n\"%s\"\n", name, node.tag, value), e.toString());
@@ -323,6 +324,18 @@ class HtmlParser {
             }
             return null;
         }
+    }
+
+    parseCaptureHtmlAttrs(htmlNode : Node, node : HibikiNode, attrName : string, attrValue : string, pctx : ParseContext) : boolean {
+        if (attrName == "innerhtml") {
+            node.innerhtml = htmlNode.innerHTML;
+            return true;
+        }
+        if (attrName == "outerhtml") {
+            node.outerhtml = htmlNode.outerHTML;
+            return true;
+        }
+        return false;
     }
 
     parseRawTagAttr(node : HibikiNode, attrName : string, attrValue : string, pctx : ParseContext) : boolean {
@@ -407,6 +420,9 @@ class HtmlParser {
             let attr = nodeAttrs.item(i);
             let attrName = attr.name.toLowerCase();
             let attrValue = attr.value;
+            if (this.parseCaptureHtmlAttrs(htmlNode, node, attrName, attrValue, pctx)) {
+                continue;
+            }
             if (this.parseRawTagAttr(node, attrName, attrValue, pctx)) {
                 continue;
             }
