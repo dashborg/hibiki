@@ -299,7 +299,7 @@ function resolveAttrValPair(k : string, v : NodeAttrType, dataenv : DataEnvironm
     }
     let resolvedVal : HibikiValEx = null;
     try {
-        resolvedVal = evalExprAst(v, dataenv);
+        resolvedVal = evalExprAstEx(v, dataenv);
     }
     catch (e) {
         let rtContext = opts.rtContext ?? "resolving attribute '%s'";
@@ -327,7 +327,7 @@ function resolveNonAmLValueAttrParts(node : HibikiNode, attrName : string, datae
     }
     let pathExpr = node.bindings[attrName];
     let pathVal = evalPathExprAst(pathExpr, dataenv);
-    if (typeof(pathVal) == "symbol" || pathVal instanceof Symbol) {
+    if (typeof(pathVal) === "symbol" || pathVal instanceof Symbol) {
         if (pathVal === SYM_NOATTR) {
             return [null, null, false];
         }
@@ -1025,6 +1025,9 @@ class BoundLValue extends LValue {
 }
 
 function exValToVal(exVal : HibikiValEx) : HibikiVal {
+    if (exVal == null) {
+        return null;
+    }
     if (exVal instanceof LValue) {
         return exVal.get();
     }
@@ -1249,7 +1252,7 @@ function ParseSetPathThrow(setpath : string) : { op : string, path : PathType } 
 }
 
 // function internalResolvePath(path : PathType, localRoot : any, globalRoot : any, specials : any, level : number) : any {
-function internalResolvePath(path : PathType, irData : any, dataenv : DataEnvironment, level : number) : any {
+function internalResolvePath(path : PathType, irData : any, dataenv : DataEnvironment, level : number) : HibikiValEx {
     if (level >= path.length) {
         return irData;
     }
@@ -1914,7 +1917,12 @@ function evalPathExprAst(exprAst : HExpr, dataenv : DataEnvironment) : (PathType
     throw new Error(sprintf("Invalid path expression etype: '%s'", exprAst.etype));
 }
 
-function evalExprAst(exprAst : HExpr, dataenv : DataEnvironment) : any {
+function evalExprAst(exprAst : HExpr, dataenv : DataEnvironment) : HibikiVal {
+    let exVal = evalExprAstEx(exprAst, dataenv);
+    return exValToVal(exVal);
+}
+
+function evalExprAstEx(exprAst : HExpr, dataenv : DataEnvironment) : HibikiValEx {
     if (exprAst == null) {
         return null;
     }

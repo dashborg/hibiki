@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<script src="/hibiki-test.js"></script>
+<div class="container m-4">
+  <template hibiki>
+    <hibiki-data>
+      {"inputbound": true, "name": "mike"}
+    </hibiki-data>
+    <h1 class="title">Test NoAttr</h1>
+    <div class="box">
+      <p class="mb-3">noattr={{ noattr }}</p>
+      <input class="input" type="text" value.bindpath="$.inputbound ? $.name : noattr"><br>
+      <p>
+        <label class="checkbox">
+          <input type="checkbox" checked.bindpath="$.inputbound">
+          Bound
+        </label>
+        | $.inputbound={{$.inputbound}} | $.name={{ $.name }}
+      </p>
+    </div>
+    <div class="box">
+      <div>
+        unbound: <local-am-input></local-am-input>
+      </div>
+      <div class="mt-3">
+        bound: <local-am-input value.bindpath="$.name"></local-am-input>
+        <p>($.name={{$.name}})</p>
+      </div>
+      <div class="mt-3">
+        unbound (noattr): <local-am-input bound="*noattr" maxlength="*noattr" value.bindpath="noattr"></local-am-input>
+      </div>
+      <div class="mt-3">
+        bound (initial null value, x=5): <local-am-input value.bindpath="$.novalue" x=5></local-am-input>
+      </div>
+      
+    </div>
+
+    <define-component name="am-input">
+      <input style="color: blue" class="input" type="text" automerge>
+      (value={{$args.value}}, @bound.value={{$args.@bound.value}},
+      $args.x=<h-text bind="$args.x" format="json"></h-text>)
+      <pre>{{$args|format("json-compact")}}</pre>
+    </define-component>
+  </template>
+</div>
