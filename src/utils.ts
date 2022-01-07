@@ -1,7 +1,7 @@
 // Copyright 2021 Dashborg Inc
 
 import * as mobx from "mobx";
-import {HibikiNode, Hibiki, HandlerPathType, NodeAttrType, HibikiVal} from "./types";
+import {HibikiNode, Hibiki, HandlerPathType, NodeAttrType, HibikiVal, HibikiValObj} from "./types";
 import {sprintf} from "sprintf-js";
 import type {HibikiBlob} from "./datactx";
 
@@ -186,7 +186,7 @@ function valToString(val : HibikiVal) : string {
         return "[Function]";
     }
     if (mobx.isArrayLike(val)) {
-        return "[Array]";
+        return val.toString();
     }
     if ((val as any)._type === "HibikiBlob") {
         return blobPrintStr(val as HibikiBlob);
@@ -452,12 +452,12 @@ function unpackAtArgs(data : Record<string, any>) : Record<string, any> {
 }
 
 
-function unpackPositionalArgs(data : Record<string, any>, posArgNames : string[]) : Record<string, any> {
+function unpackPositionalArgs(data : HibikiValObj, posArgNames : string[]) : HibikiValObj {
     if (data == null) {
         return {};
     }
     let posArgs = data["*args"];
-    if (posArgs == null || posArgs.length == 0 || posArgNames == null || posArgNames.length == 0) {
+    if (posArgs == null || !mobx.isArrayLike(posArgs) || posArgs.length == 0 || posArgNames == null || posArgNames.length == 0) {
         return data;
     }
     let rtn = {...data};
@@ -487,11 +487,11 @@ function callHook(hookName : string, hookFn : string | Function, ...rest : any[]
     return realHookFn(...rest);
 }
 
-function stripAtKeys(obj : Record<string, any>) : Record<string, any> {
+function stripAtKeys(obj : HibikiValObj) : HibikiValObj {
     if (obj == null) {
         return null;
     }
-    let rtn : Record<string, any> = {};
+    let rtn : HibikiValObj = {};
     for (let key in obj) {
         if (key.startsWith("@")) {
             continue;

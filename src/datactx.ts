@@ -6,8 +6,8 @@ import {DataEnvironment} from "./state";
 import {sprintf} from "sprintf-js";
 import {parseHtml} from "./html-parser";
 import {RtContext, getShortEMsg, HibikiError} from "./error";
-import {makeUrlParamsFromObject, SYM_PROXY, SYM_FLATTEN, isObject, stripAtKeys, unpackPositionalArgs, nodeStr, parseHandler, fullPath, blobPrintStr, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP} from "./utils";
-import {PathPart, PathType, PathUnionType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue, HandlerBlock, NodeAttrType, HibikiVal, HibikiNode, HibikiValEx, AutoMergeExpr} from "./types";
+import {makeUrlParamsFromObject, SYM_PROXY, SYM_FLATTEN, isObject, stripAtKeys, unpackPositionalArgs, nodeStr, parseHandler, fullPath, blobPrintStr, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP, valToString} from "./utils";
+import {PathPart, PathType, PathUnionType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue, HandlerBlock, NodeAttrType, HibikiVal, HibikiNode, HibikiValObj, HibikiValEx, AutoMergeExpr} from "./types";
 import {HibikiRequest} from "./request";
 import type {EHandlerType} from "./state";
 import {doParse} from "./hibiki-parser";
@@ -266,15 +266,15 @@ function resolveAttrStr(k : string, v : NodeAttrType, dataenv : DataEnvironment,
         return blobPrintStr(resolvedVal);
     }
     resolvedVal = demobx(resolvedVal);
-    if (opts.style && typeof(resolvedVal) == "number") {
+    if (opts.style && typeof(resolvedVal) === "number") {
         if (!STYLE_UNITLESS_NUMBER[k]) {
             resolvedVal = String(resolvedVal) + "px";
         }
     }
-    return String(resolvedVal);
+    return valToString(resolvedVal);
 }
 
-function valToStr(v : HibikiVal) : string {
+function attrValToStr(v : HibikiVal) : string {
     if (v == null || v === false || v === "") {
         return null;
     }
@@ -285,7 +285,7 @@ function valToStr(v : HibikiVal) : string {
         return blobPrintStr(v);
     }
     v = demobx(v);
-    return String(v);
+    return valToString(v);
 }
 
 // returns [value, exists]
@@ -408,7 +408,7 @@ function getAttributeStr(node : HibikiNode, attrName : string, dataenv : DataEnv
     if (!exists) {
         return null;
     }
-    return valToStr(hval);
+    return attrValToStr(hval);
 }
 
 const NON_ARGS_ATTRS = {
@@ -845,7 +845,7 @@ function resolveStrAttrs(node : HibikiNode, dataenv : DataEnvironment) : Record<
     let vals = resolveValAttrs(node, dataenv);
     let rtn : Record<string, string> = {};
     for (let key in vals) {
-        rtn[key] = valToStr(vals[key]);
+        rtn[key] = attrValToStr(vals[key]);
     }
     return rtn;
 }
@@ -858,7 +858,7 @@ function formatVal(val : HibikiVal, format : string) : string {
                 rtn = blobPrintStr(val);
             }
             else {
-                rtn = String(val);
+                rtn = valToString(val);
             }
         }
         else if (format === "json") {
@@ -879,9 +879,9 @@ function formatVal(val : HibikiVal, format : string) : string {
     return rtn;
 }
 
-function formatFilter(val : any, args : Record<string, any>) {
+function formatFilter(val : any, args : HibikiValObj) {
     let {format} = unpackPositionalArgs(args, ["format"]);
-    return formatVal(val, format);
+    return formatVal(val, valToString(format));
 }
 
 function forceAsArray(val : any) : any[] {
@@ -1943,8 +1943,8 @@ function evalExprAstEx(exprAst : HExpr, dataenv : DataEnvironment) : HibikiValEx
         return rtn;
     }
     else if (exprAst.etype === "array-range") {
-        let e1 = parseInt(evalExprAst(exprAst.exprs[0], dataenv));
-        let e2 = parseInt(evalExprAst(exprAst.exprs[1], dataenv));
+        let e1 = parseInt(evalExprAst(exprAst.exprs[0], dataenv) as any);
+        let e2 = parseInt(evalExprAst(exprAst.exprs[1], dataenv) as any);
         if (isNaN(e1) || isNaN(e2) || e1 > e2) {
             return [];
         }
@@ -1962,7 +1962,7 @@ function evalExprAstEx(exprAst : HExpr, dataenv : DataEnvironment) : HibikiValEx
         for (let i=0; i<exprAst.exprs.length; i++) {
             let k = evalExprAst(exprAst.exprs[i].key, dataenv);
             let v = evalExprAst(exprAst.exprs[i].valexpr, dataenv);
-            rtn[k] = v;
+            rtn[valToString(k)] = v;
         }
         return rtn;
     }
@@ -1978,7 +1978,7 @@ function evalExprAstEx(exprAst : HExpr, dataenv : DataEnvironment) : HibikiValEx
         if (filter === "format") {
             let e1 = evalExprAst(exprAst.exprs[0], dataenv);
             let args = evalExprAst(exprAst.exprs[1], dataenv);
-            return formatFilter(e1, args);
+            return formatFilter(e1, args as HibikiValObj);
         }
         else {
             throw new Error(sprintf("Invalid filter '%s' (only format is allowed)", exprAst.filter));
@@ -2007,8 +2007,8 @@ function evalExprAstEx(exprAst : HExpr, dataenv : DataEnvironment) : HibikiValEx
             return evalExprAst(exprAst.exprs[1], dataenv);
         }
         else if (exprAst.op === "*") {
-            let e1 = evalExprAst(exprAst.exprs[0], dataenv) ?? null;
-            let e2 = evalExprAst(exprAst.exprs[1], dataenv) ?? null;
+            let e1 : any = evalExprAst(exprAst.exprs[0], dataenv) ?? null;
+            let e2 : any = evalExprAst(exprAst.exprs[1], dataenv) ?? null;
             return e1 * e2;
         }
         else if (exprAst.op === "+") {
@@ -2016,21 +2016,21 @@ function evalExprAstEx(exprAst : HExpr, dataenv : DataEnvironment) : HibikiValEx
             if (exprAst.exprs == null || exprAst.exprs.length === 0) {
                 return null;
             }
-            let rtnVal = evalExprAst(exprAst.exprs[0], dataenv) ?? null;
+            let rtnVal : any = evalExprAst(exprAst.exprs[0], dataenv) ?? null;
             for (let i=1; i<exprAst.exprs.length; i++) {
-                let ev = evalExprAst(exprAst.exprs[i], dataenv) ?? null;
+                let ev : any = evalExprAst(exprAst.exprs[i], dataenv) ?? null;
                 rtnVal = rtnVal + ev;
             }
             return rtnVal;
         }
         else if (exprAst.op === "/") {
-            let e1 = evalExprAst(exprAst.exprs[0], dataenv) ?? null;
-            let e2 = evalExprAst(exprAst.exprs[1], dataenv) ?? null;
+            let e1 : any = evalExprAst(exprAst.exprs[0], dataenv) ?? null;
+            let e2 : any = evalExprAst(exprAst.exprs[1], dataenv) ?? null;
             return e1 / e2;
         }
         else if (exprAst.op === "%") {
-            let e1 = evalExprAst(exprAst.exprs[0], dataenv) ?? null;
-            let e2 = evalExprAst(exprAst.exprs[1], dataenv) ?? null;
+            let e1 : any = evalExprAst(exprAst.exprs[0], dataenv) ?? null;
+            let e2 : any = evalExprAst(exprAst.exprs[1], dataenv) ?? null;
             return e1 % e2;
         }
         else if (exprAst.op === ">=") {
@@ -2070,16 +2070,16 @@ function evalExprAstEx(exprAst : HExpr, dataenv : DataEnvironment) : HibikiValEx
             return !e1;
         }
         else if (exprAst.op === "-") {
-            let e1 = evalExprAst(exprAst.exprs[0], dataenv) ?? null;
-            let e2 = evalExprAst(exprAst.exprs[1], dataenv) ?? null;
+            let e1 : any = evalExprAst(exprAst.exprs[0], dataenv) ?? null;
+            let e2 : any = evalExprAst(exprAst.exprs[1], dataenv) ?? null;
             return e1 - e2;
         }
         else if (exprAst.op === "u-") {
-            let e1 = evalExprAst(exprAst.exprs[0], dataenv) ?? null;
+            let e1 : any = evalExprAst(exprAst.exprs[0], dataenv) ?? null;
             return -e1;
         }
         else if (exprAst.op === "u+") {
-            let e1 = evalExprAst(exprAst.exprs[0], dataenv) ?? null;
+            let e1 : any = evalExprAst(exprAst.exprs[0], dataenv) ?? null;
             return +e1;
         }
         else if (exprAst.op === "?:") {
@@ -2132,16 +2132,16 @@ function RequestFromAction(action : HAction, pure : boolean, dataenv : DataEnvir
         throw new Error(sprintf("Cannot create HibikiRequest from actiontype: '%s'", action.actiontype));
     }
     let req = new HibikiRequest(dataenv.dbstate.getExtState());
-    let fullData = demobx(evalExprAst(action.data, dataenv));
+    let fullData : HibikiValObj = demobx(evalExprAst(action.data, dataenv)) as HibikiValObj;
     if (fullData != null && !isObject(fullData)) {
         throw new Error(sprintf("HibikiAction 'callhandler' data must be null or an object, cannot be '%s'", typeof(fullData)));
     }
-    req.data = fullData;
+    req.data = fullData as HibikiValObj;
     req.rtContext = rtctx;
     req.pure = pure || action.pure;
     req.libContext = dataenv.getLibContext();
     if (action.callpath != null) {
-        let callPath = evalExprAst(action.callpath, dataenv);
+        let callPath = valToString(evalExprAst(action.callpath, dataenv));
         let hpath = parseHandler(callPath);
         if (hpath == null) {
             throw new Error("Invalid handler path: " + callPath);
@@ -2162,9 +2162,9 @@ function RequestFromAction(action : HAction, pure : boolean, dataenv : DataEnvir
             throw new Error(sprintf("HibikiAction 'callhandler' without a callpath must specify an @url param"));
         }
         let hpath = {
-            module: dataModule ?? "http",
-            url: dataUrl,
-            method: dataMethod ?? "DYN",
+            module: valToString(dataModule) ?? "http",
+            url: valToString(dataUrl),
+            method: valToString(dataMethod) ?? "DYN",
         };
         req.callpath = hpath;
     }
@@ -2239,7 +2239,7 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
         if (action.native) {
             rtctx.popContext();
         }
-        let eventStr = evalExprAst(action.event, dataenv);
+        let eventStr = valToString(evalExprAst(action.event, dataenv));
         if (eventStr == null || eventStr === "") {
             return null;
         }
@@ -2254,9 +2254,10 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
         }
         let datacontext = null;
         let params = evalExprAst(action.data, dataenv);
-        if (params != null) {
-            let {value} = unpackPositionalArgs(params, ["value"]);
-            datacontext = stripAtKeys(params);
+        if (params != null && isObject(params)) {
+            let objParams : HibikiValObj = params as HibikiValObj;
+            let {value} = unpackPositionalArgs(objParams, ["value"]);
+            datacontext = stripAtKeys(objParams);
             delete datacontext["*args"];
             if (value != null && !("value" in datacontext)) {
                 datacontext.value = value;
@@ -2311,7 +2312,7 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
     else if (action.actiontype === "throw") {
         rtctx.popContext();
         let errVal = evalExprAst(action.data, dataenv);
-        return Promise.reject(new Error(errVal));
+        return Promise.reject(new Error(valToString(errVal)));
     }
     else if (action.actiontype === "nop") {
         return null;
@@ -2663,6 +2664,6 @@ function convertSimpleType(typeName : string, value : string, defaultValue : Hib
     return value;
 }
 
-export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, evalActionStr, makeIteratorFromExpr, rawAttrStr, resolveStrAttrs, resolveValAttrs, getStyleMap, getAttributeStr, getAttributeValPair, valToStr, exValToVal, resolveLValueAttr, resolveArgsRoot, SYM_NOATTR, resolveCnArray};
+export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, evalActionStr, makeIteratorFromExpr, rawAttrStr, resolveStrAttrs, resolveValAttrs, getStyleMap, getAttributeStr, getAttributeValPair, attrValToStr, exValToVal, resolveLValueAttr, resolveArgsRoot, SYM_NOATTR, resolveCnArray};
 
 export type {PathType, HAction, HExpr, HIteratorExpr};

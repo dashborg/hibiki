@@ -480,7 +480,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
         let formValueLV = ctx.resolveLValueAttr("formvalue");
         if (formValueLV != null) {
             let value = ctx.resolveAttrStr("value") ?? "";
-            if (DataCtx.valToStr(formValueLV.get()) !== value) {
+            if (DataCtx.attrValToStr(formValueLV.get()) !== value) {
                 setTimeout(() => formValueLV.set(value), 0);
             }
         }
@@ -580,7 +580,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
         let tagName = ctx.getHtmlTagName();
         let elemProps : Record<string, any> = {};
         let attrVals : Record<string, HibikiVal> = ctx.resolveAttrVals();
-        let typeAttr = DataCtx.valToStr(attrVals["type"]);
+        let typeAttr = DataCtx.attrValToStr(attrVals["type"]);
         let managedType = NodeUtils.getManagedType(tagName, typeAttr);
         let managedAttrs = NodeUtils.MANAGED_ATTRS[managedType] ?? {};
         for (let [k,v] of Object.entries(attrVals)) {
@@ -607,7 +607,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
                 }
                 continue;
             }
-            let strVal = DataCtx.valToStr(v);
+            let strVal = DataCtx.attrValToStr(v);
             if (k == "download" && strVal == "1") {
                 elemProps["download"] = "";
                 continue;
@@ -794,7 +794,7 @@ class ScriptNode extends React.Component<HibikiReactProps, {}> {
             ctx.dataenv.dbstate.queueScriptSrc(srcAttr.makeDataUrl(), isSync);
         }
         else {
-            ctx.dataenv.dbstate.queueScriptSrc(DataCtx.valToStr(srcAttr), isSync);
+            ctx.dataenv.dbstate.queueScriptSrc(DataCtx.attrValToStr(srcAttr), isSync);
         }
         return null;
     }
@@ -979,6 +979,7 @@ class SimpleQueryNode extends React.Component<HibikiReactProps, {}> {
     constructor(props : any) {
         super(props);
         let self = this;
+        let ctx = new DBCtx(this);
         this.refreshCount = mobx.observable.box(0, {name: "refreshCount"});
         this.nameComputed = mobx.computed(() => {
             let ctx = new DBCtx(self);
@@ -986,16 +987,7 @@ class SimpleQueryNode extends React.Component<HibikiReactProps, {}> {
             if (name != null) {
                 return name;
             }
-            try {
-                let ctx = new DBCtx(self);
-                let queryStr = ctx.resolveAttrStr("query");
-                let callAction = DataCtx.ParseStaticCallStatement(queryStr);
-                let handler = DataCtx.evalExprAst(callAction.callpath, ctx.dataenv);
-                return handler || "invalid-query";
-            }
-            catch (e) {
-                return "invalid-query";
-            }
+            return ctx.uuid;
         }, {name: "nameComputed"});
     }
 
@@ -1137,7 +1129,7 @@ class DataSorterNode extends React.Component<HibikiReactProps, {}> {
             let ctx = new DBCtx(self);
             let sortSpec = ctx.resolveAttrVal("sortspec");
             let column = subMapKey(sortSpec, "column");
-            return DataCtx.valToStr(column);
+            return DataCtx.attrValToStr(column);
         });
 
         this.sortascComputed = mobx.computed(() => {
