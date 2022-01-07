@@ -858,7 +858,9 @@ class HibikiState {
         this.setStateVars();
         let rtctx = new RtContext();
         let [deps, srcs] = createDepPromise("@main", window.location.href, this, this.HtmlObj.get());
-        console.log(sprintf("Hibiki root dependencies: %s", JSON.stringify(srcs)));
+        if (srcs.length > 0) {
+            console.log(sprintf("Hibiki root dependencies: %s", JSON.stringify(srcs)));
+        }
         deps.then(() => {
             let action = {
                 actiontype: "fireevent",

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<script src="/hibiki-test.js"></script>
+<div class="container m-4">
+  <template hibiki>
+    <hibiki-data>
+      {"name": "mike", "i2name": "1-way", "hiddenvalue": "blue",
+      "cbvalue": ["banana"], "cbchecked": true,
+      "radiovalue": "banana",
+      "selectvalue": "banana",
+      "f1counter": 0, "f2counter": 0, "f3counter": 0,
+      "cb1counter": 0
+      
+      }
+    </hibiki-data>
+    <h1 class="title">Test Form Controls</h1>
+    <div class="box">
+      <h6 class="title is-6">Text Input</h6>
+      <div class="field">
+        <input class="input" value.bindpath="$.name" change.handler="$.f1counter = $.f1counter+1"><br>
+        (2-way binding, initial value="mike", current value="{{ $.name }}", onchange counter={{ $.f1counter }})
+      </div>
+      <div class="field">
+        <input class="input" bound value="*$.i2name" change.handler="$.f2counter = $.f2counter+1; if ($.f2counter % 2 == 0) { $.i2name = @value; }"><br>
+        (1-way binding, current value="{{$.i2name}}", onchange counter={{ $.f2counter }}, every other character registers)
+      </div>
+      <div class="field">
+        <input class="input" value="*$.name" change.handler="$.f2counter = $.f3counter+1"><br>
+        (unbound, value initialized to $.name - "mike", onchange counter={{ $.f3counter }})
+      </div>
+      <div class="field">
+        <textarea class="textarea" value.bindpath="$.name" change.handler="$.f1counter = $.f1counter+1"></textarea>
+        (2-way binding, initial value="mike", $.name="{{ $.name }}", onchange counter={{ $.f1counter }})
+      </div>
+    </div>
+    <div class="box content">
+      <h6 class="title is-6">Hidden Input</h6>
+      <input type="hidden" value="*$.hiddenvalue" formvalue.bindpath="$.hiddencolor">
+      <p>$.hiddencolor={{$.hiddencolor}}</p>
+      <div class="button" click.handler="$.hiddenvalue='red';">Change Hidden Value To 'red'</div>
+    </div>
+    <div class="box content">
+      <h6 class="title is-6">File Input</h6>
+      <input class="input" type="file" value.bindpath="$.filevalue">
+      <p>$.filevalue={{$.filevalue}}</p>
+      <p>Image preview (if mimetype is image/*)</p>
+      <img if="$.filevalue != null && fn:startswith(fn:blobmimetype($.filevalue), 'image/')" style="max-width: 300px; max-height: 300px;" src="*$.filevalue">
+    </div>
+    <div class="box content">
+      <h6 class="title is-6">Checkboxes</h6>
+      <div>
+        <label class="checkbox"><input type="checkbox" value="apple" formvalue.bindpath="$.cbvalue"> Apple</label>
+        <label class="checkbox"><input type="checkbox" value="banana" formvalue.bindpath="$.cbvalue"> Banana</label>
+        <label class="checkbox"><input type="checkbox" value="orange" formvalue.bindpath="$.cbvalue"> Orange</label>
+      </div>
+      <p>
+        2-way binding with formvalue | $.cbvalue={{$.cbvalue | format("json-compact")}}
+      </p>
+      <div class="mt-3">
+        <label class="checkbox"><input type="checkbox" value="apple" checked.bindpath="$.cb2way.apple"> Apple</label>
+        <label class="checkbox"><input type="checkbox" value="banana" checked.bindpath="$.cb2way.banana"> Banana</label>
+        <label class="checkbox"><input type="checkbox" value="orange" checked.bindpath="$.cb2way.orange"> Orange</label>
+      </div>
+      <p>
+        2-way binding with checked | $.cb2way.apple={{$.cb2way.apple}} | $.cb2way.banana={{$.cb2way.banana}} | $.cb2way.orange={{$.cb2way.orange}}
+      </p>
+      <div class="mt-3">
+        <label class="checkbox"><input bound type="checkbox" checked="*$.cb1way == 'blue'" change.handler="$.cb1way=(@value ? 'blue' : null);"> Blue</label>
+        <label class="checkbox"><input bound type="checkbox" checked="*$.cb1way == 'red'" change.handler="$.cb1way=(@value ? 'red' : null);"> Red</label>
+      </div>
+      <p>1-way binding onchange set $.cb1way={{ $.cb1way }}</p>
+      <div class="mt-3">
+        <label class="checkbox"><input type="checkbox" checked="$.cbchecked" change.handler="$.cb1counter = $.cb1counter+1;"> Checkbox</label>
+      </div>
+      <p>unbound, set checked to $.cbchecked={{ $.cbchecked }}, changecounter={{$.cb1counter}}</p>
+      
+    </div>
+    <div class="box content">
+      <h6 class="title is-6">Radio Buttons</h6>
+      <div>
+        <label class="radio"><input type="radio" value="apple" formvalue.bindpath="$.radiovalue"> Apple</label>
+        <label class="radio"><input type="radio" value="banana" formvalue.bindpath="$.radiovalue"> Banana</label>
+        <label class="radio"><input type="radio" value="orange" formvalue.bindpath="$.radiovalue"> Orange</label>
+      </div>
+      <p>
+        2-way binding with formvalue | $.radiovalue={{$.radiovalue}}
+      </p>
+      <div class="mt-3">
+        <label class="radio">
+          <input bound type="radio" checked="*$.radiovalue == 'banana'" change.handler="$.radiovalue='banana';"> Banana
+        </label>
+        <label class="radio">
+          <input bound type="radio" checked="*$.radiovalue == 'guava'" change.handler="$.radiovalue='guava';"> Guava
+        </label>
+      </div>
+      <p>1-way binding onchange set $.radiovalue={{ $.radiovalue }}</p>
+      <div class="mt-3">
+        <label class="radio">
+          <input type="radio" name="r1" checked="*$.radiovalue == 'apple'" change.handler="$.radio1counter = $.radio1counter+1;">
+          Unmanaged Apple
+        </label>
+        <label class="radio">
+          <input type="radio" name="r1" checked="*$.radiovalue == 'kiwi'" change.handler="$.radio1counter = $.radio1counter+1;">
+          Unmanaged Kiwi
+        </label>
+      </div>
+      <p>unbound, (uses name="r1"), changecounter={{$.radio1counter}}</p>
+      
+    </div>
+
+    <div class="box content">
+      <h6 class="title is-6">Select</h6>
+      <div class="select">
+        <select value.bindpath="$.selectvalue">
+          <option value="">(No Value)</option>
+          <option value="apple">Apple</option>
+          <option value="banana">Banana</option>
+          <option value="kiwi">Kiwi</option>
+        </select>
+      </div>
+      <p>2-way binding, $.selectvalue={{$.selectvalue}}</p>
+      <div class="select mt-3">
+        <select change.handler="$.selectlast = @value;">
+          <option value="">(No Value)</option>
+          <option value="apple">Apple</option>
+          <option value="banana">Banana</option>
+          <option selected value="kiwi">Kiwi</option>
+        </select>
+      </div>
+      <p>(unbound, kiwi is selected) $.selectlast={{$.selectlast}}</p>
+    </div>
+    
+  </template>
+</div>

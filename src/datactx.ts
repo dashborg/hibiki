@@ -2564,13 +2564,16 @@ function BlobFromBlob(blob : Blob) : Promise<HibikiBlob> {
                 return;
             }
             let mimetype = blob.type;
+            if (mimetype == null || mimetype === "") {
+                mimetype = "application/octet-stream";
+            }
             let semiIdx = (reader.result as string).indexOf(";");
-            if (semiIdx === -1 || mimetype == null || mimetype === "") {
-                reject(new Error("Invalid BLOB, bad mimetype or encoding"));
+            if (semiIdx === -1) {
+                reject(new Error("Invalid BLOB, could not be readAsDataURL"));
                 return;
             }
             let hblob = new HibikiBlob();
-            hblob.mimetype = blob.type;
+            hblob.mimetype = mimetype;
             // extra 7 bytes for "base64," ... e.g. data:image/jpeg;base64,[base64data]
             hblob.data = (reader.result as string).substr(semiIdx+1+7);
             if (blob instanceof File && blob.name != null) {
