@@ -320,7 +320,7 @@ function makeHandlers(node : HibikiNode, handlerPrefixes? : string[]) : Record<s
                 continue;
             }
             let hname = sprintf("//@event/%s", eventName);
-            handlers[hname] = {block: node.handlers[eventName], node: node};
+            handlers[hname] = {block: new DataCtx.HActionBlock(node.handlers[eventName]), node: node};
         }
     }
     if (handlerPrefixes != null && node.list != null) {
@@ -345,7 +345,7 @@ function makeHandlers(node : HibikiNode, handlerPrefixes? : string[]) : Record<s
                 }
             }
             if (prefixOk) {
-                handlers[hname] = {block: subNode.handlers["handler"], node: subNode};
+                handlers[hname] = {block: new DataCtx.HActionBlock(subNode.handlers["handler"]), node: subNode};
             }
         }
     }

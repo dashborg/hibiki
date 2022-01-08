@@ -269,8 +269,8 @@ class HtmlParser {
         }
         let blockStr = value + ";";
         try {
-            let block : HAction[] = doParse(blockStr, "ext_statementBlock");
-            node.handlers[handlerName] = block;
+            let actions : HAction[] = doParse(blockStr, "ext_statementBlock");
+            node.handlers[handlerName] = actions;
         }
         catch (e) {
             console.log(sprintf("ERROR evaluating '%s' in <%s>\n\"%s\"\n", name, node.tag, value), e.toString());

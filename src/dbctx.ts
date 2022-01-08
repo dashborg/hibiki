@@ -189,7 +189,7 @@ class DBCtx {
             event: {etype: "literal", val: event},
             data: {etype: "literal", val: datacontext},
         };
-        return DataCtx.ExecuteHandlerBlock([action], false, eventDataenv, rtctx, false);
+        return DataCtx.ExecuteHandlerBlock(new DataCtx.HActionBlock([action]), false, eventDataenv, rtctx, false);
     }
 
     @boundMethod handleOnSubmit(e : any) : boolean {

@@ -63,6 +63,14 @@ type HAction = {
     blockctx?  : string,
 };
 
+class HActionBlock {
+    actions : HAction[];
+
+    constructor(actions : HAction[]) {
+        this.actions = actions;
+    }
+}
+
 class HibikiBlob {
     mimetype : string = null;
     data : string = null;
@@ -2193,11 +2201,11 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
         let actions = action.actions ?? {};
         if (condVal) {
             rtctx.pushContext("then clause", null);
-            await ExecuteHandlerBlock(actions["then"], pure, dataenv, rtctx, false);
+            await ExecuteHandlerBlock(new HActionBlock(actions["then"]), pure, dataenv, rtctx, false);
         }
         else {
             rtctx.pushContext("else clause", null);
-            await ExecuteHandlerBlock(actions["else"], pure, dataenv, rtctx, false);
+            await ExecuteHandlerBlock(new HActionBlock(actions["else"]), pure, dataenv, rtctx, false);
         }
         return null;
     }
@@ -2348,8 +2356,20 @@ function evalActionVal(aval : HibikiActionValue) : HExpr {
     if (aval == null) {
         return null;
     }
-    if (isObject(aval) && "hibikiexpr" in aval) {
-        return ParseSimpleExprThrow(aval.hibikiexpr);
+    if (isObject(aval)) {
+        let objVal : HibikiValObj = (aval as any);
+        if ("hibikiexpr" in objVal) {
+            let exprStr = objVal.hibikiexpr;
+            if (exprStr == null) {
+                return {etype: "literal", val: null};
+            }
+            else if (typeof(exprStr) === "string") {
+                return ParseSimpleExprThrow(exprStr);
+            }
+            else {
+                throw new Error("Invalid hibikiexpr expression, not a string: " + typeof(objVal));
+            }
+        }
     }
     return {etype: "literal", val: aval};
 }
@@ -2432,7 +2452,10 @@ async function ExecuteHandlerBlockInternal(block : HandlerBlock, pure : boolean,
         return null;
     }
     let actionArr : HAction[] = null;
-    if ("hibikiactions" in block) {
+    if (block instanceof HActionBlock) {
+        actionArr = block.actions;
+    }
+    else if ("hibikiactions" in block) {
         actionArr = convertActions(block.hibikiactions);
         if (block.hibikicontext != null && isObject(block.hibikicontext)) {
             dataenv = dataenv.makeChildEnv(block.hibikicontext, null);
@@ -2448,7 +2471,11 @@ async function ExecuteHandlerBlockInternal(block : HandlerBlock, pure : boolean,
         }
     }
     else {
-        actionArr = block;
+        console.log("Invalid block passed to ExecuteHandlerBlock", block);
+        throw new Error("Invalid block passed to ExecuteHandlerBlock");
+    }
+    if (actionArr == null || actionArr.length === 0) {
+        return null;
     }
     let rtn = null;
     let markPoint = rtctx.stackSize();
@@ -2491,7 +2518,7 @@ function ExecuteHandlerBlock(block : HandlerBlock, pure : boolean, dataenv : Dat
                 event: {etype: "literal", val: "error"},
                 data: {etype: "literal", val: {"error": errorObj}},
             };
-            ExecuteHandlerBlock([errAction], pure, handlerEnv, rtctx, true);
+            ExecuteHandlerBlock(new HActionBlock([errAction]), pure, handlerEnv, rtctx, true);
             return null;
         });
     }
@@ -2665,6 +2692,6 @@ function convertSimpleType(typeName : string, value : string, defaultValue : Hib
     return value;
 }
 
-export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, evalActionStr, makeIteratorFromExpr, rawAttrStr, resolveStrAttrs, resolveValAttrs, getStyleMap, getAttributeStr, getAttributeValPair, attrValToStr, exValToVal, resolveLValueAttr, resolveArgsRoot, SYM_NOATTR, resolveCnArray};
+export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, evalActionStr, makeIteratorFromExpr, rawAttrStr, resolveStrAttrs, resolveValAttrs, getStyleMap, getAttributeStr, getAttributeValPair, attrValToStr, exValToVal, resolveLValueAttr, resolveArgsRoot, SYM_NOATTR, resolveCnArray, HActionBlock};
 
 export type {PathType, HAction, HExpr, HIteratorExpr};

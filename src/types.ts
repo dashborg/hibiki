@@ -4,7 +4,7 @@ import type {HibikiState} from "./state";
 import type {RtContext, HibikiError} from "./error";
 import type {HibikiRequest} from "./request";
 import * as mobx from "mobx";
-import type {HAction, HExpr, HibikiBlob, LValue, HIteratorExpr} from "./datactx";
+import type {HExpr, HibikiBlob, LValue, HIteratorExpr, HAction, HActionBlock} from "./datactx";
 import type {DataEnvironment} from "./state";
 
 type NodeAttrType = string | HExpr;
@@ -73,9 +73,9 @@ type HandlerValType = {
 type HandlerBlock =
       {hibikihandler: string, hibikicontext?: Record<string, any>, ctxstr? : string}
     | {hibikiactions: HibikiAction[], hibikicontext?: Record<string, any>}
-    | HAction[];
+    | HActionBlock;
 
-type HibikiActionValue = {hibikiexpr : string} | any;
+type HibikiActionValue = HibikiVal | {hibikiexpr : string};
 type HibikiActionString   = string | {hibikiexpr : string};
 
 type HibikiAction = {
@@ -202,6 +202,7 @@ interface HibikiExtState {
     setData(path : string, data : any);
     getData(path : string) : any;
     executeHandlerBlock(actions : HandlerBlock, pure? : boolean);
+    callHandler(handlerUrl : string, data : HibikiValObj);
     setPageName(pageName : string);
     setInitCallback(fn : () => void);
     initialize(force : boolean);

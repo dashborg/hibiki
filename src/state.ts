@@ -5,7 +5,7 @@ import md5 from "md5";
 import {sprintf} from "sprintf-js";
 import {boundMethod} from 'autobind-decorator'
 import {v4 as uuidv4} from 'uuid';
-import type {HibikiNode, ComponentType, LibraryType, HibikiConfig, HibikiHandlerModule, HibikiAction, EventType, HandlerValType, JSFuncType, Hibiki, ErrorCallbackFn, HtmlParserOpts, HandlerBlock, NodeAttrType, HibikiVal, HibikiValEx} from "./types";
+import type {HibikiNode, ComponentType, LibraryType, HibikiConfig, HibikiHandlerModule, HibikiAction, EventType, HandlerValType, JSFuncType, Hibiki, ErrorCallbackFn, HtmlParserOpts, HandlerBlock, NodeAttrType, HibikiVal, HibikiValObj, HibikiValEx} from "./types";
 import * as DataCtx from "./datactx";
 import {isObject, textContent, SYM_PROXY, SYM_FLATTEN, nodeStr, callHook, getHibiki, parseHandler, fullPath, parseUrlParams, smartDecodeParams, blobPrintStr, unbox} from "./utils";
 import {subNodesByTag, firstSubNodeByTag} from "./nodeutils";
@@ -755,8 +755,17 @@ class HibikiExtState {
         return dataenv.resolvePath(path, {keepMobx: false, rtContext: "HibikiExtState.getData"});
     }
 
-    executeHandlerBlock(actions : HandlerBlock, pure? : boolean) : Promise<any> {
+    executeHandlerBlock(actions : HandlerBlock, pure? : boolean) : Promise<HibikiVal> {
         return this.state.executeHandlerBlock(actions, pure);
+    }
+
+    callHandler(handlerUrl : string, data : HibikiValObj, pure? : boolean) : Promise<HibikiVal> {
+        let actions = [{
+            actiontype: "callhandler",
+            callpath: handlerUrl,
+            data: data,
+        }];
+        return this.state.executeHandlerBlock({hibikiactions: actions}, pure);
     }
 
     setPageName(pageName : string) {
@@ -813,7 +822,7 @@ class HibikiState {
             event: {etype: "literal", val: "popstate"},
         };
         let rtctx = new RtContext();
-        DataCtx.ExecuteHandlerBlock([action], false, this.pageDataenv(), rtctx, true);
+        DataCtx.ExecuteHandlerBlock(new DataCtx.HActionBlock([action]), false, this.pageDataenv(), rtctx, true);
     }
 
     setInitCallback(fn : () => void) {
@@ -867,7 +876,7 @@ class HibikiState {
                 native: true,
                 event: {etype: "literal", val: "init"},
             };
-            let pinit = DataCtx.ExecuteHandlerBlock([action], false, this.pageDataenv(), rtctx, true);
+            let pinit = DataCtx.ExecuteHandlerBlock(new DataCtx.HActionBlock([action]), false, this.pageDataenv(), rtctx, true);
             return pinit;
         }).then(() => {
             this.setInitialized();
@@ -1041,7 +1050,7 @@ class HibikiState {
         return null;
     }
 
-    executeHandlerBlock(actions : HandlerBlock, pure? : boolean) : Promise<any> {
+    executeHandlerBlock(actions : HandlerBlock, pure? : boolean) : Promise<HibikiVal> {
         let rtctx = new RtContext();
         rtctx.pushContext("HibikiState.executeHandlerBlock()", null);
         let pinit = DataCtx.ExecuteHandlerBlock(actions, pure, this.pageDataenv(), rtctx, true);
@@ -1072,6 +1081,9 @@ class HibikiState {
         return rtnp.then((data) => {
             if (data == null) {
                 return null;
+            }
+            if (data instanceof DataCtx.HActionBlock) {
+                return data;
             }
             if (isObject(data) && ("hibikihandler" in data)) {
                 return {hibikihandler: data.hibikihandler, ctxstr: data.ctxstr};
