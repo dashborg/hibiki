@@ -326,13 +326,13 @@ class HtmlParser {
         }
     }
 
-    parseCaptureHtmlAttrs(htmlNode : Node, node : HibikiNode, attrName : string, attrValue : string, pctx : ParseContext) : boolean {
+    parseCaptureHtmlAttrs(htmlElem : Element, node : HibikiNode, attrName : string, attrValue : string, pctx : ParseContext) : boolean {
         if (attrName == "innerhtml") {
-            node.innerhtml = htmlNode.innerHTML;
+            node.innerhtml = htmlElem.innerHTML;
             return true;
         }
         if (attrName == "outerhtml") {
-            node.outerhtml = htmlNode.outerHTML;
+            node.outerhtml = htmlElem.outerHTML;
             return true;
         }
         return false;
@@ -409,6 +409,7 @@ class HtmlParser {
         if (htmlNode.nodeType !== 1) { // ELEMENT_NODE
             return null;
         }
+        let htmlElem : Element = htmlNode as Element;
         let tagName = (htmlNode as Element).tagName.toLowerCase();
         pctx.tagStack.push(sprintf("<%s>", tagName));
         let node : HibikiNode = {tag: tagName};
@@ -420,7 +421,7 @@ class HtmlParser {
             let attr = nodeAttrs.item(i);
             let attrName = attr.name.toLowerCase();
             let attrValue = attr.value;
-            if (this.parseCaptureHtmlAttrs(htmlNode, node, attrName, attrValue, pctx)) {
+            if (this.parseCaptureHtmlAttrs(htmlElem, node, attrName, attrValue, pctx)) {
                 continue;
             }
             if (this.parseRawTagAttr(node, attrName, attrValue, pctx)) {

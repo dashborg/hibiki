@@ -14,7 +14,7 @@ import dayjsRelativeTime from "dayjs/plugin/relativeTime";
 import dayjsUtc from "dayjs/plugin/utc";
 import dayjsRelative from "dayjs/plugin/relativeTime";
 
-import type {HibikiNode, ComponentType, LibraryType, HibikiExtState, LibComponentType, NodeAttrType, HibikiVal} from "./types";
+import type {HibikiNode, ComponentType, LibraryType, HibikiExtState, LibComponentType, NodeAttrType, HibikiVal, HibikiReactProps} from "./types";
 import {DBCtx} from "./dbctx";
 import * as DataCtx from "./datactx";
 import {HibikiState, DataEnvironment} from "./state";
@@ -35,18 +35,11 @@ window.dayjs = dayjs;
 let welcomeMessage = false;
 let usageFired = false;
 
-type HibikiReactProps = {
-    node : HibikiNode,
-    dataenv : DataEnvironment,
-};
-
 @mobxReact.observer
 class ErrorMsg extends React.Component<{message: string}, {}> {
     render() {
         return (
-            <div className="ui negative message dashelem">
-                <p>{this.props.message}</p>
-            </div>
+            <div>{this.props.message}</div>
         );
     }
 }
@@ -874,17 +867,6 @@ class NopNode extends React.Component<HibikiReactProps, {}> {
     }
 }
 
-class RunHandlerNode extends React.Component<HibikiReactProps, {}> {
-    componentDidMount() {
-        let ctx = new DBCtx(this);
-        ctx.handleEvent("run");
-    }
-    
-    render() {
-        return null;
-    }
-}
-
 @mobxReact.observer
 class WithContextNode extends React.Component<HibikiReactProps, {}> {
     render() {
@@ -1069,309 +1051,6 @@ class SimpleQueryNode extends React.Component<HibikiReactProps, {}> {
 }
 
 @mobxReact.observer
-class InlineDataNode extends React.Component<HibikiReactProps> {
-    constructor(props : any) {
-        super(props);
-    }
-
-    componentDidMount() {
-        let ctx = new DBCtx(this);
-        if (ctx.isEditMode()) {
-            return;
-        }
-        let format = ctx.resolveAttrStr("format");
-        if (format == null) {
-            format = "json";
-        }
-        if (format != "json" && format != "jseval") {
-            console.log(sprintf("%s invalid format attribute: '%s'", nodeStr(ctx.node), format));
-            return null;
-        }
-        let text = textContent(ctx.node);
-        try {
-            let setData = null;
-            if (format == "json") {
-                setData = JSON.parse(text);
-            }
-            else if (format == "jseval") {
-                let evalVal = jseval(text);
-                setData = evalVal;
-            }
-            let outputLV = ctx.resolveLValueAttr("output");
-            if (outputLV != null) {
-                outputLV.set(setData);
-            }
-        } catch (e) {
-            console.log(sprintf("ERROR parsing %s value", nodeStr(ctx.node)), e);
-        }
-    }
-    
-    render() {
-        return null;
-    }
-}
-
-@mobxReact.observer
-class DataSorterNode extends React.Component<HibikiReactProps, {}> {
-    autorunDisposer : () => void = null;
-
-    sortcolComputed : mobx.IComputedValue<string>;
-    sortascComputed : mobx.IComputedValue<boolean>;
-    dataComputed : mobx.IComputedValue<any[]>;
-
-    constructor(props : any) {
-        super(props);
-
-        let self = this;
-        this.sortcolComputed = mobx.computed(() => {
-            let ctx = new DBCtx(self);
-            let sortSpec = ctx.resolveAttrVal("sortspec");
-            let column = subMapKey(sortSpec, "column");
-            return DataCtx.attrValToStr(column);
-        });
-
-        this.sortascComputed = mobx.computed(() => {
-            let ctx = new DBCtx(self);
-            let sortSpec = ctx.resolveAttrVal("sortspec");
-            if (sortSpec == null) {
-                return true;
-            }
-            let asc = subMapKey(sortSpec, "asc");
-            return !!asc;
-        });
-    }
-    
-    @boundMethod
-    doSort() {
-        let ctx = new DBCtx(this);
-        let sortcol = this.sortcolComputed.get();
-        let sortasc = this.sortascComputed.get();
-
-        let data : mobx.IObservableArray<HibikiVal> = null;
-        let sortInPlace = !!ctx.resolveAttrStr("inplace");
-        if (sortInPlace) {
-            let attrData = ctx.resolveAttrVal("data");
-            if (attrData == null) {
-                return;
-            }
-            if (!mobx.isObservableArray(attrData)) {
-                console.log(sprintf("%s value is not an array lvalue", nodeStr(ctx.node)));
-                return;
-            }
-            data = attrData;
-        }
-        else {
-            let attrData = ctx.resolveAttrVal("data");
-            if (attrData == null || !mobx.isArrayLike(attrData)) {
-                data = mobx.observable([]);
-            }
-            else {
-                if (!mobx.isObservableArray(attrData)) {
-                    data = mobx.observable(attrData);
-                }
-                else {
-                    data = attrData;
-                }
-            }
-        }
-        mobx.action(() => {
-            let sortedData = data;
-            sortedData = data.sort((a, b) => {
-                let rtn = 0;
-                if (a == null && b == null) {
-                    return 0;
-                }
-                if (a == null && b != null) {
-                    return (sortasc ? -1 : 1);
-                }
-                if (a != null && b == null) {
-                    return (sortasc ? 1 : -1);
-                }
-                if (sortcol != null && (typeof(a) != "object" || typeof(b) != "object")) {
-                    return 0;
-                }
-                let aval = (sortcol == null ? a : a[sortcol]);
-                let bval = (sortcol == null ? b : b[sortcol]);
-                if (typeof(aval) == "string") {
-                    aval = aval.toLowerCase();
-                }
-                if (typeof(bval) == "string") {
-                    bval = bval.toLowerCase();
-                }
-                if (aval < bval) {
-                    rtn = -1;
-                }
-                if (aval > bval) {
-                    rtn = 1;
-                }
-                if (!sortasc) {
-                    rtn = -rtn;
-                }
-                return rtn;
-            });
-            if (sortInPlace) {
-                data.replace(sortedData);
-            }
-            else {
-                let outputLV = ctx.resolveLValueAttr("output");
-                if (outputLV != null) {
-                    outputLV.set(sortedData);
-                }
-            }
-        })();
-    }
-
-    componentDidMount() {
-        this.autorunDisposer = mobx.autorun(this.doSort);
-    }
-
-    componentWillUnmount() {
-        if (this.autorunDisposer != null) {
-            this.autorunDisposer();
-        }
-    }
-
-    render() {
-        return null;
-    }
-}
-
-@mobxReact.observer
-class DataPagerNode extends React.Component<HibikiReactProps, {}> {
-    autorunDisposer : () => void = null;
-    dataComputed : mobx.IComputedValue<any[]>;
-    dataIsNullComputed : mobx.IComputedValue<boolean>;
-    totalsizeComputed : mobx.IComputedValue<number>;
-    pagesizeComputed : mobx.IComputedValue<number>;
-    curpageComputed : mobx.IComputedValue<number>;
-
-    constructor(props : any) {
-        super(props);
-        let ctx = new DBCtx(this);
-        let pageSpecLV = ctx.resolveLValueAttr("pagespec");
-        if (pageSpecLV != null) {
-            let curpageLV = pageSpecLV.subMapKey("curpage");
-            if (curpageLV.get() == null && ctx.hasAttr("curpage.default")) {
-                let defaultCurpage = ctx.resolveAttrVal("curpage.default");
-                curpageLV.set(defaultCurpage);
-            }
-        }
-        let self = this;
-        this.dataIsNullComputed = mobx.computed(() => {
-            let data = ctx.resolveAttrVal("data");
-            return (data == null);
-        }, {name: "data-isnull"});
-            
-        this.dataComputed = mobx.computed(() => {
-            let ctx = new DBCtx(self);
-            let data = ctx.resolveAttrVal("data");
-            if (data == null || !mobx.isArrayLike(data)) {
-                data = [];
-            }
-            return data;
-        }, {name: "data"});
-        
-        this.totalsizeComputed = mobx.computed(() => {
-            let data = self.dataComputed.get();
-            return data.length;
-        }, {name: "totalsize"});
-
-        this.pagesizeComputed = mobx.computed(() => {
-            let ctx = new DBCtx(self);
-            return resolveNumber(ctx.resolveAttrVal("pagesize"), (val) => (val > 0), 10);
-        }, {name: "pagesize"});
-        
-        this.curpageComputed = mobx.computed(() => {
-            let ctx = new DBCtx(self);
-            let pageSpec = ctx.resolveAttrVal("pagespec");
-            let curpageRaw = subMapKey(pageSpec, "curpage");
-            let curpage = resolveNumber(DataCtx.demobx(curpageRaw), (val) => (val >= 0), 0);
-            if (curpage < 0) {
-                curpage = 0;
-            }
-            if (curpage > 0) {
-                let totalsize = self.totalsizeComputed.get();
-                let pagesize = self.pagesizeComputed.get();
-                if (curpage * pagesize >= totalsize) {
-                    curpage = Math.floor((totalsize-1) / pagesize);
-                }
-            }
-            return curpage;
-        }, {name: "curpage"});
-    }
-
-    // pagespec
-    //   pagesize
-    //   curpage
-    //   total
-    //   hasnext
-    //   hasprev
-    //   start
-    //   num
-    
-    @boundMethod
-    doPagination() {
-        let ctx = new DBCtx(this);
-        let dataIsNull = this.dataIsNullComputed.get();
-        if (dataIsNull) {
-            setTimeout(mobx.action(() => {
-                let pageSpecLV = ctx.resolveLValueAttr("pagespec");
-                if (pageSpecLV != null) {
-                    let nodataLV = pageSpecLV.subMapKey("nodata");
-                    nodataLV.set(true);
-                }
-            }), 0);
-            return;
-        }
-        let pagesize = this.pagesizeComputed.get();
-        let curpage = this.curpageComputed.get();
-        let data = this.dataComputed.get();
-        let totalsize = data.length;
-        let start = curpage*pagesize;
-        let num = (start + pagesize > totalsize ? totalsize - start : pagesize);
-        let lastpage = Math.floor((totalsize-1) / pagesize);
-        if (lastpage < 0) {
-            lastpage = 0;
-        }
-        let pageSpec = {
-            start: start,
-            num: num,
-            pagesize: pagesize,
-            curpage: curpage,
-            total: totalsize,
-            hasnext: (totalsize > start+num),
-            hasprev: (curpage > 0),
-            lastpage: lastpage,
-        };
-        setTimeout(mobx.action(() => {
-            let output = data.slice(curpage*pagesize, (curpage+1)*pagesize);
-            let outputLV = ctx.resolveLValueAttr("output");
-            if (outputLV != null) {
-                outputLV.set(output);
-            }
-            let pageSpecLV = ctx.resolveLValueAttr("pagespec");
-            if (pageSpecLV != null) {
-                pageSpecLV.set(pageSpec);
-            }
-        }), 0);
-    }
-
-    componentDidMount() {
-        this.autorunDisposer = mobx.autorun(this.doPagination);
-    }
-
-    componentWillUnmount() {
-        if (this.autorunDisposer != null) {
-            this.autorunDisposer();
-        }
-    }
-
-    render() {
-        return null;
-    }
-}
-
-@mobxReact.observer
 class DashElemNode extends React.Component<{ctx : DBCtx, extClass? : string, extStyle? : any}, {}> {
     render() {
         let ctx = this.props.ctx;
@@ -1414,16 +1093,11 @@ addCoreComponent("h-if", IfNode);
 addCoreComponent("h-if-break", IfNode);
 addCoreComponent("h-foreach", FragmentNode);
 addCoreComponent("h-text", TextNode);
-addCoreComponent("h-script", ScriptNode);
 addCoreComponent("h-dateformat", DateFormatNode);
 addCoreComponent("h-dyn", DynNode);
-addCoreComponent("h-runhandler", RunHandlerNode);
 addCoreComponent("h-withcontext", WithContextNode);
 addCoreComponent("h-children", ChildrenNode);
 addCoreComponent("h-data", SimpleQueryNode);
-addCoreComponent("h-inlinedata", InlineDataNode);
-addCoreComponent("h-datasorter", DataSorterNode);
-addCoreComponent("h-datapager", DataPagerNode);
 addCoreComponent("h-fragment", FragmentNode);
 
 export {HibikiRootNode, CORE_LIBRARY};

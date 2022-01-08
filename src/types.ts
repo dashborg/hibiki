@@ -5,6 +5,7 @@ import type {RtContext, HibikiError} from "./error";
 import type {HibikiRequest} from "./request";
 import * as mobx from "mobx";
 import type {HAction, HExpr, HibikiBlob, LValue, HIteratorExpr} from "./datactx";
+import type {DataEnvironment} from "./state";
 
 type NodeAttrType = string | HExpr;
 
@@ -27,6 +28,11 @@ type HibikiNode = {
     innerhtml? : string,
     outerhtml? : string,
 }
+
+type HibikiReactProps = {
+    node : HibikiNode,
+    dataenv : DataEnvironment,
+};
 
 type AutoMergeExpr = {
     source : string,
@@ -201,5 +207,5 @@ interface HibikiExtState {
     initialize(force : boolean);
 };
 
-export type {HibikiNode, HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, ComponentType, LibraryType, HibikiRequest, Hibiki, HibikiAction, HibikiActionString, HibikiActionValue, HibikiExtState, EventType, HandlerValType, JSFuncType, AppModuleConfig, FetchHookFn, CsrfHookFn, ReactClass, HandlerPathType, ErrorCallbackFn, EventCallbackFn, HtmlParserOpts, LibComponentType, HandlerBlock, NodeAttrType, HibikiVal, HibikiValObj, HibikiValEx, AutoMergeExpr, AutoFireExpr};
+export type {HibikiNode, HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, ComponentType, LibraryType, HibikiRequest, Hibiki, HibikiAction, HibikiActionString, HibikiActionValue, HibikiExtState, EventType, HandlerValType, JSFuncType, AppModuleConfig, FetchHookFn, CsrfHookFn, ReactClass, HandlerPathType, ErrorCallbackFn, EventCallbackFn, HtmlParserOpts, LibComponentType, HandlerBlock, NodeAttrType, HibikiVal, HibikiValObj, HibikiValEx, AutoMergeExpr, AutoFireExpr, HibikiReactProps};
 

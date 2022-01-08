@@ -170,8 +170,8 @@ class DBCtx {
             return null;
         }
         let context = {
-            innerhtml: this.node.innerHtml,
-            outerhtml: this.node.outerHtml,
+            innerhtml: this.node.innerhtml,
+            outerhtml: this.node.outerhtml,
         };
         return this.handleEvent("mount", context);
     }

@@ -700,7 +700,6 @@ function _assignToArgsRootNs(argsRoot : Record<string, HibikiValEx>, key : strin
             nsRoot["@classlock"] = true;
         }
         if (baseName == "class") {
-            console.log("CLASS", ns, val);
             nsRoot["class"] = cn(nsRoot["class"], val);
         }
         else {
