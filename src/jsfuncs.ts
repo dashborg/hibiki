@@ -272,7 +272,7 @@ function jsBlobAsText(blob : any) : string {
         return null;
     }
     if (!blob.mimetype.startsWith("text/")) {
-            return null;
+        return null;
     }
     return atob(blob.data);
 }
