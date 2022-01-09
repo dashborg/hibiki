@@ -7,11 +7,12 @@ import {sprintf} from "sprintf-js";
 import {parseHtml} from "./html-parser";
 import {RtContext, getShortEMsg, HibikiError} from "./error";
 import {makeUrlParamsFromObject, SYM_PROXY, SYM_FLATTEN, isObject, stripAtKeys, unpackPositionalArgs, nodeStr, parseHandler, fullPath, blobPrintStr, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP, valToString} from "./utils";
-import {PathPart, PathType, PathUnionType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue, HandlerBlock, NodeAttrType, HibikiVal, HibikiNode, HibikiValObj, HibikiValEx, AutoMergeExpr} from "./types";
+import {PathPart, PathType, PathUnionType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue, HandlerBlock, NodeAttrType, HibikiVal, HibikiNode, HibikiValObj, HibikiValEx, AutoMergeExpr, JSFuncType} from "./types";
 import {HibikiRequest} from "./request";
 import type {EHandlerType} from "./state";
 import {doParse} from "./hibiki-parser";
 import * as cn from "classnames/dedupe";
+import {DefaultJSFuncs} from "./jsfuncs";
 
 window.cn = cn;
 
@@ -1839,7 +1840,16 @@ function JsonStringifyForCall(lvMap : any, v : any, space? : number) : string {
 
 function evalFnAst(fnAst : any, dataenv : DataEnvironment) : any {
     let state = dataenv.dbstate;
-    let stateFn = state.JSFuncs[fnAst.fn.toLowerCase()];
+    let stateFn : JSFuncType = null;
+    let fnName = fnAst.fn.toLowerCase();
+    if (fnName.startsWith("fn:")) {
+        fnName = fnName.substr(3);
+        stateFn = DefaultJSFuncs[fnName];
+    }
+    else if (fnName.startsWith("fnx:")) {
+        fnName = fnName.substr(4);
+        stateFn = state.JSFuncs[fnName];
+    }
     if (stateFn != null) {
         let elist = evalExprArray(fnAst.exprs, dataenv);
         if (!stateFn.native) {

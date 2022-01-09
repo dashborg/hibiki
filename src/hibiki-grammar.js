@@ -50,7 +50,7 @@ let lexer = moo.states({
         DOLLAR:   "$",
         ATID:     { match: /@[a-zA-Z][a-zA-Z_0-9]*/, value: (v) => v.substr(1) },
         ATSIGN:   "@",
-        FN:       { match: /fn:[a-zA-Z_][a-zA-Z_0-9]*/, value: (v) => v.substr(3) },
+        FN:       { match: /fnx?:[a-zA-Z_][a-zA-Z_0-9]*/ },
         ID:       { match: /[a-zA-Z_][a-zA-Z_0-9]*/,
                     type: moo.keywords({
                         KW_TRUE: "true",

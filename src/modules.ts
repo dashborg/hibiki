@@ -507,7 +507,7 @@ class HibikiModule {
     updateUrl(req : HibikiRequest) : Promise<any> {
         let data = stripAtKeys(req.data);
         let {path: urlStr, raw: isRaw, replace, title} = unpackAtArgs(req.data);
-        let url  = new URL((urlStr ?? ""), window.location.href);
+        let url = new URL((urlStr ?? ""), window.location.href);
         for (let key in data) {
             let val = data[key];
             if (val == null) {

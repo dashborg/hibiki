@@ -11,7 +11,6 @@ import {deepTextContent, evalDeepTextContent, isObject} from "./utils";
 import merge from "lodash/merge";
 import type {HibikiNode, HibikiConfig, Hibiki, HibikiExtState, ReactClass, LibraryType} from "./types";
 import {AppModule, LocalModule, HttpModule, LibModule, HibikiModule} from "./modules";
-import {DefaultJSFuncs} from "./jsfuncs";
 
 declare var window : any;
 
@@ -181,7 +180,7 @@ let hibiki : Hibiki = {
         "lib": LibModule,
         "hibiki": HibikiModule,
     },
-    JSFuncs: DefaultJSFuncs,
+    JSFuncs: {},
     LocalHandlers: LocalHandlers,
     LocalReactComponents: LocalReactComponents,
     LocalNativeComponents: LocalNativeComponents,
