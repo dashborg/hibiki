@@ -216,6 +216,11 @@ class DBCtx {
         return false;
     }
 
+    @boundMethod handleAfterChange(newVal : HibikiVal) : boolean {
+        this.handleEvent("afterchange", {value: newVal});
+        return false;
+    }
+
     getNodeLValueRoot() : DataCtx.LValue {
         let dbstate = this.dataenv.dbstate;
         let nodeData = dbstate.NodeDataMap.get(this.uuid);

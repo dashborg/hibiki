@@ -262,6 +262,15 @@ function smartDecodeParams(paramsStr : string) : {[e : string] : any} {
             rtn[key] = null;
             continue;
         }
+        let lcVal = val.toLowerCase();
+        if (lcVal === "true") {
+            rtn[key] = true;
+            continue;
+        }
+        if (lcVal === "false") {
+            rtn[key] = false;
+            continue;
+        }
         if ((val[0] == "-" || val[0] == "+" || (val[0] >= "0" && val[0] <= "9")) && (val.match(/^[+-]?\d+(\.\d+)?$/))) {
             let ival = parseFloat(val);
             if (!isNaN(ival)) {
@@ -291,10 +300,11 @@ function smartEncodeParam(val : any, isRaw? : boolean) : string {
         return String(val);
     }
     if (typeof(val) == "string") {
-        if (val == "") {
+        if (val === "") {
             return "";
         }
-        if (val[0] == "\"" || val[0] == "{" || val[0] == "[" || val[0] == "-" || (val[0] >= "0" && val[0] <= "9")) {
+        let lcVal = val.toLowerCase();
+        if (lcVal === "true" || lcVal === "false" || val[0] == "\"" || val[0] == "{" || val[0] == "[" || val[0] == "-" || (val[0] >= "0" && val[0] <= "9")) {
             return JSON.stringify(val);
         }
         return val;

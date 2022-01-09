@@ -403,6 +403,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
         if (valueLV != null) {
             valueLV.set(newValue);
         }
+        ctx.handleAfterChange(newValue);
     }
 
     @boundMethod handleRadioOnChange(e) {
@@ -414,6 +415,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
             let radioValue = ctx.resolveAttrStr("value") ?? "on";
             formValueLV.set(radioValue);
         }
+        ctx.handleAfterChange(newValue);
     }
 
     @boundMethod handleCheckboxOnChange(e) {
@@ -435,8 +437,8 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
                 let newFormValue = removeFromArray(formValueLV.get(), checkboxValue);
                 formValueLV.set(newFormValue);
             }
-            
         }
+        ctx.handleAfterChange(newValue);
     }
 
     setupManagedValue(ctx : DBCtx, elemProps : Record<string, any>) {
@@ -589,7 +591,6 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
                 continue;
             }
             if (v instanceof DataCtx.HibikiBlob) {
-                console.log("hibikiblob", k, v);
                 if (NodeUtils.BLOB_ATTRS[k]) {
                     elemProps[k] = v.makeDataUrl();
                 }

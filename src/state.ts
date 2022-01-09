@@ -854,6 +854,15 @@ class HibikiState {
         rootDataenv.setDataPath("$state.title", document.title);
         rootDataenv.setDataPath("$state.rawurlparams", parseUrlParams());
         rootDataenv.setDataPath("$state.urlparams", smartDecodeParams(window.location.search));
+        rootDataenv.setDataPath("$state.url", window.location.href);
+        rootDataenv.setDataPath("$state.location", {
+            protocol: window.location.protocol,
+            host: window.location.host,
+            hostname: window.location.hostname,
+            port: window.location.port,
+            href: window.location.href,
+            hash: window.location.hash,
+        });
     }
 
     initialize(force : boolean) {
