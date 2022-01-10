@@ -113,6 +113,11 @@ class DBCtx {
         return exists;
     }
 
+    // does not check for automerge or noattr!
+    hasRawAttr(attrName : string) : boolean {
+        return (this.node.attrs != null && this.node.attrs[attrName] != null);
+    }
+
     hasHandler(handlerName : string) : boolean {
         return (this.node.handlers != null && this.node.handlers[handlerName] != null);
     }

@@ -245,9 +245,12 @@ class AnyNode extends React.Component<HibikiReactProps, {}> {
             if (!iterating && node.foreachAttr != null) {
                 return this.renderForeach(ctx);
             }
-            let [ifAttr, ifExists] = ctx.resolveAttrValPair("if");
-            if (ifExists && !ifAttr) {
-                return null;
+            let ifExists = ctx.hasRawAttr("if");
+            if (ifExists) {
+                let ifAttrVal = ctx.resolveAttrVal("if");
+                if (!ifAttrVal) {
+                    return null;
+                }
             }
         }
         let dataenv = ctx.dataenv;
