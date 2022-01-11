@@ -59,7 +59,6 @@ function readHibikiConfigFromOuterHtml(htmlElem : string | HTMLElement) : Hibiki
 let createState = function createState(config : HibikiConfig, html : string | HTMLElement, initialData : any) : HibikiExtState {
     let state = new HibikiState();
     state.ComponentLibrary.addLibrary(CORE_LIBRARY);
-    state.ComponentLibrary.rawImportLib("@main", "@hibiki/core", null);
     
     config = config || {};
     initialData = initialData || {};

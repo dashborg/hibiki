@@ -312,7 +312,7 @@ function handleConvertType(ctx : DBCtx, value : string) : any {
     return value;
 }
 
-function makeHandlers(node : HibikiNode, handlerPrefixes? : string[]) : Record<string, HandlerValType> {
+function makeHandlers(node : HibikiNode, libContext : string, handlerPrefixes : string[]) : Record<string, HandlerValType> {
     let handlers : Record<string, HandlerValType> = {};
     if (node.handlers != null) {
         for (let eventName in node.handlers) {
@@ -320,7 +320,7 @@ function makeHandlers(node : HibikiNode, handlerPrefixes? : string[]) : Record<s
                 continue;
             }
             let hname = sprintf("//@event/%s", eventName);
-            handlers[hname] = {block: new DataCtx.HActionBlock(node.handlers[eventName]), node: node};
+            handlers[hname] = {block: new DataCtx.HActionBlock(node.handlers[eventName], libContext), node: node};
         }
     }
     if (handlerPrefixes != null && node.list != null) {
@@ -345,7 +345,7 @@ function makeHandlers(node : HibikiNode, handlerPrefixes? : string[]) : Record<s
                 }
             }
             if (prefixOk) {
-                handlers[hname] = {block: new DataCtx.HActionBlock(subNode.handlers["handler"]), node: subNode};
+                handlers[hname] = {block: new DataCtx.HActionBlock(subNode.handlers["handler"], libContext), node: subNode};
             }
         }
     }

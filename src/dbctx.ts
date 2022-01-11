@@ -159,7 +159,7 @@ class DBCtx {
     }
 
     getEventDataenv() : DataEnvironment {
-        let handlers = NodeUtils.makeHandlers(this.node);
+        let handlers = NodeUtils.makeHandlers(this.node, null, null);
         let htmlContext = sprintf("<%s>", this.node.tag);
         let envOpts = {
             htmlContext: htmlContext,

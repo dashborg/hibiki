@@ -71,8 +71,8 @@ type HandlerValType = {
 };
 
 type HandlerBlock =
-      {hibikihandler: string, hibikicontext?: Record<string, any>, ctxstr? : string}
-    | {hibikiactions: HibikiAction[], hibikicontext?: Record<string, any>}
+      {hibikihandler: string, hibikicontext?: Record<string, any>, ctxstr? : string, libContext? : string}
+    | {hibikiactions: HibikiAction[], hibikicontext?: Record<string, any>, libContext?: string}
     | HActionBlock;
 
 type HibikiActionValue = HibikiVal | {hibikiexpr : string};
@@ -163,6 +163,7 @@ type LibComponentType = {
     impl? : mobx.IObservableValue<any>,
     reactimpl? : mobx.IObservableValue<any>,
     node? : HibikiNode,
+    isPrivate? : boolean,
 }
 
 type LibraryType = {

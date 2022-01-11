@@ -66,9 +66,11 @@ type HAction = {
 
 class HActionBlock {
     actions : HAction[];
+    libContext : string;
 
-    constructor(actions : HAction[]) {
+    constructor(actions : HAction[], libContext? : string) {
         this.actions = actions;
+        this.libContext = libContext;
     }
 }
 
@@ -2158,7 +2160,7 @@ function RequestFromAction(action : HAction, pure : boolean, dataenv : DataEnvir
     req.data = fullData as HibikiValObj;
     req.rtContext = rtctx;
     req.pure = pure || action.pure;
-    req.libContext = dataenv.getLibContext();
+    req.libContext = dataenv.getLibContext() ?? "main";
     if (action.callpath != null) {
         let callPath = valToString(evalExprAst(action.callpath, dataenv));
         let hpath = parseHandler(callPath);
@@ -2227,8 +2229,15 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
         let req = RequestFromAction(action, pure, dataenv, rtctx);
         rtctx.replaceContext(sprintf("Calling handler %s", fullPath(req.callpath)), null);
         let block = await dataenv.dbstate.callHandlerWithReq(req);
-        let handlerEnv = dataenv.makeChildEnv({data: req.data}, {blockLocalData: true});
-        let rtnVal = await ExecuteHandlerBlock(block, req.pure, handlerEnv, rtctx, false);
+        let rtnVal : HibikiVal = null;
+        if (block != null) {
+            let libContext : string = null;
+            if (typeof(block.libContext) === "string") {
+                libContext = block.libContext;
+            }
+            let handlerEnv = dataenv.makeChildEnv({data: req.data}, {blockLocalData: true, libContext: libContext});
+            rtnVal = await ExecuteHandlerBlock(block, req.pure, handlerEnv, rtctx, false);
+        }
         doAssignment(action, rtnVal, pure, dataenv);
         return rtnVal;
     }

@@ -265,7 +265,7 @@ class AnyNode extends React.Component<HibikiReactProps, {}> {
             else if (component.componentType == "hibiki-native") {
                 this.nodeType = "component";
                 let ImplNode = component.impl.get();
-                if (ImplNode == null && component.libName == "@main") {
+                if (ImplNode == null && component.libName == "main") {
                     ImplNode = getHibiki().LocalNativeComponents.get(component.name);
                 }
                 if (ImplNode == null) {
@@ -313,7 +313,7 @@ class CustomReactNode extends React.Component<HibikiReactProps & {component : Co
         let component = this.props.component;
         let implBox = component.reactimpl;
         let reactImpl = implBox.get();
-        if (reactImpl == null && component.libName == "@main") {
+        if (reactImpl == null && component.libName == "main") {
             reactImpl = getHibiki().LocalReactComponents.get(component.name);
         }
         if (reactImpl == null) {
@@ -680,7 +680,7 @@ class CustomNode extends React.Component<HibikiReactProps & {component : Compone
         let nodeVar = NodeUtils.makeNodeVar(ctx);
         let childrenVar = NodeUtils.makeChildrenVar(ctx.dataenv, ctx.node);
         let componentName = DataCtx.rawAttrStr(rawImplAttrs.name);
-        let ctxHandlers = NodeUtils.makeHandlers(ctx.node);
+        let ctxHandlers = NodeUtils.makeHandlers(ctx.node, null, null);
         let eventCtx = sprintf("%s", nodeStr(ctx.node));
         let eventDE = ctx.dataenv.makeChildEnv(null, {eventBoundary: "hard", handlers: ctxHandlers, htmlContext: eventCtx});
         let nodeDataLV = ctx.getNodeDataLV(componentName);
@@ -688,7 +688,7 @@ class CustomNode extends React.Component<HibikiReactProps & {component : Compone
         specials.children = childrenVar;
         specials.node = nodeVar;
         let argsRoot = ctx.resolveArgsRoot();
-        let handlers = NodeUtils.makeHandlers(implNode, ["event"]);
+        let handlers = NodeUtils.makeHandlers(implNode, component.libName, ["event"]);
         let envOpts = {
             componentRoot: unbox(ctx.getNodeData(componentName)),
             argsRoot: argsRoot,

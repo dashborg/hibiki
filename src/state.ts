@@ -33,74 +33,6 @@ function eventBubbles(event : string) : boolean {
     return true;
 }
 
-function createDepPromise(libName : string, srcUrl : string, state : HibikiState, libNode : HibikiNode) : [Promise<any>, string[]] {
-    if (libNode == null) {
-        return [Promise.resolve(true), []];
-    }
-    let parr = [];
-    let scriptTags = subNodesByTag(libNode, "script");
-    let srcs = [];
-    for (let i=0; i<scriptTags.length; i++) {
-        let stag = scriptTags[i];
-        let attrs = NodeUtils.getRawAttrs(stag);
-        if (attrs.type != null && attrs.type !== "text/javascript") {
-            continue;
-        }
-        if (attrs.src == null) {
-            let p = state.queueScriptText(textContent(stag), !attrs.async);
-            parr.push(p);
-            continue;
-        }
-        let scriptSrc = attrs.src;
-        if (attrs.relative) {
-            scriptSrc = new URL(scriptSrc, srcUrl).toString();
-        }
-        let p = state.queueScriptSrc(scriptSrc, !attrs.async);
-        parr.push(p);
-        srcs.push("[script]" + scriptSrc);
-    }
-    let linkTags = subNodesByTag(libNode, "link");
-    for (let i=0; i<linkTags.length; i++) {
-        let ltag = linkTags[i];
-        let attrs = NodeUtils.getRawAttrs(ltag);
-        if (attrs.rel !== "stylesheet" || attrs.href == null) {
-            continue;
-        }
-        let cssUrl = attrs.href;
-        if (attrs.relative) {
-            cssUrl = new URL(cssUrl, srcUrl).toString();
-        }
-        let p = state.loadCssLink(cssUrl, !attrs.async);
-        parr.push(p);
-        srcs.push("[css]" + cssUrl);
-    }
-    let styleTags = subNodesByTag(libNode, "style");
-    for (let i=0; i<styleTags.length; i++) {
-        state.loadStyleText(textContent(styleTags[i]));
-    }
-    let importTags = subNodesByTag(libNode, "import-library");
-    for (let i=0; i<importTags.length; i++) {
-        let itag = importTags[i];
-        let attrs = NodeUtils.getRawAttrs(itag);
-        if (attrs.src == null || attrs.src === "") {
-            console.log("Invalid <import-library> tag, no src attribute");
-            continue;
-        }
-        if (attrs.prefix == null || attrs.prefix === "") {
-            console.log(sprintf("Invalid <import-library> tag src[%s], no prefix attribute", itag.attrs.src));
-            continue;
-        }
-        let libUrl = attrs.src;
-        if (attrs.relative) {
-            libUrl = new URL(libUrl, srcUrl).toString();
-        }
-        let p = state.ComponentLibrary.importLibrary(libName, attrs.src, attrs.prefix, !attrs.async);
-        parr.push(p);
-        srcs.push("[library]" + libUrl);
-    }
-    return [Promise.all(parr).then(() => true), srcs];
-}
-
 type DataEnvironmentOpts = {
     componentRoot? : HibikiVal,
     argsRoot? : Record<string, HibikiValEx>,
@@ -442,15 +374,15 @@ class DataEnvironment {
 
 class ComponentLibrary {
     libs : Record<string, LibraryType>;               // name -> library
-    components : Record<string, ComponentType>;       // tag-name -> component
     importedUrls : Record<string, boolean>;
     state : HibikiState;
+    srcUrlToLibNameMap : Map<string, string>;
 
     constructor(state : HibikiState) {
         this.state = state;
         this.libs = {};
-        this.components = {};
         this.importedUrls = {};
+        this.srcUrlToLibNameMap = new Map();
     }
 
     addLibrary(libObj : LibraryType) {
@@ -519,77 +451,6 @@ class ComponentLibrary {
         ctype.impl.set(impl);
     }
 
-    importLibrary(libContext : string, srcUrl : string, prefix : string, sync : boolean) : Promise<boolean> {
-        if (srcUrl == null || srcUrl === "") {
-            return Promise.resolve(true);
-        }
-        if (this.importedUrls[srcUrl]) {
-            return Promise.resolve(true);
-        }
-        this.importedUrls[srcUrl] = true;
-        let fetchInit : any = {};
-        let libName = null;
-        let p = fetch(srcUrl).then((resp) => {
-            if (!resp.ok) {
-                throw new Error(sprintf("Bad fetch response: %d %s", resp.status, resp.statusText));
-            }
-            let ctype = resp.headers.get("Content-Type");
-            if (!ctype.startsWith("text/")) {
-                throw new Error(sprintf("Bad fetch response, non-text mime-type: '%s'", ctype));
-            }
-            return resp.text();
-        })
-        .then((rtext) => {
-            let defNode = parseHtml(rtext, null, {});
-            let libNode = firstSubNodeByTag(defNode, "define-library");
-            if (libNode == null) {
-                throw new Error(sprintf("No top-level <define-library> found"));
-            }
-            if (libNode.attrs == null || libNode.attrs.name == null) {
-                throw new Error(sprintf("<define-library> must have 'name' attribute"));
-            }
-            libName = libNode.attrs.name;
-            this.buildLib(libName, libNode, true, srcUrl);
-            this.rawImportLib(libName, "@hibiki/core", null);
-            this.rawImportLib(libContext, libName, prefix);
-            let [depPromise, srcs] = createDepPromise(libName, srcUrl, this.state, libNode);
-            if (srcs.length > 0) {
-                console.log(sprintf("Hibiki Library '%s' dependencies: %s", this.fullLibName(libName), JSON.stringify(srcs)));
-            }
-            return depPromise;
-        })
-        .then(() => {
-            let hibiki = getHibiki();
-            let cbparr = [];
-            if (hibiki.LibraryCallbacks[libName] != null) {
-                for (let i=0; i<hibiki.LibraryCallbacks[libName].length; i++) {
-                    let cbfn = hibiki.LibraryCallbacks[libName][i];
-                    cbparr.push(Promise.resolve(cbfn(this.state, this)));
-                }
-            }
-            return Promise.all(cbparr);
-        })
-        .then(() => {
-            let numComps = 0;
-            if (this.libs[libName] != null) {
-                let libObj = this.libs[libName];
-                numComps = Object.keys(libObj.libComponents).length;
-                this.state.makeLocalModule(libContext, prefix, libName);
-            }
-            
-            console.log(sprintf("Hibiki Imported Library '%s' to prefix '%s', defined %d component(s)", this.fullLibName(libName), prefix, numComps));
-            return true;
-        })
-        .catch((e) => {
-            console.log(sprintf("Error importing library '%s'", srcUrl), e);
-            return true;
-        });
-        if (sync) {
-            return p;
-        }
-        return Promise.resolve(true);
-    }
-
     buildLib(libName : string, htmlobj : HibikiNode, clear : boolean, url? : string) {
         if (this.libs[libName] == null || clear) {
             let lib : LibraryType = {name: libName, libComponents: {}, importedComponents: {}, localHandlers: {}, modules: {}, handlers: {}};
@@ -602,6 +463,7 @@ class ComponentLibrary {
             lib.modules["http"] = new mreg["http"](this.state, {});
             lib.modules["local"] = new mreg["local"](this.state, {});
             lib.modules["lib"] = new mreg["lib"](this.state, {libContext: libName});
+            lib.modules["lib-local"] = new mreg["lib"](this.state, {libContext: libName});
             this.libs[libName] = lib;
         }
         let libObj = this.libs[libName];
@@ -618,57 +480,23 @@ class ComponentLibrary {
                 continue;
             }
             let name = attrs.name;
+            let isPrivate = !!attrs.private;
             if (libObj.libComponents[name]) {
                 console.log(sprintf("cannot redefine component %s/%s", libName, name));
                 continue;
             }
             if (attrs.react) {
-                libObj.libComponents[name] = {componentType: "react-custom", reactimpl: mobx.observable.box(null)};
+                libObj.libComponents[name] = {componentType: "react-custom", reactimpl: mobx.observable.box(null), isPrivate: isPrivate};
                 continue;
             }
             if (attrs.native) {
-                libObj.libComponents[name] = {componentType: "hibiki-native", impl: mobx.observable.box(null)};
+                libObj.libComponents[name] = {componentType: "hibiki-native", impl: mobx.observable.box(null), isPrivate: isPrivate};
                 continue;
             }
-            libObj.libComponents[name] = {componentType: "hibiki-html", node: h};
+            libObj.libComponents[name] = {componentType: "hibiki-html", node: h, isPrivate: isPrivate};
         }
-        let handlers = NodeUtils.makeHandlers(htmlobj, ["lib"]);
+        let handlers = NodeUtils.makeHandlers(htmlobj, libName, ["lib"]);
         libObj.handlers = handlers;
-    }
-
-    rawImportLib(libContext : string, libName : string, prefix : string) {
-        if (prefix === "local") {
-            throw new Error("Cannot import library with reserved 'local' prefix");
-        }
-        let libObj = this.libs[libName];
-        if (libObj == null) {
-            console.log("Hibiki Error invalid component library in rawImportLib", libName);
-            return;
-        }
-        if (libContext == null || (libContext !== "@main" && this.libs[libContext] == null)) {
-            console.log("Hibiki Error invalid libContext in rawImportLib", libContext);
-        }
-        for (let name in libObj.libComponents) {
-            if (name.startsWith("@")) {
-                continue;
-            }
-            let newComp = libObj.libComponents[name];
-            let cpath = libName + ":" + name;
-            let importName = (prefix == null ? "" : prefix + "-") + name;
-            let origComp = this.components[importName];
-            if (origComp != null && (origComp.libName !== libName || origComp.name !== name)) {
-                console.log(sprintf("Conflicting import %s %s:%s (discarding %s:%s)", importName, origComp.libName, origComp.name, libName, name));
-                continue;
-            }
-            let ctype = {componentType: newComp.componentType, libName: libName, name: name, impl: newComp.impl, reactimpl: newComp.reactimpl, node: newComp.node};
-            if (libContext === "@main") {
-                this.components[importName] = ctype;
-            }
-            else {
-                let ctxLib = this.libs[libContext];
-                ctxLib.importedComponents[importName] = ctype;
-            }
-        }
     }
 
     findLocalBlockHandler(handlerName : string, libContext : string) : HandlerBlock {
@@ -710,9 +538,7 @@ class ComponentLibrary {
                 node: comp.node,
             };
         }
-        if (libContext == null || libContext === "@main") {
-            return this.components[tagName];
-        }
+        libContext = libContext ?? "main";
         let libObj = this.libs[libContext];
         if (libObj == null) {
             return null;
@@ -726,6 +552,252 @@ class ComponentLibrary {
             return null;
         }
         return libObj.modules[moduleName];
+    }
+
+    makeLocalModule(libContext : string, libName : string, prefix : string) {
+        if (libContext == null) {
+            throw new Error("null libContext in makeLocalModule");
+        }
+        if (prefix == null || libName == null) {
+            return;
+        }
+        let hibiki = getHibiki();
+        let mreg = hibiki.ModuleRegistry;
+        let mod = new mreg["lib"](this.state, {libContext: libName});
+        this.registerModule(libContext, "lib-" + prefix, mod);
+    }
+
+    buildLibraryFromUrl(srcUrl : string) : Promise<LibraryType> {
+        let libName : string = this.srcUrlToLibNameMap.get(srcUrl);
+        if (libName != null) {
+            return Promise.resolve(this.libs[libName]);
+        }
+        let libNode : HibikiNode = null;
+        let fetchInit : any = {};
+        let p = fetch(srcUrl).then((resp) => {
+            if (!resp.ok) {
+                throw new Error(sprintf("Bad fetch response for library url '%s': %d %s", srcUrl, resp.status, resp.statusText));
+            }
+            let ctype = resp.headers.get("Content-Type");
+            if (!ctype.startsWith("text/")) {
+                throw new Error(sprintf("Bad fetch response for library url '%s', non-text mime-type: '%s'", srcUrl, ctype));
+            }
+            return resp.text();
+        })
+        .then((rtext) => {
+            let defNode = parseHtml(rtext, null, {});
+            libNode = firstSubNodeByTag(defNode, "define-library");
+            if (libNode == null) {
+                throw new Error(sprintf("No top-level <define-library> found for library url '%s'", srcUrl));
+            }
+            if (libNode.attrs == null || libNode.attrs.name == null) {
+                throw new Error(sprintf("<define-library> must have 'name' attribute for library url '%s'", srcUrl));
+            }
+            libName = DataCtx.rawAttrStr(libNode.attrs.name);
+            return null;
+        })
+        .then(() => {
+            return this.buildLibrary(libName, libNode, srcUrl, false);
+        });
+        return p;
+    }
+
+    buildLibrary(libName : string, libNode : HibikiNode, srcUrl : string, forceRebuild : boolean) : Promise<LibraryType> {
+        if (!forceRebuild && this.libs[libName]) {
+            return Promise.resolve(this.libs[libName]);
+        }
+        if (libNode == null) {
+            return Promise.resolve(null);
+        }
+        let libObj : LibraryType = {name: libName, url: srcUrl, libComponents: {}, importedComponents: {}, localHandlers: {}, modules: {}, handlers: {}};
+        this.libs[libName] = libObj;
+        if (srcUrl != null) {
+            this.srcUrlToLibNameMap.set(srcUrl, libName);
+        }
+        srcUrl = srcUrl ?? "local";
+        let libPrintStr = sprintf("%s(%s)", libName, srcUrl);
+        let parr = [];
+        let scriptTags = subNodesByTag(libNode, "script");
+        let srcs = [];
+        for (let i=0; i<scriptTags.length; i++) {
+            let stag = scriptTags[i];
+            let attrs = NodeUtils.getRawAttrs(stag);
+            if (attrs.type != null && attrs.type !== "text/javascript") {
+                console.log(sprintf("WARNING library %s not processing script node with type=%s", libPrintStr, attrs.type));
+                continue;
+            }
+            if (attrs.src == null) {
+                let p = this.state.queueScriptText(textContent(stag), !attrs.async);
+                parr.push(p);
+                continue;
+            }
+            let scriptSrc = attrs.src;
+            if (attrs.relative) {
+                scriptSrc = new URL(scriptSrc, srcUrl).toString();
+            }
+            let p = this.state.queueScriptSrc(scriptSrc, true);
+            parr.push(p);
+            srcs.push("[script]" + scriptSrc);
+        }
+        let linkTags = subNodesByTag(libNode, "link");
+        for (let i=0; i<linkTags.length; i++) {
+            let ltag = linkTags[i];
+            let attrs = NodeUtils.getRawAttrs(ltag);
+            if (attrs.rel !== "stylesheet") {
+                console.log(sprintf("WARNING library %s not processing link node with rel=%s", libPrintStr, attrs.rel));
+                continue;
+            }
+            if (attrs.href == null) {
+                console.log(sprintf("WARNING library %s not processing link rel=stylesheet node without href", libPrintStr));
+                continue;
+            }
+            let cssUrl = attrs.href;
+            if (attrs.relative) {
+                cssUrl = new URL(cssUrl, srcUrl).toString();
+            }
+            let p = this.state.loadCssLink(cssUrl, !attrs.async);
+            parr.push(p);
+            srcs.push("[css]" + cssUrl);
+        }
+        let styleTags = subNodesByTag(libNode, "style");
+        for (let i=0; i<styleTags.length; i++) {
+            this.state.loadStyleText(textContent(styleTags[i]));
+        }
+
+        // components
+        let htmlList = libNode.list ?? [];
+        for (let h of htmlList) {
+            if (h.tag !== "define-component") {
+                continue;
+            }
+            let attrs = NodeUtils.getRawAttrs(h);
+            if (attrs["name"] == null) {
+                console.log(sprintf("WARNING library %s define-component tag without a name, skipping", libPrintStr));
+                continue;
+            }
+            let name = attrs.name;
+            if (name in libObj.libComponents) {
+                console.log(sprintf("WARNING library %s cannot redefine component %s/%s", libPrintStr, libName, name));
+                continue;
+            }
+            if (attrs.react) {
+                libObj.libComponents[name] = {componentType: "react-custom", reactimpl: mobx.observable.box(null)};
+                continue;
+            }
+            if (attrs.native) {
+                libObj.libComponents[name] = {componentType: "hibiki-native", impl: mobx.observable.box(null)};
+                continue;
+            }
+            libObj.libComponents[name] = {componentType: "hibiki-html", node: h};
+        }
+
+        // handlers
+        if (libName == "main") {
+            libObj.handlers = NodeUtils.makeHandlers(libNode, libName, ["local", "event"]);
+        }
+        else {
+            libObj.handlers = NodeUtils.makeHandlers(libNode, libName, ["lib"]);
+        }
+
+        // modules
+        let hibiki = getHibiki();
+        let mreg = hibiki.ModuleRegistry;
+        libObj.modules["hibiki"] = new mreg["hibiki"](this.state, {});
+        libObj.modules["http"] = new mreg["http"](this.state, {});
+        libObj.modules["main"] = new mreg["lib"](this.state, {libContext: "main"});
+        if (libName == "main") {
+            libObj.modules["local"] = new mreg["local"](this.state, {});
+            libObj.modules["lib-local"] = new mreg["lib"](this.state, {libContext: libName});
+        }
+        else {
+            libObj.modules["lib"] = new mreg["lib"](this.state, {libContext: libName});
+        }
+        this.importLibrary(libName, "@hibiki/core", null);
+        let importTags = subNodesByTag(libNode, "import-library");
+        for (let i=0; i<importTags.length; i++) {
+            let itag = importTags[i];
+            let attrs = NodeUtils.getRawAttrs(itag);
+            if (attrs.src == null || attrs.src === "") {
+                console.log("Invalid <import-library> tag, no src attribute");
+                continue;
+            }
+            if (attrs.prefix == null || attrs.prefix === "") {
+                console.log(sprintf("Invalid <import-library> tag src[%s], no prefix attribute", itag.attrs.src));
+                continue;
+            }
+            let libUrl = attrs.src;
+            if (attrs.relative) {
+                libUrl = new URL(libUrl, srcUrl).toString();
+            }
+            let p = this.state.ComponentLibrary.buildLibraryFromUrl(attrs.src);
+            let afterImportP = p.then((importedLibObj) => {
+                if (importedLibObj != null) {
+                    this.importLibrary(libName, importedLibObj.name, attrs.prefix);
+                }
+            });
+            if (!attrs.async) {
+                parr.push(afterImportP);
+            }
+            srcs.push("[library]" + libUrl);
+        }
+        
+        return Promise.all(parr).then(() => {
+            let hibiki = getHibiki();
+            if (hibiki.LibraryCallbacks[libName] == null) {
+                return null;
+            }
+            let cbparr = [];
+            for (let cbfn of hibiki.LibraryCallbacks[libName]) {
+                let cbp = Promise.resolve(cbfn(this.state, this));
+                cbparr.push(cbp);
+            }
+            return Promise.all(cbparr);
+        })
+        .then(() => {
+            if (srcs.length > 0 || true) {
+                if (libName == "main") {
+                    console.log(sprintf("Hibiki root dependencies: %s", JSON.stringify(srcs)));
+                }
+                else {
+                    console.log(sprintf("Hibiki Library '%s' dependencies: %s", libPrintStr, JSON.stringify(srcs)));
+                }
+            }
+            return libObj;
+        });
+    }
+
+    importLibrary(libContext : string, libName : string, prefix : string) {
+        if (prefix === "local" || prefix == "main" || prefix == "lib") {
+            throw new Error(sprintf("Cannot import library with reserved '%s' prefix", prefix));
+        }
+        let libObj = this.libs[libName];
+        if (libObj == null) {
+            console.log(sprintf("Hibiki Error cannot import library '%s': not found", libName));
+            return;
+        }
+        if (libContext == null || this.libs[libContext] == null) {
+            console.log("Hibiki Error invalid libContext in rawImportLib", libContext);
+        }
+        let ctxLib = this.libs[libContext];
+        for (let name in libObj.libComponents) {
+            if (name.startsWith("@")) {
+                continue;
+            }
+            let newComp = libObj.libComponents[name];
+            if (newComp.isPrivate) {
+                continue;
+            }
+            let cpath = libName + ":" + name;
+            let importName = (prefix == null ? "" : prefix + "-") + name;
+            let origComp = ctxLib.importedComponents[importName];
+            if (origComp != null && (origComp.libName !== libName || origComp.name !== name)) {
+                console.log(sprintf("Conflicting import %s %s:%s (discarding %s:%s)", importName, origComp.libName, origComp.name, libName, name));
+                continue;
+            }
+            let ctype = {componentType: newComp.componentType, libName: libName, name: name, impl: newComp.impl, reactimpl: newComp.reactimpl, node: newComp.node};
+            ctxLib.importedComponents[importName] = ctype;
+        }
+        this.makeLocalModule(libContext, libName, prefix);
     }
 }
 
@@ -799,8 +871,6 @@ class HibikiState {
     InitCallbacks : (() => void)[];
     JSFuncs : Record<string, JSFuncType>;
     NodeUuidMap : Map<string, DBCtx> = new Map();
-    
-    Modules : Record<string, HibikiHandlerModule> = {};
     DataRoots : Record<string, mobx.IObservableValue<HibikiVal>>;
 
     constructor() {
@@ -865,7 +935,7 @@ class HibikiState {
         });
     }
 
-    initialize(force : boolean) {
+    initialize(force : boolean) : Promise<any> {
         if (this.Initialized.get()) {
             console.log("Hibiki State is already initialized");
         }
@@ -874,12 +944,9 @@ class HibikiState {
             return;
         }
         this.setStateVars();
+        let mainLibPromise = this.ComponentLibrary.buildLibrary("main", this.HtmlObj.get(), "local", true);
         let rtctx = new RtContext();
-        let [deps, srcs] = createDepPromise("@main", window.location.href, this, this.HtmlObj.get());
-        if (srcs.length > 0) {
-            console.log(sprintf("Hibiki root dependencies: %s", JSON.stringify(srcs)));
-        }
-        deps.then(() => {
+        let rtnp = mainLibPromise.then(() => {
             let action = {
                 actiontype: "fireevent",
                 native: true,
@@ -894,6 +961,7 @@ class HibikiState {
             let errObj = new HibikiError(e.toString(), e, rtctx);
             this.reportErrorObj(errObj);
         });
+        return rtnp;
     }
 
     getExtState() : HibikiExtState {
@@ -910,52 +978,28 @@ class HibikiState {
         if (config.hooks == null) {
             config.hooks = {};
         }
-        let hibiki = getHibiki();
-        let mreg = hibiki.ModuleRegistry;
-        if (config.modules != null) {
-            for (let moduleName in config.modules) {
-                let mconfig = config.modules[moduleName];
-                if (mconfig.remove) {
-                    continue;
-                }
-                let mtype = mconfig["type"] ?? moduleName;
-                try {
-                    let mctor = mreg[mtype];
-                    if (mctor == null) {
-                        console.log(sprintf("Hibiki Config Error, while configuring module '%s', module type '%s' not found", moduleName, mtype));
-                        continue;
-                    }
-                    this.Modules[moduleName] = new mctor(this, mconfig);
-                }
-                catch (e) {
-                    console.log(sprintf("Hibiki Config, error initializing module '%s' (type '%s')", moduleName, mtype), e);
-                }
-            }
-        }
-        this.Modules["hibiki"] = new mreg["hibiki"](this, {});
-        this.Modules["local"] = new mreg["local"](this, {});
-        this.Modules["lib-local"] = new mreg["local"](this, {});
-        if (config.modules == null || !("http" in config.modules)) {
-            this.Modules["http"] = new mreg["http"](this, {});
-        }
-    }
-
-    makeLocalModule(libContext : string, prefix : string, libName : string) {
-        if (prefix == null || libName == null) {
-            return;
-        }
-        if (("lib-" + prefix) in this.Modules) {
-            return;
-        }
-        let hibiki = getHibiki();
-        let mreg = hibiki.ModuleRegistry;
-        if (libContext == null || libContext === "@main") {
-            this.Modules["lib-" + prefix] = new mreg["lib"](this, {libContext: libName});
-        }
-        else {
-            let mod = new mreg["lib"](this, {libContext: libName});
-            this.ComponentLibrary.registerModule(libContext, "lib-" + prefix, mod);
-        }
+        // let hibiki = getHibiki();
+        // let mreg = hibiki.ModuleRegistry;
+        // if (config.modules != null) {
+        //     for (let moduleName in config.modules) {
+        //         let mconfig = config.modules[moduleName];
+        //         if (mconfig.remove) {
+        //             continue;
+        //         }
+        //         let mtype = mconfig["type"] ?? moduleName;
+        //         try {
+        //             let mctor = mreg[mtype];
+        //             if (mctor == null) {
+        //                 console.log(sprintf("Hibiki Config Error, while configuring module '%s', module type '%s' not found", moduleName, mtype));
+        //                 continue;
+        //             }
+        //             this.Modules[moduleName] = new mctor(this, mconfig);
+        //         }
+        //         catch (e) {
+        //             console.log(sprintf("Hibiki Config, error initializing module '%s' (type '%s')", moduleName, mtype), e);
+        //         }
+        //     }
+        // }
     }
 
     @mobx.action setGlobalData(globalData : any) {
@@ -964,7 +1008,7 @@ class HibikiState {
 
     @mobx.action setHtml(htmlobj : HibikiNode) {
         this.HtmlObj.set(htmlobj);
-        this.ComponentLibrary.buildLib("@main", htmlobj, true);
+        this.ComponentLibrary.buildLib("main", htmlobj, true);
     }
 
     allowUsageImg() : boolean {
@@ -994,10 +1038,10 @@ class HibikiState {
     pageDataenv() : DataEnvironment {
         let env = this.rootDataenv();
         let htmlContext = sprintf("<page %s>", this.PageName.get());
-        let opts = {eventBoundary: "hard", htmlContext: htmlContext, libContext: "@main", handlers: {}};
+        let opts = {eventBoundary: "hard", htmlContext: htmlContext, libContext: "main", handlers: {}};
         let curPage = this.findCurrentPage();
-        let h1 = NodeUtils.makeHandlers(curPage, ["event", "local"]);
-        let h2 = NodeUtils.makeHandlers(this.HtmlObj.get(), ["event", "local"]);
+        let h1 = NodeUtils.makeHandlers(curPage, "main", ["event", "local"]);
+        let h2 = NodeUtils.makeHandlers(this.HtmlObj.get(), "main", ["event", "local"]);
         opts.handlers = Object.assign({}, h2, h1);
         env = env.makeChildEnv(null, opts);
         return env;
@@ -1076,9 +1120,6 @@ class HibikiState {
         if (moduleName == null || moduleName === "") {
             throw new Error(sprintf("Invalid handler, no module specified path: %s", fullPath(req.callpath)));
         }
-        else if (req.libContext == null || req.libContext === "@main") {
-            module = this.Modules[moduleName];
-        }
         else {
             module = this.ComponentLibrary.getModule(moduleName, req.libContext);
         }
@@ -1095,10 +1136,10 @@ class HibikiState {
                 return data;
             }
             if (isObject(data) && ("hibikihandler" in data)) {
-                return {hibikihandler: data.hibikihandler, ctxstr: data.ctxstr};
+                return data;
             }
             if (isObject(data) && ("hibikiactions" in data) && Array.isArray(data.hibikiactions)) {
-                return {hibikiactions: data.hibikiactions};
+                return data;
             }
             return {hibikiactions: [{actiontype: "setreturn", data: data}]};
         });
@@ -1243,6 +1284,7 @@ function hasHtmlRR(rra : any[]) : boolean {
     }
     return false;
 }
+
 
 export {HibikiState, DataEnvironment, HibikiExtState};
 export type {EHandlerType};

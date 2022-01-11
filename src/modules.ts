@@ -410,7 +410,7 @@ class LocalModule {
             if (rtnVal != null) {
                 req.setReturn(rtnVal);
             }
-            return {hibikiactions: req.actions};
+            return {hibikiactions: req.actions, libContext: "main"};
         });
         return p;
     }
@@ -443,7 +443,7 @@ class LibModule {
             if (rtnVal != null) {
                 req.setReturn(rtnVal);
             }
-            return {hibikiactions: req.actions};
+            return {hibikiactions: req.actions, libContext: this.libContext};
         });
         return p;
     }
