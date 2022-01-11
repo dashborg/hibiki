@@ -23,6 +23,14 @@ type CallHandlerOptsType = {
 
 type EHandlerType = {handler : HandlerBlock, node : HibikiNode, dataenv : DataEnvironment};
 
+let RESTRICTED_MODS = {
+    "hibiki": true,
+    "lib": true,
+    "local": true,
+    "http": true,
+    "main": true,
+};
+
 function eventBubbles(event : string) : boolean {
     if (event === "load") {
         return false;
@@ -451,54 +459,6 @@ class ComponentLibrary {
         ctype.impl.set(impl);
     }
 
-    buildLib(libName : string, htmlobj : HibikiNode, clear : boolean, url? : string) {
-        if (this.libs[libName] == null || clear) {
-            let lib : LibraryType = {name: libName, libComponents: {}, importedComponents: {}, localHandlers: {}, modules: {}, handlers: {}};
-            if (url != null) {
-                lib.url = url;
-            }
-            let hibiki = getHibiki();
-            let mreg = hibiki.ModuleRegistry;
-            lib.modules["hibiki"] = new mreg["hibiki"](this.state, {});
-            lib.modules["http"] = new mreg["http"](this.state, {});
-            lib.modules["local"] = new mreg["local"](this.state, {});
-            lib.modules["lib"] = new mreg["lib"](this.state, {libContext: libName});
-            lib.modules["lib-local"] = new mreg["lib"](this.state, {libContext: libName});
-            this.libs[libName] = lib;
-        }
-        let libObj = this.libs[libName];
-        if (htmlobj == null || htmlobj.list == null) {
-            return;
-        }
-        for (let h of htmlobj.list) {
-            if (h.tag !== "define-component") {
-                continue;
-            }
-            let attrs = NodeUtils.getRawAttrs(h);
-            if (attrs["name"] == null) {
-                console.log("define-component tag without a name, skipping");
-                continue;
-            }
-            let name = attrs.name;
-            let isPrivate = !!attrs.private;
-            if (libObj.libComponents[name]) {
-                console.log(sprintf("cannot redefine component %s/%s", libName, name));
-                continue;
-            }
-            if (attrs.react) {
-                libObj.libComponents[name] = {componentType: "react-custom", reactimpl: mobx.observable.box(null), isPrivate: isPrivate};
-                continue;
-            }
-            if (attrs.native) {
-                libObj.libComponents[name] = {componentType: "hibiki-native", impl: mobx.observable.box(null), isPrivate: isPrivate};
-                continue;
-            }
-            libObj.libComponents[name] = {componentType: "hibiki-html", node: h, isPrivate: isPrivate};
-        }
-        let handlers = NodeUtils.makeHandlers(htmlobj, libName, ["lib"]);
-        libObj.handlers = handlers;
-    }
-
     findLocalBlockHandler(handlerName : string, libContext : string) : HandlerBlock {
         let libObj = this.libs[libContext];
         if (libObj == null) {
@@ -552,6 +512,22 @@ class ComponentLibrary {
             return null;
         }
         return libObj.modules[moduleName];
+    }
+
+    removeModule(moduleName : string, libContext : string) {
+        let libObj = this.libs[libContext];
+        if (libObj == null) {
+            return null;
+        }
+        delete libObj.modules[moduleName];
+    }
+
+    addModule(moduleName : string, module : HibikiHandlerModule, libContext : string) {
+        let libObj = this.libs[libContext];
+        if (libObj == null) {
+            return null;
+        }
+        libObj.modules[moduleName] = module;
     }
 
     makeLocalModule(libContext : string, libName : string, prefix : string) {
@@ -708,6 +684,7 @@ class ComponentLibrary {
         if (libName == "main") {
             libObj.modules["local"] = new mreg["local"](this.state, {});
             libObj.modules["lib-local"] = new mreg["lib"](this.state, {libContext: libName});
+            this.state.buildConfigModules();
         }
         else {
             libObj.modules["lib"] = new mreg["lib"](this.state, {libContext: libName});
@@ -972,34 +949,44 @@ class HibikiState {
         this.PageName.set(pageName);
     }
 
+    buildConfigModules() {
+        if (this.Config.modules == null) {
+            return;
+        }
+        let hibiki = getHibiki();
+        let mreg = hibiki.ModuleRegistry;
+        for (let moduleName in this.Config.modules) {
+            let mconfig = this.Config.modules[moduleName];
+            if (mconfig.remove) {
+                this.ComponentLibrary.removeModule(moduleName, "main");
+                continue;
+            }
+            if (RESTRICTED_MODS[moduleName] || moduleName.startsWith("lib-")) {
+                console.log(sprintf("Hibiki Config Error, cannot configure module with name '%s', name is reserved", moduleName));
+                continue;
+            }
+            let mtype = mconfig["type"] ?? moduleName;
+            try {
+                let mctor = mreg[mtype];
+                if (mctor == null) {
+                    console.log(sprintf("Hibiki Config Error, while configuring module '%s', module type '%s' not found", moduleName, mtype));
+                    continue;
+                }
+                let mod = new mctor(this, mconfig);
+                this.ComponentLibrary.addModule(moduleName, mod, "main");
+            }
+            catch (e) {
+                console.log(sprintf("Hibiki Config, error initializing module '%s' (type '%s')", moduleName, mtype), e);
+            }
+        }
+    }
+
     @mobx.action setConfig(config : HibikiConfig) {
         config = config ?? {};
         this.Config = config;
         if (config.hooks == null) {
             config.hooks = {};
         }
-        // let hibiki = getHibiki();
-        // let mreg = hibiki.ModuleRegistry;
-        // if (config.modules != null) {
-        //     for (let moduleName in config.modules) {
-        //         let mconfig = config.modules[moduleName];
-        //         if (mconfig.remove) {
-        //             continue;
-        //         }
-        //         let mtype = mconfig["type"] ?? moduleName;
-        //         try {
-        //             let mctor = mreg[mtype];
-        //             if (mctor == null) {
-        //                 console.log(sprintf("Hibiki Config Error, while configuring module '%s', module type '%s' not found", moduleName, mtype));
-        //                 continue;
-        //             }
-        //             this.Modules[moduleName] = new mctor(this, mconfig);
-        //         }
-        //         catch (e) {
-        //             console.log(sprintf("Hibiki Config, error initializing module '%s' (type '%s')", moduleName, mtype), e);
-        //         }
-        //     }
-        // }
     }
 
     @mobx.action setGlobalData(globalData : any) {
@@ -1008,7 +995,6 @@ class HibikiState {
 
     @mobx.action setHtml(htmlobj : HibikiNode) {
         this.HtmlObj.set(htmlobj);
-        this.ComponentLibrary.buildLib("main", htmlobj, true);
     }
 
     allowUsageImg() : boolean {
