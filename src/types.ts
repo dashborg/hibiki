@@ -116,8 +116,9 @@ type HtmlParserOpts = {
 };
 
 type HttpConfig = {
-    baseUrl?: string,            // defaults to null (dynamically set to window.location.href)
-    lockToBaseOrigin? : boolean, // defaults to false
+    baseUrl?: string,             // defaults to null (dynamically set to window.location.href)
+    lockToBaseOrigin? : boolean,  // defaults to false
+    forceRelativeUrls? : boolean, // defaults to false
     
     defaultHeaders? : Record<string, HibikiActionString>,
     defaultInit? : Record<string, any>,

@@ -341,16 +341,31 @@ class HttpModule {
         let url : URL = null;
         try {
             let baseUrl = this.opts.baseUrl ?? window.location.href;
-            url = new URL(req.callpath.url, baseUrl);
+            let callPathUrlStr = req.callpath.url;
+            if (this.opts.forceRelativeUrls && callPathUrlStr.startsWith("/") && !callPathUrlStr.startsWith("//")) {
+                callPathUrlStr = callPathUrlStr.substr(1);
+            }
+            url = new URL(callPathUrlStr, baseUrl);
             if (this.opts.lockToBaseOrigin) {
                 let baseOrigin = (new URL(baseUrl)).origin;
                 if (url.origin !== baseOrigin) {
                     throw new Error(sprintf("Origin is locked to '%s'", baseOrigin));
                 }
             }
+            if (this.opts.forceRelativeUrls) {
+                let baseUrlObj = new URL(baseUrl);
+                let baseOrigin = baseUrlObj.origin;
+                if (url.origin !== baseOrigin || !url.pathname.startsWith(baseUrlObj.pathname)) {
+                    throw new Error(sprintf("Handler URL '%s' is not relative to '%s' (forceRelativeUrls is set)", url.toString(), baseUrl.toString()));
+                }
+            }
         }
         catch (e) {
-            throw new Error(sprintf("Invalid URL for http handler '%s': %s", req.callpath.url, e.toString()));
+            let modName = "http";
+            if (req.callpath.module != "http") {
+                modName = sprintf("%s[http]", req.callpath.module);
+            }
+            throw new Error(sprintf("Invalid URL for %s handler '%s': %s", modName, fullPath(req.callpath), e.toString()));
         }
         let fetchInit = makeFetchInit(req, url, this.opts);
         let p = fetch(url.toString(), fetchInit).then((resp) => handleFetchResponse(url, resp));
