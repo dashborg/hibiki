@@ -731,7 +731,7 @@ class ComponentLibrary {
             return Promise.all(cbparr);
         })
         .then(() => {
-            if (srcs.length > 0 || true) {
+            if (srcs.length > 0) {
                 if (libName == "main") {
                     console.log(sprintf("Hibiki root dependencies: %s", JSON.stringify(srcs)));
                 }
@@ -863,13 +863,10 @@ class HibikiState {
     
     @boundMethod popStateHandler() {
         this.setStateVars();
-        let action = {
-            actiontype: "fireevent",
-            native: true,
-            event: {etype: "literal", val: "popstate"},
-        };
         let rtctx = new RtContext();
-        DataCtx.ExecuteHandlerBlock_reportErr(new DataCtx.HActionBlock([action]), false, this.pageDataenv(), rtctx);
+        rtctx.pushContext(sprintf("Firing native 'popstate' event"), null);
+        let eventObj = {event: "popstate", native: true, bubble: false, datacontext: {}};
+        DataCtx.FireEvent(eventObj, this.pageDataenv(), rtctx, false);
     }
 
     setInitCallback(fn : () => void) {
@@ -922,21 +919,21 @@ class HibikiState {
         }
         this.setStateVars();
         let mainLibPromise = this.ComponentLibrary.buildLibrary("main", this.HtmlObj.get(), "local", true);
-        let rtctx = new RtContext();
         let rtnp = mainLibPromise.then(() => {
-            let action = {
-                actiontype: "fireevent",
-                native: true,
-                event: {etype: "literal", val: "init"},
-            };
-            let pinit = DataCtx.ExecuteHandlerBlock(new DataCtx.HActionBlock([action]), false, this.pageDataenv(), rtctx);
+            let rtctx = new RtContext();
+            rtctx.pushContext(sprintf("Firing native 'init' event"), null);
+            let eventObj = {event: "init", native: true, bubble: false, datacontext: {}};
+            let pinit = DataCtx.FireEvent(eventObj, this.pageDataenv(), rtctx, true);
             return pinit;
         }).then(() => {
             this.setInitialized();
         }).catch((e) => {
-            rtctx.pushErrorContext(e);
-            let errObj = new HibikiError(e.toString(), e, rtctx);
-            this.reportErrorObj(errObj);
+            if (e instanceof HibikiError) {
+                console.log("Hibiki Error Initializing HibikiState during 'init' event - Not Rendering\n" + e.toString());
+            }
+            else {
+                console.log("Hibiki Error Initializing HibikiState", e);
+            }
         });
         return rtnp;
     }
@@ -1003,20 +1000,10 @@ class HibikiState {
     }
 
     unhandledEvent(event : EventType, rtctx : RtContext) {
-        if (event.event == "error") {
-            if (event.datacontext != null && event.datacontext.error != null) {
-                this.reportErrorObj(event.datacontext.error);
-            }
-            else {
-                let errObj = new HibikiError("Unknown Error", null, rtctx);
-                this.reportErrorObj(errObj);
-            }
+        if (event.event === "init") {
+            return;
         }
-        else {
-            if (event.event !== "init") {
-                console.log(sprintf("Hibiki unhandled event %s", event.event), event.datacontext, rtctx);
-            }
-        }
+        console.log(sprintf("Hibiki unhandled event %s", event.event), event.datacontext, rtctx);
     }
 
     rootDataenv() : DataEnvironment {
@@ -1094,7 +1081,7 @@ class HibikiState {
 
     executeHandlerBlock(actions : HandlerBlock, pure? : boolean) : Promise<HibikiVal> {
         let rtctx = new RtContext();
-        rtctx.pushContext("HibikiState.executeHandlerBlock()", null);
+        rtctx.pushContext("Calling HibikiState.executeHandlerBlock()", null);
         let pinit = DataCtx.ExecuteHandlerBlock(actions, pure, this.pageDataenv(), rtctx);
         return pinit;
     }

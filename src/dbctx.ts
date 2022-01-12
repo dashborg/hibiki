@@ -187,14 +187,10 @@ class DBCtx {
         }
         let eventDataenv = this.getEventDataenv();
         let rtctx = new RtContext();
-        rtctx.pushContext(sprintf("native event %s:%s (in %s)", nodeStr(this.node), event, this.dataenv.getHtmlContext()), null);
-        let action = {
-            actiontype: "fireevent",
-            native: true,
-            event: {etype: "literal", val: event},
-            data: {etype: "literal", val: datacontext},
-        };
-        return DataCtx.ExecuteHandlerBlock_reportErr(new DataCtx.HActionBlock([action]), false, eventDataenv, rtctx);
+        rtctx.pushContext(sprintf("Firing native '%s' event on %s (in %s)", event, nodeStr(this.node), this.dataenv.getHtmlContext()), null);
+        let eventObj = {event: event, bubble: false, datacontext: datacontext, native: true};
+        let prtn = DataCtx.FireEvent(eventObj, eventDataenv, rtctx, false);
+        return prtn;
     }
 
     @boundMethod handleOnSubmit(e : any) : boolean {

@@ -22,9 +22,11 @@ function rtItemAsString(rtci : RtContextItem) : string {
 }
 
 class RtContext {
+    actionCounter : number;
     stack : RtContextItem[];
 
     constructor() {
+        this.actionCounter = 0;
         this.stack = [];
     }
 
@@ -32,6 +34,13 @@ class RtContext {
         opts = opts || {};
         // console.log("RT-REPLACE", this.stack.length, this.stack[this.stack.length-1].desc, "=>", desc);
         this.stack[this.stack.length-1] = {desc: desc, handlerName: opts.handlerName, handlerEnv: opts.handlerEnv};
+    }
+
+    copy() : RtContext {
+        let rtn = new RtContext();
+        rtn.stack = [...this.stack];
+        rtn.actionCounter = this.actionCounter;
+        return rtn;
     }
 
     getTopHandlerContext() : RtContextItem {
@@ -42,6 +51,15 @@ class RtContext {
             }
         }
         return null;
+    }
+
+    isRunningErrorHandler() : boolean {
+        for (let item of this.stack) {
+            if (item.handlerName === "error") {
+                return true;
+            }
+        }
+        return false;
     }
 
     isHandlerInStack(env : DataEnvironment, handlerName : string) : boolean {
@@ -76,7 +94,7 @@ class RtContext {
         if (emsg.length > 80) {
             emsg = emsg.substr(0, 77) + "...";
         }
-        this.pushContext(sprintf("throw error: <<%s>>", emsg), null);
+        this.pushContext(sprintf("Throwing error: <<%s>>", emsg), null);
     }
 
     popContext() {
@@ -128,11 +146,25 @@ class HibikiError {
         this._type = "HibikiError";
         this.message = msg;
         this.err = err;
-        this.rtctx = rtctx;
+        if (rtctx != null) {
+            this.rtctx = rtctx.copy();
+        }
     }
 
     get context() : string {
         return this.rtctx.asString();
+    }
+
+    get stack() : string {
+        let errStr = "Hibiki Error | " + this.message + "\n";
+        if (this.rtctx != null) {
+            errStr += this.rtctx.asString("> ") + "\n";
+        }
+        return errStr;
+    }
+
+    get jsstack() : string {
+        return this.toString();
     }
 
     toString() : string {

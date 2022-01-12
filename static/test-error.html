@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<script src="/hibiki-test.js"></script>
+<div class="container m-4">
+  <template hibiki>
+    <hibiki-data>
+      {"error": null}
+    </hibiki-data>
+    <h1 class="title">Test Error Handling</h1>
+
+    <div class="box" class.has-background-danger="*$.error" class.has-background-success="*!$.error" style="color: white; font-weight: bold;">
+      <div if="$.error">
+        <div style="display: flex; align-items: center">
+          <div>Error Caught</div>
+          <div class="ml-3"><button class="button" click.handler="$.error = null;">Reset</button></div>
+        </div>
+        <div class="mt-2">
+          Message: {{ $.error.message }}
+          <pre>{{$.error.jsstack}}</pre>
+        </div>
+      </div>
+      <div if="!$.error">
+        No Error Caught
+      </div>
+    </div>
+
+    <div class="box">
+      <button class="button is-danger" click.handler="https://testapi.hibikihtml.com/api/notfound; $.clicked = true;" error.handler="$.error=@error;">Simple Error Handler</button>
+      <p>Clicked = {{ $.clicked }} (should stay null after click)</p>
+    </div>
+
+    <div class="box">
+      <button class="button is-danger" foo.handler="//@foo/bar()" click.handler="fire->foo(); $.indirect_click = true;" error.handler="$.error=@error;">Indirect (error in fired event)</button>
+      <p>Clicked = {{ $.indirect_click }} (should be true after click)</p>
+    </div>
+
+  </template>
+</div>

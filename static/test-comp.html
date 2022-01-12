@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<script src="/hibiki-test.js"></script>
+<div class="container m-4">
+  <template hibiki>
+    <h1 class="title">Test Components</h1>
+
+    <local-box class.has-background-info-light style="font-weight: bold">
+      Box Component
+    </local-box>
+
+    <local-box>
+      <local-emailinput placeholder="Email Test" value.bindpath="$.email"></local-emailinput>
+      <p>
+        Value: "{{$.email}}"
+      </p>
+    </local-box>
+
+    <local-box>
+      <local-onoff-button value.bindpath="$.onoff" change.handler="//@app/foo(x=22)">Test On/Off</local-onoff-button>
+      <p>The value is {{ $.onoff ? "on" : "off" }}.</p>
+    </local-box>
+
+    <define-component name="box">
+      <div automerge class="box">
+        <h-children bind="@children.all"></h-children>
+      </div>
+    </define-component>
+
+    <define-component name="emailinput">
+      <div class="field">
+        <p class="control has-icons-left has-icons-right">
+          <input class="input" type="email" placeholder="Email" automerge="@all|!placeholder|!type">
+          <local-fieldicon icon="envelope" class="is-small is-left"></local-fieldicon>
+        </p>
+      </div>
+    </define-component>
+
+    <!-- multiple levels of components -->
+    <define-component name="fieldicon">
+      <span class="icon" automerge="@all|-icon">
+        <i class.fa class="* 'fa-' + $args.icon"></i>
+      </span>
+    </define-component>
+
+    <define-component name="onoff-button">
+      <button class="button" class.is-success="*$args.value" class.is-danger="*!$args.value" click.handler="$args.value = !$args.value; fire->change($args.value);">
+        <h-children bind="@children.all"></h-children>
+        <span class="icon is-small ml-1">
+          <i if="$args.value" class="fa fa-check"></i>
+          <i if="!$args.value" class="fa fa-close"></i>
+        </span>
+      </button>
+    </define-component>
+  </template>
+</div>
