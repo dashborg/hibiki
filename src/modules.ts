@@ -3,7 +3,7 @@
 import {isObject, unpackPositionalArgs, stripAtKeys, getHibiki, fullPath, getSS, setSS, smartEncodeParam, unpackArg, unpackAtArgs, blobPrintStr, base64ToArray, callHook} from "./utils";
 import {sprintf} from "sprintf-js";
 import type {HibikiState} from "./state";
-import type {AppModuleConfig, FetchHookFn, Hibiki, HibikiAction, HandlerPathType, HibikiExtState} from "./types";
+import type {FetchHookFn, Hibiki, HibikiAction, HandlerPathType, HibikiExtState, HttpConfig, HibikiActionString, HibikiVal} from "./types";
 import * as DataCtx from "./datactx";
 import type {HibikiRequest} from "./request";
 import merge from "lodash/merge";
@@ -154,7 +154,7 @@ function jsonReplacer(key : string, value : any) : any {
     return DataCtx.MapReplacer.bind(this)(key, value);
 }
 
-function DefaultCsrfHook() {
+function DefaultCsrfValueFn() {
     let csrfToken = null;
     let csrfMwElem = document.querySelector('[name=csrfmiddlewaretoken]');
     if (csrfMwElem != null) {
@@ -165,34 +165,6 @@ function DefaultCsrfHook() {
         csrfToken = (csrfMetaElem as any).content;
     }
     return csrfToken;   
-}
-
-function setCsrfHeaders(state : HibikiState, url : URL, fetchInit : Record<string, any>, data : any) {
-    let csrfMethods = state.Config.csrfMethods ?? ["POST", "PUT", "PATCH"];
-    if (csrfMethods.indexOf(fetchInit.method) == -1) {
-        return;
-    }
-    let csrfToken = unpackArg(data, "@csrf");
-    if (csrfToken == null) {
-        csrfToken = state.Config.csrfToken;
-    }
-    if (csrfToken == null) {
-        csrfToken = callHook("CsrfHook", (state.Config.hooks.csrfHook ?? DefaultCsrfHook), url);
-    }
-    if (csrfToken == null) {
-        return;
-    }
-    let headerNames = this.Config.csrfHeaders ?? ["X-Csrf-Token", "X-CSRFToken"];
-    for (let h in headerNames) {
-        fetchInit.headers.set(h, csrfToken);
-    }
-    let paramNames = this.Config.csrfParams ?? [];
-    for (let p in paramNames) {
-        if (fetchInit["csrfParams"] == null) {
-            fetchInit["csrfParams"] = {};
-        }
-        fetchInit["csrfParams"][p] = csrfToken;
-    }
 }
 
 function setParams(method : string, url : URL, fetchInit : Record<string, any>, data : any) {
@@ -243,21 +215,69 @@ function setParams(method : string, url : URL, fetchInit : Record<string, any>, 
     return;
 }
 
-function runFetchHooks(state : HibikiState, url : URL, fetchInit : Record<string, any>) {
-    callHook("FetchHook", state.Config.hooks.fetchHook, url, fetchInit);
+function evalCsrfHExpr(hexpr : DataCtx.HExpr, state : HibikiState, datacontext : Record<string, HibikiVal>) : string {
+    if (hexpr == null) {
+        return null;
+    }
+    let dataenv = state.rootDataenv().makeChildEnv(datacontext, null);
+    let val = DataCtx.evalExprAst(hexpr, dataenv);
+    return DataCtx.valToString(val);
 }
 
-function buildFetchInit(req : HibikiRequest, defaultInit : any, defaultHeaders : Record<string, any>) : any{
+function setCsrf(req : HibikiRequest, url : URL, fetchInit : Record<string, any>, opts : HttpConfig) {
+    if (opts.csrfMethods.indexOf(fetchInit.method) == -1) {
+        return;
+    }
+    if (opts.csrfAllowedOrigins.indexOf("*") == -1 && opts.csrfAllowedOrigins.indexOf(url.origin)) {
+        return;
+    }
+    let csrfToken : string = DataCtx.valToString(unpackArg(req.data, "@csrf"));
+    if (csrfToken == null && opts.compiledCsrfToken != null) {
+        let token = opts.compiledCsrfToken;
+        if (typeof(token) === "string") {
+            csrfToken = token;
+        }
+        else if (typeof(token) === "function" || (isObject(token) && "jsfunc" in token)) {
+            csrfToken = callHook("CSRFValue", token);
+        }
+        else if (isObject(token) && "etype" in token) {
+            let val = evalCsrfHExpr(token, hibikiState(req.state), {data: req.data, url: url.toString()});
+        }
+    }
+    if (csrfToken == null) {
+        return;
+    }
+    for (let h of opts.csrfHeaders) {
+        fetchInit.headers.set(h, csrfToken);
+    }
+    for (let p of opts.csrfParams) {
+        if (fetchInit["csrfParams"] == null) {
+            fetchInit["csrfParams"] = {};
+        }
+        fetchInit["csrfParams"][p] = csrfToken;
+    }
+}
+
+function makeFetchInit(req : HibikiRequest, url : URL, opts : HttpConfig) : Record<string, any> {
     let {mode: dataMode, init: dataInit, headers: dataHeaders, credentials: dataCredentials} = unpackAtArgs(req.data);
     let method = getMethod(req);
-    let fetchInit = Object.assign({}, defaultInit, dataInit);
-    fetchInit.headers = convertHeaders((defaultInit ?? {}).headers, defaultHeaders, (dataInit || {}).headers, dataHeaders);
+    if (!VALID_METHODS[method]) {
+        throw new Error(sprintf("Invalid method '%s' passed to http handler %s", method, fullPath(req.callpath)));
+    }
+    let fetchInit = Object.assign({}, opts.defaultInit, dataInit);
+    let defaultHeaders = evalHExprMap(opts.compiledHeaders, hibikiState(req.state), {data: req.data, url: url.toString()});
+    fetchInit.headers = convertHeaders(fetchInit.headers, defaultHeaders, (dataInit ?? {}).headers, dataHeaders);
     fetchInit.method = method;
     if (dataMode != null) {
         fetchInit.mode = dataMode;
     }
     if (dataCredentials != null) {
         fetchInit.credentials = dataCredentials;
+    }
+    setCsrf(req, url, fetchInit, opts);
+    setParams(method, url, fetchInit, req.data);
+    if (opts.fetchHookFn != null) {
+        callHook("FetchHook", opts.fetchHookFn, url, fetchInit);
     }
     return fetchInit;
 }
@@ -276,28 +296,63 @@ function urlSameOrigin(urlStr : string) {
     return url.origin == window.location.origin;
 }
 
+function isActionStr(v : any) : boolean {
+    if (v == null) {
+        return false;
+    }
+    if (isObject(v) && "hibikiexpr" in v) {
+        return true;
+    }
+    return false;
+}
+
+function setDefaultOptions(opts : HttpConfig) {
+    opts.baseUrl = opts.baseUrl ?? window.location.href;
+    opts.csrfToken = opts.csrfToken ?? DefaultCsrfValueFn;
+    opts.csrfMethods = opts.csrfMethods ?? ["POST", "PUT", "PATCH"];
+    opts.csrfHeaders = opts.csrfHeaders ?? ["X-Csrf-Token", "X-CSRFToken"];
+    opts.csrfParams = opts.csrfParams ?? [];
+    opts.csrfAllowedOrigins = opts.csrfAllowedOrigins ?? [(new URL(opts.baseUrl)).origin];
+    if (opts.defaultHeaders != null) {
+        opts.compiledHeaders = {};
+        for (let hkey in opts.defaultHeaders) {
+            opts.compiledHeaders[hkey] = DataCtx.compileActionStr(opts.defaultHeaders[hkey]);
+        }
+    }
+    if (isActionStr(opts.csrfToken)) {
+        opts.compiledCsrfToken = DataCtx.compileActionStr(opts.csrfToken as HibikiActionString);
+    }
+    else {
+        opts.compiledCsrfToken = opts.csrfToken as any;
+    }
+}
+
 class HttpModule {
     state : HibikiState;
+    opts : HttpConfig;
 
-    constructor(state : HibikiState) {
+    constructor(state : HibikiState, opts : HttpConfig) {
         this.state = state;
+        this.opts = Object.assign({}, opts);
+        setDefaultOptions(this.opts);
     }
 
     callHandler(req : HibikiRequest) : Promise<any> {
         let url : URL = null;
         try {
-            url = new URL(req.callpath.url, window.location.href);
+            let baseUrl = this.opts.baseUrl ?? window.location.href;
+            url = new URL(req.callpath.url, baseUrl);
+            if (this.opts.lockToBaseOrigin) {
+                let baseOrigin = (new URL(baseUrl)).origin;
+                if (url.origin !== baseOrigin) {
+                    throw new Error(sprintf("Origin is locked to '%s'", baseOrigin));
+                }
+            }
         }
         catch (e) {
             throw new Error(sprintf("Invalid URL for http handler '%s': %s", req.callpath.url, e.toString()));
         }
-        let fetchInit = buildFetchInit(req, null, null);
-        if (!VALID_METHODS[fetchInit.method]) {
-            throw new Error(sprintf("Invalid method '%s' passed to http handler %s", fetchInit.method, fullPath(req.callpath)));
-        }
-        setCsrfHeaders(this.state, url, fetchInit, req.data);
-        setParams(fetchInit.method, url, fetchInit, req.data);
-        runFetchHooks(this.state, url, fetchInit);
+        let fetchInit = makeFetchInit(req, url, this.opts);
         let p = fetch(url.toString(), fetchInit).then((resp) => handleFetchResponse(url, resp));
         return p;
     }
@@ -314,63 +369,6 @@ function evalHExprMap(m : Record<string, DataCtx.HExpr>, state : HibikiState, da
         rtn[key] = val;
     }
     return DataCtx.demobx(rtn);
-}
-
-class AppModule {
-    state : HibikiState;
-    rootUrl : URL;
-    defaultHeaders : Record<string, DataCtx.HExpr>;
-    defaultInit : any;
-    
-    constructor(state : HibikiState, config : AppModuleConfig) {
-        this.state = state;
-        if (config == null) {
-            throw new Error("Invalid AppModule config, cannot be null");
-        }
-        if (config.rootUrl == null) {
-            throw new Error("Invalid AppModule config, must set rootUrl");
-        }
-        try {
-            this.rootUrl = new URL(config.rootUrl, window.location.href);
-        }
-        catch (e) {
-            throw new Error("Invalid AppModule rootUrl: " + e.toString());
-        }
-        this.defaultHeaders = {};
-        if (config.defaultHeaders != null) {
-            for (let hkey in config.defaultHeaders) {
-                this.defaultHeaders[hkey] = DataCtx.evalActionStr(config.defaultHeaders[hkey]);
-            }
-        }
-        this.defaultInit = config.defaultInit ?? {};
-    }
-
-    callHandler(req : HibikiRequest) : Promise<any> {
-        let callpathUrl = req.callpath.url;
-        if (callpathUrl.startsWith("/")) {
-            callpathUrl = callpathUrl.substr(1);
-        }
-        let url : URL = null;
-        try {
-            url = new URL(callpathUrl, this.rootUrl);
-            if (url.origin != this.rootUrl.origin) {
-                throw new Error(sprintf("Must use a relative URL for app module, origin does not match rootUrl '%s' vs '%s'", this.rootUrl.origin, url.origin));
-            }
-        }
-        catch (e) {
-            throw new Error(sprintf("Invalid handler path '%s' [module=app, rootUrl=%s]: %s", fullPath(req.callpath), this.rootUrl.toString(), e.toString()));
-        }
-        let defaultHeaders = evalHExprMap(this.defaultHeaders, ((req.state as any).state as HibikiState), {data: req.data, url: url.toString()});
-        let fetchInit = buildFetchInit(req, this.defaultInit, defaultHeaders);
-        if (!VALID_METHODS[fetchInit.method]) {
-            throw new Error(sprintf("Invalid method '%s' passed to handler %s", fetchInit.method, fullPath(req.callpath)));
-        }
-        setCsrfHeaders(this.state, url, fetchInit, req.data);
-        setParams(fetchInit.method, url, fetchInit, req.data);
-        runFetchHooks(this.state, url, fetchInit);
-        let p = fetch(url.toString(), fetchInit).then((resp) => handleFetchResponse(url, resp));
-        return p;
-    }
 }
 
 function getMethod(req : HibikiRequest) : string {
@@ -530,4 +528,4 @@ class HibikiModule {
     }
 }
 
-export {AppModule, LocalModule, HttpModule, LibModule, HibikiModule};
+export {LocalModule, HttpModule, LibModule, HibikiModule};

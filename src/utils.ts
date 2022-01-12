@@ -1,7 +1,7 @@
 // Copyright 2021 Dashborg Inc
 
 import * as mobx from "mobx";
-import {HibikiNode, Hibiki, HandlerPathType, NodeAttrType, HibikiVal, HibikiValObj} from "./types";
+import {HibikiNode, Hibiki, HandlerPathType, NodeAttrType, HibikiVal, HibikiValObj, JSFuncStr} from "./types";
 import {sprintf} from "sprintf-js";
 import type {HibikiBlob} from "./datactx";
 
@@ -479,8 +479,8 @@ function unpackPositionalArgs(data : HibikiValObj, posArgNames : string[]) : Hib
     return rtn;
 }
 
-function callHook(hookName : string, hookFn : string | Function, ...rest : any[]) : any {
-    if (hookFn == null || hookFn == "") {
+function callHook(hookName : string, hookFn : JSFuncStr | Function, ...rest : any[]) : any {
+    if (hookFn == null) {
         return null;
     }
     let realHookFn : Function = null;
@@ -488,7 +488,10 @@ function callHook(hookName : string, hookFn : string | Function, ...rest : any[]
         realHookFn = hookFn;
     }
     else {
-        realHookFn = window[hookFn];
+        if (!isObject(hookFn) || hookFn.jsfunc == null) {
+            return null;
+        }
+        realHookFn = window[hookFn.jsfunc];
         if (realHookFn == null || typeof(realHookFn) != "function") {
             console.log(sprintf("Hibiki hook[%s], function '%s' could not be resolved", hookName, hookFn));
             return null;

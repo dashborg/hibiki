@@ -679,7 +679,7 @@ class ComponentLibrary {
         let hibiki = getHibiki();
         let mreg = hibiki.ModuleRegistry;
         libObj.modules["hibiki"] = new mreg["hibiki"](this.state, {});
-        libObj.modules["http"] = new mreg["http"](this.state, {});
+        libObj.modules["http"] = new mreg["http"](this.state, this.state.Config.httpConfig);
         libObj.modules["main"] = new mreg["lib"](this.state, {libContext: "main"});
         if (libName == "main") {
             libObj.modules["local"] = new mreg["local"](this.state, {});
@@ -869,7 +869,7 @@ class HibikiState {
             event: {etype: "literal", val: "popstate"},
         };
         let rtctx = new RtContext();
-        DataCtx.ExecuteHandlerBlock(new DataCtx.HActionBlock([action]), false, this.pageDataenv(), rtctx, true);
+        DataCtx.ExecuteHandlerBlock_reportErr(new DataCtx.HActionBlock([action]), false, this.pageDataenv(), rtctx);
     }
 
     setInitCallback(fn : () => void) {
@@ -929,7 +929,7 @@ class HibikiState {
                 native: true,
                 event: {etype: "literal", val: "init"},
             };
-            let pinit = DataCtx.ExecuteHandlerBlock(new DataCtx.HActionBlock([action]), false, this.pageDataenv(), rtctx, true);
+            let pinit = DataCtx.ExecuteHandlerBlock(new DataCtx.HActionBlock([action]), false, this.pageDataenv(), rtctx);
             return pinit;
         }).then(() => {
             this.setInitialized();
@@ -984,9 +984,6 @@ class HibikiState {
     @mobx.action setConfig(config : HibikiConfig) {
         config = config ?? {};
         this.Config = config;
-        if (config.hooks == null) {
-            config.hooks = {};
-        }
     }
 
     @mobx.action setGlobalData(globalData : any) {
@@ -1092,7 +1089,7 @@ class HibikiState {
     executeHandlerBlock(actions : HandlerBlock, pure? : boolean) : Promise<HibikiVal> {
         let rtctx = new RtContext();
         rtctx.pushContext("HibikiState.executeHandlerBlock()", null);
-        let pinit = DataCtx.ExecuteHandlerBlock(actions, pure, this.pageDataenv(), rtctx, true);
+        let pinit = DataCtx.ExecuteHandlerBlock(actions, pure, this.pageDataenv(), rtctx);
         return pinit;
     }
 

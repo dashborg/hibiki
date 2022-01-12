@@ -102,16 +102,11 @@ type HibikiHandlerModule = {
     callHandler : (req : HibikiRequest) => Promise<any>;
 };
 
-type AppModuleConfig = {
-    rootUrl : string,
-    defaultHeaders? : Record<string, HibikiActionString>,
-    defaultInit? : any,
-};
-
-type FetchHookFn = string | ((url : URL, fetchInit : Record<string, any>) => void);
-type CsrfHookFn = string | ((url : URL) => string);
-type ErrorCallbackFn = string | ((HibikiError) => void);
-type EventCallbackFn = string | ((EventType) => void);
+type JSFuncStr = {jsfunc : string};
+type FetchHookFn = JSFuncStr | ((url : URL, fetchInit : Record<string, any>) => void);
+type CsrfHookFn = JSFuncStr | ((url : URL) => string);
+type ErrorCallbackFn = JSFuncStr | ((HibikiError) => void);
+type EventCallbackFn = JSFuncStr | ((EventType) => void);
 
 type ModuleConfig = Record<string, any>;
 
@@ -119,20 +114,35 @@ type HtmlParserOpts = {
     noInlineText? : boolean,
 };
 
+type HttpConfig = {
+    baseUrl?: string,            // defaults to null (dynamically set to window.location.href)
+    lockToBaseOrigin? : boolean, // defaults to false
+    
+    defaultHeaders? : Record<string, HibikiActionString>,
+    defaultInit? : Record<string, any>,
+
+    // CSRF configuration
+    csrfToken? : JSFuncStr | (() => string) | HibikiActionString;  // defaults to DefaultCsrfValueFn
+    csrfMethods? : string[],         // defaults to ["POST", "PUT", "PATCH"]
+    csrfParams? : string[],          // defaults to []
+    csrfHeaders? : string[],         // defaults to ["X-Csrf-Token", "X-CSRFToken"]
+    csrfAllowedOrigins? : string[],  // defaults to [baseUrl.origin].  ["*"] means all (not recommended)
+
+    // called right before calling fetch, can modify url or fetchInit.
+    // throw an exception to cancel the fetch request.
+    fetchHookFn? : JSFuncStr | ((url : URL, fetchInit : any) => void);
+
+    compiledHeaders? : Record<string, HExpr>,                // internal use
+    compiledCsrfToken? : string | JSFuncStr | (() => string) | HExpr, // internal use
+};
+
 type HibikiConfig = {
-    hooks? : {
-        csrfHook?  : CsrfHookFn,
-        fetchHook? : FetchHookFn,
-    },
     noConfigMergeFromHtml? : boolean,
     noDataMergeFromHtml?   : boolean,
     noUsageImg? : boolean,
     noWelcomeMessage? : boolean,
     modules? : Record<string, ModuleConfig>,
-    csrfHeaders? : string[],
-    csrfParams? : string[],
-    csrfToken? : string,
-    csrfMethods? : string[],
+    httpConfig? : HttpConfig;
 };
 
 type PathUnionType = string | PathType;
@@ -209,5 +219,5 @@ interface HibikiExtState {
     initialize(force : boolean);
 };
 
-export type {HibikiNode, HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, ComponentType, LibraryType, HibikiRequest, Hibiki, HibikiAction, HibikiActionString, HibikiActionValue, HibikiExtState, EventType, HandlerValType, JSFuncType, AppModuleConfig, FetchHookFn, CsrfHookFn, ReactClass, HandlerPathType, ErrorCallbackFn, EventCallbackFn, HtmlParserOpts, LibComponentType, HandlerBlock, NodeAttrType, HibikiVal, HibikiValObj, HibikiValEx, AutoMergeExpr, AutoFireExpr, HibikiReactProps};
+export type {HibikiNode, HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, ComponentType, LibraryType, HibikiRequest, Hibiki, HibikiAction, HibikiActionString, HibikiActionValue, HibikiExtState, EventType, HandlerValType, JSFuncType, FetchHookFn, CsrfHookFn, ReactClass, HandlerPathType, ErrorCallbackFn, EventCallbackFn, HtmlParserOpts, LibComponentType, HandlerBlock, NodeAttrType, HibikiVal, HibikiValObj, HibikiValEx, AutoMergeExpr, AutoFireExpr, HibikiReactProps, HttpConfig, JSFuncStr};
 

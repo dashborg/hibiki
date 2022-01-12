@@ -10,9 +10,14 @@ import {HibikiRootNode, CORE_LIBRARY} from "./nodes";
 import {deepTextContent, evalDeepTextContent, isObject} from "./utils";
 import merge from "lodash/merge";
 import type {HibikiNode, HibikiConfig, Hibiki, HibikiExtState, ReactClass, LibraryType} from "./types";
-import {AppModule, LocalModule, HttpModule, LibModule, HibikiModule} from "./modules";
+import {LocalModule, HttpModule, LibModule, HibikiModule} from "./modules";
 
 declare var window : any;
+
+function errorWithCause(message : string, cause : Error) {
+    // @ts-ignore
+    throw new Error(message, {cause: cause}); // ES6 error with cause
+}
 
 function readHibikiOptsFromHtml(htmlObj : HibikiNode) : {config : HibikiConfig, initialData : any} {
     let config : HibikiConfig = null;
@@ -23,10 +28,20 @@ function readHibikiOptsFromHtml(htmlObj : HibikiNode) : {config : HibikiConfig, 
     for (let i=0; i<htmlObj.list.length; i++) {
         let subNode = htmlObj.list[i];
         if (config == null && subNode.tag == "hibiki-config") {
-            config = evalDeepTextContent(subNode, true);
+            try {
+                config = evalDeepTextContent(subNode, true);
+            }
+            catch (e) {
+                throw errorWithCause("Error parsing <hibiki-config> content: " + e.message, e);
+            }
         }
         if (initialData == null && subNode.tag == "hibiki-data") {
-            initialData = evalDeepTextContent(subNode, true);
+            try {
+                initialData = evalDeepTextContent(subNode, true);
+            }
+            catch (e) {
+                throw errorWithCause("Error parsing <hibiki-data> content: " + e.message, e); 
+            }
             if (initialData != null && !isObject(initialData)) {
                 initialData = {data: initialData};
             }
@@ -174,7 +189,6 @@ let hibiki : Hibiki = {
     HibikiReact: HibikiRootNode,
     ModuleRegistry: {
         "local": LocalModule,
-        "app": AppModule,
         "http": HttpModule,
         "lib": LibModule,
         "hibiki": HibikiModule,
