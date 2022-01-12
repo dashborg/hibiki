@@ -122,14 +122,13 @@ class HibikiError {
     message : string;
     rtctx : RtContext;
     err : any;
-    blockStr : string;
+    event? : string;
     
-    constructor(msg : string, err? : any, rtctx? : RtContext, blockStr? : string) {
+    constructor(msg : string, err? : any, rtctx? : RtContext) {
         this._type = "HibikiError";
         this.message = msg;
         this.err = err;
         this.rtctx = rtctx;
-        this.blockStr = blockStr;
     }
 
     get context() : string {
@@ -140,9 +139,6 @@ class HibikiError {
         let errStr = "Hibiki Error | " + this.message + "\n";
         if (this.rtctx != null) {
             errStr += this.rtctx.asString("> ") + "\n";
-        }
-        if (this.blockStr != null) {
-            errStr += "BLOCK: " + this.blockStr + "\n";
         }
         if (this.err != null && this.err.stack != null) {
             errStr += "\nJavaScript Error: " + this.err.stack + "\n";

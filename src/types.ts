@@ -63,6 +63,7 @@ type EventType = {
     event : string,
     bubble : boolean,
     datacontext : Record<string, any>,
+    nodeuuid? : string,
 };
 
 type HandlerValType = {

@@ -2291,30 +2291,8 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
                 datacontext.value = value;
             }
         }
-        let event = {event: eventStr, datacontext, bubble};
-        let ehandler : EHandlerType = null;
-        if (action.nodeuuid) {
-            let dbctx = dataenv.dbstate.NodeUuidMap.get(action.nodeuuid);
-            if (dbctx == null) {
-                console.log(sprintf("Hibiki Action fireevent:%s, could not find node uuid %s", eventStr, action.nodeuuid));
-                return null;
-            }
-            ehandler = dbctx.getEventDataenv().resolveEventHandler(event, rtctx);
-        }
-        else {
-            ehandler = dataenv.resolveEventHandler(event, rtctx);
-        }
-        if (ehandler == null) {
-            if (bubble) {
-                dataenv.dbstate.unhandledEvent(event, rtctx);
-            }
-            return null;
-        }
-        let htmlContext = sprintf("event%s(%s)", (event.bubble ? "-bubble" : ""), event.event);
-        let eventEnv = ehandler.dataenv.makeChildEnv(event.datacontext, {htmlContext: htmlContext});
-        let ctxStr = sprintf("Running %s:%s.handler (in [[%s]])", nodeStr(ehandler.node), event.event, ehandler.dataenv.getFullHtmlContext());
-        rtctx.pushContext(ctxStr, {handlerEnv: ehandler.dataenv, handlerName: event.event});
-        return ExecuteHandlerBlock(ehandler.handler, pure, eventEnv, rtctx);
+        let event = {event: eventStr, datacontext, bubble, nodeuuid: action.nodeuuid};
+        return FireEvent(event, dataenv, rtctx);
     }
     else if (action.actiontype === "log") {
         let dataValArr = forceAsArray(demobx(evalExprAst(action.data, dataenv)));
@@ -2464,6 +2442,32 @@ function convertActions(actions : HibikiAction[]) : HAction[] {
         }
     }
     return rtn;
+}
+
+async function FireEvent(event : EventType, dataenv : DataEnvironment, rtctx : RtContext) : Promise<any> {
+    let ehandler : EHandlerType = null;
+    if (event.nodeuuid) {
+        let dbctx = dataenv.dbstate.NodeUuidMap.get(event.nodeuuid);
+        if (dbctx == null) {
+            console.log(sprintf("Hibiki fire event '%s', could not find node uuid %s", event.event, event.nodeuuid));
+            return null;
+        }
+        ehandler = dbctx.getEventDataenv().resolveEventHandler(event, rtctx);
+    }
+    else {
+        ehandler = dataenv.resolveEventHandler(event, rtctx);
+    }
+    if (ehandler == null) {
+        if (event.bubble) {
+            dataenv.dbstate.unhandledEvent(event, rtctx);
+        }
+        return null;
+    }
+    let htmlContext = sprintf("event%s(%s)", (event.bubble ? "-bubble" : ""), event.event);
+    let eventEnv = ehandler.dataenv.makeChildEnv(event.datacontext, {htmlContext: htmlContext});
+    let ctxStr = sprintf("Running %s:%s.handler (in [[%s]])", nodeStr(ehandler.node), event.event, ehandler.dataenv.getFullHtmlContext());
+    rtctx.pushContext(ctxStr, {handlerEnv: ehandler.dataenv, handlerName: event.event});
+    return ExecuteHandlerBlock(ehandler.handler, false, eventEnv, rtctx);
 }
 
 async function ExecuteHandlerBlockInternal(block : HandlerBlock, pure : boolean, dataenv : DataEnvironment, rtctx : RtContext) : Promise<any> {

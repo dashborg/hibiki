@@ -1003,8 +1003,14 @@ class HibikiState {
     }
 
     unhandledEvent(event : EventType, rtctx : RtContext) {
-        if (event.event == "error" && event.datacontext != null && event.datacontext.error != null) {
-            this.reportErrorObj(event.datacontext.error);
+        if (event.event == "error") {
+            if (event.datacontext != null && event.datacontext.error != null) {
+                this.reportErrorObj(event.datacontext.error);
+            }
+            else {
+                let errObj = new HibikiError("Unknown Error", null, rtctx);
+                this.reportErrorObj(errObj);
+            }
         }
         else {
             if (event.event !== "init") {
