@@ -46,9 +46,6 @@ class ErrorMsg extends React.Component<{message: string}, {}> {
 
 @mobxReact.observer
 class HibikiRootNode extends React.Component<{hibikiState : HibikiExtState}, {}> {
-    renderingDBState : HibikiState;
-    loadUuid : string;
-
     constructor(props : any) {
         super(props);
     }
@@ -85,14 +82,7 @@ class HibikiRootNode extends React.Component<{hibikiState : HibikiExtState}, {}>
         let node = this.getHibikiNode();
         let dataenv = this.getDataenv();
         let ctx = new DBCtx(null, node, dataenv);
-        let cnArr = ctx.resolveCnArray();
-        let style = ctx.resolveStyleMap();
-        this.renderingDBState = ctx.dataenv.dbstate;
-        return (
-            <div style={style} className={cn(cnArr)}>
-                <NodeList list={ctx.node.list} ctx={ctx} isRoot={true}/>
-            </div>
-        );
+        return <NodeList list={ctx.node.list} ctx={ctx} isRoot={true}/>;
     }
 }
 

@@ -120,7 +120,12 @@ function loadTag(elem : HTMLElement) : HibikiExtState {
         }
         if (renderNode == null) {
             renderNode = document.createElement("div");
-            renderNode.classList.add("hibiki-root");
+            if (elem.getAttribute("class") != null) {
+                renderNode.setAttribute("class", elem.getAttribute("class"));
+            }
+            if (elem.getAttribute("style") != null) {
+                renderNode.setAttribute("style", elem.getAttribute("style"));
+            }
             if (elem.parentElement.tagName.toLowerCase() == "head") {
                 document.querySelector("body").prepend(renderNode);
             }
