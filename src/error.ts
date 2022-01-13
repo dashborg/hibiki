@@ -2,16 +2,19 @@
 
 import type {DataEnvironment} from "./state";
 import {sprintf} from "sprintf-js";
+import type {HibikiNode} from "./types";
 
 type RtContextItem = {
     desc : string,
     handlerName? : string,
     handlerEnv? : DataEnvironment,
+    handlerNode? : HibikiNode,
 };
 
 type RtContextOpts = {
     handlerName? : string,
     handlerEnv? : DataEnvironment,
+    handlerNode? : HibikiNode,
 };
 
 function rtItemAsString(rtci : RtContextItem) : string {
@@ -32,8 +35,7 @@ class RtContext {
 
     replaceContext(desc : string, opts : RtContextOpts) {
         opts = opts || {};
-        // console.log("RT-REPLACE", this.stack.length, this.stack[this.stack.length-1].desc, "=>", desc);
-        this.stack[this.stack.length-1] = {desc: desc, handlerName: opts.handlerName, handlerEnv: opts.handlerEnv};
+        this.stack[this.stack.length-1] = {desc: desc, handlerName: opts.handlerName, handlerEnv: opts.handlerEnv, handlerNode : opts.handlerNode};
     }
 
     copy() : RtContext {
@@ -84,8 +86,7 @@ class RtContext {
 
     pushContext(desc : string, opts : RtContextOpts) {
         opts = opts || {};
-        // console.log("RT-PUSH", this.stack.length+1, desc);
-        this.stack.push({desc: desc, handlerName: opts.handlerName, handlerEnv: opts.handlerEnv});
+        this.stack.push({desc: desc, handlerName: opts.handlerName, handlerEnv: opts.handlerEnv, handlerNode: opts.handlerNode});
     }
 
     pushErrorContext(err : any) {
@@ -102,7 +103,6 @@ class RtContext {
             return;
         }
         this.stack.pop();
-        // console.log("RT-POP", this.stack.length);
     }
 
     asString(indentStr? : string) : string {
@@ -122,7 +122,6 @@ class RtContext {
     }
 
     revertStack(size : number) {
-        // console.log("RT-REVERT", this.stack.length, "=>", size);
         if (size < this.stack.length) {
             this.stack.length = size;
         }
@@ -140,7 +139,6 @@ class HibikiError {
     message : string;
     rtctx : RtContext;
     err : any;
-    event? : string;
     
     constructor(msg : string, err? : any, rtctx? : RtContext) {
         this._type = "HibikiError";
@@ -149,6 +147,28 @@ class HibikiError {
         if (rtctx != null) {
             this.rtctx = rtctx.copy();
         }
+    }
+
+    get event() : string {
+        if (this.rtctx == null) {
+            return null;
+        }
+        let rtitem = this.rtctx.getTopHandlerContext();
+        if (rtitem == null) {
+            return null;
+        }
+        return rtitem.handlerName;
+    }
+
+    get node() : HibikiNode {
+        if (this.rtctx == null) {
+            return null;
+        }
+        let rtitem = this.rtctx.getTopHandlerContext();
+        if (rtitem == null) {
+            return null;
+        }
+        return rtitem.handlerNode;
     }
 
     get context() : string {
@@ -168,10 +188,7 @@ class HibikiError {
     }
 
     toString() : string {
-        let errStr = "Hibiki Error | " + this.message + "\n";
-        if (this.rtctx != null) {
-            errStr += this.rtctx.asString("> ") + "\n";
-        }
+        let errStr = this.stack;
         if (this.err != null && this.err.stack != null) {
             errStr += "\nJavaScript Error: " + this.err.stack + "\n";
         }

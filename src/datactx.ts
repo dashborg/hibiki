@@ -2300,7 +2300,7 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
                 datacontext.value = value;
             }
         }
-        let event = {event: eventStr, datacontext, bubble, nodeuuid: action.nodeuuid};
+        let event = {event: eventStr, native: false, datacontext, bubble, nodeuuid: action.nodeuuid};
         return FireEvent(event, dataenv, rtctx, false);
     }
     else if (action.actiontype === "log") {
@@ -2315,8 +2315,8 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
         if (action.debug) {
             console.log("DataEnvironment Stack");
             dataenv.printStack();
-            console.log("Runtime Context", rtctx);
-            console.log(rtctx.asString());
+            console.log(rtctx.asString("> "));
+            console.log("RtContext / DataEnvironment", rtctx, dataenv);
         }
         if (action.alert) {
             let alertStr = dataValArr.map((v) => String(v)).join(", ");
@@ -2327,6 +2327,15 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
     else if (action.actiontype === "throw") {
         rtctx.popContext();
         let errVal = evalExprAst(action.data, dataenv);
+        if (errVal instanceof HibikiError) {
+            if (errVal.rtctx != null) {
+                let hctx = rtctx.getTopHandlerContext();
+                if (hctx != null) {
+                    errVal.rtctx.pushContext(sprintf("Rethrowing error from '%s' handler in %s", hctx.handlerName, nodeStr(hctx.handlerNode)), null);
+                }
+            }
+            return Promise.reject(errVal);
+        }
         return Promise.reject(new Error(valToString(errVal)));
     }
     else if (action.actiontype === "nop") {
@@ -2454,6 +2463,9 @@ function convertActions(actions : HibikiAction[]) : HAction[] {
 }
 
 async function FireEvent(event : EventType, dataenv : DataEnvironment, rtctx : RtContext, throwErrors : boolean) : Promise<any> {
+    if (event.event == "unhandlederror" && !event.native) {
+        throw new Error("Cannot fire->unhandlederror from handler");
+    }
     let ehandler : EHandlerType = null;
     if (event.nodeuuid) {
         let dbctx = dataenv.dbstate.NodeUuidMap.get(event.nodeuuid);
@@ -2475,12 +2487,19 @@ async function FireEvent(event : EventType, dataenv : DataEnvironment, rtctx : R
     let htmlContext = sprintf("event%s(%s)", (event.bubble ? "-bubble" : ""), event.event);
     let eventEnv = ehandler.dataenv.makeChildEnv(event.datacontext, {htmlContext: htmlContext});
     let ctxStr = sprintf("Running %s:%s.handler (in [[%s]])", nodeStr(ehandler.node), event.event, ehandler.dataenv.getFullHtmlContext());
-    rtctx.pushContext(ctxStr, {handlerEnv: ehandler.dataenv, handlerName: event.event});
+    rtctx.pushContext(ctxStr, {handlerEnv: ehandler.dataenv, handlerName: event.event, handlerNode: ehandler.node});
     try {
         await ExecuteHandlerBlock(ehandler.handler, false, eventEnv, rtctx);
         return null;
     }
     catch (e) {
+        if (e instanceof HibikiError) {
+            if (throwErrors) {
+                throw e;
+            }
+            await dataenv.dbstate.unhandledError(e, rtctx);
+            return null;
+        }
         rtctx.pushErrorContext(e);
         let errorObj = makeErrorObj(e, rtctx);
         let errorEventObj = {
@@ -2495,10 +2514,10 @@ async function FireEvent(event : EventType, dataenv : DataEnvironment, rtctx : R
             if (throwErrors) {
                 throw errorObj;
             }
-            dataenv.dbstate.reportErrorObj(errorObj);
+            await dataenv.dbstate.unhandledError(errorObj, rtctx);
             return null;
         }
-        FireEvent(errorEventObj, dataenv, rtctx, false);
+        return FireEvent(errorEventObj, dataenv, rtctx, false);
     }
 }
 
@@ -2717,6 +2736,6 @@ function convertSimpleType(typeName : string, value : string, defaultValue : Hib
     return value;
 }
 
-export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, makeIteratorFromExpr, rawAttrStr, resolveStrAttrs, resolveValAttrs, getStyleMap, getAttributeStr, getAttributeValPair, attrValToStr, exValToVal, resolveLValueAttr, resolveArgsRoot, SYM_NOATTR, resolveCnArray, HActionBlock, valToString, compileActionStr, FireEvent};
+export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, makeIteratorFromExpr, rawAttrStr, resolveStrAttrs, resolveValAttrs, getStyleMap, getAttributeStr, getAttributeValPair, attrValToStr, exValToVal, resolveLValueAttr, resolveArgsRoot, SYM_NOATTR, resolveCnArray, HActionBlock, valToString, compileActionStr, FireEvent, makeErrorObj};
 
 export type {PathType, HAction, HExpr, HIteratorExpr};

@@ -236,13 +236,17 @@ class DataEnvironment {
         else {
             deType = "  |";
         }
+        let hkeysStr = Object.keys(this.handlers).join(",");
+        let specialsStr = Object.keys(this.specials).map((v) => "@" + v).join(",");
+        let libStr = "";
+        if (this.libContext != null && this.libContext !== "main") {
+            libStr = sprintf("lib[%s] ", this.libContext);
+        }
+        let stackStr = sprintf("%s %-30s | %-30s | %s%s", deType, this.htmlContext, specialsStr, libStr, hkeysStr);
+        console.log(stackStr);
         if (this.parent != null) {
             this.parent.printStack();
         }
-        let hkeysStr = Object.keys(this.handlers).join(",");
-        let specialsStr = Object.keys(this.specials).map((v) => "@" + v).join(",");
-        let stackStr = sprintf("%s %-30s | %-30s | %s", deType, this.htmlContext, specialsStr, hkeysStr);
-        console.log(stackStr);
     }
 
     // always returns hard
@@ -833,7 +837,6 @@ class HibikiExtState {
 class HibikiState {
     FeClientId : string = null;
     Ui : string = null;
-    ErrorCallback : ErrorCallbackFn;
     HtmlObj : mobx.IObservableValue<any> = mobx.observable.box(null, {name: "HtmlObj", deep: false});
     ComponentLibrary : ComponentLibrary;
     Initialized : mobx.IObservableValue<boolean> = mobx.observable.box(false, {name: "Initialized"});
@@ -938,6 +941,31 @@ class HibikiState {
         return rtnp;
     }
 
+    async unhandledError(errorObj : HibikiError, rtctx : RtContext) : Promise<any> {
+        let pageEnv = this.pageDataenv();
+        let eventObj = {event: "unhandlederror", native: true, bubble: false, datacontext: {error: errorObj}};
+        let ehandler = pageEnv.resolveEventHandler(eventObj, rtctx);
+        if (ehandler != null) {
+            try {
+                await DataCtx.FireEvent(eventObj, this.pageDataenv(), rtctx, true);
+                return null;
+            }
+            catch (e) {
+                if (e instanceof HibikiError) {
+                    this.reportErrorObj(e);
+                    return null;
+                }
+                let newErrorObj = DataCtx.makeErrorObj(e, rtctx);
+                this.reportErrorObj(newErrorObj);
+                return null;
+            }
+        }
+        else {
+            this.reportErrorObj(errorObj);
+            return null;
+        }
+    }
+
     getExtState() : HibikiExtState {
         return new HibikiExtState(this);
     }
@@ -1000,7 +1028,7 @@ class HibikiState {
     }
 
     unhandledEvent(event : EventType, rtctx : RtContext) {
-        if (event.event === "init") {
+        if (event.event === "init" || event.event === "unhandlederror") {
             return;
         }
         console.log(sprintf("Hibiki unhandled event %s", event.event), event.datacontext, rtctx);
@@ -1127,11 +1155,18 @@ class HibikiState {
     }
 
     reportErrorObj(errorObj : HibikiError) {
-        if (this.ErrorCallback == null) {
+        try {
+            let rtn = callHook("UnhandledErrorHook", this.Config.unhandledErrorHook, errorObj);
+            if (rtn) {
+                return;
+            }
             console.log(errorObj.toString());
-            return;
         }
-        callHook("ErrorCallback", this.ErrorCallback, errorObj);
+        catch (e) {
+            console.log("Hibiki Error while running unhandledErrorHook", e);
+            console.log("Original Error:\n" + errorObj.toString());
+        }
+        
     }
 
     registerDataNodeState(uuid : string, query : string, dnstate : any) {

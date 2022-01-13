@@ -1,10 +1,30 @@
 <!DOCTYPE html>
 <script src="/hibiki-test.js"></script>
 <div class="container m-4">
+
+  <script>
+    var unhandledErrorCount = 0;
+    function unhandledErrors(errorObj) {
+        unhandledErrorCount++;
+        HibikiState.setData("$.unhandled_js_error_count", unhandledErrorCount);
+        HibikiState.setData("$.unhandled_error_event", errorObj.event);
+        return errorObj.event != "foo";
+    }
+  </script>
+  
   <template hibiki>
+    <hibiki-config>
+      {"unhandledErrorHook": {"jsfunc": "unhandledErrors"}}
+    </hibiki-config>
     <hibiki-data>
-      {"error": null}
+      {"error": null, "unhandled_js_error_count": 0, "unhandled_error_count": 0}
     </hibiki-data>
+    <define-handler name="//@event/unhandlederror">
+      if (@error.event != "hibiki") {
+          throw(@error);
+      }
+      $.unhandled_error_count = $.unhandled_error_count + 1;
+    </define-handler>
     <h1 class="title">Test Error Handling</h1>
 
     <div class="box" class.has-background-danger="*$.error" class.has-background-success="*!$.error" style="color: white; font-weight: bold;">
@@ -14,8 +34,9 @@
           <div class="ml-3"><button class="button" click.handler="$.error = null;">Reset</button></div>
         </div>
         <div class="mt-2">
-          Message: {{ $.error.message }}
-          <pre>{{$.error.jsstack}}</pre>
+          <p>Message: {{ $.error.message }}</p>
+          <p>Event: {{ $.error.event }}</p>
+          <pre class="mt-2">{{$.error.jsstack}}</pre>
         </div>
       </div>
       <div if="!$.error">
@@ -24,13 +45,28 @@
     </div>
 
     <div class="box">
-      <button class="button is-danger" click.handler="https://testapi.hibikihtml.com/api/notfound; $.clicked = true;" error.handler="$.error=@error;">Simple Error Handler</button>
+      <p>Unhandled Error Handler Fired: JS[{{ $.unhandled_js_error_count }}] Hibiki[{{ $.unhandled_error_count }}]</p>
+      <p>Last Unhandled Error from event: {{ $.unhandled_error_event }}</p>
+    </div>
+
+    <div class="box">
+      <button class="button is-danger" click.handler="https://testapi.hibikihtml.com/api/notfound; $.clicked = true;" error.handler="$.error=@error; debug('simple')">Simple Error Handler</button>
       <p>Clicked = {{ $.clicked }} (should stay null after click)</p>
     </div>
 
     <div class="box">
       <button class="button is-danger" foo.handler="//@foo/bar()" click.handler="fire->foo(); $.indirect_click = true;" error.handler="$.error=@error;">Indirect (error in fired event)</button>
       <p>Clicked = {{ $.indirect_click }} (should be true after click)</p>
+    </div>
+
+    <div class="box">
+      <button class="button is-danger" click.handler="//@foo/bar()">Unhandled Error (no console log)</button>
+      <button class="button is-danger" foo.handler="//@foo/bar" click.handler="fire->foo()">Unhandled Error (should log)</button>
+      <button class="button is-danger" hibiki.handler="//@foo/bar" click.handler="fire->hibiki()">Unhandled Error (Hibiki Event)</button>
+    </div>
+
+    <div class="box">
+      <button class="button is-danger" click.handler="//@foo/bar()" error.handler="throw(@error)">Simple Handler / rethrow</button>
     </div>
 
   </template>

@@ -61,6 +61,7 @@ type HandlerPathType = {
 
 type EventType = {
     event : string,
+    native : boolean,
     bubble : boolean,
     datacontext : Record<string, any>,
     nodeuuid? : string,
@@ -106,7 +107,7 @@ type HibikiHandlerModule = {
 type JSFuncStr = {jsfunc : string};
 type FetchHookFn = JSFuncStr | ((url : URL, fetchInit : Record<string, any>) => void);
 type CsrfHookFn = JSFuncStr | ((url : URL) => string);
-type ErrorCallbackFn = JSFuncStr | ((HibikiError) => void);
+type ErrorCallbackFn = JSFuncStr | ((HibikiError) => boolean);
 type EventCallbackFn = JSFuncStr | ((EventType) => void);
 
 type ModuleConfig = Record<string, any>;
@@ -145,6 +146,7 @@ type HibikiConfig = {
     noWelcomeMessage? : boolean,
     modules? : Record<string, ModuleConfig>,
     httpConfig? : HttpConfig;
+    unhandledErrorHook? : ErrorCallbackFn;
 };
 
 type PathUnionType = string | PathType;
