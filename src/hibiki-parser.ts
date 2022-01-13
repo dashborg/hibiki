@@ -1,4 +1,4 @@
-// Copyright 2021 Dashborg Inc
+// Copyright 2021-2022 Dashborg Inc
 
 import nearley from "nearley";
 import hibikiGrammar from "./hibiki-grammar.js";

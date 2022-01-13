@@ -1,4 +1,4 @@
-// Copyright 2021 Dashborg Inc
+// Copyright 2021-2022 Dashborg Inc
 
 import camelCase from "camelcase";
 import type {HibikiNode, HtmlParserOpts, PathType, AutoMergeExpr, AutoFireExpr, NodeAttrType} from "./types";

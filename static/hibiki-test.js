@@ -1,4 +1,4 @@
-// Copyright 2021 Dashborg Inc
+// Copyright 2021-2022 Dashborg Inc
 
 // sets up a very basic HTML page that
 // includes hibiki-dev.js, the JS prereqs, and Bulma for testing.
