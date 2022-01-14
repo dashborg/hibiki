@@ -69,7 +69,8 @@ class HibikiRootNode extends React.Component<{hibikiState : HibikiExtState}, {}>
         }
         if (dbstate.allowWelcomeMessage() && !welcomeMessage) {
             welcomeMessage = true;
-            console.log(flowerEmoji + " Hibiki HTML https://github.com/dashborg/hibiki | Developed by Dashborg Inc https://dashborg.net");
+            let versionStr = (getHibiki().BUILD === "devbuild" ? "devbuild" : getHibiki().VERSION + " " + getHibiki().BUILD);
+            console.log(flowerEmoji + sprintf(" Hibiki HTML https://github.com/dashborg/hibiki [%s] | Developed by Dashborg Inc https://dashborg.net", versionStr));
         }
     }
 

@@ -1,9 +1,10 @@
+const webpack = require('webpack');
 const merge = require('webpack-merge');
 const common = require('./webpack.common.js');
 const path = require('path');
 const CopyPlugin = require("copy-webpack-plugin");
 
-module.exports = merge.merge(common, {
+var merged = merge.merge(common, {
     mode: "development",
     devtool: "source-map",
     devServer: {
@@ -19,4 +20,12 @@ module.exports = merge.merge(common, {
         aggregateTimeout: 200,
     },
 });
+
+var definePlugin = new webpack.DefinePlugin({
+    __HIBIKIVERSION__: JSON.stringify("v0"),
+    __HIBIKIBUILD__: JSON.stringify("devbuild"),
+});
+merged.plugins.push(definePlugin);
+
+module.exports = merged;
 

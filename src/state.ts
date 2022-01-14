@@ -30,7 +30,6 @@ let RESTRICTED_MODS = {
     "local": true,
     "http": true,
     "main": true,
-    "hibiki": true,
     "h": true,
     "html": true,
 };

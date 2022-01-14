@@ -210,6 +210,8 @@ interface Hibiki {
     ImportLibs : Record<string, any>;
     LibraryCallbacks : Record<string, any[]>;
     States : Record<string, HibikiExtState>;
+    VERSION : string;
+    BUILD : string;
 };
 
 interface HibikiExtState {

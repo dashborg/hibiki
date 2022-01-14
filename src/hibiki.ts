@@ -14,6 +14,9 @@ import {LocalModule, HttpModule, LibModule, HibikiModule} from "./modules";
 
 declare var window : any;
 
+// @ts-ignore - from webpack DefinePlugin
+let BUILD = __HIBIKIBUILD__; let VERSION = __HIBIKIVERSION__;
+
 function errorWithCause(message : string, cause : Error) {
     // @ts-ignore
     throw new Error(message, {cause: cause}); // ES6 error with cause
@@ -210,6 +213,8 @@ let hibiki : Hibiki = {
     },
     LibraryCallbacks: {},
     States: {},
+    VERSION: VERSION,
+    BUILD: BUILD,
 };
 
 window.Hibiki = hibiki;
