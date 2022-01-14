@@ -179,7 +179,7 @@ function setParams(method : string, url : URL, fetchInit : Record<string, any>, 
     let encoding = unpackArg(data, "@encoding");
     if (method == "GET" || method == "DELETE") {
         if (encoding != null && encoding != "url") {
-            console.log(sprintf("WARNING, @enc=%s is ignored for GET/DELETE requests, only 'url' is supported", encoding));
+            console.log(sprintf("WARNING, @encoding=%s is ignored for GET/DELETE requests, only 'url' is supported", encoding));
         }
         for (let key in params) {
             let val = params[key];

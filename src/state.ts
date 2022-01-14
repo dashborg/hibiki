@@ -24,11 +24,15 @@ type CallHandlerOptsType = {
 type EHandlerType = {handler : HandlerBlock, node : HibikiNode, dataenv : DataEnvironment};
 
 let RESTRICTED_MODS = {
+    "": true,
     "hibiki": true,
     "lib": true,
     "local": true,
     "http": true,
     "main": true,
+    "hibiki": true,
+    "h": true,
+    "html": true,
 };
 
 function eventBubbles(event : string) : boolean {
@@ -693,7 +697,7 @@ class ComponentLibrary {
         else {
             libObj.modules["lib"] = new mreg["lib"](this.state, {libContext: libName});
         }
-        this.importLibrary(libName, "@hibiki/core", null);
+        this.importLibrary(libName, "@hibiki/core", null, true);
         let importTags = subNodesByTag(libNode, "import-library");
         for (let i=0; i<importTags.length; i++) {
             let itag = importTags[i];
@@ -747,8 +751,8 @@ class ComponentLibrary {
         });
     }
 
-    importLibrary(libContext : string, libName : string, prefix : string) {
-        if (prefix === "local" || prefix == "main" || prefix == "lib") {
+    importLibrary(libContext : string, libName : string, prefix : string, system? : boolean) {
+        if (!system && (prefix == null || RESTRICTED_MODS[prefix])) {
             throw new Error(sprintf("Cannot import library with reserved '%s' prefix", prefix));
         }
         let libObj = this.libs[libName];
