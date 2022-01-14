@@ -1,0 +1,186 @@
+.fullpage {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+
+    .hero {
+        height: 84px;
+    }
+
+    .main-content-and-nav {
+        height: calc(100vh - 84px);
+    }
+}
+
+.bold {
+    font-weight: bold;
+}
+
+a.content-anchor {
+    display: block;
+    position: relative;
+    top: -70px;
+}
+
+.spacer {
+    flex: 0 0 5px;
+    background-color: #ddd;
+}
+
+.main-playground {
+    display: flex;
+    flex-grow: 1;
+
+    .editor-container {
+        flex: 1 1 0%;
+    }
+    #iframe-container {
+        flex: 0 0 45%;
+    }
+}
+
+.main-content-and-nav {
+    display: flex;
+    flex-grow: 1;
+    aside {
+        flex: 0 0 200px;
+        border-right: 2px solid #ddd;
+    }
+    .content-container {
+        flex: 1 1 0%;
+        overflow: auto;
+    }
+    .runtime-container {
+        flex: 0 0 50%;
+    }
+}
+
+.content-container {
+    ul.monospace li {
+        font-family: monospace;
+        font-size: 13px;
+    }
+
+    ul.example-list {
+        margin-top: 0 !important;
+    }
+
+    code {
+        font-family: monospace;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        white-space: nowrap;
+    }
+    
+    pre.codeblock {
+        display: block;
+        padding: 1rem !important;
+        color: #da1039;
+    }
+}
+
+.runtime-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 50vw;
+    background-color: #ddd;
+
+    .editor-container {
+        max-height: 60%;
+    }
+}
+
+.editor-container {
+    display: flex;
+    flex-direction: column;
+    flex: 1 0 0%;
+    background-color: #ddd;
+    
+    .fontsizer {
+        height: calc(100% - 40px);
+        flex-grow: 1;
+        .CodeMirror {
+            height: 100%;
+        }
+    }
+}
+
+#iframe-container {
+    display: flex;
+    flex-direction: column;
+    background-color: white;
+    flex: 1 0 0%;
+    border-radius: 5px;
+    
+    iframe {
+        width: 100%;
+        flex-grow: 1;
+    }
+}
+
+.main-content {
+    display: flex;
+    flex-grow: 1;
+    flex-direction: row;
+    background-color: #eee;
+
+    .editor-container {
+        flex-grow: 2;
+        max-width: 800px;
+    }
+
+    .spacer {
+        width: 5px;
+        background-color: #ddd;
+    }
+
+    .preview-container {
+        flex-grow: 1;
+        min-width: 300px;
+    }
+}
+
+.bg-blue {
+    background-color: #6ccff6;
+}
+
+.bg-black {
+    background-color: #001011;
+}
+
+.bg-silver {
+    background-color: #757780;
+}
+
+.bg-pink {
+    background-color: #f1b5cb;
+}
+
+.bg-yellow {
+    background-color: #f6efa6;
+}
+
+.fontsize-0 .CodeMirror * {
+    font-size: 10px;
+}
+
+.fontsize-1 .CodeMirror * {
+    font-size: 11px;
+}
+
+.fontsize-2 .CodeMirror * {
+    font-size: 12px;
+}
+
+.fontsize-3 .CodeMirror * {
+    font-size: 14px;
+}
+
+.fontsize-4 .CodeMirror * {
+    font-size: 16px;
+}
+
+.fontsize-5 .CodeMirror * {
+    font-size: 18px;
+}

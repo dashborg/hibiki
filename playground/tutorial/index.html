@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta chartset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <title>Hibiki HTML Tutorial</title>
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <script src="https://cdn.hibikihtml.com/hibiki/latest/hibiki-prod.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.3/css/bulma.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/playground.css">
+  </head>
+  <body>
+    <template hibiki>
+      <hibiki-data>
+        {"bulma": true}
+      </hibiki-data>
+      <import-library src="/libs/playground.html" prefix="play"></import-library>
+      <import-library src="/libs/codemirror.html" prefix="codemirror"></import-library>
+      <define-handler name="//@event/popstate">
+        //@lib-play/switchpage(page=$state.urlparams.page, bulma=true, ispop=true);
+      </define-handler>
+      <div class="fullpage" mount.handler="//@lib-play/switchpage(page=$state.urlparams.page);">
+        <section class="hero" style="height: 84px;">
+          <div class="hero-body bg-black pt-5 pb-5">
+            <h1 class="title" style="color: white;">&#x1f338; Hibiki HTML Tutorial</h1>
+          </div>
+        </section>
+        <div class="main-content-and-nav">
+          <aside class="menu pt-2">
+            <p class="menu-label pl-1">Tutorial</p>
+            <ul class="menu-list">
+              <li><play-menuitem page="t-intro">1. Hibiki Introduction</local-menuitem></li>
+              <li><play-menuitem page="t-gs">2. Getting Started</local-menuitem></li>
+              <li><play-menuitem page="t-binding">3. Binding Data</local-menuitem></li>
+              <li><play-menuitem page="t-expr">4. Data Expressions</local-menuitem></li>
+              <li><play-menuitem page="t-handlers">5. Handlers</local-menuitem></li>
+              <li><play-menuitem page="t-remote-handlers">6. Remote Handlers</local-menuitem></li>
+              <li><play-menuitem page="t-local-handlers">7. Local Handlers & Module URLs</local-menuitem></li>
+              <li><play-menuitem page="t-remote-actions">8. Remote Actions</local-menuitem></li>
+              <li><play-menuitem page="t-forms">9. Form Elements</local-menuitem></li>
+              <li><play-menuitem page="t-components">10. Components</local-menuitem></li>
+              <li><play-menuitem page="t-libraries">11. Libraries</local-menuitem></li>
+              <li><play-menuitem page="t-wrapup">12. Wrap Up</local-menuitem></li>
+            </ul>
+          </aside>
+          <div class="content-container">
+              <div class="tutorial-content p-3">
+                <div class="content mb-5">
+                  <h-dyn bind.bindpath="$.tutorial_content"></h-dyn>
+                </div>
+              </div>
+          </div>
+          <div class="spacer"></div>
+          <div class="runtime-container">
+            <div class="editor-container">
+              <codemirror-editor text.bindpath="$.codetext" change.handler="//@lib-play/make-iframe(text=@value, bulma=true)"></codemirror-editor>
+            </div>
+            <div id="iframe-container" class="p-2 mr-2 mb-2">
+              <iframe></iframe>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+  </body>
+</html>

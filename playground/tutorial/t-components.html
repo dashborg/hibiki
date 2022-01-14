@@ -1,0 +1,174 @@
+<template hibiki>
+  <hibiki-data>{"box1color": "blue"}</hibiki-data>
+  <define-component name="colorbox">
+    <div class="box has-text-weight-bold"
+         style="background-color: *($args.color == '' ? 'black' : $args.color); color: white;">
+      Color is {{ ($args.color == '' ? '(not set)' : $args.color) }}!
+    </div>
+  </define-component>
+  <define-component name="setred">
+    <button class="button" click.handler="$args.color = 'red'">Set Red</button>
+  </define-component>
+  <define-component name="bulma-emailinput">
+    <div class="control has-icons-left has-icons-right">
+      <input class="input is-medium" type="email" placeholder="Email" value.bindpath="$.email" change.handler="fire->change(value=@value)">
+      <span class="icon is-left">
+        <i class="fa fa-envelope"></i>
+      </span>
+    </div>
+  </define-component>  
+  <div class="box">
+    <div>Box #1 Color</div>
+    <div class="select">
+      <select value.bindpath="$.box1color">
+        <option value="red">Red
+        <option value="green">Green
+        <option value="blue">Blue
+        <option value="purple">Purple
+      </select>
+    </div>
+    <local-setred color.bindpath="$.box1color"></local-setred>
+    <br>
+  </div>
+  <local-colorbox color.bindpath="$.box1color"></local-colorbox>
+  <local-colorbox color="purple"></local-colorbox>
+  <div class="box">
+    <local-bulma-emailinput value.bindpath="$.email"></local-bulma-emailinput>
+    <br>
+    Value = {{ $.email }}
+  </div>
+</template>
+--------
+<h4 class="title is-4">Components</h4>
+<p>
+  Components allow you to create reuseable functionality in your Hibiki HTML app.
+  In order to define a local component, use the tag
+  <span style="white-space: nowrap">&lt;define-component&gt;</span>
+  at the top-level
+  with your new component's name.  To use your component, prefix the name with
+  "local-".
+</p>
+<pre class="codeblock">
+&lt;define-component name="comp1">
+  ... HTML goes here ...  
+&lt;/define-component>
+
+// to use the component use the "local" prefix:
+&lt;local-comp1>&lt;/local-comp1>
+</pre>
+<p>
+  Components may use the global data model and help you package up repeated sections of HTML.
+</p>
+
+<h6 class="title is-6">Passing Data to Components</h6>
+<p>
+  To make general components (that don't depend on the global data model) you'll need to pass
+  arguments.  Arguments can be
+  accessed inside of your component using the special <i>args root</i> <code>$args</code>.
+</p>
+<pre class="codeblock">
+&lt;define-component name="comp1">
+  My name is {\{ $args.name }\}
+&lt;/define-component>
+
+&lt;local-comp1 name="Mike">&lt;/local-comp1>
+</pre>
+
+<h6 class="title is-6">Binding Data to Components</h6>
+<p>
+  Just like the &lt;input&gt; tag can both read its value and write its value, you can create
+  components that can read and write data as well.  To pass a bound argument, just
+  add <i>.bindpath</i>.
+</p>
+<p>
+  This example shows a component with a bindable argument called <i>color</i>.  Inside the component
+  we can assign a value to color using the component root: <code>$args.color = 'red'</code>.  When using
+  our component, we can specify <i>color.bindpath</i> which will be updated to 'red' when the user
+  clicks on the button.
+</p>
+<pre class="codeblock">
+&lt;define-component name="setcolor">
+  &lt;button class="button" click.handler="$args.color = 'red'">Set Red&lt;/button>
+&lt;/define-component>
+
+&lt;local-setcolor color.bindpath="$.color">&lt;/local-setcolor>
+</pre>
+
+<h6 class="title is-6">Firing Events</h6>
+<p>
+  Components can also fire custom events.  These events can be handled the same way that
+  native events are handled.  Here's an example of our "setcolor" component firing
+  a custom event called "colorchange".  <code>@value</code> will be set to the
+  new color.  Events are fired using the syntax <code>fire->[eventname]([event data])</code>
+</p>
+<pre class="codeblock">
+&lt;define-component name="setcolor">
+  &lt;button class="button" click.handler="fire->colorchange(value='red')">Set Red&lt;/button>
+  &lt;button class="button" click.handler="fire->colorchange(value='blue')">Set Blue&lt;/button>
+&lt;/define-component>
+
+&lt;local-setcolor colorchange.handler="$.box1color = @value;">&lt;/local-setcolor>
+</pre>
+
+<h6 class="title is-6">Children</h6>
+<p>
+  A special local variable <code>@children</code> is available inside of your component that holds
+  the child elements passed to your component.  The <code>@children</code> variable allows for simple
+  filtering by tag name or <i>slot</i>, but the most common usage is to just include <i>all</i> of the
+  in your defined component.  That is done by using the &lt;h-children&gt; tag with <code>@children.all</code>:
+</p>
+<pre>
+&lt;define-component name="bulma-box">
+  &lt;div class="box">
+    &lt;h-children bind="@children.all">&lt;/h-children>
+  &lt;/div>
+&lt;/define-component>
+
+&lt;local-bulma-box>
+  &lt;p>child content&lt;/p>
+  &lt;p>more &lt;b>content&lt;/b>&lt;/p>
+&lt;/local-bulma-box>  
+</pre>
+
+<h6 class="title is-6">Input Wrappers</h6>
+<p>
+  Because you can fire events and bind values, you can easily write wrappers for the standard
+  input controls.  Here's a component that creates a bulma input control with a left icon:
+</p>
+<pre class="codeblock">
+&lt;define-component name="bulma-emailinput">
+  &lt;div class="control has-icons-left has-icons-right">
+    &lt;input class="input is-medium" type="email" placeholder="Email" value.bindpath="$args.value" change.handler="fire->change(value=@value)">
+    &lt;span class="icon is-left">
+      &lt;i class="fa fa-envelope">&lt;/i>
+    &lt;/span>
+  &lt;/div>
+&lt;/define-component>
+
+&lt;local-bulma-emailinput value.bindpath="$.email">&lt;/local-bulma-emailinput>
+</pre>
+<div class="box has-background-info-light">
+  <h6 class="title is-6">Advanced Components with AutoMerge</h6>
+  <p>
+    One of the most tedious parts of component writing is figuring out how to allow
+    users to customize general components without creating a huge number of parameters.
+    Hibiki HTML has solved this problem using <b>automerge</b>.
+  </p>
+  <p>
+    In the original example, our component's &lt;input&gt; tag only accepts a
+    value argument.  What if we want to allow the user to override the placeholder,
+    add custom styles or set a maximum length?
+  </p>
+  <pre class="codeblock">&lt;input automerge="@all" class="input is-medium" type="email" change.handler="fire->change(value=@value)"></pre>
+  <p>
+    Adding the <code>automerge</code> attribute takes each parameter passed to the
+    custom tag and <i>automatically merges</i> them into the &lt;input&gt; tag.  So now our custom input tag
+    can take the same parameters as a native input tag.
+  </p>
+  <pre class="codeblock">&lt;local-bulma-emailinput value.bindpath="$.email" maxlength="50" placeholder="Email Address" style="color: red;"></pre>
+  <p>
+    Automerge is very powerful, is highly customizable, and can merge to multiple target elements.
+  </p>
+</div>
+
+<play-nextprev prev="t-forms" next="t-libraries"></play-nextprev>

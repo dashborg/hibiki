@@ -1,0 +1,16 @@
+<template hibiki>
+  <hibiki-data>
+    {"fruits": [{"name": "apple", "emoji": "&#127822;"},
+                {"name": "banana", "emoji": "&#127820;"}, 
+                {"name": "blueberry", "emoji": "&#129744;"}], 
+     "selected": "banana"}
+  </hibiki-data>
+  <div class="content box">
+    <ul>
+      <li foreach="@fruit in $.fruits">
+        {{ @fruit.name }} {{ @fruit.emoji }}
+        <span if="@fruit.name == $.selected">(selected)</span>
+      </li>
+    </ul>
+  </div>
+</template>

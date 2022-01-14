@@ -1,0 +1,45 @@
+<template hibiki>
+  <hibiki-data>
+    {"color": "blue"}
+  </hibiki-data>
+  <define-handler name="//@local/set-green">
+    $.color = "green";
+  </define-handler>
+  <define-handler name="//@local/set-any-color">
+    $.color = @data.color;
+  </define-handler>
+  <div class="box">
+    <button class="button" click.handler="$.color = 'red'">Set Red</button>
+    <button class="button" click.handler="$.color = 'green';">Set Green</button>
+    <button class="button" click.handler="$.color = 'black';">Set Black</button>
+  </div>
+  <div class="box has-text-weight-bold"
+       style="background-color: *$.color; color: white;">
+    Color is {{ $.color }}!
+  </div>
+</template>
+--------
+<h4 class="title is-4">Handler Types</h4>
+<p>
+  Hibiki HTML supports 3 types of handlers: inline, remote, and JavaScript.  All 3 handler
+  types are <i>isomorphic</i>, they each return a set of <i>actions</i> that are executed by
+  the Hibiki HTML runtime to update the data model.
+</p>
+<p>
+  Anything you can do or change in an inline handler can also be done with a remote handler
+  by returning actions in JSON form.
+</p>
+
+<h4 class="title is-4">Inline Handlers</h4>
+<p>
+  Let's create a button, and add an inline click handler (other supported events include <i>change</i>,
+  <i>mount</i>, and <i>submit</i>).  All inline handlers in your HTML end with <code>.handler</code>.
+</p>
+<pre class="codeblock">&lt;button click.handler="$.color = 'red'" class="button">Set Red&lt;/button></pre>
+
+<p>
+  Handlers can update data, make backend API calls, call other handlers, and more.
+  This example shows a click handler updating <code>$.color</code> in the data model.
+</p>
+
+<play-nextprev prev="t-expr" next="t-remote-handlers"></play-nextprev>

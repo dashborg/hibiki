@@ -1,0 +1,7 @@
+<template hibiki>
+  <hibiki-data>{"color": "blue"}</hibiki-data>
+  <div class="box" style="background-color: *$.color; color: white">
+    The color is {{$.color}}
+  </div>
+  <button class="button" click.handler="$.color = 'green'">Change Color</button>
+</template>

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta chartset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <title>Hibiki HTML Playground</title>
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <script src="https://cdn.hibikihtml.com/hibiki/latest/hibiki-prod.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.3/css/bulma.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/playground.css">
+  </head>
+  <body>
+    <template hibiki>
+      <import-library src="/libs/playground.html" prefix="play"></import-library>
+      <import-library src="/libs/codemirror.html" prefix="codemirror"></import-library>
+      <define-handler name="//@event/init">
+        $.bulma = ($state.urlparams.bulma == null || $state.urlparams.bulma) ? true : false;
+        $.optionsmodal = false;
+        if ($state.urlparams.codeid == null) {
+            $.codetext = //@hibiki/get-session-storage(key="hibiki-playground-content");
+        }
+        else {
+            $.codetext = //@local/load-codeid(codeid=$state.urlparams.codeid);
+        };
+        if ($.codetext == null || fn:trim($.codetext) == "") {
+            $.codetext = //@local/load-codeid(codeid="default");
+        }
+        //@lib-play/make-iframe(text=$.codetext, bulma=$.bulma);
+      </define-handler>
+      <define-handler name="//@local/load-codeid">
+        @url = '/codeid/' + @data.codeid + '.html';
+        @blob = callhandler(@url=@url);
+        setreturn(fn:blobastext(@blob));
+      </define-handler>
+      <define-handler name="//@local/save-and-make-iframe">
+        //@hibiki/set-session-storage(key='hibiki-playground-content', value=$.codetext);
+        //@hibiki/set-session-storage(key='hibiki-playground-bulma', value=$.bulma);
+        //@hibiki/update-url(codeid=null, bulma=($.bulma ? null : false), @replace=true);
+        //@lib-play/make-iframe(text=$.codetext, bulma=$.bulma);
+      </define-handler>
+      <div class="fullpage">
+        <section class="hero" style="height: 84px;">
+          <div class="hero-body bg-black pt-5 pb-5">
+            <h1 class="title" style="color: white;">&#x1f338; Hibiki HTML Playground</h1>
+          </div>
+        </section>
+        <div class="main-playground">
+          <div class="editor-container">
+            <div style="display:flex; justify-content: flex-end">
+              <div>
+                <play-onoff-button value.bindpath="$.bulma" click.handler="//@local/save-and-make-iframe">
+                  {{ $.bulma ? "Use" : "No" }} Bulma CSS
+                </play-onoff-button>
+              </div>
+            </div>
+            <codemirror-editor initialtext="*$.codetext" change.handler="$.codetext=@value; //@local/save-and-make-iframe;"></codemirror-editor>
+          </div>
+          <div class="spacer"></div>
+          <div id="iframe-container" class="p-2 mr-2 mb-2">
+            <iframe></iframe>
+          </div>
+        </div>
+      </div>
+    </template>
+  </body>
+</html>

@@ -1,0 +1,14 @@
+<template hibiki>
+  <hibiki-data>{"color": "blue"}</hibiki-data>
+  <define-handler name="//@local/get-color">
+    @resp = GET https://testapi.hibikihtml.com/api/get-color-1(name="Michelle");
+    $.color = @resp.color;
+  </define-handler>
+  <div class="box" style="background-color: *$.color; color: white">
+    The color is {{$.color}}
+  </div>
+  <button class="button" click.handler="$.color = 'green'">Change Color</button>
+  <button class="button" click.handler="//@local/get-color">
+    Get Michelle's Color
+  </button>
+</template>

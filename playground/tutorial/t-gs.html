@@ -1,0 +1,60 @@
+<template hibiki>
+  <h1 class="title">&#x1f338; Hibiki HTML</h1>
+  <div class="box">
+    Hibiki HTML <i>is</i> HTML.<br>
+  </div>
+</template>
+--------
+<h4 class="title is-4">Getting Started</h4>
+<p>
+  You can create a Hibiki HTML app on any page in two steps.  First add the Hibiki HTML JavaScript tag to
+  your page:
+</p>
+<pre class="codeblock">&lt;script src="https://cdn.hibikihtml.com/hibiki/latest/hibiki-prod.min.js"&gt;&lt;/script&gt;</pre>
+<p>
+  Next add a Hibiki template block to your page where you want the application to display (you can also wrap
+  your existing HTML to instantly convert it to a Hibiki app):
+</p>
+<pre class="codeblock">&lt;template hibiki&gt;
+  HTML content goes here
+&lt;/template&gt;</pre>
+
+<h6 class="title is-6 mb-2">Hibiki HTML <i>is</i> HTML</h6>
+<p>
+  Hibiki renders regular HTML as-is.  It is parsed using the browser's own parser, so it follows the same rules.
+</p>
+
+<play-nextprev prev="t-intro" next="t-binding"></play-nextprev>
+
+<hr>
+
+<h4 class="title is-4">About This Tutorial</h4>
+
+<h6 class="title is-6 mb-2">The Tutorial is Interactive</h6>
+<p>
+  You can edit the code in the upper right, hit submit and it will be executed in the bottom right.
+  The examples can also be run in a static HTML file on your own machine, or in
+  <a href="https://codepen.io/pen/?template=QWMBgPg" target="_blank">Codepen</a>.
+</p>
+
+<h6 class="title is-6 mb-2">How the preview and tutorial was built</h6>
+<p>
+  The entire tutorial site is written in Hibiki HTML!  It includes the excellent
+  <a href="https://codemirror.net/" target="_blank">CodeMirror</a> library to render the code editor.
+  The full source code is available on <a href="https://github.com/dashborg/hibiki/tree/main/playground/" target="_blank">GitHub</a>.
+</p>
+<p>
+  The preview you see in the bottom right is an &lt;iframe&gt; that renders the HTML in the code
+  block above.  Here is the full template (<a target="_blank" href="https://github.com/dashborg/hibiki/tree/main/playground/playground-iframe-bulma.html">GitHub</a>).  It imports the Hibiki HTML script tag, and for
+  styling I've imported the excellent
+  <a href="https://bulma.io/" target="_blank">Bulma</a> CSS library, and
+  <a href="https://fontawesome.com/v4.7/" target="_blank">FontAwesome v4.7</a>.
+</p>
+<pre class="codeblock">&lt;script src="https://cdn.hibikihtml.com/hibiki/latest/hibiki-prod.min.js">&lt;/script>
+&lt;link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+&lt;link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.3/css/bulma.min.css"></pre>
+
+
+
+<play-nextprev prev="t-intro" next="t-binding"></play-nextprev>
+

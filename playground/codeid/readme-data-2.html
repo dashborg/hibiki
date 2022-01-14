@@ -1,0 +1,15 @@
+<template hibiki>
+  <hibiki-data>
+    {"numlights": 4, "selected": true, "index": 5, "isprimary": true}
+  </hibiki-data>
+  <div class="box" style="font-weight: *($.selected ? 'bold' : 'normal')">
+    Bold Text (if selected)
+  </div>
+  <div class="box">Index: <h-text bind="$.index + 1"></h-text></div>
+  <div class="box">
+    There are {{$.numlights}} light{{$.numlights > 1 ? 's' : ''}}
+  </div>
+  <div class="box">
+    <button class="button" class.is-primary="*$.isprimary">Primary Button</button>
+  </div>
+</template>

@@ -1,0 +1,64 @@
+<template hibiki>
+  <hibiki-data>
+    {
+      "color": "blue",
+      "index": 1,
+      "points": [[1,1], [2,4], [3,9]],
+      "user": {"first_name": "mike"},
+      "pi": 3.141592
+    }
+  </hibiki-data>
+  <div class="box" style="background-color: *$.color; color: white;">
+    Color is <h-text bind="$.color"></h-text>!
+  </div>
+  <div class="box">
+    Point at index [<h-text bind="$.index"></h-text>] =
+    <h-text bind="$.points[1]" format="json-compact"></h-text>
+  </div>
+  <div class="box">
+    PI (2 decimal places): <h-text bind="$.pi" format="%.2f"></h-text>
+  </div>
+  <div class="box">
+    Undefined paths safely evaluate to <h-text bind="$.no.path[5]"></h-text>.
+  </div>
+</template>
+--------
+<h4 class="title is-4">Binding Data</h4>
+<p>
+  Hibiki HTML applications have a <i>built-in</i> frontend data model
+  (built on top of the excellent <a target="_blank" href="https://mobx.js.org/">MobX</a> library).
+  The easiest way to initialize it is with
+  a JSON object using the <code>&lt;hibiki-data&gt;</code> tag.
+</p>
+<p>
+  You can access the data model to display dynamic text, attributes, and style values, and
+  to evaluate conditionals and loops.
+</p>
+<p class="mb-0">
+  To display text, use the <code>&lt;h-text&gt;</code> tag.  We <i>bind</i> it to the data model using the
+  <i>bind</i> attribute.  The data model root is <code>$</code> and you can access keys with the familar <code>.</code> syntax, and arrays with brackets.  No need for <i>null</i> checks, undefined paths will safely evaluate to null.
+  Here are some examples:
+</p>
+<ul class="monospace example-list">
+  <li>$.color
+  <li>$.values[0]
+  <li>$.user.first_name
+  <li>$.user["first_name"]
+  <li>$.points[$.index][0]
+</ul>
+<p>
+  To set the value of an <b>attribute</b>, or a <b>style property</b> in your HTML
+  to a dynamic value, start the value with <code>*</code>:
+</p>
+<pre class="codeblock">&lt;div title="* $.divtitle" style="background-color: *$.color;">&lt;/div></pre>
+<p>
+  You can format <code>&lt;h-text&gt;</code> values by using the <code>format</code> attribute.  It accepts
+  a <i>printf</i> format specifier or the special keywords "json" and <span style="white-space: nowrap">"json-compact"</span> to output values as JSON.
+</p>
+<p class="mb-0">Examples:</p>
+<ul class="monospace example-list">
+  <li>&lt;h-text bind="$.pi" format="%.2f">&lt;/h-text>
+  <li>&lt;h-text bind="$.points[1]" format="json-compact">&lt;/h-text>
+</ul>
+
+<play-nextprev prev="t-gs" next="t-expr"></play-nextprev>

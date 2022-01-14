@@ -1,0 +1,79 @@
+<template hibiki>
+  <hibiki-data>
+    {"numlights": 4, "selected": true, "index": 5, "isprimary": true}
+  </hibiki-data>
+  <div class="box" style="font-weight: *($.selected ? 'bold' : 'normal')">
+    Bold Text
+  </div>
+  <div class="box">Index: <h-text bind="$.index + 1"></div>
+  <div class="box">
+    There are {{$.numlights}} light{{$.numlights > 1 ? 's' : ''}}
+  </div>
+  <div class="box">
+    <button class="button" class.is-primary="*$.isprimary">Primary Button</button>
+  </div>
+</template>
+--------
+<h4 class="title is-4">Data Expressions</h4>
+<p>
+  When binding data, you can also use simple expressions.  Hibiki HTML supports all of the standard
+  conditional and arithmetic operators:
+  <code>+, -, /, *, %, ==, !=, &gt;, &lt;, &gt;=, &lt;=, !, ||, &&</code>
+</p>
+<p>
+  Hibiki also supports ternary conditionals:
+  <code>(<i>condition</i> ? <i>true-case</i> : <i>false-case</i>)</code>
+</p>
+<p class="mb-0">
+  Here are some examples:
+</p>
+<ul class="monospace example-list">
+  <li>&lt;div style="font-weight: *($.selected ? 'bold' : 'normal')"&gt;
+  <li>&lt;h-text bind="$.index + 1"&gt;
+</ul>
+<p>
+  You can see live examples on the
+  <a target="_blank" href="https://tests.hibikihtml.com/test-basic.html">Basic Test Page</a>.
+  and more information is available in the
+  <a target="_blank" href="https://docs.hibikihtml.com/reference/expressions">Expression Reference</a>.
+</p>
+
+<h6 class="title is-6">Shortcuts</h6>
+<p>
+  Instead of writing out
+  <code>&lt;h-text bind="<i>expr</i>"&gt;&lt;/h-text&gt;</code>
+  you can use <code>{\{ <i>expr</i> }\}</code> with an optional trailing
+  format specification.
+</p>
+<p>
+  Additional classes can be turned on/off using the shorthand attribute syntax
+  (remember to use a <code>*</code> to make it dynamic):<br>
+  <code>&lt;div class.<i>class-name</i>="<i>value</i>"&gt;</code>
+</p>
+<p class="mb-0">Examples:</p>
+<ul class="monospace example-list">
+  <li>There are {\{$.numlights}\} light{\{$.numlights > 1 ? 's' : ''}\}
+  <li>&lt;button class="button" class.is-primary="*$.isprimary"&gt;
+  <li>{\{ $.pi | format("%.2f") }\}
+</ul>
+
+<h6 class="title is-6">Functions</h6>
+<p>
+  For convenience, Hibiki HTML provides a set of functions to help manipulate data
+  in expressions.  The complete list is listed in the
+  <a target="_blank" href="https://tests.hibikihtml.com/test-basic.html">Basic Test Page</a> and in the
+  <a target="_blank" href="https://docs.hibikihtml.com/reference/expressions/#functions">Function Reference</a>.
+</p>
+<p>
+  Functions all start with "fn:" and are not case sensitive.  Here are some examples:
+</p>
+<pre class="codeblock">
+  fn:max($.num, 10);
+  fn:slice($.arr, 0, 5);
+  fn:int($.form.strval);
+  fn:split($.str, ",");
+  fn:json($.form);
+  fn:jsonparse('{"x": 5}');
+</pre>
+
+<play-nextprev prev="t-binding" next="t-handlers"></play-nextprev>

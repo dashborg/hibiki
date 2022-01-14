@@ -1,0 +1,86 @@
+<template hibiki>
+  <define-handler name="//@event/init">
+    $.color = "blue";
+  </define-handler>
+  <define-handler name="//@local/set-green">
+    $.color = "green";
+  </define-handler>
+  <define-handler name="//@local/set-any-color">
+    $.color = @data.color;
+  </define-handler>
+  <div class="box">
+    <button class="button" click.handler="$.color = 'red'">Set Red</button>
+    <button class="button" click.handler="//@local/set-green()">Set Green</button>
+    <button class="button"
+            click.handler="//@local/set-any-color(color='black')">
+      Set Black
+    </button>
+  </div>
+  <div class="box has-text-weight-bold"
+       style="background-color: *$.color; color: white;">
+    Color is {{ $.color }}!
+  </div>
+</template>
+--------
+<h4 class="title is-4">Local Handlers</h4>
+<p>
+  Writing handlers inline can be cumbersome, so Hibiki HTML lets you define local handlers
+  using <code>&lt;define-handler&gt;</code>.  These definitions must be placed at the top-level
+  of your template.  Any parameters
+  passed will be available as the local variable <code>@data</code>.
+</p>
+<p>
+  Here's an example of a handler that just sets <code>$.color</code> to its parameter <i>color</i>.
+</p>
+<pre class="codeblock">
+  &lt;define-handler name="//@local/set-any-color">
+    $.color = @data.color;
+  &lt;/define-handler>
+
+  // call it in a click handler using it's name
+  click.handler="//@local/set-any-color(color='black');"
+</pre>
+
+<h6 class="title is-6">Module URLs</h6>
+<p>
+  Local handlers use a special type of URL that starts with <code>//@local/</code>.
+  This is called a <i>module URL</i> (for the module <i>local</i>).
+  In general, module URLs look like: <code>//@[module-name]/...</code>.
+</p>
+<p>
+  All handlers are run through the Hibiki HTML module system.  The remote URLs that you
+  used in the previous section were actually handled by the built in <i>http</i> module.
+  Hibiki HTML supports a number of built-in modules that provide special functionality,
+  and allows advanced implementations to
+  provide their own.  Modules are very powerful, but for local handlers, it is only
+  important that their names must start with <code>//@local/</code>.
+</p>
+
+<h6 class="title is-6">Event Handlers</h6>
+<p>
+  You may also define <i>event handlers</i> at the top-level of your Hibiki HTML app.  They
+  look like local handlers, except they use the module <i>event</i>.  You can use them
+  to write custom error handlers and respond to custom events.
+</p>
+<p>
+  The most common event handler is for <i>init</i>.  This lets your app initialize itself
+  before it is displayed.  You can use the <i>init handler</i> to set up local data,
+  or make a remote call to initialize itself.  Because remote handlers can return data
+  <i>and</i> HTML, you can specify a complete app by just writing an init handler!
+</p>
+<pre class="codeblock">
+  &lt;define-handler name="//@event/init">
+    $.color = 'blue';
+    $.remotedata = GET /api/initial-app-data(user=$state.urlparams.userid);
+  &lt;/define-handler>
+
+  &lt;define-handler name="//@event/init">
+    GET /api/setup-app(page='homepage');
+  &lt;/define-handler>
+</pre>
+<p>
+  In this example, we removed the &lt;hibiki-data&gt; tag and replaced it with an <i>init handler</i>.
+  We've also defined some local handlers to hook up to our color buttons.
+</p>
+
+<play-nextprev prev="t-remote-handlers" next="t-remote-actions"></play-nextprev>

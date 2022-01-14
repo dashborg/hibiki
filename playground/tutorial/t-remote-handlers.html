@@ -1,0 +1,102 @@
+<template hibiki>
+  <hibiki-data>
+    {"color": "blue"}
+  </hibiki-data>
+  <div class="box">
+    <button class="button" click.handler="@rtn = GET https://testapi.hibikihtml.com/api/get-color-1; $.color = @rtn.color;">
+      Get Remote Color
+    </button>
+    <button class="button" click.handler="$.img = GET http://testapi.hibikihtml.com/api/ck-image">Get Image BLOB</button>
+  </div>
+  <div class="box has-text-weight-bold"
+       style="background-color: *$.color; color: white;">
+    Color is {{ $.color }}!
+  </div>
+  <div class="box">
+    Image: {{ $.img }}
+    <span if="$.img">| <a download="img.jpg" href="*$.img">Download</a></span>
+    <br>
+    <img if="$.img" style="width: 300px;" src="*$.img">
+  </div>
+</template>
+--------
+<h4 class="title is-4">Remote Handlers</h4>
+<p>
+  Calling backend REST APIs is easy.  To specify a remote call use one of the HTTP verbs
+  (GET, POST, PUT, PATCH, or DELETE) followed by the URL to access (relative or absolute).
+</p>
+<pre class="codeblock">
+  // simple GET
+  GET /api/test-1
+  
+  // a relative URL
+  GET relative/url.html?test=1
+  
+  // POST to a remote resource
+  POST https://remoteserver.any.com/api/test-post
+  
+  // 'GET' can be omitted for URLs that start with http, https, or //
+  https://testapi.hibikihtml.com/api/random-number
+</pre>
+<p>
+  To add programatic parameters, add parentheses immediately after the URL and specify
+  comma separated <code>key=[value]</code> pairs.  Programatic parameters override
+  any parameters in the URL.
+</p>
+<pre class="codeblock">
+  GET /api/test-1?y=22(x=55)
+  POST /api/test-post(user={id: 55, name: 'mike'}, access_code='A55', @enc='www')
+</pre>
+
+<div class="box has-background-info-light">
+<h6 class="title is-6">Parameter Encodings</h6>
+<p>
+  Objects will
+  be automatically converted to JSON.  GET and DELETE requests will marshal parameters
+  to a query string, POST, PUT, and PATCH requests will marshal their parameters
+  to a JSON body by default (Content-Type of <i>application/json</i>).
+</p>
+<p>
+  Hibiki HTML also supports
+  marshaling parameters as <i>application/x-www-form-urlencoded</i>
+  and <i>multipart/form-data</i> by settng <code>@enc='url'</code> or
+  <code>@enc='multipart'</code> respectively.  <i>HibikiBlob</i>s can be passed
+  to a backend server either via JSON or multipart encoding.
+</p>
+</div>
+
+<h6 class="title is-6">Remote Responses</h6>
+<p>
+  If the remote call returns Content-Type 'application/json', it is automatically
+  unmarshaled and useable.  You can assign the remote handler call to a
+  local (<code>@var</code>) or global (<code>$.var</code>) variable:<br>
+  <code>$.result = GET /handler(x=55);</code>
+</p>
+<p>
+  If the remote call returns a different content type (e.g. an image, csv,
+  binary data, etc.), it will be converted to a <i>HibikiBlob</i> and can also
+  be assigned to a variable: <code>$.img = GET /images/ck1.jpg</code>.
+  Blobs have many uses, but can be easily assigned to &lt;img&gt; or &lt;video&gt; tags
+  to display or &lt;a&gt; tags for downloading:
+</p>
+<pre class="codeblock">
+  &lt;img src="*$.img"&gt;
+  &lt;a download="mycsv.csv" href="*$.csvblob"&gt;Download&lt;/a&gt;
+</pre>
+<p>
+  You can see a remote call for JSON data, and for an image BLOB in the example by clicking
+  the buttons.  In this example /api/get-color-1 returns the JSON body:
+  <br>
+  <code>{"color": "purple"}</code>
+</p>
+
+<div class="box has-background-info-light">
+  <h6 class="title is-6">CORS and CSRF</h6>
+  <p>
+    Hibiki HTML fully supports CORS requests and multiple ways of automatically specifying CSRF parameters/headers.
+    It isn't covered in the tutorial because it is specific to your backend.  If you need help with
+    CORS or CSRF setup, feel free to reach out for help.
+  </p>
+</div>
+
+<play-nextprev prev="t-handlers" next="t-local-handlers"></play-nextprev>

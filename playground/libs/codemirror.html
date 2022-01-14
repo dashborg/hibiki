@@ -1,0 +1,76 @@
+<define-library name="@hibiki/codemirror">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.64.0/codemirror.min.js" integrity="sha512-4DlmQ+aBOfYTZ3uzRKCDXdyL7y8IlopnVChhXG0pRFgyvhwONVQW3JX8e5DYoXUNr3evQpLZz7S3O1XxMH4WKA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.64.0/codemirror.min.css"></link>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.64.0/mode/xml/xml.min.js" integrity="sha512-UWfBe6aiZInvbBlm91IURVHHTwigTPtM3M4B73a8AykmxhDWq4EC/V2rgUNiLgmd/i0y0KWHolqmVQyJ35JsNA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.64.0/mode/javascript/javascript.min.js" integrity="sha512-DJ/Flq7rxJDDhgkO49H/rmidX44jmxWot/ku3c+XXEF9XFal78KIpu7w6jEaQhK4jli1U3/yOH+Rp3cIIEYFPQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.64.0/mode/css/css.min.js" integrity="sha512-5jz5G7Fn6Xbc3YA/5KYXYwxSkyKEh7oEFNwc7cCnMs48diTBh24gKxcbt7r8Do+xFK6pJgr+BFfcKnUne+XUvA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.64.0/mode/htmlmixed/htmlmixed.min.js" integrity="sha512-IC+qg9ITjo2CLFOTQcO6fBbvisTeJmiT5D5FnXsCptqY8t7/UxWhOorn2X+GHkoD1FNkyfnMJujt5PcB7qutyA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script>
+    function handleControlEnter(state, uuid, cm) {
+        let actions = [];
+        let text = cm.getValue();
+        actions.push({actiontype: "fireevent", event: "change", nodeuuid: uuid, data: {value: text}});
+        state.executeHandlerBlock({hibikiactions: actions});
+    }
+    
+    function mountCM(req) {
+        let uuid = req.data.id;
+        let text = req.data.text ?? "";
+        let textarea = document.getElementById("editor-textarea-" + uuid);
+        let state = req.state;
+        let cm = CodeMirror.fromTextArea(textarea, {
+            lineNumbers: true,
+            mode: "htmlmixed",
+            lineWrapping: true,
+            extraKeys: {
+                'Ctrl-Enter': (cm) => handleControlEnter(state, uuid, cm),
+                'Cmd-Enter': (cm) => handleControlEnter(state, uuid, cm),
+            },
+        });
+        cm.setValue(text);
+        window.globalCodeMirror = cm;
+    }
+
+    function getCMText(req) {
+        return window.globalCodeMirror.getValue();
+    }
+
+    function setCMText(req) {
+        let text = req.data.text ?? "";
+        return window.globalCodeMirror.setValue(text);
+    }
+
+    function cmCallbackFn(state, clib) {
+        clib.registerLocalJSHandler("@hibiki/codemirror", "/mountCM", mountCM);
+        clib.registerLocalJSHandler("@hibiki/codemirror", "/getCMText", getCMText);
+        clib.registerLocalJSHandler("@hibiki/codemirror", "/setCMText", setCMText);
+    }
+
+    window.Hibiki.addLibraryCallback("@hibiki/codemirror", cmCallbackFn);
+  </script>
+  
+  <define-component name="editor">
+    <div class="* 'fontsize-' + ($c.fontsize + 3)" class.fontsizer>
+      <textarea mount.handler="//@lib/mountCM(id=$c._hibiki.uuid, text=$args.initialtext)" class="editor" id="*'editor-textarea-' + $c._hibiki.uuid"></textarea>
+    </div>
+    <div class="columns mb-0 pb-2">
+      <div class="column pb-0" style="margin-left: 29px;">
+        <button click.handler="$c.fontsize = fn:min($c.fontsize+1, 2);" class="button is-small">
+          <span class="icon is-small">
+            <i class="fa fa-plus"></i>
+          </span>
+        </button>
+        <button click.handler="$c.fontsize = fn:max($c.fontsize-1, -3);" class="button is-small">
+          <span class="icon is-small">
+            <i class="fa fa-minus"></i>
+          </span>
+        </button>
+      </div>
+      <div class="column pb-0"></div>
+      <div class="column is-flex-grow-0 pb-0" style="flex-basis: content;">
+        <button click.handler="@text = //@lib/getCMText(id=$c._hibiki.uuid); fire->change(@text)" class="button is-primary pl-5 pr-5 mr-2" style="font-weight: bold;">Submit (Ctrl-Enter)</button>
+        <div style="width:12px;"></div>
+      </div>
+    </div>
+  </define-component>
+</define-library>

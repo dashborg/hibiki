@@ -1,0 +1,38 @@
+<define-library name="tutorial/d3">
+  <script src="https://d3js.org/d3.v6.min.js"></script>
+  <script>
+    (function() {
+        let renderScatter = function(req) {
+            let data = req.data.data || [];
+            console.log("RENDER SCATTER-PLOT", req.libContext, data);
+            document.querySelector("#scatter-plot").innerHTML = "";
+            let height = 500;
+            let width = 500;
+            let margin = 30;
+            let svg = d3.select(document.querySelector("#scatter-plot"));
+            svg = svg.append("g").attr("transform", "translate(" + margin + "," + margin + ")");
+            let xaxis = d3.scaleLinear().domain([0, 50]).range([0, width]);
+            svg.append("g").attr("transform", "translate(0, " + height + ")").call(d3.axisBottom(xaxis));
+            let yaxis = d3.scaleLinear().domain([50, 0]).range([0, height]);
+            svg.append("g").call(d3.axisLeft(yaxis));
+            svg.append("g").selectAll("circle").data(data).enter().append("circle")
+                .attr("cx", (d) => xaxis(d.x))
+                .attr("cy", (d) => yaxis(d.y))
+                .attr("r", (d) => Math.sqrt(d.val)*2)
+                .style("fill", (d) => d.color);
+            req.setData("$.v", 25);
+            return "hello";
+        }
+        
+        let runCallback = function(state, clib) {
+            clib.registerLocalJSHandler("tutorial/d3", "/render", renderScatter);
+        }
+        
+        window.Hibiki.addLibraryCallback("tutorial/d3", runCallback);
+    })();
+  </script>
+
+  <define-component name="scatter-plot" args="data">
+    <svg style="width: 560px; height: 560px;" id="scatter-plot"></svg>
+  </define-component>
+</define-library>

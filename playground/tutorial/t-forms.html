@@ -1,0 +1,199 @@
+<template hibiki>
+  <hibiki-data>{"color": "blue"}</hibiki-data>
+  <div class="box">
+    <div class="control mb-3">
+      <input class="input" type="text" placeholder="Color" value.bindpath="$.color">
+    </div>
+    <div class="control mb-3">
+      <div class="select">
+        <select value.bindpath="$.color">
+          <option value>(Set Color)</option>
+          <option value="red">Red</option>
+          <option value="green">Green</option>
+          <option value="blue">Blue</option>
+          <option value="purple">Purple</option>
+        </select>
+      </div>
+    </div>
+    <div class="control mb-3">
+      <label class="radio">
+        <input type="radio" name="color" value="red" formvalue.bindpath="$.color">
+        Red
+      </label>
+      <label class="radio">
+        <input type="radio" name="color" value="green" formvalue.bindpath="$.color">
+        Green
+      </label>
+      <label class="radio">
+        <input type="radio" name="color" value="blue" formvalue.bindpath="$.color">
+        Blue
+      </label>
+      <label class="checkbox ml-5">
+        <!-- this checkbox is using 1-way data-binding -->
+        <input type="checkbox" value="purple"
+               bound checked="* $.color == 'purple'"
+               change.handler="if (@value) { $.color = 'purple'; } else { $.color = ''; }">
+        Is Purple (1-way binding)
+      </label>
+    </div>
+    <div class="box has-text-weight-bold"
+         style="background-color: *($.color == '' ? 'black' : $.color); color: white;">
+      Color is {{ ($.color == '' ? '(not set)' : $.color) }}!
+    </div>
+  </div>
+  <div class="box">
+    Checkbox example: {{ $.checktest | format("json") }}
+    <br>
+    <label class="checkbox">
+      <input type="checkbox" name="test" value="first" formvalue.bindpath="$.checktest">
+      First
+    </label>
+    <label class="checkbox">
+      <input type="checkbox" name="test" value="second" formvalue.bindpath="$.checktest">
+      Second
+    </label>
+    <label class="checkbox">
+      <input type="checkbox" name="test" value="third" formvalue.bindpath="$.checktest">
+      Third
+    </label>
+  </div>
+  <div class="box">
+    File Input Example (creates a BLOB).  Try uploading an image, and it will display inline.
+    <br>
+    <input type="file" value.bindpath="$.file">
+    <br>
+    $.file = {{ $.file }}
+    <br>
+    <img if="$.file" style="width: 200px" src="*$.file">
+  </div>
+</template>
+--------
+<h4 class="title is-4">Forms</h4>
+<p>
+  Hibiki HTML supports 2-way and 1-way data-binding for form controls (both
+  can be useful depending on your application).
+</p>
+<div class="box has-background-info-light">
+<p>
+  <b>2-way</b> data-binding works by <i>binding a path</i> in the data model
+  to the form control.  That path and the form control are kept in sync.
+  They both get updated by either:
+  (1) user input updating the form control, or
+  (2) your handlers updating the data model path.
+</p>
+<p>
+  <b>1-way</b> data-binding works by <i>binding a value</i> computed from
+  the data model to the form control.  The form control is updated
+  whenever the value is changed.  User input does <i>not</i> update the value,
+  instead it fires <i>change events</i> which may update the value (or not).
+</p>
+</div>
+<p>
+  All controls also fire
+  a <i>change</i> event when a user changes the state of a control (typing, selecting, clicking, etc.).
+  A <i>change</i> event is fired before 2-way binding data is updated and
+  an <i>afterchange</i> event is fired after after 2-way binding data is updated.  In your change
+  events, the local variable
+  <code>@value</code> will be set to the new value of the control.  More detailed
+  information is available in the
+  <a target="_blank" href="https://docs.hibikihtml.com/reference/input-controls/">Input Controls Reference</a>.
+</p>
+
+<div class="box has-background-warning-light">
+<p>
+  By default, if you add no special attributes to your controls, they will not
+  be managed by Hibiki HTML and will function like regular HTML controls and can
+  be hooked up to &lt;form&gt; elements as usual.
+</p>
+</div>
+
+<h6 class="title is-6">Text Inputs</h6>
+<p>
+  Here's an example of a 2-way controlled text input.  Instead of specifying
+  a normal <i>value</i> attribute, we'll use <i>value.bindpath</i>.  Bindpath
+  attributes must be a <i>path</i> into the global data model.  The value of the
+  control is <i>read</i> from the path, and as the user types into the control
+  the value is <i>written</i> in real-time.
+</p>
+<pre class="codeblock">
+&lt;input class="input" type="text" value.bindpath="$.color">
+</pre>
+<h6 class="title is-6">Selects</h6>
+<p>
+  The &lt;select&gt; control works the same way.  The select's <i>value.bindpath</i> is set
+  to the option's <i>value</i> when it is selected.  And if the bindpath changes, the appropriate
+  option becomes selected.
+</p>
+<pre class="codeblock">
+&lt;select value.bindpath="$.color">
+  &lt;option value>(Set Color)</option>
+  &lt;option value="red">Red</option>
+  &lt;option value="green">Green</option>
+  &lt;option value="blue">Blue</option>
+  &lt;option value="purple">Purple</option>
+&lt;/select>
+</pre>
+
+<h6 class="title is-6">Radio Buttons</h6>
+<p>
+  Radio buttons use the attribute <i>formvalue.bindpath</i> to create two-way data-binding.
+  When a radio button becomes selected, it will set its <i>value</i> to the bindpath.
+  <i>Radio groups</i> (buttons in the same form with the same name)
+  can be controled by setting each radio button's bindpath to the same path.
+</p>
+<pre class="codeblock">
+&lt;input type="radio" name="color" value="red" formvalue.bindpath="$.color">
+</pre>
+
+<h6 class="title is-6">Checkboxes</h6>
+<p>
+  For 2-way control, checkboxes also use <i>formvalue.bindpath</i>.  Unlike radio buttons,
+  multiple checkboxes can be checked in <i>checkbox group</i> (buttons in the same
+  form with the same name).  So the bindpath will be set to an <i>array</i> of strings
+  with the <i>value</i> of each checked checkbox in the group.  To get the correct behavior,
+  each checkbox in the group should set it's bndpath to the same path.
+</p>
+<pre class="codeblock">
+&lt;input type="checkbox" name="test" value="red" formvalue.bindpath="$.checktest">
+</pre>
+
+<h6 class="title is-6">File Inputs</h6>
+<p>
+  File inputs create BLOB objects with the uploaded file.  After the user uploads their file
+  the bindpath will be set to a BLOB representing the file.  These BLOBs can be displayed inline
+  like we saw in the "Remote Handlers" section, and can also be passed as parameters to backend
+  handlers.  Note that to upload BLOB content, you should use POST, and an encoding type of "multipart".
+</p>
+<pre class="codeblock">
+&lt;input type="file" value.bindpath="$.file">
+</pre>
+
+<div class="box has-background-info-light">
+<h6 class="title is-6">1-Way Data-Binding (Advanced)</h6>
+<p>
+  The "Is Purple" checkbox in the playground code shows an example of 1-way data-binding.
+  To enable 1-way binding, you must add the attribute <code>bound</code>.  When a control
+  is bound, its <i>value</i> (or <i>checked</i>) attribute is locked to the value
+  provided by the Hibiki HTML template.  This means even if you type into the input, or click
+  on a checkbox it will not change (unless the underlying data changes).
+</p>
+<p>
+  When bound, if the user changes the state of the control (by typing or clicking)
+  it will fire a <i>change</i> event with <code>@value</code> set to thew new value
+  (or true/false for a radio button or checkbox).  The handler is responsible for
+  updating the data-model (or not).
+</p>
+<pre class="codeblock">
+&lt;input type="checkbox" value="purple"
+  bound checked="* $.color == 'purple'"
+  change.handler="if (@value) { $.color = 'purple'; } else { $.color = ''; }">
+</pre>
+<p>
+  Here the <i>checked</i> attribute is locked to the expression
+  <code>$.color == "purple"</code>.  You'll see the checkbox become checked if purple
+  is selected.  Then we add a change handler to force the color to be purple if we
+  check the box (<code>@value</code> is true), or clear out the color if unchecked.
+</p>
+</div>
+
+<play-nextprev prev="t-remote-actions" next="t-components"></play-nextprev>

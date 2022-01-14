@@ -1,0 +1,87 @@
+<template hibiki>
+  <hibiki-data>
+    {"color": "blue"}
+  </hibiki-data>
+  <define-handler name="//@local/set-any-color">
+    $.color = @data.color;
+  </define-handler>
+  <div class="box">
+    <button class="button" click.handler="$.color = 'red'">Set Red</button>
+    <button class="button"
+            click.handler="GET https://testapi.hibikihtml.com/api/set-color-action">
+      Simple Remote Action
+    </button>
+    <button class="button"
+            click.handler="GET https://testapi.hibikihtml.com/api/callhandler-action">
+      CallHandler Action
+    </button>
+  </div>
+  <div class="box has-text-weight-bold"
+       style="background-color: *$.color; color: white;">
+    Color is {{ $.color }}!
+  </div>
+</template>
+--------
+<h4 class="title is-4">Actions</h4>
+<p>
+  Actions are what sets Hibiki HTML apart from other frameworks.  They allow backend
+  handlers to return JSON that can script and control the frontend.  Actions can
+  set data, fire events, call other handlers, and update the HTML template.
+</p>
+<div class="box has-background-warning-light">
+<p>
+  Note that allowing an untrusted API to execute actions could be a security risk.
+  Any handler call can disable unsafe actions by setting the special parameter
+  <code>@pure=true</code>.
+</p>
+</div>
+<p>
+  To return actions, your backend handler must return a specially formatted JSON response.
+  It must be an object with the top-level key <i>hibikiactions</i>.  The simplest,
+  and most useful action
+  is <i>setdata</i>.  Here's some example JSON that sets the path <code>$.color</code>
+  to "DeepSkyBlue":
+</p>
+<pre class="codeblock">
+{"hibikiactions": [
+    {"actiontype": "setdata", "setpath": "$.color", "data": "DeepSkyBlue"}
+]}
+</pre>
+<p>
+  The test URL
+  <a target="_blank" href="https://testapi.hibikihtml.com/api/set-color-action">https://testapi.hibikihtml.com/api/set-color-action</a>
+  has been set up to return that exact payload.  We hook it up to our button using a
+  regular click handler and a remote call
+</p>
+<pre class="codeblock">
+&lt;button class="button" click.handler="GET https://testapi.hibikihtml.com/api/set-color-action">
+</pre>
+<p>
+  You can click the "Remote Action" button to see this in action.
+</p>
+
+<h6 class="title is-6">Advanced: Actions Calling Handlers</h6>
+<p>
+  Every statement that you can write in an <i>inline handler</i> has an equivalent JSON representation.
+  You can find more information about actions in the
+  <a target="_blank" href="https://docs.hibikihtml.com/reference/actions">Action Reference</a>.
+</p>
+<p>
+  This example shows a remote handler returning an action that calls a <i>local handler</i>.
+  It provides the callpath and the parameters to pass to the local handler.
+  (<a target="_blank" href="https://testapi.hibikihtml.com/api/callhandler-action">https://testapi.hibikihtml.com/api/callhandler-action</a>).
+</p>
+<pre class="codeblock">
+{"hibikiactions": [
+    {"actiontype": "callhandler", "callpath": "//@local/set-any-color", "data": {"color": "Teal"}}
+]}
+</pre>
+<p>
+  This is 100% equivalent to an inline handler calling:
+</p>
+<pre class="codeblock">
+  //@local/set-any-color(color='Teal')
+</pre>
+  
+
+<play-nextprev prev="t-local-handlers" next="t-forms"></play-nextprev>

@@ -1,0 +1,11 @@
+<template hibiki>
+  <define-component name="colorbox">
+    <div class="box" style="background-color: *$args.color; color: white">
+      The color is {{$args.color}}
+    </div>
+  </define-component>
+  
+  <local-colorbox color="green"></local-colorbox>
+  <local-colorbox color="blue"></local-colorbox>
+  <local-colorbox color="purple"></local-colorbox>
+</template>

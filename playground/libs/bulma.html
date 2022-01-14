@@ -1,0 +1,26 @@
+<define-library name="tutorial/bulma">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.3/css/bulma.min.css">
+  
+  <define-component name="emailinput">
+    <div class="control has-icons-left has-icons-right">
+      <input class="input is-medium" automerge="@all|!placeholder" type="email" placeholder="Email" change.handler="fire->change(value=@value)">
+      <span class="icon is-left">
+        <i class="fa fa-envelope"></i>
+      </span>
+    </div>
+  </define-component>
+
+  <define-component name="checkbox">
+    <label class="checkbox">
+      <input type="checkbox" automerge change.handler="fire->change(@value)">
+      <h-children bind="@children.all"></h-children>
+    </label>
+  </define-component>
+
+  <define-component name="colorbox">
+    <div class="box has-text-weight-bold"
+         style="background-color: *($args.color == '' ? 'black' : $args.color); color: white;">
+      Color is {{ ($args.color == '' ? '(not set)' : $args.color) }}!
+    </div>
+  </define-component>
+</define-library>

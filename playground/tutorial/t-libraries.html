@@ -1,0 +1,91 @@
+<template hibiki>
+  <import-library src="/libs/bulma.html" prefix="my"></import-library>
+  <my-colorbox color="blue"></my-colorbox>
+  <div class="box">
+    <my-emailinput placeholder="Your Email" value.bindpath="$.email" style="color: red;"></my-emailinput>
+    <br>
+    Email value is "{{ $.email }}"
+  </div>
+</template>
+--------
+<h4 class="title is-4">Libraries</h4>
+<p>
+  Libraries allow you to bundle a group of components and handlers into a package that
+  can be imported into any Hibiki HTML app.  Libraries are just HTML files
+  with a top level tag of &lt;define-library&gt;.
+</p>
+<p>
+  To import a library you use the &lt;import-library&gt; tag.  Provide the URL as the <i>src</i>
+  attribute, and then a library <i>prefix</i>.  The prefix is like a namespace for the imported
+  components.  If a library exports a component named "button" and you provide a prefix of "my",
+  then to use the component you'd use the tag &lt;my-button&gt;.  Any handlers that the library
+  exports will be available using the "lib-my" module, e.g. "//@lib-my/[handler-name]".
+</p>
+<pre class="codeblock">
+&lt;import-library src="/my/library/url.html" prefix="my"&gt;&lt;/import-library>
+</pre>
+<div class="box has-background-info-light">
+  <p>
+    When you declare a local handler using &lt;define-handler&gt; or a local component
+    using &lt;define-component&gt; they are automatically added to the special
+    "local" library that is imported with the "local" prefix.  That's why you must
+    prefix your components with "local-" when you use them.
+    <code>//@local</code> is an alias for <code>//@lib-local</code>.
+  </p>
+</div>
+<div class="box has-background-warning-light">
+  <p>
+    Because libraries can include additional JavaScript and CSS, for security reasons you should
+    take the same care when importing a Hibiki HTML library that you do when importing
+    a 3rd party &lt;script&gt; tag.
+  </p>
+</div>
+
+<h6 class="title is-6">Defining a Library</h6>
+<p>
+  A library is defined with a top-level tag of &lt;define-library&gt;.  It includes:
+</p>
+<ul>
+  <li>A set of &lt;define-component&gt; tags for exported components
+  <li>&lt;script&gt; tags to be included when importing the library
+  <li>&lt;link rel="stylesheet"&gt; tags for additional CSS files to be included when importing the library
+  <li>An initialization function to be run when the library is loaded
+  <li>Local handlers to be made available to the importing code
+  <li>Custom JavaScript components including native Hibiki or ReactJS components
+</ul>
+<p>
+  Here's an example of a very simple library that defines two components, and includes a stylesheet.
+  It is hosted at
+  <a target="_blank" href="https://playground.hibikihtml.com/libs/bulma.html">https://playground.hibikihtml.com/libs/bulma.html</a> (you'll have to view source).  Note: this library uses <i>automerge</i> to allow customization
+  of the emailinput control.
+</p>
+<pre class="codeblock">
+&lt;define-library name="tutorial/bulma">
+  &lt;link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.3/css/bulma.min.css">
+  
+  &lt;define-component name="emailinput">
+    &lt;div class="control has-icons-left has-icons-right">
+      &lt;input class="input is-medium" automerge="@all|!placeholder" type="email" placeholder="Email" change.handler="fire->change(value=@value)">
+      &lt;span class="icon is-left">
+        &lt;i class="fa fa-envelope">&lt;/i>
+      &lt;/span>
+    &lt;/div>
+  &lt;/define-component>
+
+  &lt;define-component name="checkbox">
+    &lt;label class="checkbox">
+      &lt;input type="checkbox" automerge change.handler="fire->change(@value)">
+      &lt;h-children bind="@children.all">&lt;/h-children>
+    &lt;/label>
+  &lt;/define-component>
+
+  &lt;define-component name="colorbox">
+    &lt;div class="box has-text-weight-bold"
+         style="background-color: *($args.color == '' ? 'black' : $args.color); color: white;">
+      Color is {{ ($args.color == '' ? '(not set)' : $args.color) }}!
+    &lt;/div>
+  &lt;/define-component>
+&lt;/define-library>
+</pre>
+
+<play-nextprev prev="t-components" next="t-wrapup"></play-nextprev>
