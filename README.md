@@ -253,7 +253,7 @@ to offer a proprietary license that satisfies your legal department.
 ## Credits
 
 Hibiki HTML is an open source version of the frontend language originally built and designed for
-the [Dashborg](https://dashborg.net) internal tools framework.  Hibiki HTML core is built in [TypeScript](https://www.typescriptlang.org/), using
+the [Dashborg](https://dashborg.net) internal tools framework.  The Hibiki HTML core is built in [TypeScript](https://www.typescriptlang.org/), using
 [React](https://reactjs.org/), [MobX](https://mobx.js.org/), and [Nearley](https://nearley.js.org/). 
 The Hibiki HTML playground is built in Hibiki HTML, also using 
 [CodeMirror](https://codemirror.net/) and [Bulma](https://bulma.io).

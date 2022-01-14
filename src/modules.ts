@@ -484,9 +484,22 @@ class HibikiModule {
         else if (handlerName == "/update-url") {
             return this.updateUrl(req);
         }
+        else if (handlerName == "/sleep") {
+            return this.sleep(req);
+        }
         else {
             throw new Error("Invalid Hibiki Module handler: " + fullPath(req.callpath));
         }
+    }
+
+    sleep(req : HibikiRequest) : Promise<any> {
+        let sleepMs = unpackArg(req.data, "ms", 0);
+        if (sleepMs == null || typeof(sleepMs) !== "number") {
+            throw new Error("sleep requires 'ms' parameter (must be number)");
+        }
+        return new Promise((resolve, reject) => {
+            setTimeout(() => resolve(true), sleepMs);
+        });
     }
 
     getSS(req : HibikiRequest) : Promise<any> {
