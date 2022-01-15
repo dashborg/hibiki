@@ -64,7 +64,7 @@ class HibikiRootNode extends React.Component<{hibikiState : HibikiExtState}, {}>
         if (dbstate.allowUsageImg() && !usageFired) {
             usageFired = true;
             let usageImg = new Image();
-            usageImg.src = "https://static.dashborg.net/static/hibiki-usage.gif";
+            usageImg.src = "https://hibikihtml.com/hibiki-usage.gif";
             usageImg.onload = function() {};
         }
         if (dbstate.allowWelcomeMessage() && !welcomeMessage) {
