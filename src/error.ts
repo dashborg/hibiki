@@ -1,5 +1,6 @@
 // Copyright 2021-2022 Dashborg Inc
 
+import {v4 as uuidv4} from 'uuid';
 import type {DataEnvironment} from "./state";
 import {sprintf} from "sprintf-js";
 import type {HibikiNode} from "./types";
@@ -25,10 +26,12 @@ function rtItemAsString(rtci : RtContextItem) : string {
 }
 
 class RtContext {
+    rtid : string;
     actionCounter : number;
     stack : RtContextItem[];
 
     constructor() {
+        this.rtid = uuidv4();
         this.actionCounter = 0;
         this.stack = [];
     }

@@ -1,9 +1,11 @@
 // Copyright 2021-2022 Dashborg Inc
 
+import {v4 as uuidv4} from 'uuid';
 import type {RtContext} from "./error";
 import type {HibikiAction, HibikiExtState, HandlerPathType} from "./types";
 
 class HibikiRequest {
+    reqid : string;
     callpath : HandlerPathType;
     data : Record<string, any>;
     rtContext : RtContext;
@@ -13,6 +15,7 @@ class HibikiRequest {
     libContext : string;
 
     constructor(state : HibikiExtState) {
+        this.reqid = uuidv4();
         this.state = state;
         this.actions = [];
     }
