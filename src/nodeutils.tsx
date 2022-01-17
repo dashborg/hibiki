@@ -207,6 +207,7 @@ function makeChildrenVar(dataenv : DataEnvironment, node : HibikiNode) : any {
     rtn.all = node.list;
     rtn.bytag = {};
     rtn.byslot = {};
+    rtn.noslot = [];
     for (let i=0; i<node.list.length; i++) {
         let n = node.list[i];
         let tagname = n.tag;
@@ -220,6 +221,9 @@ function makeChildrenVar(dataenv : DataEnvironment, node : HibikiNode) : any {
                 rtn.byslot[slotname] = [];
             }
             rtn.byslot[slotname].push(n);
+        }
+        else {
+            rtn.noslot.push(n);
         }
     }
     return rtn;

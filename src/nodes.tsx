@@ -678,7 +678,7 @@ class CustomNode extends React.Component<HibikiReactProps & {component : Compone
         let specials : Record<string, any> = {};
         specials.children = childrenVar;
         specials.node = nodeVar;
-        let argsRoot = ctx.resolveArgsRoot();
+        let argsRoot = ctx.resolveArgsRoot(implNode);
         let handlers = NodeUtils.makeHandlers(implNode, component.libName, ["event"]);
         let envOpts = {
             componentRoot: unbox(ctx.getNodeData(componentName)),
@@ -884,6 +884,10 @@ class WithContextNode extends React.Component<HibikiReactProps, {}> {
 class ChildrenNode extends React.Component<HibikiReactProps, {}> {
     render() {
         let ctx = new DBCtx(this);
+        let textStr = ctx.resolveAttrStr("text");
+        if (textStr != null) {
+            return textStr;
+        }
         let children = ctx.resolveAttrVal("bind");
         if (children == null) {
             if (ctx.node.list == null) {

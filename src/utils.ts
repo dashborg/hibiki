@@ -630,6 +630,17 @@ function unbox(data : any) : any {
     return data;
 }
 
+function splitTrim(s : string, splitStr : string) : string[] {
+    if (s == null || s == "") {
+        return [];
+    }
+    let parts = s.split(splitStr);
+    for (let i=0; i<parts.length; i++) {
+        parts[i] = parts[i].trim();
+    }
+    return parts;
+}
+
 const STYLE_UNITLESS_NUMBER = { // from react
     "animation-iteration-count": true,
     "border-image-outset": true,
@@ -692,5 +703,5 @@ const STYLE_KEY_MAP = {
     "fullcenter": {flex: true},
 };
 
-export {jsonRespHandler, parseUrlParams, valToString, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, makeUrlParamsFromObject, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs, blobPrintStr, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy, valInArray, rawAttrFromNode, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP, subMapKey, subArrayIndex, unbox};
+export {jsonRespHandler, parseUrlParams, valToString, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, makeUrlParamsFromObject, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs, blobPrintStr, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy, valInArray, rawAttrFromNode, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP, subMapKey, subArrayIndex, unbox, splitTrim};
 

@@ -6,7 +6,7 @@ import {DataEnvironment} from "./state";
 import {sprintf} from "sprintf-js";
 import {parseHtml} from "./html-parser";
 import {RtContext, getShortEMsg, HibikiError} from "./error";
-import {makeUrlParamsFromObject, SYM_PROXY, SYM_FLATTEN, isObject, stripAtKeys, unpackPositionalArgs, nodeStr, parseHandler, fullPath, blobPrintStr, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP, valToString} from "./utils";
+import {makeUrlParamsFromObject, SYM_PROXY, SYM_FLATTEN, isObject, stripAtKeys, unpackPositionalArgs, nodeStr, parseHandler, fullPath, blobPrintStr, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP, valToString, splitTrim} from "./utils";
 import {PathPart, PathType, PathUnionType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue, HandlerBlock, NodeAttrType, HibikiVal, HibikiNode, HibikiValObj, HibikiValEx, AutoMergeExpr, JSFuncType} from "./types";
 import {HibikiRequest} from "./request";
 import type {EHandlerType} from "./state";
@@ -797,17 +797,45 @@ function mergeArgsRootNs(argsRoot : Record<string, HibikiValEx>, ns : string) {
     }
 }
 
-function resolveArgsRoot(node : HibikiNode, dataenv : DataEnvironment) : Record<string, HibikiValEx> {
-    if (node.attrs == null) {
-        return {};
-    }
+function resolveArgsRoot(node : HibikiNode, dataenv : DataEnvironment, implNode : HibikiNode) : Record<string, HibikiValEx> {
     let argsRoot = {"@ns": {}};
 
     // forced automerge
     resolveArgsRootAutoMerge(argsRoot, node, dataenv, true);
+
+    let boundArgs = [];
+    if (implNode != null && implNode.attrs != null && implNode.attrs.boundargs != null) {
+        let baAttr = rawAttrStr(implNode.attrs.boundargs);
+        boundArgs = splitTrim(baAttr, ",");
+    }
+    for (let i=0; i<boundArgs.length; i++) {
+        let key = boundArgs[i];
+        if (key in argsRoot || NON_ARGS_ATTRS[key]) {
+            continue;
+        }
+        let lvalue = resolveLValueAttr(node, key, dataenv, {noAutoMerge: true});
+        if (lvalue != null) {
+            _assignToArgsRootNs(argsRoot, key, lvalue);
+            continue;
+        }
+        let [val, exists] = getAttributeValPair(node, key, dataenv, {noAutoMerge: true, noBindings: true});
+        if (exists) {
+            let lv = CreateReadOnlyLValue(val, sprintf("$args.%s:readonly", key));
+            _assignToArgsRootNs(argsRoot, key, lv);
+            continue;
+        }
+        else {
+            let lv = CreateObjectLValue(null, sprintf("$args.%s", key));
+            _assignToArgsRootNs(argsRoot, key, lv);
+            continue;
+        }
+    }
     
     if (node.bindings != null) {
         for (let key in node.bindings) {
+            if (key in argsRoot || NON_ARGS_ATTRS[key]) {
+                continue;
+            }
             let lvalue = resolveLValueAttr(node, key, dataenv, {noAutoMerge: true});
             if (lvalue != null) {
                 _assignToArgsRootNs(argsRoot, key, lvalue);
@@ -1091,6 +1119,12 @@ function CreateReadOnlyLValue(val : any, debugName : string) : LValue {
     let box = mobx.observable.box(val, {deep: false, name: debugName});
     let lvalue = new ObjectLValue(null, box);
     return new ReadOnlyLValue(lvalue);
+}
+
+function CreateObjectLValue(val : any, debugName : string) : LValue {
+    let box = mobx.observable.box(val, {deep: false, name: debugName});
+    let lvalue = new ObjectLValue(null, box);
+    return lvalue;
 }
 
 class ObjectLValue extends LValue {

@@ -206,10 +206,10 @@ class DBCtx {
     @boundMethod handleOnClick(e : any) : boolean {
         if (e != null) {
             e.preventDefault();
-            e.stopPropagation();
+            // e.stopPropagation();
         }
         this.handleEvent("click");
-        return false;
+        return true;
     }
 
     @boundMethod handleOnChange(newVal : HibikiVal) : boolean {
@@ -237,8 +237,8 @@ class DBCtx {
         return DataCtx.resolveLValueAttr(this.node, dataName, this.dataenv);
     }
 
-    resolveArgsRoot() : Record<string, HibikiValEx> {
-        return DataCtx.resolveArgsRoot(this.node, this.dataenv);
+    resolveArgsRoot(implNode : HibikiNode) : Record<string, HibikiValEx> {
+        return DataCtx.resolveArgsRoot(this.node, this.dataenv, implNode);
     }
 
     resolveAttrData(dataName : string, writeable : boolean) : DataCtx.LValue {
