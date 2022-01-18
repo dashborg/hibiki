@@ -4,14 +4,14 @@ import type {HibikiState} from "./state";
 import type {RtContext, HibikiError} from "./error";
 import type {HibikiRequest} from "./request";
 import * as mobx from "mobx";
-import type {HExpr, HibikiBlob, LValue, HIteratorExpr, HAction, HActionBlock} from "./datactx";
+import type {HExpr, HibikiBlob, LValue, HIteratorExpr, HAction, HActionBlock, OpaqueValue, ChildrenVar} from "./datactx";
 import type {DataEnvironment} from "./state";
 
 type NodeAttrType = string | HExpr;
 
 type HibikiValEx = HibikiVal | LValue | symbol;
 type HibikiValObj = {[k : string] : HibikiVal};
-type HibikiVal = string | number | boolean | HibikiValObj | HibikiVal[] | HibikiBlob | HibikiNode;
+type HibikiVal = string | number | boolean | HibikiValObj | HibikiVal[] | HibikiBlob | HibikiNode | OpaqueValue | ChildrenVar;
 
 type HibikiNode = {
     tag    : string,

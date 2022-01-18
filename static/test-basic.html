@@ -376,7 +376,7 @@
     
     <define-component name="test-tr">
       <html-tr>
-        <html-td><pre>{{fn:trim(@children.byslot.test[0].innerhtml)}}</pre></html-td>
+        <html-td><pre>{{fn:trim(@children.byslot.test.list[0].innerhtml)}}</pre></html-td>
         <h-children bind="@children.byslot.result"></h-children>
         <h-children bind="@children.byslot.test"></h-children>
       </html-tr>

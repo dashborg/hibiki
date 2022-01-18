@@ -199,36 +199,6 @@ function makeNodeVar(ctx : DBCtx) : any {
     return rtn;
 }
 
-function makeChildrenVar(dataenv : DataEnvironment, node : HibikiNode) : any {
-    if (node == null || node.list == null || node.list.length === 0) {
-        return null;
-    }
-    let rtn : any = {};
-    rtn.all = node.list;
-    rtn.bytag = {};
-    rtn.byslot = {};
-    rtn.noslot = [];
-    for (let i=0; i<node.list.length; i++) {
-        let n = node.list[i];
-        let tagname = n.tag;
-        if (rtn.bytag[tagname] == null) {
-            rtn.bytag[tagname] = [];
-        }
-        rtn.bytag[tagname].push(n);
-        let slotname = DataCtx.getAttributeStr(n, "slot", dataenv);
-        if (slotname != null) {
-            if (rtn.byslot[slotname] == null) {
-                rtn.byslot[slotname] = [];
-            }
-            rtn.byslot[slotname].push(n);
-        }
-        else {
-            rtn.noslot.push(n);
-        }
-    }
-    return rtn;
-}
-
 function parseArgsDecl(datatypes : string) : {[e : string] : boolean} {
     let rtn : {[e : string] : boolean} = {};
     if (datatypes == null || datatypes.trim() === "") {
@@ -392,4 +362,4 @@ function getRawAttrs(node : HibikiNode) : Record<string, string> {
     return rtn;
 }
 
-export {BLOCKED_ELEMS, INLINE_ELEMS, SPECIAL_ATTRS, BLOB_ATTRS, SUBMIT_ELEMS, MANAGED_ATTRS, renderTextSpan, renderTextData, makeNodeVar, makeChildrenVar, parseArgsDecl, handleConvertType, makeHandlers, subNodesByTag, firstSubNodeByTag, getManagedType, getRawAttrs};
+export {BLOCKED_ELEMS, INLINE_ELEMS, SPECIAL_ATTRS, BLOB_ATTRS, SUBMIT_ELEMS, MANAGED_ATTRS, renderTextSpan, renderTextData, makeNodeVar, parseArgsDecl, handleConvertType, makeHandlers, subNodesByTag, firstSubNodeByTag, getManagedType, getRawAttrs};

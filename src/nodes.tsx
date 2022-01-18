@@ -669,14 +669,13 @@ class CustomNode extends React.Component<HibikiReactProps & {component : Compone
         let implNode = component.node;
         let rawImplAttrs : Record<string, NodeAttrType> = implNode.attrs || {};
         let nodeVar = NodeUtils.makeNodeVar(ctx);
-        let childrenVar = NodeUtils.makeChildrenVar(ctx.dataenv, ctx.node);
         let componentName = DataCtx.rawAttrStr(rawImplAttrs.name);
         let ctxHandlers = NodeUtils.makeHandlers(ctx.node, null, null);
         let eventCtx = sprintf("%s", nodeStr(ctx.node));
         let eventDE = ctx.dataenv.makeChildEnv(null, {eventBoundary: "hard", handlers: ctxHandlers, htmlContext: eventCtx});
         let nodeDataLV = ctx.getNodeDataLV(componentName);
         let specials : Record<string, any> = {};
-        specials.children = childrenVar;
+        specials.children = new DataCtx.ChildrenVar(ctx.node.list, ctx.dataenv);
         specials.node = nodeVar;
         let argsRoot = ctx.resolveArgsRoot(implNode);
         let handlers = NodeUtils.makeHandlers(implNode, component.libName, ["event"]);
@@ -889,26 +888,32 @@ class ChildrenNode extends React.Component<HibikiReactProps, {}> {
             return textStr;
         }
         let children = ctx.resolveAttrVal("bind");
-        if (children == null) {
+        if (children != null && !(children instanceof DataCtx.ChildrenVar)) {
+            return <ErrorMsg message={sprintf("%s bind expression is not valid, must be [children] type", nodeStr(ctx.node))}/>;
+        }
+        let cvar : DataCtx.ChildrenVar = children as DataCtx.ChildrenVar;
+        let childEnv = (cvar == null ? ctx.dataenv : cvar.dataenv);
+        let contextattr = ctx.resolveAttrStr("datacontext");
+        if (contextattr != null) {
+            try {
+                let ctxEnv = DataCtx.ParseAndCreateContextThrow(contextattr, "context", ctx.dataenv, nodeStr(ctx.node));
+                childEnv = childEnv.makeChildEnv(ctxEnv.specials, null);
+            }
+            catch (e) {
+                return <ErrorMsg message={nodeStr(ctx.node) + " Error parsing/executing context block: " + e}/>;
+            }
+        }
+        if (cvar == null || cvar.list.length == 0) {
             if (ctx.node.list == null) {
                 return null;
             }
-            let rtnElems = ctxRenderHtmlChildren(ctx);
+            let rtnElems = ctxRenderHtmlChildren(ctx, childEnv);
             if (rtnElems == null) {
                 return null;
             }
             return <React.Fragment>{rtnElems}</React.Fragment>;
         }
-        if (!mobx.isArrayLike(children)) {
-            return <ErrorMsg message={sprintf("%s bind expression is not an array", nodeStr(ctx.node))}/>;
-        }
-        for (let i=0; i<children.length; i++) {
-            let c = (children[i] as HibikiNode);
-            if (c == null || c.tag == null) {
-                return <ErrorMsg message={sprintf("%s bad child node @ index:%d", nodeStr(ctx.node), i)}/>;
-            }
-        }
-        let rtnElems = baseRenderHtmlChildren(children as HibikiNode[], ctx.dataenv, false);
+        let rtnElems = baseRenderHtmlChildren(cvar.list, childEnv, false);
         if (rtnElems == null) {
             return null;
         }

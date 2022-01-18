@@ -2,11 +2,11 @@
 
 import * as mobx from "mobx";
 import {v4 as uuidv4} from 'uuid';
-import {DataEnvironment} from "./state";
+import {DataEnvironment, HibikiState} from "./state";
 import {sprintf} from "sprintf-js";
 import {parseHtml} from "./html-parser";
 import {RtContext, getShortEMsg, HibikiError} from "./error";
-import {makeUrlParamsFromObject, SYM_PROXY, SYM_FLATTEN, isObject, stripAtKeys, unpackPositionalArgs, nodeStr, parseHandler, fullPath, blobPrintStr, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP, valToString, splitTrim} from "./utils";
+import {SYM_PROXY, SYM_FLATTEN, isObject, stripAtKeys, unpackPositionalArgs, nodeStr, parseHandler, fullPath, blobPrintStr, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP, splitTrim} from "./utils";
 import {PathPart, PathType, PathUnionType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue, HandlerBlock, NodeAttrType, HibikiVal, HibikiNode, HibikiValObj, HibikiValEx, AutoMergeExpr, JSFuncType} from "./types";
 import {HibikiRequest} from "./request";
 import type {EHandlerType} from "./state";
@@ -76,6 +76,136 @@ class HActionBlock {
     }
 }
 
+class ChildrenVar {
+    list : HibikiNode[];
+    dataenv : DataEnvironment;
+    
+    constructor(list : HibikiNode[], dataenv : DataEnvironment) {
+        this.list = list ?? [];
+        this.dataenv = dataenv;
+    }
+
+    get all() : ChildrenVar {
+        return this;
+    }
+
+    get noslot() : ChildrenVar {
+        let rtn = [];
+        for (let child of this.list) {
+            let childSlot = getAttributeStr(child, "slot", this.dataenv);
+            if (childSlot == null) {
+                rtn.push(child);
+            }
+        }
+        return new ChildrenVar(rtn, this.dataenv);
+    }
+
+    get byslot() {
+        let rtn = {};
+        for (let child of this.list) {
+            let childSlot = getAttributeStr(child, "slot", this.dataenv);
+            if (childSlot == null) {
+                continue;
+            }
+            if (!(childSlot in rtn)) {
+                rtn[childSlot] = new ChildrenVar([], this.dataenv);
+            }
+            rtn[childSlot].list.push(child);
+        }
+        return rtn;
+    }
+
+    get bytag() {
+        let rtn = {};
+        for (let child of this.list) {
+            let tagName = child.tag;
+            if (!(tagName in rtn)) {
+                rtn[tagName] = new ChildrenVar([], this.dataenv);
+            }
+            rtn[tagName].list.push(child);
+        }
+        return rtn;
+    }
+
+    get first() {
+        let rtn = (this.list.length > 0 ? [this.list[0]] : []);
+        return new ChildrenVar(rtn, this.dataenv);
+    }
+
+    get byindex() {
+        let rtn = [];
+        for (let child of this.list) {
+            rtn.push(new ChildrenVar([child], this.dataenv));
+        }
+        return rtn;
+    }
+
+    asString() : string {
+        let arr = [];
+        for (let child of this.list) {
+            if (child.tag.startsWith("#")) {
+                arr.push(child.tag);
+            }
+            else {
+                arr.push("<" + child.tag + ">");
+            }
+        }
+        if (arr.length === 0) {
+            return "[children:none]";
+        }
+        return sprintf("[children:%s]", arr.toString());
+    }
+}
+
+class OpaqueValue {
+    _type : "OpaqueValue";
+    value : any;
+
+    constructor(value : any) {
+        this._type = "OpaqueValue";
+        this.value = value;
+    }
+
+    asString() : string {
+        if (this.value == null) {
+            return null;
+        }
+        if (this.value instanceof ChildrenVar) {
+            return this.value.asString();
+        }
+        return "[opaque]";
+    }
+}
+
+function isOpaqueType(val : any, setter? : boolean) : boolean {
+    if (setter && val instanceof ChildrenVar) {
+        return true;
+    }
+    return (val instanceof OpaqueValue || val instanceof HibikiBlob || val instanceof DataEnvironment || val instanceof HibikiRequest || val instanceof RtContext);
+}
+
+function opaqueTypeAsString(val : any) {
+    if (val instanceof ChildrenVar) {
+        return val.asString();
+    }
+    if (val instanceof HibikiBlob) {
+        return val.asString();
+    }
+    if (val instanceof DataEnvironment) {
+        return "[DataEnvironment]";
+    }
+    if (val instanceof HibikiRequest) {
+        return sprintf("[HibikiRequest:%s]", val.reqid);
+    }
+    if (val instanceof RtContext) {
+        return sprintf("[RtContext:%s]", val.rtid);
+    }
+    if (val instanceof OpaqueValue) {
+        return val.asString();
+    }
+    return "[opaque]";
+}
+
 class HibikiBlob {
     mimetype : string = null;
     data : string = null;
@@ -84,6 +214,10 @@ class HibikiBlob {
 
     makeDataUrl() : string {
         return "data:" + this.mimetype + ";base64," + this.data;
+    }
+
+    asString() : string {
+        return blobPrintStr(this);
     }
 }
 
@@ -264,6 +398,43 @@ type ResolveOpts = {
     noAutoMerge? : boolean,
     noBindings? : boolean,
 };
+
+function valToString(val : HibikiVal) : string {
+    if (val == null) {
+        return null;
+    }
+    if (typeof(val) == "string" || typeof(val) == "number" || typeof(val) == "boolean" || typeof(val) == "symbol" || typeof(val) == "bigint") {
+        return val.toString();
+    }
+    if (typeof(val) == "function") {
+        return "[Function]";
+    }
+    if (mobx.isArrayLike(val)) {
+        return val.toString();
+    }
+    if (!isObject(val)) {
+        return "[" + typeof(val) + "]";
+    }
+    if (val instanceof HibikiBlob) {
+        return blobPrintStr(val);
+    }
+    if (val instanceof OpaqueValue) {
+        return val.asString();
+    }
+    if (val instanceof HibikiRequest) {
+        return sprintf("[HibikiRequest:%s]", val.reqid);
+    }
+    if (val instanceof RtContext) {
+        return sprintf("[RtContext:%s]", val.rtid);
+    }
+    if (val instanceof DataEnvironment) {
+        return "[DataEnvironment]";
+    }
+    if (val instanceof ChildrenVar) {
+        return val.asString();
+    }
+    return "[Object object]";
+}
 
 // turns empty string into null
 function resolveAttrStr(k : string, v : NodeAttrType, dataenv : DataEnvironment, opts? : ResolveOpts) : string {
@@ -1330,6 +1501,9 @@ function internalResolvePath(path : PathType, irData : any, dataenv : DataEnviro
         if (irData instanceof LValue) {
             return internalResolvePath(path, irData.subArrayIndex(pp.pathindex), dataenv, level+1);
         }
+        if (isOpaqueType(irData)) {
+            return null;
+        }
         if (!mobx.isArrayLike(irData)) {
             throw new Error(sprintf("Cannot resolve array index (non-array) in ResolvePath, path=%s, level=%d", StringPath(path), level));
         }
@@ -1347,6 +1521,9 @@ function internalResolvePath(path : PathType, irData : any, dataenv : DataEnviro
         }
         if (irData instanceof LValue) {
             return internalResolvePath(path, irData.subMapKey(pp.pathkey), dataenv, level+1);
+        }
+        if (isOpaqueType(irData)) {
+            return null;
         }
         if (typeof(irData) !== "object") {
             throw new Error(sprintf("Cannot resolve map key (non-object) in ResolvePath, path=%s, level=%d, type=%s", StringPath(path), level, typeof(irData)));
@@ -1583,6 +1760,9 @@ function internalSetPath(dataenv : DataEnvironment, op : string, path : PathType
             internalSetPath(dataenv, op, path, localRoot.subArrayIndex(pp.pathindex), setData, level+1, opts);
             return localRoot;
         }
+        if (isOpaqueType(localRoot, true)) {
+            throw new Error(sprintf("SetPath cannot resolve array index through %s, path=%s, level=%d", opaqueTypeAsString(localRoot), StringPath(path), level));
+        }
         if (!mobx.isArrayLike(localRoot)) {
             throw new Error(sprintf("SetPath cannot resolve array index through non-array, path=%s, level=%d", StringPath(path), level));
         }
@@ -1601,6 +1781,9 @@ function internalSetPath(dataenv : DataEnvironment, op : string, path : PathType
             else {
                 localRoot = new Map();
             }
+        }
+        if (isOpaqueType(localRoot, true)) {
+            throw new Error(sprintf("SetPath cannot resolve map key through %s, path=%s, level=%d", opaqueTypeAsString(localRoot), StringPath(path), level));
         }
         if (typeof(localRoot) !== "object") {
             throw new Error(sprintf("SetPath cannot resolve map key through non-object, path=%s, level=%d", StringPath(path), level));
@@ -1702,6 +1885,12 @@ function MapReplacer(key : string, value : any) : any {
     else if (this[key] instanceof HibikiRequest) {
         return "[HibikiRequest]";
     }
+    else if (this[key] instanceof HibikiState) {
+        return "[HibikiState]";
+    }
+    else if (this[key] instanceof ChildrenVar) {
+        return this[key].asString();
+    }
     else if (this[key] === SYM_NOATTR) {
         return null;
     }
@@ -1764,6 +1953,12 @@ function DeepEqual(data1 : any, data2 : any) : boolean {
     }
     if (data1 instanceof DataEnvironment || data2 instanceof DataEnvironment) {
         return (data1 instanceof DataEnvironment) && (data2 instanceof DataEnvironment);
+    }
+    if (data1 instanceof HibikiRequest || data2 instanceof HibikiRequest) {
+        return data1.reqid == data2.reqid;
+    }
+    if (data1 instanceof RtContext || data2 instanceof RtContext) {
+        return data1.rtid == data2.rtid;
     }
     if (typeof(data1) !== typeof(data2)) {
         return false;
@@ -2770,6 +2965,6 @@ function convertSimpleType(typeName : string, value : string, defaultValue : Hib
     return value;
 }
 
-export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, makeIteratorFromExpr, rawAttrStr, resolveStrAttrs, resolveValAttrs, getStyleMap, getAttributeStr, getAttributeValPair, attrValToStr, exValToVal, resolveLValueAttr, resolveArgsRoot, SYM_NOATTR, resolveCnArray, HActionBlock, valToString, compileActionStr, FireEvent, makeErrorObj};
+export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, makeIteratorFromExpr, rawAttrStr, resolveStrAttrs, resolveValAttrs, getStyleMap, getAttributeStr, getAttributeValPair, attrValToStr, exValToVal, resolveLValueAttr, resolveArgsRoot, SYM_NOATTR, resolveCnArray, HActionBlock, valToString, compileActionStr, FireEvent, makeErrorObj, OpaqueValue, ChildrenVar};
 
 export type {PathType, HAction, HExpr, HIteratorExpr};

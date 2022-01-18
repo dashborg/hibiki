@@ -175,50 +175,6 @@ function getSS(key : string) : any {
     }
 }
 
-function valToString(val : HibikiVal) : string {
-    if (val == null) {
-        return null;
-    }
-    if (typeof(val) == "string" || typeof(val) == "number" || typeof(val) == "boolean" || typeof(val) == "symbol" || typeof(val) == "bigint") {
-        return val.toString();
-    }
-    if (typeof(val) == "function") {
-        return "[Function]";
-    }
-    if (mobx.isArrayLike(val)) {
-        return val.toString();
-    }
-    if ((val as any)._type === "HibikiBlob") {
-        return blobPrintStr(val as HibikiBlob);
-    }
-    return "[Object object]";
-}
-
-function makeUrlParamsFromObject(params : any) : string {
-    let urlparams = "";
-    if (params == null || !isObject(params)) {
-        return "";
-    }
-    urlparams = "?";
-    let first = true;
-    for (let key in params) {
-        let val = params[key];
-        if (val == null) {
-            continue;
-        }
-        let strVal = valToString(val);
-        if (!first) {
-            urlparams = urlparams + "&";
-        }
-        first = false;
-        urlparams += encodeURIComponent(key) + "=" + encodeURIComponent(strVal);
-    }
-    if (urlparams == "?") {
-        return "";
-    }
-    return urlparams;
-}
-
 function hasRole(roleList : string[], role : string) : boolean {
     if (roleList == null) {
         return false;
@@ -703,5 +659,5 @@ const STYLE_KEY_MAP = {
     "fullcenter": {flex: true},
 };
 
-export {jsonRespHandler, parseUrlParams, valToString, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, makeUrlParamsFromObject, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs, blobPrintStr, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy, valInArray, rawAttrFromNode, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP, subMapKey, subArrayIndex, unbox, splitTrim};
+export {jsonRespHandler, parseUrlParams, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs, blobPrintStr, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy, valInArray, rawAttrFromNode, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP, subMapKey, subArrayIndex, unbox, splitTrim};
 
