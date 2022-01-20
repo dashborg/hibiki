@@ -247,7 +247,7 @@ class AnyNode extends React.Component<HibikiReactProps, {}> {
         let dataenv = ctx.dataenv;
         let dbstate = dataenv.dbstate;
         let compName = ctx.resolveAttrStr("component") ?? tagName;
-        let component = dbstate.ComponentLibrary.findComponent(compName, dataenv.getLibContext());
+        let component = dbstate.ComponentLibrary.findComponent(compName, node.libContext);
         if (component != null) {
             if (component.componentType == "react-custom") {
                 this.nodeType = "react-component";

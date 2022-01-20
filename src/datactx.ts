@@ -101,7 +101,41 @@ class ChildrenVar {
         return new ChildrenVar(rtn, this.dataenv);
     }
 
-    get byslot() {
+    get bycomp() : Record<string, ChildrenVar> {
+        let rtn : Record<string, ChildrenVar> = {};
+        for (let child of this.list) {
+            if (child.tag.startsWith("hibiki-")) {
+                continue;
+            }
+            let compName = getAttributeStr(child, "component", this.dataenv) ?? child.tag;
+            let component = this.dataenv.dbstate.ComponentLibrary.findComponent(compName, child.libContext);
+            let cname = null;
+            if (component == null) {
+                if (child.tag.startsWith("#")) {
+                    cname = child.tag;
+                }
+                else if (child.tag.startsWith("html-")) {
+                    cname = "@html:" + child.tag.substr(5);
+                }
+                else if (child.tag.indexOf("-") == -1) {
+                    cname = "@html:" + child.tag;
+                }
+                else {
+                    cname = "@unknown:" + child.tag;
+                }
+            }
+            else {
+                cname = component.libName + ":" + component.name;
+            }
+            if (rtn[cname] == null) {
+                rtn[cname] = new ChildrenVar([], this.dataenv);
+            }
+            rtn[cname].list.push(child);
+        }
+        return rtn;
+    }
+
+    get byslot() : Record<string, ChildrenVar> {
         let rtn = {};
         for (let child of this.list) {
             let childSlot = getAttributeStr(child, "slot", this.dataenv);
@@ -116,7 +150,7 @@ class ChildrenVar {
         return rtn;
     }
 
-    get bytag() {
+    get bytag() : Record<string, ChildrenVar> {
         let rtn = {};
         for (let child of this.list) {
             let tagName = child.tag;
@@ -128,12 +162,12 @@ class ChildrenVar {
         return rtn;
     }
 
-    get first() {
+    get first() : ChildrenVar {
         let rtn = (this.list.length > 0 ? [this.list[0]] : []);
         return new ChildrenVar(rtn, this.dataenv);
     }
 
-    get byindex() {
+    get byindex() : ChildrenVar[] {
         let rtn = [];
         for (let child of this.list) {
             rtn.push(new ChildrenVar([child], this.dataenv));
