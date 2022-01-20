@@ -13,7 +13,7 @@
   </div>
   <div class="box">
     Point at index [<h-text bind="$.index"></h-text>] =
-    <h-text bind="$.points[1]" format="json-compact"></h-text>
+    <h-text bind="$.points[$.index]" format="json-compact"></h-text>
   </div>
   <div class="box">
     PI (2 decimal places): <h-text bind="$.pi" format="%.2f"></h-text>

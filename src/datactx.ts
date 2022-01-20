@@ -6,7 +6,7 @@ import {DataEnvironment, HibikiState} from "./state";
 import {sprintf} from "sprintf-js";
 import {parseHtml} from "./html-parser";
 import {RtContext, getShortEMsg, HibikiError} from "./error";
-import {SYM_PROXY, SYM_FLATTEN, isObject, stripAtKeys, unpackPositionalArgs, nodeStr, parseHandler, fullPath, blobPrintStr, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP, splitTrim} from "./utils";
+import {SYM_PROXY, SYM_FLATTEN, isObject, stripAtKeys, unpackPositionalArgs, nodeStr, parseHandler, fullPath, blobPrintStr, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP, splitTrim, bindLibContext} from "./utils";
 import {PathPart, PathType, PathUnionType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue, HandlerBlock, NodeAttrType, HibikiVal, HibikiNode, HibikiValObj, HibikiValEx, AutoMergeExpr, JSFuncType} from "./types";
 import {HibikiRequest} from "./request";
 import type {EHandlerType} from "./state";
@@ -60,6 +60,7 @@ type HAction = {
     callpath?  : HExpr,
     data?      : HExpr,
     html?      : string,
+    libcontext? : string,
     nodeuuid?  : string,
     actions?   : Record<string, HAction[]>,
     blockstr?  : string,
@@ -2597,6 +2598,7 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
     }
     else if (action.actiontype === "html") {
         let htmlObj = parseHtml(action.html);
+        bindLibContext(htmlObj, (action.libcontext ?? "main"));
         if (htmlObj != null) {
             dataenv.dbstate.setHtml(htmlObj);
         }
@@ -2659,8 +2661,10 @@ function convertAction(action : HibikiAction) : HAction {
     if (action.pure) rtn.pure = true;
     if (action.debug) rtn.debug = true;
     if (action.alert) rtn.alert = true;
-    if (action.setop != null) rtn.setop = action.setop;
-    if (action.setpath != null) {
+    if (action.setop != null && typeof(action.setop) === "string") {
+        rtn.setop = action.setop;
+    }
+    if (action.setpath != null && typeof(action.setpath) === "string") {
         let path = ParsePathThrow(action.setpath, true);
         rtn.setpath = path;
     }
@@ -2673,7 +2677,12 @@ function convertAction(action : HibikiAction) : HAction {
     if (action.data != null) {
         rtn.data = compileActionVal(action.data);
     }
-    if (action.html != null) rtn.html = action.html;
+    if (action.html != null && typeof(action.html) === "string") {
+        rtn.html = action.html;
+    }
+    if (action.libcontext != null && typeof(action.libcontext) === "string") {
+        rtn.libcontext = action.libcontext;
+    }
     if (action.actions != null) {
         if (!isObject(action.actions)) {
             throw new Error("Invalid HibikiAction, 'actions' field should be Record<string, HibikiAction[]> | " + JSON.stringify(action));
@@ -2683,10 +2692,16 @@ function convertAction(action : HibikiAction) : HAction {
             rtn.actions[key] = convertActions(action.actions[key]);
         }
     }
-    if (action.nodeuuid != null) rtn.nodeuuid = action.nodeuuid;
-    if (action.blockstr != null) rtn.blockstr = action.blockstr;
-    if (action.blockctx != null) rtn.blockctx = action.blockctx;
-    if (action.blobbase64 != null) {
+    if (action.nodeuuid != null && typeof(action.nodeuuid) === "string") {
+        rtn.nodeuuid = action.nodeuuid;
+    }
+    if (action.blockstr != null && typeof(action.blockstr) === "string") {
+        rtn.blockstr = action.blockstr;
+    }
+    if (action.blockctx != null && typeof(action.blockctx) === "string") {
+        rtn.blockctx = action.blockctx;
+    }
+    if (action.blobbase64 != null && typeof(action.blobbase64) === "string") {
         if (action.actiontype === "blob") {
             rtn.actiontype = "setdata";
         }

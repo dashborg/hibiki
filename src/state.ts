@@ -7,7 +7,7 @@ import {boundMethod} from 'autobind-decorator'
 import {v4 as uuidv4} from 'uuid';
 import type {HibikiNode, ComponentType, LibraryType, HibikiConfig, HibikiHandlerModule, HibikiAction, EventType, HandlerValType, JSFuncType, Hibiki, ErrorCallbackFn, HtmlParserOpts, HandlerBlock, NodeAttrType, HibikiVal, HibikiValObj, HibikiValEx} from "./types";
 import * as DataCtx from "./datactx";
-import {isObject, textContent, SYM_PROXY, SYM_FLATTEN, nodeStr, callHook, getHibiki, parseHandler, fullPath, parseUrlParams, smartDecodeParams, blobPrintStr, unbox} from "./utils";
+import {isObject, textContent, SYM_PROXY, SYM_FLATTEN, nodeStr, callHook, getHibiki, parseHandler, fullPath, parseUrlParams, smartDecodeParams, blobPrintStr, unbox, bindLibContext} from "./utils";
 import {subNodesByTag, firstSubNodeByTag} from "./nodeutils";
 import {RtContext, HibikiError} from "./error";
 import {HibikiRequest} from "./request";
@@ -578,6 +578,7 @@ class ComponentLibrary {
                 throw new Error(sprintf("<define-library> must have 'name' attribute for library url '%s'", srcUrl));
             }
             libName = DataCtx.rawAttrStr(libNode.attrs.name);
+            bindLibContext(libNode, libName);
             return null;
         })
         .then(() => {
@@ -593,7 +594,7 @@ class ComponentLibrary {
         if (libNode == null) {
             return Promise.resolve(null);
         }
-        let libObj : LibraryType = {name: libName, url: srcUrl, libComponents: {}, importedComponents: {}, localHandlers: {}, modules: {}, handlers: {}};
+        let libObj : LibraryType = {name: libName, libNode: libNode, url: srcUrl, libComponents: {}, importedComponents: {}, localHandlers: {}, modules: {}, handlers: {}};
         this.libs[libName] = libObj;
         if (srcUrl != null) {
             this.srcUrlToLibNameMap.set(srcUrl, libName);
@@ -799,6 +800,7 @@ class HibikiExtState {
 
     setHtml(html : string | HTMLElement) {
         let htmlObj = parseHtml(html);
+        bindLibContext(htmlObj, "main");
         this.state.setHtml(htmlObj);
     }
 

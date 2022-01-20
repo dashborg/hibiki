@@ -27,6 +27,7 @@ type HibikiNode = {
     autofire? : AutoFireExpr[],
     innerhtml? : string,
     outerhtml? : string,
+    libContext? : string,
 }
 
 type HibikiReactProps = {
@@ -92,6 +93,7 @@ type HibikiAction = {
     callpath?     : HibikiActionString,
     data?         : HibikiActionValue,
     html?         : string,              // for type=html
+    libcontext?   : string,              // for type=html
     nodeuuid?     : string,              // for type=fireevent
     actions?      : Record<string, HibikiAction[]>,
     blockstr?     : string,              // for type=block
@@ -182,6 +184,7 @@ type LibComponentType = {
 
 type LibraryType = {
     name: string,
+    libNode : HibikiNode,
     url?: string,
     libComponents: Record<string, LibComponentType>;
     importedComponents : Record<string, ComponentType>;

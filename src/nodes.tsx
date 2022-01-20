@@ -18,7 +18,7 @@ import type {HibikiNode, ComponentType, LibraryType, HibikiExtState, LibComponen
 import {DBCtx} from "./dbctx";
 import * as DataCtx from "./datactx";
 import {HibikiState, DataEnvironment} from "./state";
-import {resolveNumber, isObject, textContent, SYM_PROXY, SYM_FLATTEN, jseval, nodeStr, getHibiki, addToArrayDupCheck, removeFromArray, valInArray, blobPrintStr, subMapKey, unbox} from "./utils";
+import {resolveNumber, isObject, textContent, SYM_PROXY, SYM_FLATTEN, jseval, nodeStr, getHibiki, addToArrayDupCheck, removeFromArray, valInArray, blobPrintStr, subMapKey, unbox, bindLibContext} from "./utils";
 import {parseHtml} from "./html-parser";
 import * as NodeUtils from "./nodeutils";
 import {RtContext, HibikiError} from "./error";
@@ -937,6 +937,7 @@ class DynNode extends React.Component<HibikiReactProps, {}> {
             this.curHtmlObj = null;
             try {
                 this.curHtmlObj = parseHtml(bindVal);
+                bindLibContext(this.curHtmlObj, (ctx.resolveAttrStr("libcontext") ?? "main"));
             }
             catch (e) {
                 let errObj = new HibikiError(sprintf("Error parsing HTML in %s node: %s", nodeStr(ctx.node), e.toString()), e);
@@ -1076,6 +1077,7 @@ function addCoreComponent(name : string, impl : any) {
 
 let CORE_LIBRARY : LibraryType = {
     name: "@hibiki/core",
+    libNode: {tag: "#def", list: []},
     libComponents: {},
     importedComponents: {},
     localHandlers: {},

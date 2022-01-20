@@ -7,7 +7,7 @@ import {parseHtml} from "./html-parser";
 import {HibikiState, DataEnvironment} from "./state";
 import * as ReactDOM from "react-dom";
 import {HibikiRootNode, CORE_LIBRARY} from "./nodes";
-import {deepTextContent, evalDeepTextContent, isObject} from "./utils";
+import {deepTextContent, evalDeepTextContent, isObject, bindLibContext} from "./utils";
 import merge from "lodash/merge";
 import type {HibikiNode, HibikiConfig, Hibiki, HibikiExtState, ReactClass, LibraryType} from "./types";
 import {LocalModule, HttpModule, LibModule, HibikiModule} from "./modules";
@@ -83,6 +83,7 @@ let createState = function createState(config : HibikiConfig, html : string | HT
     let htmlObj : HibikiNode = null;
     if (html != null) {
         htmlObj = parseHtml(html);
+        bindLibContext(htmlObj, "main");
     }
     state.setHtml(htmlObj);
     let configFromOuterHtml = readHibikiConfigFromOuterHtml(html);
