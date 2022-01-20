@@ -1183,6 +1183,31 @@ function* makeIteratorFromExpr(iteratorExpr : HIteratorExpr, dataenv : DataEnvir
     }
 }
 
+class Watcher {
+    expr : HExpr;
+    lastVal : HibikiVal;
+    firstRun : boolean;
+    fireOnInitialRun : boolean;
+    
+    constructor(expr : HExpr, fireOnInitialRun : boolean) {
+        this.expr = expr;
+        this.lastVal = null;
+        this.firstRun = true;
+        this.fireOnInitialRun = fireOnInitialRun;
+    }
+
+    checkValue(dataenv : DataEnvironment) : [HibikiVal, boolean] {
+        let val = evalExprAst(this.expr, dataenv);
+        let valUpdated = !DeepEqual(val, this.lastVal);
+        if (this.firstRun) {
+            valUpdated = this.fireOnInitialRun;
+        }
+        this.lastVal = val;
+        this.firstRun = false;
+        return [val, valUpdated];
+    }
+}
+
 abstract class LValue {
     abstract get() : HibikiVal;
     abstract getEx() : HibikiValEx;
@@ -2965,6 +2990,6 @@ function convertSimpleType(typeName : string, value : string, defaultValue : Hib
     return value;
 }
 
-export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, makeIteratorFromExpr, rawAttrStr, resolveStrAttrs, resolveValAttrs, getStyleMap, getAttributeStr, getAttributeValPair, attrValToStr, exValToVal, resolveLValueAttr, resolveArgsRoot, SYM_NOATTR, resolveCnArray, HActionBlock, valToString, compileActionStr, FireEvent, makeErrorObj, OpaqueValue, ChildrenVar};
+export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, makeIteratorFromExpr, rawAttrStr, resolveStrAttrs, resolveValAttrs, getStyleMap, getAttributeStr, getAttributeValPair, attrValToStr, exValToVal, resolveLValueAttr, resolveArgsRoot, SYM_NOATTR, resolveCnArray, HActionBlock, valToString, compileActionStr, FireEvent, makeErrorObj, OpaqueValue, ChildrenVar, Watcher};
 
 export type {PathType, HAction, HExpr, HIteratorExpr};

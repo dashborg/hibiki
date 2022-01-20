@@ -13,6 +13,7 @@ import {RtContext, HibikiError} from "./error";
 import {HibikiRequest} from "./request";
 import * as NodeUtils from "./nodeutils";
 import type {DBCtx} from "./dbctx";
+import {doParse} from "./hibiki-parser";
 
 import {parseHtml} from "./html-parser";
 
@@ -834,6 +835,25 @@ class HibikiExtState {
 
     makeHibikiBlob(blob : Blob) : Promise<DataCtx.HibikiBlob> {
         return this.state.blobFromBlob(blob);
+    }
+
+    makeWatcher(exprStr : string, callback : (v : HibikiVal) => void) : (() => void) {
+        let exprAst : DataCtx.HExpr = doParse(exprStr, "ext_fullExpr");
+        exprAst.sourcestr = exprStr;
+        let watcher = new DataCtx.Watcher(exprAst, false);
+        let disposer = mobx.autorun(() => {
+            try {
+                let pageEnv = this.state.pageDataenv();
+                let [val, updated] = watcher.checkValue(pageEnv);
+                if (updated) {
+                    callback(DataCtx.demobx(val));
+                }
+            }
+            catch (e) {
+                console.log(sprintf("Error evaluating watch expression [[%s]]:", exprStr), e);
+            }
+        });
+        return disposer;
     }
 }
 
