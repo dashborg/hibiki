@@ -1,19 +1,7 @@
 <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta chartset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-    <title>Hibiki</title>
-    <link rel="preconnect" href="https://fonts.gstatic.com">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/17.0.2/umd/react.production.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/17.0.2/umd/react-dom.production.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mobx/5.15.4/mobx.umd.min.js"></script>
-    <script src="/dist/hibiki-dev.js"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.3/css/bulma.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
-  </head>
-  <body>
-    <template hibiki>
+<html hibiki>
+  <script src="/hibiki-test.js"></script>
+  <body class="hibiki-cloak">
       <hibiki-data>
         {"mode": "scatter"}
       </hibiki-data>
@@ -23,7 +11,7 @@
             "modules": {"app": {"type": "http", "baseUrl": "https://testapi.hibikihtml.com/"}}
         }
       </hibiki-config>
-      <h-data name="get-data" query="//@app/api/d3-test" load.handler="$.data = @value.data; //@lib-d3/render(data=$.data)"></h-data>
+      <h-data name="get-data" query="//@app/api/d3-test" load.handler="$.data = @value.data"></h-data>
       <section class="hero is-primary mb-3">
         <div class="hero-body">
           <h1 class="title">D3 Test</h1>
@@ -70,7 +58,6 @@
           <d3-scatter-plot data="*$.data"></d3-scatter-plot>
         </div>
       </div>
-    </template>
+
   </body>
 </html>
-

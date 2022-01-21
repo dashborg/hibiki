@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <script src="/hibiki-test.js"></script>
-<div class="container m-4" style="min-width: 1400px;">
-  <template hibiki>
-    <hibiki-data>
-      {"color": "blue", "name": "mike", "PI": 3.14159, "x": 55, "idx": 2, "arr": [1,1,2,3,5,8],
-       "point": {"x": 5, "y": 2}, "fruits1": ["apple"]}
-    </hibiki-data>
+<body hibiki class="hibiki-cloak">
+  <hibiki-data>
+    {"color": "blue", "name": "mike", "PI": 3.14159, "x": 55, "idx": 2, "arr": [1,1,2,3,5,8],
+    "point": {"x": 5, "y": 2}, "fruits1": ["apple"]}
+  </hibiki-data>
+  <div class="container m-4" style="min-width: 1400px;">
     <h1 class="title">Test Basic</h1>
     <div class="box">
       <table class="table is-bordered test-output">
@@ -353,7 +353,7 @@
         </tr>
         <tr component="local-test-tr">
           <td slot="test" innerhtml>
-<div class="box bold -bold" class.bg-green="*$.x == 55">
+<div class="box bold !bold" class.bg-green="*$.x == 55">
   green              
 </div>
           </td>
@@ -363,7 +363,7 @@
         </tr>
         <tr component="local-test-tr">
           <td slot="test" innerhtml>
-<div class="box bg-green no-bg-green" class.bold="1">
+<div class="box bg-green !bg-green" class.bold="1">
   bold
 </div>
           </td>
@@ -373,13 +373,13 @@
         </tr>        
       </table>
     </div>
+  </div>
     
-    <define-component name="test-tr">
-      <html-tr>
-        <html-td><pre>{{fn:trim(@children.byslot.test.list[0].innerhtml)}}</pre></html-td>
-        <h-children bind="@children.byslot.result"></h-children>
-        <h-children bind="@children.byslot.test"></h-children>
-      </html-tr>
-    </define-component>
-  </template>
-</div>
+  <define-component name="test-tr">
+    <html-tr>
+      <html-td><pre>{{fn:trim(@children.byslot.test.list[0].innerhtml)}}</pre></html-td>
+      <h-children bind="@children.byslot.result"></h-children>
+      <h-children bind="@children.byslot.test"></h-children>
+    </html-tr>
+  </define-component>
+</body>

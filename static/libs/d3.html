@@ -34,6 +34,8 @@
   </script>
 
   <define-component name="scatter-plot" args="data">
+    <h-watcher bind="$args.data" fireoninit update.handler="//@lib/render(data=$args.data)"></h-watcher>
     <svg style="width: 560px; height: 560px;" id="scatter-plot"></svg>
   </define-component>
 </define-library>
+

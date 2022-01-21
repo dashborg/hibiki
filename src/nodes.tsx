@@ -719,15 +719,10 @@ class CustomNode extends React.Component<HibikiReactProps & {component : Compone
         let implNode = component.node;
         let childEnv = this.makeCustomChildEnv(false);
         let rtnElems = baseRenderHtmlChildren(implNode.list, childEnv, true)
-        if (implNode.attrs && implNode.attrs["dashelem"]) {
-            return <DashElemNode ctx={ctx}>{rtnElems}</DashElemNode>
+        if (rtnElems == null) {
+            return null;
         }
-        else {
-            if (rtnElems == null) {
-                return null;
-            }
-            return <React.Fragment>{rtnElems}</React.Fragment>
-        }
+        return <React.Fragment>{rtnElems}</React.Fragment>
     }
 }
 
@@ -955,6 +950,32 @@ class DynNode extends React.Component<HibikiReactProps, {}> {
     }
 }
 
+class WatcherNode extends React.Component<HibikiReactProps, {}> {
+    lastVal : HibikiVal;
+    firstRun : boolean;
+
+    constructor(props : any) {
+        super(props);
+        this.firstRun = true;
+    }
+    
+    render() {
+        let ctx = new DBCtx(this);
+        let bindVal = DataCtx.demobx(ctx.resolveAttrVal("bind"));
+        let updated = !DataCtx.DeepEqual(bindVal, this.lastVal);
+        if (this.firstRun) {
+            let fireOnInit = ctx.resolveAttrStr("fireoninit");
+            updated = (fireOnInit && fireOnInit !== "0");
+        }
+        if (updated) {
+            setTimeout(() => {
+                ctx.handleEvent("update", {value: bindVal});
+            }, 0);
+        }
+        return null;
+    }
+}
+
 class SimpleQueryNode extends React.Component<HibikiReactProps, {}> {
     refreshCount : mobx.IObservableValue<number>;
     callNum : number = 0;
@@ -1055,20 +1076,6 @@ class SimpleQueryNode extends React.Component<HibikiReactProps, {}> {
     }
 }
 
-@mobxReact.observer
-class DashElemNode extends React.Component<{ctx : DBCtx, extClass? : string, extStyle? : any}, {}> {
-    render() {
-        let ctx = this.props.ctx;
-        let cnArr = ctx.resolveCnArray(this.props.extClass);
-        let style = ctx.resolveStyleMap(this.props.extStyle);
-        return (
-            <div className={cn(cnArr, "dashelem")} style={style}>
-                {this.props.children}
-            </div>
-        );
-    }
-}
-
 function addCoreComponent(name : string, impl : any) {
     let comp : LibComponentType = {componentType: "hibiki-native"};
     comp.impl = mobx.observable.box(impl, {name: "@hibiki/core/" + name});
@@ -1105,5 +1112,6 @@ addCoreComponent("h-withcontext", WithContextNode);
 addCoreComponent("h-children", ChildrenNode);
 addCoreComponent("h-data", SimpleQueryNode);
 addCoreComponent("h-fragment", FragmentNode);
+addCoreComponent("h-watcher", WatcherNode);
 
 export {HibikiRootNode, CORE_LIBRARY};

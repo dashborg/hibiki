@@ -282,14 +282,10 @@ function makeCnArr(cnVal : any) : Record<string, boolean>[] {
     let splitArr = classVal.split(/\s+/);
     for (let i=0; i<splitArr.length; i++) {
         let val = splitArr[i];
-        if (val === "") {
+        if (val === "" || val === "hibiki-cloak") {
             continue;
         }
-        if (val.startsWith("no-")) {
-            rtn.push({[val.substr(3)]: false});
-            continue;
-        }
-        if (val.startsWith("-")) {
+        if (val.startsWith("!")) {
             rtn.push({[val.substr(1)]: false});
             continue;
         }
@@ -312,7 +308,7 @@ function resolveNonAmCnArray(node : HibikiNode, ns : string, dataenv : DataEnvir
         }
         let kval = k.substr(baseClassAttrName.length+1);
         let rval = getAttributeStr(node, k, dataenv);
-        if (rval && rval !== "0") {
+        if (rval && rval !== "0" && kval !== "hibiki-cloak") {
             cnArr.push({[kval]: true});
         }
         else {
@@ -683,7 +679,7 @@ function resolveAutoMergeCnArraySingle(source : string, argsRoot : Record<string
         }
         exists = true;
         let kval = k.substr(6);
-        if (v && v !== "0") {
+        if (v && v !== "0" && kval !== "hibiki-cloak") {
             cnArr.push({[kval]: true});
         }
         else {

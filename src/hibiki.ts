@@ -106,6 +106,7 @@ function render(elem : HTMLElement, state : HibikiExtState) {
     let reactElem = React.createElement(HibikiRootNode, props, null);
     state.setInitCallback(() => {
         ReactDOM.render(reactElem, elem);
+        elem.classList.remove("hibiki-cloak");
     });
     state.initialize(false);
 }
@@ -150,6 +151,11 @@ function loadTag(elem : HTMLElement) : HibikiExtState {
 
 function autoloadTags() {
     let elems = document.querySelectorAll("hibiki, template[hibiki]");
+    let htmlElem = document.querySelector("html");
+    let bodyElem = document.querySelector("body");
+    if (htmlElem.hasAttribute("hibiki") || (bodyElem != null && bodyElem.hasAttribute("hibiki"))) {
+        elems = document.querySelectorAll("body");
+    }
     for (let i=0; i<elems.length; i++) {
         let elem : HTMLElement = elems[i] as HTMLElement;
         if (elem.hasAttribute("noautoload")) {
@@ -220,9 +226,14 @@ let hibiki : Hibiki = {
 
 window.Hibiki = hibiki;
 
+let hideStyleSheet = document.createElement("style");
+hideStyleSheet.innerHTML = ".hibiki-cloak { display: none }";
+document.querySelector("head").appendChild(hideStyleSheet);
+
 if (document.readyState == "loading") {
     document.addEventListener("DOMContentLoaded", () => autoloadTags());
 }
 else {
     autoloadTags();
 }
+
