@@ -19,7 +19,7 @@ For an interactive walkthrough please check out the
 * **Issue Tracker** https://github.com/dashborg/hibiki/issues
 * **Homepage** - https://hibikihtml.com
 * **Reference Documentation** - https://docs.hibikihtml.com
-* **Join Slack for Questions** - [Invite Link](https://join.slack.com/t/hibikihtml/shared_invite/zt-10y1w2bf4-fTxbtFOM_BFaOBd2n6cAOg)
+* **Join Slack for Questions** - [Invite Link](https://join.slack.com/t/hibikihtml/shared_invite/zt-12chjq2j5-lBQ114i06ZQX0rV5hDsUBQ)
 
 ## Getting Started
 
@@ -267,5 +267,6 @@ I'm excited to see Hibiki HTML working in the real world.  If you have an applic
 thinking about using Hibiki HTML for, please reach out.  I'm happy to help, build out additional
 functionality/components, or do team training.
 
-[Join the Hibiki HTML Slack Channel](https://join.slack.com/t/hibikihtml/shared_invite/zt-10y1w2bf4-fTxbtFOM_BFaOBd2n6cAOg)
+[Join the Hibiki HTML Slack Channel](https://join.slack.com/t/hibikihtml/shared_invite/zt-12chjq2j5-lBQ114i06ZQX0rV5hDsUBQ
+)
 
