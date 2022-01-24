@@ -580,6 +580,9 @@ function base64ToArray(b64 : string) : Uint8Array {
 }
 
 function unbox(data : any) : any {
+    if (data == null) {
+        return null;
+    }
     if (mobx.isBoxedObservable(data)) {
         return data.get();
     }

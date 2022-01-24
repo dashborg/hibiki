@@ -185,12 +185,14 @@ class DataEnvironment {
         if (rootName === "args") {
             return this.getArgsRoot();
         }
-        else {
-            if (rootName in this.dbstate.DataRoots) {
-                return unbox(this.dbstate.DataRoots[rootName]);
-            }
-            throw new Error("Invalid root path");
+        if (rootName == "lib") {
+            let libContext = this.getLibContext() ?? "main";
+            return unbox(this.dbstate.DataRoots["lib:" + libContext])
         }
+        if (rootName in this.dbstate.DataRoots) {
+            return unbox(this.dbstate.DataRoots[rootName]);
+        }
+        throw new Error("Invalid root path");
     }
 
     getContextProxy() : {[e : string] : any} {

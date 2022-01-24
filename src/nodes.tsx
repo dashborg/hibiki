@@ -63,8 +63,9 @@ class HibikiRootNode extends React.Component<{hibikiState : HibikiExtState}, {}>
         let flowerEmoji = String.fromCodePoint(0x1F338);
         if (dbstate.allowUsageImg() && !usageFired) {
             usageFired = true;
+            let versionStr = (getHibiki().BUILD === "devbuild" ? "devbuild" : getHibiki().VERSION + "|" + getHibiki().BUILD);
             let usageImg = new Image();
-            usageImg.src = "https://hibikihtml.com/hibiki-usage.gif";
+            usageImg.src = sprintf("https://hibikihtml.com/hibiki-usage.gif?version=%s&build=%s", getHibiki().VERSION, getHibiki().BUILD);
             usageImg.onload = function() {};
         }
         if (dbstate.allowWelcomeMessage() && !welcomeMessage) {
