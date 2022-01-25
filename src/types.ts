@@ -5,13 +5,14 @@ import type {RtContext, HibikiError} from "./error";
 import type {HibikiRequest} from "./request";
 import * as mobx from "mobx";
 import type {HExpr, HibikiBlob, LValue, HIteratorExpr, HAction, HActionBlock, OpaqueValue, ChildrenVar} from "./datactx";
-import type {DataEnvironment} from "./state";
+import type {DataEnvironment, EHandlerType} from "./state";
 
 type NodeAttrType = string | HExpr;
 
 type HibikiValEx = HibikiVal | LValue | symbol;
 type HibikiValObj = {[k : string] : HibikiVal};
 type HibikiVal = string | number | boolean | HibikiValObj | HibikiVal[] | HibikiBlob | HibikiNode | OpaqueValue | ChildrenVar;
+type InjectedAttrs = Record<string, HibikiVal | LValue | EHandlerType>;
 
 type HibikiNode = {
     tag    : string,
@@ -33,6 +34,7 @@ type HibikiNode = {
 type HibikiReactProps = {
     node : HibikiNode,
     dataenv : DataEnvironment,
+    injectedAttrs : InjectedAttrs,
 };
 
 type AutoMergeExpr = {
@@ -71,6 +73,7 @@ type EventType = {
 type HandlerValType = {
     block : HandlerBlock,
     node : HibikiNode,
+    boundDataenv? : DataEnvironment,
 };
 
 type HandlerBlock =
@@ -229,5 +232,5 @@ interface HibikiExtState {
     makeWatcher(exprStr : string, callback : (v : HibikiVal) => void) : (() => void);
 };
 
-export type {HibikiNode, HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, ComponentType, LibraryType, HibikiRequest, Hibiki, HibikiAction, HibikiActionString, HibikiActionValue, HibikiExtState, EventType, HandlerValType, JSFuncType, FetchHookFn, CsrfHookFn, ReactClass, HandlerPathType, ErrorCallbackFn, EventCallbackFn, HtmlParserOpts, LibComponentType, HandlerBlock, NodeAttrType, HibikiVal, HibikiValObj, HibikiValEx, AutoMergeExpr, AutoFireExpr, HibikiReactProps, HttpConfig, JSFuncStr};
+export type {HibikiNode, HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, ComponentType, LibraryType, HibikiRequest, Hibiki, HibikiAction, HibikiActionString, HibikiActionValue, HibikiExtState, EventType, HandlerValType, JSFuncType, FetchHookFn, CsrfHookFn, ReactClass, HandlerPathType, ErrorCallbackFn, EventCallbackFn, HtmlParserOpts, LibComponentType, HandlerBlock, NodeAttrType, HibikiVal, HibikiValObj, HibikiValEx, AutoMergeExpr, AutoFireExpr, HibikiReactProps, HttpConfig, JSFuncStr, InjectedAttrs};
 

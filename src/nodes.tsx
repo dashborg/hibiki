@@ -14,8 +14,8 @@ import dayjsRelativeTime from "dayjs/plugin/relativeTime";
 import dayjsUtc from "dayjs/plugin/utc";
 import dayjsRelative from "dayjs/plugin/relativeTime";
 
-import type {HibikiNode, ComponentType, LibraryType, HibikiExtState, LibComponentType, NodeAttrType, HibikiVal, HibikiReactProps} from "./types";
-import {DBCtx} from "./dbctx";
+import type {HibikiNode, ComponentType, LibraryType, HibikiExtState, LibComponentType, NodeAttrType, HibikiVal, HibikiReactProps, InjectedAttrs} from "./types";
+import {DBCtx, makeDBCtx, makeCustomDBCtx} from "./dbctx";
 import * as DataCtx from "./datactx";
 import {HibikiState, DataEnvironment} from "./state";
 import {resolveNumber, isObject, textContent, SYM_PROXY, SYM_FLATTEN, jseval, nodeStr, getHibiki, addToArrayDupCheck, removeFromArray, valInArray, blobPrintStr, subMapKey, unbox, bindLibContext} from "./utils";
@@ -23,6 +23,7 @@ import {parseHtml} from "./html-parser";
 import * as NodeUtils from "./nodeutils";
 import {RtContext, HibikiError} from "./error";
 import type {HAction} from "./datactx";
+import type {EHandlerType} from "./state";
 
 declare var window : any;
 
@@ -83,7 +84,7 @@ class HibikiRootNode extends React.Component<{hibikiState : HibikiExtState}, {}>
         let dbstate = this.getHibikiState();
         let node = this.getHibikiNode();
         let dataenv = this.getDataenv();
-        let ctx = new DBCtx(null, node, dataenv);
+        let ctx = makeCustomDBCtx(node, dataenv, null);
         return <NodeList list={ctx.node.list} ctx={ctx} isRoot={true}/>;
     }
 }
@@ -113,61 +114,69 @@ function ctxRenderHtmlChildren(ctx : DBCtx, dataenv? : DataEnvironment) : (Eleme
     return rtn;
 }
 
+function baseRenderOneNode(node : HibikiNode, dataenv : DataEnvironment, injectedAttrs : InjectedAttrs, isRoot : boolean) : [any, boolean, DataEnvironment] {
+    if (node.tag == "#text") {
+        return [node.text, false, dataenv];
+    }
+    else if (node.tag == "#comment") {
+        return [null, false, null];
+    }
+    else if (NodeUtils.BLOCKED_ELEMS[node.tag]) {
+        return [null, false, null];
+    }
+    else if (node.tag == "if-break") {
+        let ifBreakCtx = makeCustomDBCtx(node, dataenv, null);
+        let [ifAttr, exists] = ifBreakCtx.resolveAttrValPair("condition");
+        if (!exists) {
+            return [<ErrorMsg message="<if-break> requires 'condition' attribute"/>, false, null];
+        }
+        if (!ifAttr) {
+            return [null, false, null];
+        }
+        return [<AnyNode node={node} dataenv={dataenv} injectedAttrs={injectedAttrs}/>, true, null];
+    }
+    else if (node.tag == "define-vars") {
+        let setCtx = makeCustomDBCtx(node, dataenv, null);
+        let contextAttr = setCtx.resolveAttrStr("context");
+        if (contextAttr == null) {
+            return [<ErrorMsg message="<define-vars> no context attribute"/>, false, null];
+        }
+        try {
+            let ctxDataenv = DataCtx.ParseAndCreateContextThrow(contextAttr, "context", dataenv, "<define-vars>");
+            return [null, false, ctxDataenv];
+        }
+        catch (e) {
+            return [<ErrorMsg message={"<define-vars> Error parsing/executing context block: " + e}/>, false, null];
+        }
+        return [null, false, null];
+    }
+    else if (node.tag == "define-handler") {
+        let attrs = node.attrs || {};
+        if (!isRoot) {
+            return [<ErrorMsg message={"<define-handler> is only allowed at root of <hibiki>, <page>, or <define-component> nodes"}/>, false, null];
+        }
+        return [null, false, null];
+    }
+    else {
+        return [<AnyNode node={node} dataenv={dataenv} injectedAttrs={injectedAttrs}/>, false, null];
+    }
+}
+
 function baseRenderHtmlChildren(list : HibikiNode[], dataenv : DataEnvironment, isRoot : boolean) : Element[] {
     let rtn : any[] = [];
     if (list == null || list.length == 0) {
         return null;
     }
     for (let child of list) {
-        if (child.tag == "#text") {
-            rtn.push(child.text);
+        let [elem, stopLoop, newDataenv] = baseRenderOneNode(child, dataenv, null, isRoot);
+        if (elem != null) {
+            rtn.push(elem);
         }
-        else if (child.tag == "#comment") {
-            continue;
-        }
-        else if (NodeUtils.BLOCKED_ELEMS[child.tag]) {
-            continue;
-        }
-        else if (child.tag == "if-break") {
-            // withcontext?
-            let ifBreakCtx = new DBCtx(null, child, dataenv);
-            let [ifAttr, exists] = ifBreakCtx.resolveAttrValPair("condition");
-            if (!exists) {
-                rtn.push(<ErrorMsg message="<if-break> requires 'condition' attribute"/>);
-                continue;
-            }
-            if (!ifAttr) {
-                continue;
-            }
-            rtn.push(<AnyNode node={child} dataenv={dataenv}/>);
+        if (stopLoop) {
             break;
         }
-        else if (child.tag == "define-vars") {
-            let setCtx = new DBCtx(null, child, dataenv);
-            let contextAttr = setCtx.resolveAttrStr("context");
-            if (contextAttr == null) {
-                rtn.push(<ErrorMsg message="<define-vars> no context attribute"/>);
-                continue;
-            }
-            try {
-                let ctxDataenv = DataCtx.ParseAndCreateContextThrow(contextAttr, "context", dataenv, "<define-vars>");
-                dataenv = ctxDataenv;
-            }
-            catch (e) {
-                rtn.push(<ErrorMsg message={"<define-vars> Error parsing/executing context block: " + e}/>);
-            }
-            continue;
-        }
-        else if (child.tag == "define-handler") {
-            let attrs = child.attrs || {};
-            if (!isRoot) {
-                rtn.push(<ErrorMsg message={"<define-handler> is only allowed at root of <hibiki>, <page>, or <define-component> nodes"}/>);
-                continue;
-            }
-            continue;
-        }
-        else {
-            rtn.push(<AnyNode node={child} dataenv={dataenv}/>);
+        if (newDataenv != null) {
+            dataenv = newDataenv;
         }
     }
     return rtn;
@@ -186,7 +195,7 @@ class NodeList extends React.Component<{list : HibikiNode[], ctx : DBCtx, isRoot
 }
 
 function staticEvalTextNode(node : HibikiNode, dataenv : DataEnvironment) : string {
-    let ctx = new DBCtx(null, node, dataenv);
+    let ctx = makeCustomDBCtx(node, dataenv, null);
     let tagName = ctx.node.tag;
     if (tagName == "#text") {
         return node.text;
@@ -201,7 +210,7 @@ function staticEvalTextNode(node : HibikiNode, dataenv : DataEnvironment) : stri
         }
     }
     // TODO foreach
-    let rtn = NodeUtils.renderTextData(node, dataenv, true);
+    let rtn = NodeUtils.renderTextData(ctx, true);
     return rtn;
 }
 
@@ -217,7 +226,7 @@ class AnyNode extends React.Component<HibikiReactProps, {}> {
         for (let ctxVars of iterator) {
             let htmlContext = sprintf("%s:%d", nodeStr(ctx.node), index);
             let childEnv = ctx.dataenv.makeChildEnv(ctxVars, {htmlContext: htmlContext});
-            let childCtx = new DBCtx(null, node, childEnv);
+            let childCtx = makeCustomDBCtx(node, childEnv, this.props.injectedAttrs);
             let content = this.renderInner(childCtx, true);
             if (content != null) {
                 rtnContent.push(content);
@@ -252,7 +261,7 @@ class AnyNode extends React.Component<HibikiReactProps, {}> {
         if (component != null) {
             if (component.componentType == "react-custom") {
                 this.nodeType = "react-component";
-                return <CustomReactNode component={component} node={node} dataenv={dataenv}/>;
+                return <CustomReactNode component={component} node={node} dataenv={dataenv} injectedAttrs={ctx.injectedAttrs}/>;
             }
             else if (component.componentType == "hibiki-native") {
                 this.nodeType = "component";
@@ -267,7 +276,7 @@ class AnyNode extends React.Component<HibikiReactProps, {}> {
             }
             else if (component.componentType == "hibiki-html") {
                 this.nodeType = "hibiki-html-component";
-                return <CustomNode component={component} node={node} dataenv={dataenv}/>;
+                return <CustomNode component={component} node={node} dataenv={dataenv} injectedAttrs={ctx.injectedAttrs}/>;
             }
             else {
                 this.nodeType = "unknown";
@@ -276,14 +285,14 @@ class AnyNode extends React.Component<HibikiReactProps, {}> {
         }
         if (compName.startsWith("html-") || compName.indexOf("-") == -1) {
             this.nodeType = "rawhtml";
-            return <RawHtmlNode node={node} dataenv={dataenv}/>
+            return <RawHtmlNode node={node} dataenv={dataenv} injectedAttrs={ctx.injectedAttrs}/>
         }
         this.nodeType = "unknown";
         return <div>&lt;{compName}&gt;</div>;
     }
 
     render() {
-        let ctx = new DBCtx(this);
+        let ctx = makeDBCtx(this);
         let content = this.renderInner(ctx, false)
         return content;
     }
@@ -292,7 +301,7 @@ class AnyNode extends React.Component<HibikiReactProps, {}> {
 @mobxReact.observer
 class CustomReactNode extends React.Component<HibikiReactProps & {component : ComponentType}, {}> {
     componentDidMount() {
-        let ctx = new DBCtx(this);
+        let ctx = makeDBCtx(this);
         if (ctx.isEditMode()) {
             return;
         }
@@ -300,7 +309,7 @@ class CustomReactNode extends React.Component<HibikiReactProps & {component : Co
     }
     
     render() {
-        let ctx = new DBCtx(this);
+        let ctx = makeDBCtx(this);
         let dataenv = ctx.dataenv;
         let component = this.props.component;
         let implBox = component.reactimpl;
@@ -312,7 +321,7 @@ class CustomReactNode extends React.Component<HibikiReactProps & {component : Co
             return null;
         }
         let attrs = ctx.resolveAttrVals();
-        let nodeVar = NodeUtils.makeNodeVar(ctx);
+        let nodeVar = NodeUtils.makeNodeVar(ctx, false);
         let htmlContext = sprintf("react:%s", nodeStr(ctx.node));
         let childEnv = ctx.dataenv.makeChildEnv({node: nodeVar}, {htmlContext: htmlContext, libContext: component.libName});
         let rtnElems = baseRenderHtmlChildren(ctx.node.list, childEnv, false)
@@ -333,11 +342,11 @@ async function convertBlobArray(blobArr : Blob[]) : Promise<DataCtx.HibikiBlob[]
 class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
     constructor(props : any) {
         super(props);
-        let ctx = new DBCtx(this);
+        let ctx = makeDBCtx(this);
     }
 
     componentDidMount() {
-        let ctx = new DBCtx(this);
+        let ctx = makeDBCtx(this);
         if (ctx.isEditMode()) {
             return;
         }
@@ -345,7 +354,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
     }
 
     @boundMethod handleFileOnChange(e) {
-        let ctx = new DBCtx(this);
+        let ctx = makeDBCtx(this);
         let isMultiple = !!ctx.resolveAttrStr("multiple");
         let valueLV = ctx.resolveLValueAttr("value");
         let p = convertBlobArray(e.target.files);
@@ -373,7 +382,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
     }
 
     @boundMethod handleSelectOnChange(e) {
-        let ctx = new DBCtx(this);
+        let ctx = makeDBCtx(this);
         let valueLV = ctx.resolveLValueAttr("value");
         let isMulti = !!ctx.resolveAttrStr("multiple");
         let newValue : (string | string[]) = null;
@@ -390,7 +399,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
     }
 
     @boundMethod handleValueOnChange(e) {
-        let ctx = new DBCtx(this);
+        let ctx = makeDBCtx(this);
         let valueLV = ctx.resolveLValueAttr("value");
         let newValue = e.target.value;
         NodeUtils.handleConvertType(ctx, newValue);
@@ -402,7 +411,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
     }
 
     @boundMethod handleRadioOnChange(e) {
-        let ctx = new DBCtx(this);
+        let ctx = makeDBCtx(this);
         let formValueLV = ctx.resolveLValueAttr("formvalue");
         let newValue = e.target.checked;
         ctx.handleOnChange(newValue);
@@ -414,7 +423,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
     }
 
     @boundMethod handleCheckboxOnChange(e) {
-        let ctx = new DBCtx(this);
+        let ctx = makeDBCtx(this);
         let checkedLV = ctx.resolveLValueAttr("checked");
         let formValueLV = ctx.resolveLValueAttr("formvalue");
         let newValue = e.target.checked;
@@ -564,7 +573,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
     }
     
     render() {
-        let ctx = new DBCtx(this);
+        let ctx = makeDBCtx(this);
         let tagName = ctx.getHtmlTagName();
         let elemProps : Record<string, any> = {};
         let attrVals : Record<string, HibikiVal> = ctx.resolveAttrVals();
@@ -657,6 +666,87 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
     }
 }
 
+function createInjectList(ctx : DBCtx, child : HibikiNode, nodeDataenv : DataEnvironment) : Record<string, HibikiVal | DataCtx.LValue | EHandlerType> {
+    let childCtx = makeCustomDBCtx(child, nodeDataenv, null);
+    let nodeVar = NodeUtils.makeNodeVar(childCtx, true);
+    let evalInjectAttrsEnv = ctx.dataenv.makeChildEnv({node: nodeVar}, null);
+    let injectAttrs = DataCtx.resolveValAttrs(ctx.node, evalInjectAttrsEnv, null);
+    let toInject : Record<string, HibikiVal | DataCtx.LValue | EHandlerType> = {};
+    for (let k in injectAttrs) {
+        if (!k.startsWith("inject:")) {
+            continue;
+        }
+        let shortName = k.substr(7);
+        let lv = ctx.resolveLValueAttr(k);
+        if (lv != null) {
+            toInject[shortName] = lv;
+        }
+        else {
+            toInject[shortName] = injectAttrs[k];
+        }
+    }
+    let styleMap = DataCtx.getStyleMap(ctx.node, "inject", evalInjectAttrsEnv, null);
+    if (styleMap != null && Object.keys(styleMap).length > 0) {
+        toInject["@style"] = styleMap;
+    }
+    if (ctx.node.handlers != null) {
+        for (let hname in ctx.node.handlers) {
+            if (!hname.startsWith("inject:")) {
+                continue;
+            }
+            let shortName = hname.substr(7);
+            let handlerBlock = ctx.node.handlers[hname];
+            toInject[shortName + ".handler"] = {handler: new DataCtx.HActionBlock(handlerBlock, ctx.dataenv.getLibContext()), node: ctx.node, dataenv: evalInjectAttrsEnv};
+        }
+    }
+    return toInject;
+}
+
+@mobxReact.observer
+class InjectNode extends React.Component<HibikiReactProps> {
+    render() {
+        let ctx = makeDBCtx(this);
+        let nodeDataenv : DataEnvironment = null;
+        let nodeList : HibikiNode[] = null;
+        let bindVal = ctx.resolveAttrVal("bind");
+        if (bindVal != null) {
+            if (!(bindVal instanceof DataCtx.ChildrenVar)) {
+                return <ErrorMsg message={sprintf("%s bind expression is not valid, must be [children] type", nodeStr(ctx.node))}/>;
+            }
+            nodeList = bindVal.list;
+            nodeDataenv = bindVal.dataenv;
+        }
+        else if (ctx.node.list != null) {
+            nodeList = ctx.node.list;
+            nodeDataenv = ctx.dataenv;
+        }
+        if (nodeList == null || nodeList.length == 0) {
+            return null;
+        }
+        let rtnElems = [];
+        for (let child of nodeList) {
+            let toInject = null;
+            if (!NodeUtils.NON_INJECTABLE[child.tag] && !child.tag.startsWith("#")) {
+                toInject = createInjectList(ctx, child, nodeDataenv);
+            }
+            let [elem, shouldBreak, newEnv] = baseRenderOneNode(child, nodeDataenv, toInject, false);
+            if (elem != null) {
+                rtnElems.push(elem);
+            }
+            if (shouldBreak) {
+                break;
+            }
+            if (newEnv) {
+                nodeDataenv = newEnv;
+            }
+        }
+        if (rtnElems.length == 0) {
+            return null;
+        }
+        return <React.Fragment>{rtnElems}</React.Fragment>;
+    }
+}
+
 @mobxReact.observer
 class CustomNode extends React.Component<HibikiReactProps & {component : ComponentType}, {}> {
     constructor(props : any) {
@@ -665,13 +755,13 @@ class CustomNode extends React.Component<HibikiReactProps & {component : Compone
     }
     
     makeCustomChildEnv(initialize : boolean) : DataEnvironment {
-        let ctx = new DBCtx(this);
+        let ctx = makeDBCtx(this);
         let component = this.props.component;
         let implNode = component.node;
         let rawImplAttrs : Record<string, NodeAttrType> = implNode.attrs || {};
-        let nodeVar = NodeUtils.makeNodeVar(ctx);
+        let nodeVar = NodeUtils.makeNodeVar(ctx, false);
         let componentName = DataCtx.rawAttrStr(rawImplAttrs.name);
-        let ctxHandlers = NodeUtils.makeHandlers(ctx.node, null, null);
+        let ctxHandlers = NodeUtils.makeHandlers(ctx.node, ctx.injectedAttrs, null, null);
         let eventCtx = sprintf("%s", nodeStr(ctx.node));
         let eventDE = ctx.dataenv.makeChildEnv(null, {eventBoundary: "hard", handlers: ctxHandlers, htmlContext: eventCtx});
         let nodeDataLV = ctx.getNodeDataLV(componentName);
@@ -679,7 +769,7 @@ class CustomNode extends React.Component<HibikiReactProps & {component : Compone
         specials.children = new DataCtx.ChildrenVar(ctx.node.list, ctx.dataenv);
         specials.node = nodeVar;
         let argsRoot = ctx.resolveArgsRoot(implNode);
-        let handlers = NodeUtils.makeHandlers(implNode, component.libName, ["event"]);
+        let handlers = NodeUtils.makeHandlers(implNode, null, component.libName, ["event"]);
         let envOpts = {
             componentRoot: unbox(ctx.getNodeData(componentName)),
             argsRoot: argsRoot,
@@ -701,7 +791,7 @@ class CustomNode extends React.Component<HibikiReactProps & {component : Compone
     }
 
     componentDidMount() {
-        let ctx = new DBCtx(this);
+        let ctx = makeDBCtx(this);
         if (ctx.isEditMode()) {
             return;
         }
@@ -709,12 +799,12 @@ class CustomNode extends React.Component<HibikiReactProps & {component : Compone
     }
 
     componentWillUnmount() {
-        let ctx = new DBCtx(this);
+        let ctx = makeDBCtx(this);
         ctx.unregisterUuid();
     }
 
     render() {
-        let ctx = new DBCtx(this);
+        let ctx = makeDBCtx(this);
         ctx.registerUuid();
         let component = this.props.component;
         let implNode = component.node;
@@ -730,14 +820,15 @@ class CustomNode extends React.Component<HibikiReactProps & {component : Compone
 @mobxReact.observer
 class TextNode extends React.Component<HibikiReactProps, {}> {
     render() {
-        return NodeUtils.renderTextData(this.props.node, this.props.dataenv);
+        let ctx = makeDBCtx(this);
+        return NodeUtils.renderTextData(ctx);
     }
 }
 
 @mobxReact.observer
 class IfNode extends React.Component<HibikiReactProps, {}> {
     render() {
-        let ctx = new DBCtx(this);
+        let ctx = makeDBCtx(this);
         let [condAttr, exists] = ctx.resolveAttrValPair("condition");
         if (!exists) {
             return <ErrorMsg message={sprintf("<%s> node requires 'condition' attribute", ctx.node.tag)}/>
@@ -752,7 +843,7 @@ class IfNode extends React.Component<HibikiReactProps, {}> {
 @mobxReact.observer
 class FragmentNode extends React.Component<HibikiReactProps, {}> {
     render() {
-        let ctx = new DBCtx(this);
+        let ctx = makeDBCtx(this);
         return <NodeList list={ctx.node.list} ctx={ctx}/>;
     }
 }
@@ -760,7 +851,7 @@ class FragmentNode extends React.Component<HibikiReactProps, {}> {
 @mobxReact.observer
 class ScriptNode extends React.Component<HibikiReactProps, {}> {
     render() {
-        let ctx = new DBCtx(this);
+        let ctx = makeDBCtx(this);
         let srcAttr = ctx.resolveAttrVal("src");
         let isSync = !ctx.resolveAttrStr("async")
         if (srcAttr == null) {
@@ -784,7 +875,7 @@ class ScriptNode extends React.Component<HibikiReactProps, {}> {
 @mobxReact.observer
 class DateFormatNode extends React.Component<HibikiReactProps, {}> {
     render() {
-        let ctx = new DBCtx(this);
+        let ctx = makeDBCtx(this);
         let bindVal = DataCtx.demobx(ctx.resolveAttrVal("bind"));
         let modeAttr = ctx.resolveAttrStr("mode");
         let nulltext = ctx.resolveAttrStr("nulltext");
@@ -860,7 +951,7 @@ class NopNode extends React.Component<HibikiReactProps, {}> {
 @mobxReact.observer
 class WithContextNode extends React.Component<HibikiReactProps, {}> {
     render() {
-        let ctx = new DBCtx(this);
+        let ctx = makeDBCtx(this);
         let contextattr = ctx.resolveAttrStr("context");
         if (contextattr == null) {
             return <ErrorMsg message={sprintf("%s no context attribute", nodeStr(ctx.node))}/>;
@@ -878,7 +969,7 @@ class WithContextNode extends React.Component<HibikiReactProps, {}> {
 @mobxReact.observer
 class ChildrenNode extends React.Component<HibikiReactProps, {}> {
     render() {
-        let ctx = new DBCtx(this);
+        let ctx = makeDBCtx(this);
         let textStr = ctx.resolveAttrStr("text");
         if (textStr != null) {
             return textStr;
@@ -923,7 +1014,7 @@ class DynNode extends React.Component<HibikiReactProps, {}> {
     curHtmlObj : HibikiNode = null;
 
     render() {
-        let ctx = new DBCtx(this);
+        let ctx = makeDBCtx(this);
         let bindVal = ctx.resolveAttrStr("bind");
         if (bindVal == null) {
             return null;
@@ -961,7 +1052,7 @@ class WatcherNode extends React.Component<HibikiReactProps, {}> {
     }
     
     render() {
-        let ctx = new DBCtx(this);
+        let ctx = makeDBCtx(this);
         let bindVal = DataCtx.demobx(ctx.resolveAttrVal("bind"));
         let updated = !DataCtx.DeepEqual(bindVal, this.lastVal);
         if (this.firstRun) {
@@ -986,10 +1077,10 @@ class SimpleQueryNode extends React.Component<HibikiReactProps, {}> {
     constructor(props : any) {
         super(props);
         let self = this;
-        let ctx = new DBCtx(this);
+        let ctx = makeDBCtx(this);
         this.refreshCount = mobx.observable.box(0, {name: "refreshCount"});
         this.nameComputed = mobx.computed(() => {
-            let ctx = new DBCtx(self);
+            let ctx = makeDBCtx(self);
             let name = ctx.resolveAttrStr("name");
             if (name != null) {
                 return name;
@@ -1036,7 +1127,7 @@ class SimpleQueryNode extends React.Component<HibikiReactProps, {}> {
 
     @boundMethod
     doGetData() {
-        let ctx = new DBCtx(this);
+        let ctx = makeDBCtx(this);
         let dbstate = ctx.dataenv.dbstate;
         let version = dbstate.RenderVersion.get();
         let refreshCount = this.refreshCount.get();
@@ -1062,7 +1153,7 @@ class SimpleQueryNode extends React.Component<HibikiReactProps, {}> {
     }
     
     render() {
-        let ctx = new DBCtx(this);
+        let ctx = makeDBCtx(this);
         let queryStr = ctx.resolveAttrStr("query");
         if (queryStr == null) {
             return <ErrorMsg message={sprintf("%s without query attribute", nodeStr(ctx.node))}/>;
@@ -1114,5 +1205,6 @@ addCoreComponent("h-children", ChildrenNode);
 addCoreComponent("h-data", SimpleQueryNode);
 addCoreComponent("h-fragment", FragmentNode);
 addCoreComponent("h-watcher", WatcherNode);
+addCoreComponent("h-inject", InjectNode);
 
 export {HibikiRootNode, CORE_LIBRARY};

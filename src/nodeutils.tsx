@@ -4,12 +4,13 @@ import * as mobx from "mobx";
 import * as React from "react";
 import * as cn from "classnames/dedupe";
 
-import {DBCtx} from "./dbctx";
-import type {HibikiNode, HandlerValType, HibikiVal} from "./types";
+import {DBCtx, makeCustomDBCtx} from "./dbctx";
+import type {HibikiNode, HandlerValType, HibikiVal, InjectedAttrs} from "./types";
 import * as DataCtx from "./datactx";
 import {sprintf} from "sprintf-js";
 import {isObject, textContent, rawAttrFromNode, nodeStr} from "./utils";
 import {DataEnvironment} from "./state";
+import type {EHandlerType} from "./state";
 
 let BLOCKED_ELEMS = {
     "html": true,
@@ -19,6 +20,11 @@ let BLOCKED_ELEMS = {
     "frameset": true,
     "title": true,
     "applet": true,
+};
+
+let NON_INJECTABLE = {
+    "define-vars": true,
+    "if-break": true,
 };
 
 let INLINE_ELEMS = {
@@ -163,8 +169,7 @@ function renderTextSpan(text : string, style : any, className : string) : any {
     return text;
 }
 
-function renderTextData(node : HibikiNode, dataenv : DataEnvironment, onlyText? : boolean) : any {
-    let ctx = new DBCtx(null, node, dataenv);
+function renderTextData(ctx : DBCtx, onlyText? : boolean) : any {
     let style = ctx.resolveStyleMap();
     let cnArr = ctx.resolveCnArray();
     let bindVal = DataCtx.demobx(ctx.resolveAttrVal("bind"));
@@ -185,7 +190,7 @@ function renderTextData(node : HibikiNode, dataenv : DataEnvironment, onlyText? 
     return renderTextSpan(rtn, style, cn(cnArr));
 }
 
-function makeNodeVar(ctx : DBCtx) : any {
+function makeNodeVar(ctx : DBCtx, withAttrs : boolean) : any {
     let node = ctx.node;
     if (node == null) {
         return null;
@@ -193,9 +198,11 @@ function makeNodeVar(ctx : DBCtx) : any {
     let rtn : any = {};
     rtn.tag = ctx.getHtmlTagName();
     rtn.rawtag = ctx.node.tag;
-    rtn._type = "HibikiNode";
     rtn.uuid = ctx.uuid;
-    rtn.dataenv = ctx.dataenv;
+    if (withAttrs) {
+        rtn.attrs = ctx.resolveAttrVals();
+    }
+    rtn.children = new DataCtx.ChildrenVar(ctx.node.list, ctx.dataenv);
     return rtn;
 }
 
@@ -286,14 +293,31 @@ function handleConvertType(ctx : DBCtx, value : string) : any {
     return value;
 }
 
-function makeHandlers(node : HibikiNode, libContext : string, handlerPrefixes : string[]) : Record<string, HandlerValType> {
+function makeHandlers(node : HibikiNode, injectedAttrs : InjectedAttrs, libContext : string, handlerPrefixes : string[]) : Record<string, HandlerValType> {
     let handlers : Record<string, HandlerValType> = {};
+    if (injectedAttrs != null) {
+        for (let iname in injectedAttrs) {
+            if (!iname.endsWith(".handler")) {
+                continue;
+            }
+            let hname = sprintf("//@event/%s", iname.substr(0, iname.length-8));
+            let ehandler = (injectedAttrs[iname] as EHandlerType);
+            handlers[hname] = {
+                block: ehandler.handler,
+                node: ehandler.node,
+                boundDataenv: ehandler.dataenv,
+            };
+        }
+    }
     if (node.handlers != null) {
         for (let eventName in node.handlers) {
             if (node.handlers[eventName] == null) {
                 continue;
             }
             let hname = sprintf("//@event/%s", eventName);
+            if (hname in handlers) {
+                continue;
+            }
             handlers[hname] = {block: new DataCtx.HActionBlock(node.handlers[eventName], libContext), node: node};
         }
     }
@@ -362,4 +386,4 @@ function getRawAttrs(node : HibikiNode) : Record<string, string> {
     return rtn;
 }
 
-export {BLOCKED_ELEMS, INLINE_ELEMS, SPECIAL_ATTRS, BLOB_ATTRS, SUBMIT_ELEMS, MANAGED_ATTRS, renderTextSpan, renderTextData, makeNodeVar, parseArgsDecl, handleConvertType, makeHandlers, subNodesByTag, firstSubNodeByTag, getManagedType, getRawAttrs};
+export {BLOCKED_ELEMS, INLINE_ELEMS, SPECIAL_ATTRS, BLOB_ATTRS, SUBMIT_ELEMS, MANAGED_ATTRS, NON_INJECTABLE, renderTextSpan, renderTextData, makeNodeVar, parseArgsDecl, handleConvertType, makeHandlers, subNodesByTag, firstSubNodeByTag, getManagedType, getRawAttrs};

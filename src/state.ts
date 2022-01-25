@@ -290,6 +290,9 @@ class DataEnvironment {
         let evHandlerName = sprintf("//@event/%s", event.event);
         if ((evHandlerName in env.handlers) && !rtctx.isHandlerInStack(env, event.event)) {
             let hval = env.handlers[evHandlerName];
+            if (hval.boundDataenv != null) {
+                return {handler: hval.block, node: hval.node, dataenv: hval.boundDataenv};
+            }
             return {handler: hval.block, node: hval.node, dataenv: env};
         }
         if (env.parent == null) {
@@ -680,10 +683,10 @@ class ComponentLibrary {
 
         // handlers
         if (libName == "main") {
-            libObj.handlers = NodeUtils.makeHandlers(libNode, libName, ["local", "event"]);
+            libObj.handlers = NodeUtils.makeHandlers(libNode, null, libName, ["local", "event"]);
         }
         else {
-            libObj.handlers = NodeUtils.makeHandlers(libNode, libName, ["lib"]);
+            libObj.handlers = NodeUtils.makeHandlers(libNode, null, libName, ["lib"]);
         }
 
         // modules
@@ -1071,8 +1074,8 @@ class HibikiState {
         let htmlContext = sprintf("<page %s>", this.PageName.get());
         let opts = {eventBoundary: "hard", htmlContext: htmlContext, libContext: "main", handlers: {}};
         let curPage = this.findCurrentPage();
-        let h1 = NodeUtils.makeHandlers(curPage, "main", ["event", "local"]);
-        let h2 = NodeUtils.makeHandlers(this.HtmlObj.get(), "main", ["event", "local"]);
+        let h1 = NodeUtils.makeHandlers(curPage, null, "main", ["event", "local"]);
+        let h2 = NodeUtils.makeHandlers(this.HtmlObj.get(), null, "main", ["event", "local"]);
         opts.handlers = Object.assign({}, h2, h1);
         env = env.makeChildEnv(null, opts);
         return env;

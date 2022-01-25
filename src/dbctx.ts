@@ -2,14 +2,16 @@
 
 import * as mobx from "mobx";
 import * as DataCtx from "./datactx";
+import * as cn from "classnames/dedupe";
 import { v4 as uuidv4 } from 'uuid';
 import {DataEnvironment} from "./state";
 import {sprintf} from "sprintf-js";
 import {boundMethod} from 'autobind-decorator'
-import {HibikiNode, HibikiVal, HibikiValEx} from "./types";
+import {HibikiNode, HibikiVal, HibikiValObj, HibikiValEx, InjectedAttrs, HibikiReactProps} from "./types";
 import * as NodeUtils from "./nodeutils";
-import {nodeStr} from "./utils";
+import {nodeStr, isObject} from "./utils";
 import {RtContext} from "./error";
+import type {EHandlerType} from "./state";
 
 async function convertFormData(formData : FormData) : Promise<Record<string, any>> {
     let params = {};
@@ -46,21 +48,28 @@ async function convertFormData(formData : FormData) : Promise<Record<string, any
     return params;
 }
 
+function makeCustomDBCtx(nodeArg : HibikiNode, dataenvArg : DataEnvironment, injectedAttrs : InjectedAttrs) : DBCtx {
+    return new DBCtx(null, nodeArg, dataenvArg, injectedAttrs);
+}
+
+function makeDBCtx(elem : React.Component<HibikiReactProps, {}>) : DBCtx {
+    return new DBCtx(elem, null, null, null);
+}
+
 class DBCtx {
     dataenv : DataEnvironment;
     node : HibikiNode;
     uuid : string;
+    injectedAttrs : InjectedAttrs;
     
-    constructor(elem : React.Component<{node : HibikiNode, dataenv : DataEnvironment}, {}>, nodeArg? : HibikiNode, dataenvArg? : DataEnvironment) {
+    constructor(elem : React.Component<HibikiReactProps, {}>, nodeArg : HibikiNode, dataenvArg : DataEnvironment, injectedAttrs : InjectedAttrs) {
         if (elem != null) {
+            this.dataenv = elem.props.dataenv;
+            this.node = elem.props.node;
+            this.injectedAttrs = elem.props.injectedAttrs ?? {};
             let elemAny = elem as any;
             if (elemAny.uuid == null) {
                 elemAny.uuid = uuidv4();
-            }
-            this.dataenv = elem.props.dataenv;
-            this.node = elemAny.props.node;
-            if (nodeArg != null) {
-                this.node = nodeArg;
             }
             this.uuid = elemAny.uuid;
         }
@@ -68,6 +77,7 @@ class DBCtx {
             this.dataenv = dataenvArg;
             this.node = nodeArg;
             this.uuid = uuidv4();
+            this.injectedAttrs = injectedAttrs ?? {};
         }
         if (this.node == null) {
             throw new Error("DBCtx no node prop");
@@ -95,16 +105,47 @@ class DBCtx {
         return this.dataenv.evalExpr(expr, keepMobx);
     }
 
+    getInjectedValPair(attrName : string) : [HibikiVal, boolean] {
+        if (!(attrName in this.injectedAttrs) || attrName.endsWith(".handler")) {
+            return [null, false];
+        }
+        let val = this.injectedAttrs[attrName];
+        if (val instanceof DataCtx.LValue) {
+            let resolvedVal = val.getEx();
+            if (resolvedVal === DataCtx.SYM_NOATTR) {
+                return [null, false];
+            }
+            return [DataCtx.exValToVal(resolvedVal), true];
+        }
+        if (isObject(val) && (val as EHandlerType).dataenv instanceof DataEnvironment) {
+            return ["[ehandler]", true];
+        }
+        let hval = val as HibikiVal;
+        return [DataCtx.exValToVal(hval), true];
+    }
+
     resolveAttrStr(attrName : string) : string {
+        let [ival, exists] = this.getInjectedValPair(attrName);
+        if (exists) {
+            return DataCtx.valToString(ival);
+        }
         return DataCtx.getAttributeStr(this.node, attrName, this.dataenv);
     }
 
     resolveAttrVal(attrName : string) : HibikiVal {
+        let [ival, iexists] = this.getInjectedValPair(attrName);
+        if (iexists) {
+            return ival;
+        }
         let [rval, exists] = DataCtx.getAttributeValPair(this.node, attrName, this.dataenv);
         return rval;
     }
 
     resolveAttrValPair(attrName : string) : [HibikiVal, boolean] {
+        let [ival, iexists] = this.getInjectedValPair(attrName);
+        if (iexists) {
+            return [ival, true];
+        }
         return DataCtx.getAttributeValPair(this.node, attrName, this.dataenv);
     }
 
@@ -119,11 +160,15 @@ class DBCtx {
     }
 
     hasHandler(handlerName : string) : boolean {
+        let ihname = handlerName + ".handler";
+        if (ihname in this.injectedAttrs) {
+            return true;
+        }
         return (this.node.handlers != null && this.node.handlers[handlerName] != null);
     }
 
     resolveAttrVals() : Record<string, HibikiVal> {
-        return DataCtx.resolveValAttrs(this.node, this.dataenv);
+        return DataCtx.resolveValAttrs(this.node, this.dataenv, this.injectedAttrs);
     }
 
     getRawAttr(attrName : string) : string {
@@ -138,19 +183,31 @@ class DBCtx {
     }
 
     resolveNsStyleMap(ns : string, initStyles? : any) : any {
+        let [ival, exists] = this.getInjectedValPair(DataCtx.nsAttrName("@style", ns));
+        if (exists && isObject(ival)) {
+            let ivalObj : HibikiValObj = ival as HibikiValObj;
+            initStyles = initStyles ?? {};
+            for (let skey in ivalObj) {
+                initStyles[skey] = ivalObj[skey];
+            }
+        }
         return DataCtx.getStyleMap(this.node, ns, this.dataenv, initStyles);
     }
 
     resolveStyleMap(initStyles? : Record<string, any>) : any {
-        return DataCtx.getStyleMap(this.node, "self", this.dataenv, initStyles);
+        return this.resolveNsStyleMap("self", initStyles);
     }
 
     resolveNsCnArray(ns : string, moreClasses? : string) : Record<string, boolean>[] {
+        let [ival, exists] = this.getInjectedValPair(DataCtx.nsAttrName("class", ns));
+        if (exists) {
+            moreClasses = (moreClasses ?? "") + " " + DataCtx.valToString(ival);
+        }
         return DataCtx.resolveCnArray(this.node, ns, this.dataenv, moreClasses);
     }
 
     resolveCnArray(moreClasses? : string) : Record<string, boolean>[] {
-        return DataCtx.resolveCnArray(this.node, "self", this.dataenv, moreClasses);
+        return this.resolveNsCnArray("self", moreClasses);
     }
 
     setDataPath(path : string, value : HibikiVal, rtContext? : string) {
@@ -159,7 +216,7 @@ class DBCtx {
     }
 
     getEventDataenv() : DataEnvironment {
-        let handlers = NodeUtils.makeHandlers(this.node, null, null);
+        let handlers = NodeUtils.makeHandlers(this.node, this.injectedAttrs, null, null);
         let htmlContext = sprintf("<%s>", this.node.tag);
         let envOpts = {
             htmlContext: htmlContext,
@@ -206,7 +263,6 @@ class DBCtx {
     @boundMethod handleOnClick(e : any) : boolean {
         if (e != null) {
             e.preventDefault();
-            // e.stopPropagation();
         }
         this.handleEvent("click");
         return true;
@@ -234,26 +290,22 @@ class DBCtx {
     }
 
     resolveLValueAttr(dataName : string) : DataCtx.LValue {
+        if (dataName in this.injectedAttrs) {
+            let ival = this.injectedAttrs[dataName];
+            if (!(ival instanceof DataCtx.LValue)) {
+                return null;
+            }
+            let resolvedVal = ival.getEx();
+            if (resolvedVal !== DataCtx.SYM_NOATTR) {
+                return ival;
+            }
+            // fall-through
+        }
         return DataCtx.resolveLValueAttr(this.node, dataName, this.dataenv);
     }
 
     resolveArgsRoot(implNode : HibikiNode) : Record<string, HibikiValEx> {
-        return DataCtx.resolveArgsRoot(this.node, this.dataenv, implNode);
-    }
-
-    resolveAttrData(dataName : string, writeable : boolean) : DataCtx.LValue {
-        let lvrtn = this.resolveLValueAttr(dataName);
-        if (lvrtn != null) {
-            return lvrtn;
-        }
-        if (this.hasAttr(dataName)) {
-            if (writeable) {
-                console.log(sprintf("Warning: %s=\"%s\" specified for writeable '%s' value (making read-only)", dataName, this.getRawAttr(dataName), dataName));
-            }
-            let dataVal = this.resolveAttrVal(dataName);
-            return DataCtx.CreateReadOnlyLValue(dataVal, "readonly:" + this.node.tag + "#" + dataName);
-        }
-        return null;
+        return DataCtx.resolveArgsRoot(this.node, this.dataenv, this.injectedAttrs, implNode);
     }
 
     registerUuid() {
@@ -286,4 +338,4 @@ class DBCtx {
     }
 }
 
-export {DBCtx};
+export {DBCtx, makeDBCtx, makeCustomDBCtx};
