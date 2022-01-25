@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<script src="/hibiki-test.js"></script>
+<body hibiki class="hibiki-cloak">
+  <div class="container">
+    <h1 class="title">Menu Example</h1>
+    <div style="display: flex; flex-direction: row;">
+      <aside class="menu" style="width: 300px;">
+        <p class="menu-label">
+          General
+        </p>
+        <ul class="menu-list">
+          <li component="local-menu-item" value="dashboard" selected.bindpath="$.selected">Dashboard</li>
+          <li component="local-menu-item" value="accounts" selected.bindpath="$.selected">Accounts</li>
+          <li component="local-menu-item" value="zones" selected.bindpath="$.selected">Zones</li>
+        </ul>
+        <local-menu selected.bindpath="$.selected" class="mt-4">
+          <local-menu-item value="dashboard">Dashboard</local-menu-item>
+          <local-menu-item value="accounts">Accounts</local-menu-item>
+          <local-menu-item value="zones">Zones</local-menu-item>
+        </local-menu>
+      </aside>
+      <div class="box" style="width: 100%;">
+        Selected Menu Item: {{ $.selected }}
+        <div>
+          <h-children inject:href="/test-basic.html" inject:style="color: red" inject:class="has-text-weight-bold">
+            <a href="#">Test Inject Link</a>
+          </h-children>
+          (Should be <span style="color: red; font-weight: bold">red/bold</span> and link to /test-basic.html)
+        </div>
+        <div>
+          <h-children inject:click.handler="$.selected = 'accounts'">
+            <a href="#">Test Inject Handler</a>
+          </h-children>
+          (Should set menu to 'accounts' when clicked)
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <define-component name="menu-item">
+    <html-li>
+      <a class.is-active="* $args.selected == $args.value" click.handler="$args.selected = $args.value">
+        <h-children bind="@children"></h-children>
+      </a>
+    </html-li>
+  </define-component>
+
+  <define-component name="menu">
+    <html-ul class="menu-list" automerge="@class|style">
+      <h-children bind="@children.tags" inject:click.handler="$args.selected = @node.attrs.value;" inject:class.is-active="* @node.attrs.value == $args.selected" inject:selected.bindpath="$args.selected"></h-children>
+    </html-ul>
+  </define-component>
+</body>

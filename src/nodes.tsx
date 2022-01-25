@@ -703,51 +703,6 @@ function createInjectList(ctx : DBCtx, child : HibikiNode, nodeDataenv : DataEnv
 }
 
 @mobxReact.observer
-class InjectNode extends React.Component<HibikiReactProps> {
-    render() {
-        let ctx = makeDBCtx(this);
-        let nodeDataenv : DataEnvironment = null;
-        let nodeList : HibikiNode[] = null;
-        let bindVal = ctx.resolveAttrVal("bind");
-        if (bindVal != null) {
-            if (!(bindVal instanceof DataCtx.ChildrenVar)) {
-                return <ErrorMsg message={sprintf("%s bind expression is not valid, must be [children] type", nodeStr(ctx.node))}/>;
-            }
-            nodeList = bindVal.list;
-            nodeDataenv = bindVal.dataenv;
-        }
-        else if (ctx.node.list != null) {
-            nodeList = ctx.node.list;
-            nodeDataenv = ctx.dataenv;
-        }
-        if (nodeList == null || nodeList.length == 0) {
-            return null;
-        }
-        let rtnElems = [];
-        for (let child of nodeList) {
-            let toInject = null;
-            if (!NodeUtils.NON_INJECTABLE[child.tag] && !child.tag.startsWith("#")) {
-                toInject = createInjectList(ctx, child, nodeDataenv);
-            }
-            let [elem, shouldBreak, newEnv] = baseRenderOneNode(child, nodeDataenv, toInject, false);
-            if (elem != null) {
-                rtnElems.push(elem);
-            }
-            if (shouldBreak) {
-                break;
-            }
-            if (newEnv) {
-                nodeDataenv = newEnv;
-            }
-        }
-        if (rtnElems.length == 0) {
-            return null;
-        }
-        return <React.Fragment>{rtnElems}</React.Fragment>;
-    }
-}
-
-@mobxReact.observer
 class CustomNode extends React.Component<HibikiReactProps & {component : ComponentType}, {}> {
     constructor(props : any) {
         super(props);
@@ -974,34 +929,51 @@ class ChildrenNode extends React.Component<HibikiReactProps, {}> {
         if (textStr != null) {
             return textStr;
         }
-        let children = ctx.resolveAttrVal("bind");
-        if (children != null && !(children instanceof DataCtx.ChildrenVar)) {
-            return <ErrorMsg message={sprintf("%s bind expression is not valid, must be [children] type", nodeStr(ctx.node))}/>;
+        let nodeDataenv : DataEnvironment = null;
+        let nodeList : HibikiNode[] = null;
+        let bindVal = ctx.resolveAttrVal("bind");
+        if (bindVal != null) {
+            if (!(bindVal instanceof DataCtx.ChildrenVar)) {
+                return <ErrorMsg message={sprintf("%s bind expression is not valid, must be [children] type", nodeStr(ctx.node))}/>;
+            }
+            nodeList = bindVal.list;
+            nodeDataenv = bindVal.dataenv;
         }
-        let cvar : DataCtx.ChildrenVar = children as DataCtx.ChildrenVar;
-        let childEnv = (cvar == null ? ctx.dataenv : cvar.dataenv);
+        else if (ctx.node.list != null) {
+            nodeList = ctx.node.list;
+            nodeDataenv = ctx.dataenv;
+        }
+        if (nodeList == null || nodeList.length == 0) {
+            return null;
+        }
         let contextattr = ctx.resolveAttrStr("datacontext");
         if (contextattr != null) {
             try {
                 let ctxEnv = DataCtx.ParseAndCreateContextThrow(contextattr, "context", ctx.dataenv, nodeStr(ctx.node));
-                childEnv = childEnv.makeChildEnv(ctxEnv.specials, null);
+                nodeDataenv = childEnv.makeChildEnv(ctxEnv.specials, null);
             }
             catch (e) {
                 return <ErrorMsg message={nodeStr(ctx.node) + " Error parsing/executing context block: " + e}/>;
             }
         }
-        if (cvar == null || cvar.list.length == 0) {
-            if (ctx.node.list == null) {
-                return null;
+        let rtnElems = [];
+        for (let child of nodeList) {
+            let toInject = null;
+            if (!NodeUtils.NON_INJECTABLE[child.tag] && !child.tag.startsWith("#")) {
+                toInject = createInjectList(ctx, child, nodeDataenv);
             }
-            let rtnElems = ctxRenderHtmlChildren(ctx, childEnv);
-            if (rtnElems == null) {
-                return null;
+            let [elem, shouldBreak, newEnv] = baseRenderOneNode(child, nodeDataenv, toInject, false);
+            if (elem != null) {
+                rtnElems.push(elem);
             }
-            return <React.Fragment>{rtnElems}</React.Fragment>;
+            if (shouldBreak) {
+                break;
+            }
+            if (newEnv) {
+                nodeDataenv = newEnv;
+            }
         }
-        let rtnElems = baseRenderHtmlChildren(cvar.list, childEnv, false);
-        if (rtnElems == null) {
+        if (rtnElems.length == 0) {
             return null;
         }
         return <React.Fragment>{rtnElems}</React.Fragment>;
@@ -1205,6 +1177,5 @@ addCoreComponent("h-children", ChildrenNode);
 addCoreComponent("h-data", SimpleQueryNode);
 addCoreComponent("h-fragment", FragmentNode);
 addCoreComponent("h-watcher", WatcherNode);
-addCoreComponent("h-inject", InjectNode);
 
 export {HibikiRootNode, CORE_LIBRARY};
