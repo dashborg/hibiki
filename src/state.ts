@@ -406,7 +406,7 @@ class ComponentLibrary {
         this.srcUrlToLibNameMap = new Map();
     }
 
-    addLibrary(libObj : LibraryType) {
+    addLibrary(libObj : LibraryType) : void {
         this.libs[libObj.name] = libObj;
     }
 
@@ -418,7 +418,7 @@ class ComponentLibrary {
         return sprintf("%s(%s)", libName, libObj.url);
     }
 
-    registerLocalJSHandler(libName : string, handlerName : string, fn : (HibikiRequest) => any) {
+    registerLocalJSHandler(libName : string, handlerName : string, fn : (req : HibikiRequest) => any) : void {
         let libObj = this.libs[libName];
         if (libObj == null) {
             console.log("Hibiki registerLocalHandler library '%s' not found", libName);
@@ -427,7 +427,7 @@ class ComponentLibrary {
         libObj.localHandlers[handlerName] = fn;
     }
 
-    registerModule(libName : string, moduleName : string, module : HibikiHandlerModule) {
+    registerModule(libName : string, moduleName : string, module : HibikiHandlerModule) : void {
         let libObj = this.libs[libName];
         if (libObj == null) {
             console.log("Hibiki registerModule library '%s' not found", libName);
@@ -436,7 +436,7 @@ class ComponentLibrary {
         libObj.modules[moduleName] = module;
     }
 
-    registerReactComponentImpl(libName : string, componentName : string, impl : any) {
+    registerReactComponentImpl(libName : string, componentName : string, impl : any) : void {
         let libObj = this.libs[libName];
         if (libObj == null) {
             console.log("Hibiki registerReactComponentImpl library '%s' not found", libName);
@@ -454,7 +454,7 @@ class ComponentLibrary {
         ctype.reactimpl.set(impl);
     }
 
-    registerNativeComponentImpl(libName : string, componentName : string, impl : any) {
+    registerNativeComponentImpl(libName : string, componentName : string, impl : any) : void {
         let libObj = this.libs[libName];
         if (libObj == null) {
             console.log("Hibiki registerNativeComponentImpl library '%s' not found", libName);
@@ -527,7 +527,7 @@ class ComponentLibrary {
         return libObj.modules[moduleName];
     }
 
-    removeModule(moduleName : string, libContext : string) {
+    removeModule(moduleName : string, libContext : string) : void {
         let libObj = this.libs[libContext];
         if (libObj == null) {
             return null;
@@ -535,7 +535,7 @@ class ComponentLibrary {
         delete libObj.modules[moduleName];
     }
 
-    addModule(moduleName : string, module : HibikiHandlerModule, libContext : string) {
+    addModule(moduleName : string, module : HibikiHandlerModule, libContext : string) : void {
         let libObj = this.libs[libContext];
         if (libObj == null) {
             return null;
@@ -543,7 +543,7 @@ class ComponentLibrary {
         libObj.modules[moduleName] = module;
     }
 
-    makeLocalModule(libContext : string, libName : string, prefix : string) {
+    makeLocalModule(libContext : string, libName : string, prefix : string) : void {
         if (libContext == null) {
             throw new Error("null libContext in makeLocalModule");
         }
@@ -608,7 +608,7 @@ class ComponentLibrary {
         let libPrintStr = sprintf("%s(%s)", libName, srcUrl);
         let parr = [];
         let scriptTags = subNodesByTag(libNode, "script");
-        let srcs = [];
+        let srcs : string[] = [];
         for (let i=0; i<scriptTags.length; i++) {
             let stag = scriptTags[i];
             let attrs = NodeUtils.getRawAttrs(stag);
@@ -757,7 +757,7 @@ class ComponentLibrary {
         });
     }
 
-    importLibrary(libContext : string, libName : string, prefix : string, system? : boolean) {
+    importLibrary(libContext : string, libName : string, prefix : string, system? : boolean) : void {
         if (!system && (prefix == null || RESTRICTED_MODS[prefix])) {
             throw new Error(sprintf("Cannot import library with reserved '%s' prefix", prefix));
         }
@@ -799,22 +799,22 @@ class HibikiExtState {
         this.state = state;
     }
 
-    initialize(force : boolean) {
+    initialize(force : boolean) : void {
         this.state.initialize(force);
     }
 
-    setHtml(html : string | HTMLElement) {
+    setHtml(html : string | HTMLElement) : void {
         let htmlObj = parseHtml(html);
         bindLibContext(htmlObj, "main");
         this.state.setHtml(htmlObj);
     }
 
-    setData(path : string, data : any) {
+    setData(path : string, data : any) : void {
         let dataenv = this.state.rootDataenv();
         dataenv.setDataPath(path, data, "HibikiExtState.setDataPath");
     }
 
-    getData(path : string) : any {
+    getData(path : string) : HibikiVal {
         let dataenv = this.state.rootDataenv();
         return dataenv.resolvePath(path, {keepMobx: false, rtContext: "HibikiExtState.getData"});
     }
@@ -832,7 +832,7 @@ class HibikiExtState {
         return this.state.executeHandlerBlock({hibikiactions: actions}, pure);
     }
 
-    setPageName(pageName : string) {
+    setPageName(pageName : string) : void {
         this.state.setPageName(pageName);
     }
 
@@ -871,8 +871,8 @@ class HibikiState {
     ComponentLibrary : ComponentLibrary;
     Initialized : mobx.IObservableValue<boolean> = mobx.observable.box(false, {name: "Initialized"});
     RenderVersion : mobx.IObservableValue<number> = mobx.observable.box(0, {name: "RenderVersion"});
-    DataNodeStates = {};
-    ResourceCache = {};
+    DataNodeStates : Record<string, {query : string, dnstate : any}> = {};
+    ResourceCache : Record<string, boolean> = {};
     HasRendered = false;
     NodeDataMap : Map<string, mobx.IObservableValue<HibikiVal>> = new Map();  // TODO clear on unmount
     ExtHtmlObj : mobx.ObservableMap<string,any> = mobx.observable.map({}, {name: "ExtHtmlObj", deep: false});
@@ -1000,7 +1000,7 @@ class HibikiState {
         return new HibikiExtState(this);
     }
 
-    @mobx.action setPageName(pageName : string) {
+    @mobx.action setPageName(pageName : string) : void {
         this.PageName.set(pageName);
     }
 

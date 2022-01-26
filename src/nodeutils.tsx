@@ -2,17 +2,17 @@
 
 import * as mobx from "mobx";
 import * as React from "react";
-import * as cn from "classnames/dedupe";
+import cn from "classnames/dedupe";
 
 import {DBCtx, makeCustomDBCtx} from "./dbctx";
-import type {HibikiNode, HandlerValType, HibikiVal, InjectedAttrs} from "./types";
+import type {HibikiNode, HandlerValType, HibikiVal} from "./types";
 import * as DataCtx from "./datactx";
 import {sprintf} from "sprintf-js";
 import {isObject, textContent, rawAttrFromNode, nodeStr} from "./utils";
 import {DataEnvironment} from "./state";
 import type {EHandlerType} from "./state";
 
-let BLOCKED_ELEMS = {
+let BLOCKED_ELEMS : Record<string, boolean> = {
     "html": true,
     "body": true,
     "meta": true,
@@ -22,12 +22,12 @@ let BLOCKED_ELEMS = {
     "applet": true,
 };
 
-let NON_INJECTABLE = {
+let NON_INJECTABLE : Record<string, boolean> = {
     "define-vars": true,
     "if-break": true,
 };
 
-let INLINE_ELEMS = {
+let INLINE_ELEMS : Record<string, boolean> = {
     "a": true,
     "abbr": true,
     "acronym": true,
@@ -63,16 +63,16 @@ let INLINE_ELEMS = {
     "var": true,
 };
 
-let SUBMIT_ELEMS = {
+let SUBMIT_ELEMS : Record<string, boolean> = {
     "form": true,
 };
 
-let BLOB_ATTRS = {
+let BLOB_ATTRS : Record<string, boolean> = {
     "src": true,
     "href": true,
 };
 
-let SPECIAL_ATTRS = {
+let SPECIAL_ATTRS : Record<string, boolean> = {
     "style": true,
     "class": true,
     "if": true,
@@ -84,14 +84,14 @@ let SPECIAL_ATTRS = {
     "defaultvalue": true,
 };
 
-let UNMANAGED_INPUT_TYPES = {
+let UNMANAGED_INPUT_TYPES : Record<string, boolean> = {
     "submit": true,
     "button": true,
     "reset": true,
     "image": true,
 };
 
-let MANAGED_ATTRS = {
+let MANAGED_ATTRS : Record<string, Record<string, boolean>> = {
     "value": {"value": true, "defaultvalue": true},
     "radio": {"checked": true, "defaultchecked": true},
     "checkbox": {"checked": true, "defaultchecked": true},
@@ -293,15 +293,12 @@ function handleConvertType(ctx : DBCtx, value : string) : any {
     return value;
 }
 
-function makeHandlers(node : HibikiNode, injectedAttrs : InjectedAttrs, libContext : string, handlerPrefixes : string[]) : Record<string, HandlerValType> {
+function makeHandlers(node : HibikiNode, injectedAttrs : DataCtx.InjectedAttrsObj, libContext : string, handlerPrefixes : string[]) : Record<string, HandlerValType> {
     let handlers : Record<string, HandlerValType> = {};
     if (injectedAttrs != null) {
-        for (let iname in injectedAttrs) {
-            if (!iname.endsWith(".handler")) {
-                continue;
-            }
-            let hname = sprintf("//@event/%s", iname.substr(0, iname.length-8));
-            let ehandler = (injectedAttrs[iname] as EHandlerType);
+        for (let iname in injectedAttrs.handlers) {
+            let hname = sprintf("//@event/%s", iname);
+            let ehandler : EHandlerType = injectedAttrs.handlers[iname];
             handlers[hname] = {
                 block: ehandler.handler,
                 node: ehandler.node,

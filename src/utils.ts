@@ -74,7 +74,7 @@ function jsonRespHandler(resp) {
 
 function parseUrlParams() : Record<string,string> {
     let urlParams = new URLSearchParams(window.location.search);
-    let paramsObj = {};
+    let paramsObj : Record<string, string> = {};
     for (let [k, v] of (urlParams as any).entries()) {
         paramsObj[k] = v;
     }
@@ -103,7 +103,7 @@ function valToFloat(val : any, def : number) : number {
     return ival;
 }
 
-function resolveNumber(val : any, test : (number) => boolean, def : number) : number {
+function resolveNumber(val : any, test : (v : number) => boolean, def : number) : number {
     if (val == null) {
         return def;
     }
@@ -207,8 +207,8 @@ function parseDisplayStr(displayStr : string) : {path : string, pagename : strin
     return {path, pagename};
 }
 
-function smartDecodeParams(paramsStr : string) : {[e : string] : any} {
-    let rtn = {};
+function smartDecodeParams(paramsStr : string) : Record<string, any> {
+    let rtn : Record<string, any> = {};
     if (paramsStr == null || paramsStr == "") {
         return rtn;
     }
@@ -646,7 +646,7 @@ const STYLE_UNITLESS_NUMBER = { // from react
     "stroke-width": true,
 };
 
-const STYLE_KEY_MAP = {
+const STYLE_KEY_MAP : Record<string, {key? : string, val? : string, flex? : boolean}> = {
     "bold": {key: "fontWeight", val: "bold"},
     "italic": {key: "fontStyle", val: "italic"},
     "underline": {key: "textDecoration", val: "underline"},

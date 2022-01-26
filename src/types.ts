@@ -4,15 +4,14 @@ import type {HibikiState} from "./state";
 import type {RtContext, HibikiError} from "./error";
 import type {HibikiRequest} from "./request";
 import * as mobx from "mobx";
-import type {HExpr, HibikiBlob, LValue, HIteratorExpr, HAction, HActionBlock, OpaqueValue, ChildrenVar} from "./datactx";
+import type {HExpr, HibikiBlob, LValue, HIteratorExpr, HAction, HActionBlock, OpaqueValue, ChildrenVar, InjectedAttrsObj, UnboundExpr} from "./datactx";
 import type {DataEnvironment, EHandlerType} from "./state";
 
 type NodeAttrType = string | HExpr;
 
 type HibikiValEx = HibikiVal | LValue | symbol;
 type HibikiValObj = {[k : string] : HibikiVal};
-type HibikiVal = string | number | boolean | HibikiValObj | HibikiVal[] | HibikiBlob | HibikiNode | OpaqueValue | ChildrenVar;
-type InjectedAttrs = Record<string, HibikiVal | LValue | EHandlerType>;
+type HibikiVal = string | number | boolean | HibikiValObj | HibikiVal[] | HibikiBlob | HibikiNode | OpaqueValue | ChildrenVar | UnboundExpr;
 
 type HibikiNode = {
     tag    : string,
@@ -21,6 +20,7 @@ type HibikiNode = {
     foreachAttr? : HIteratorExpr,
     handlers? : Record<string, HAction[]>,
     bindings? : Record<string, HExpr>,
+    exprs? : Record<string, HExpr>,
     list?  : HibikiNode[],
     style? : Record<string, NodeAttrType>,
     morestyles? : Record<string, Record<string, NodeAttrType>>,
@@ -34,7 +34,7 @@ type HibikiNode = {
 type HibikiReactProps = {
     node : HibikiNode,
     dataenv : DataEnvironment,
-    injectedAttrs : InjectedAttrs,
+    injectedAttrs : InjectedAttrsObj,
 };
 
 type AutoMergeExpr = {
@@ -112,8 +112,8 @@ type HibikiHandlerModule = {
 type JSFuncStr = {jsfunc : string};
 type FetchHookFn = JSFuncStr | ((url : URL, fetchInit : Record<string, any>) => void);
 type CsrfHookFn = JSFuncStr | ((url : URL) => string);
-type ErrorCallbackFn = JSFuncStr | ((HibikiError) => boolean);
-type EventCallbackFn = JSFuncStr | ((EventType) => void);
+type ErrorCallbackFn = JSFuncStr | ((err : HibikiError) => boolean);
+type EventCallbackFn = JSFuncStr | ((event : EventType) => void);
 
 type ModuleConfig = Record<string, any>;
 
@@ -191,7 +191,7 @@ type LibraryType = {
     url?: string,
     libComponents: Record<string, LibComponentType>;
     importedComponents : Record<string, ComponentType>;
-    localHandlers : Record<string, (HibikiRequest) => any>;
+    localHandlers : Record<string, (req : HibikiRequest) => any>;
     modules : Record<string, HibikiHandlerModule>;
     handlers : Record<string, HandlerValType>;
 };
@@ -199,18 +199,18 @@ type LibraryType = {
 type ReactClass = new(props : any) => React.Component<any, any>;
 
 interface Hibiki {
-    autoloadTags();
+    autoloadTags() : void;
     loadTag(elem: HTMLElement) : HibikiExtState;
-    render(elem : HTMLElement, state : HibikiExtState);
+    render(elem : HTMLElement, state : HibikiExtState) : void;
     createState(config : HibikiConfig, html : string | HTMLElement, initialData : any) : HibikiExtState;
-    registerLocalJSHandler(path : string, fn : (HibikiRequest) => any);
-    registerLocalReactComponentImpl(name : string, reactImpl : ReactClass);
-    registerLocalNativeComponentImpl(name : string, reactImpl : ReactClass);
-    addLibraryCallback(libName : string, fn : Function);
+    registerLocalJSHandler(path : string, fn : (req : HibikiRequest) => any) : void;
+    registerLocalReactComponentImpl(name : string, reactImpl : ReactClass) : void;
+    registerLocalNativeComponentImpl(name : string, reactImpl : ReactClass) : void;
+    addLibraryCallback(libName : string, fn : Function) : void;
     HibikiReact : new(props : any) => React.Component<{hibikiState : HibikiExtState}, {}>;
-    ModuleRegistry : Record<string, (new(HibikiState, ModuleConfig) => HibikiHandlerModule)>;
+    ModuleRegistry : Record<string, (new(state : HibikiState, config : ModuleConfig) => HibikiHandlerModule)>;
     JSFuncs : Record<string, JSFuncType>;
-    LocalHandlers : Record<string, (HibikiRequest) => any>;
+    LocalHandlers : Record<string, (req : HibikiRequest) => any>;
     LocalReactComponents : mobx.ObservableMap<string, ReactClass>;
     LocalNativeComponents : mobx.ObservableMap<string, ReactClass>;
     ImportLibs : Record<string, any>;
@@ -221,16 +221,16 @@ interface Hibiki {
 };
 
 interface HibikiExtState {
-    setHtml(html : string | HTMLElement);
-    setData(path : string, data : any);
-    getData(path : string) : any;
-    executeHandlerBlock(actions : HandlerBlock, pure? : boolean);
-    callHandler(handlerUrl : string, data : HibikiValObj);
-    setPageName(pageName : string);
+    setHtml(html : string | HTMLElement) : void;
+    setData(path : string, data : any): void;
+    getData(path : string) : HibikiVal;
+    executeHandlerBlock(actions : HandlerBlock, pure? : boolean) : Promise<HibikiVal>;
+    callHandler(handlerUrl : string, data : HibikiValObj) : Promise<HibikiVal>;
+    setPageName(pageName : string) : void;
     setInitCallback(fn : () => void);
-    initialize(force : boolean);
+    initialize(force : boolean) : void;
     makeWatcher(exprStr : string, callback : (v : HibikiVal) => void) : (() => void);
 };
 
-export type {HibikiNode, HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, ComponentType, LibraryType, HibikiRequest, Hibiki, HibikiAction, HibikiActionString, HibikiActionValue, HibikiExtState, EventType, HandlerValType, JSFuncType, FetchHookFn, CsrfHookFn, ReactClass, HandlerPathType, ErrorCallbackFn, EventCallbackFn, HtmlParserOpts, LibComponentType, HandlerBlock, NodeAttrType, HibikiVal, HibikiValObj, HibikiValEx, AutoMergeExpr, AutoFireExpr, HibikiReactProps, HttpConfig, JSFuncStr, InjectedAttrs};
+export type {HibikiNode, HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, ComponentType, LibraryType, HibikiRequest, Hibiki, HibikiAction, HibikiActionString, HibikiActionValue, HibikiExtState, EventType, HandlerValType, JSFuncType, FetchHookFn, CsrfHookFn, ReactClass, HandlerPathType, ErrorCallbackFn, EventCallbackFn, HtmlParserOpts, LibComponentType, HandlerBlock, NodeAttrType, HibikiVal, HibikiValObj, HibikiValEx, AutoMergeExpr, AutoFireExpr, HibikiReactProps, HttpConfig, JSFuncStr};
 

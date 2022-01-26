@@ -71,6 +71,8 @@ let lexer = moo.states({
                         KW_THROW: "throw",
                         KW_REF: "ref",
                         KW_IN: "in",
+                        KW_BIND: "bind",
+                        KW_UNBIND: "unbind",
                     }),
                   },
         LBRACK:   "[",
@@ -406,6 +408,8 @@ primaryExpr ->
     | literalArray    {% id %}
     | literalMap      {% id %}
     | fnExpr          {% id %}
+    | bindExpr        {% id %}
+    | unbindExpr      {% id %}
     | %LPAREN fullExpr %RPAREN {% (data) => data[1] %}
     | pathExprNonTerm {% id %}
 
@@ -415,6 +419,14 @@ fnExpr ->
           return {etype: "fn", fn: data[0].value, exprs: data[2]};
       } %}
     | %KW_REF %LPAREN lvaluePath %RPAREN {% (data) => ({etype: "ref", path: data[2]}) %}
+
+bindExpr -> %KW_BIND %LPAREN fullExpr %RPAREN {% (data) => {
+          return {etype: "bind", exprs: [data[2]]};
+      } %}
+
+unbindExpr -> %KW_UNBIND %LPAREN fullExpr %RPAREN {% (data) => {
+          return {etype: "unbind", exprs: [data[2]]};
+      } %}
 
 literalArray ->
       %LBRACK optionalLiteralArrayElements %RBRACK {% (data) => {
@@ -553,6 +565,8 @@ idOrKeyword ->
     | %KW_CALLHANDLER {% id %}
     | %KW_NAVTO       {% id %}
     | %KW_IN          {% id %}
+    | %KW_BIND        {% id %}
+    | %KW_UNBIND      {% id %}
 
 _ -> %WS:*
 

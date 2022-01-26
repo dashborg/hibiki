@@ -9,7 +9,7 @@ import type {HibikiRequest} from "./request";
 import merge from "lodash/merge";
 import * as mobx from "mobx";
 
-let VALID_METHODS = {"GET": true, "POST": true, "PUT": true, "PATCH": true, "DELETE": true};
+let VALID_METHODS : Record<string, boolean> = {"GET": true, "POST": true, "PUT": true, "PATCH": true, "DELETE": true};
 
 function handleFetchResponse(url : URL, resp : any) : Promise<any> {
     if (!resp.ok) {
@@ -487,6 +487,9 @@ class HibikiModule {
         else if (handlerName == "/sleep") {
             return this.sleep(req);
         }
+        else if (handlerName == "/navigate") {
+            return this.navigate(req);
+        }
         else {
             throw new Error("Invalid Hibiki Module handler: " + fullPath(req.callpath));
         }
@@ -552,6 +555,23 @@ class HibikiModule {
             window.history.pushState(null, document.title, url.toString());
         }
         hibikiState(req.state).setStateVars();
+        return null;
+    }
+
+    navigate(req : HibikiRequest) : Promise<any> {
+        let data = stripAtKeys(req.data);
+        let {path: urlStr, raw: isRaw} = unpackAtArgs(req.data);
+        let url = new URL((urlStr ?? ""), window.location.href);
+        for (let key in data) {
+            let val = data[key];
+            if (val == null) {
+                url.searchParams.delete(key);
+                continue;
+            }
+            url.searchParams.set(key, smartEncodeParam(val, isRaw));
+        }
+        // @ts-ignore (you definitely can set window.location to a string)
+        window.location = url.toString();
         return null;
     }
 }

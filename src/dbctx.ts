@@ -2,12 +2,12 @@
 
 import * as mobx from "mobx";
 import * as DataCtx from "./datactx";
-import * as cn from "classnames/dedupe";
+import cn from "classnames/dedupe";
 import { v4 as uuidv4 } from 'uuid';
 import {DataEnvironment} from "./state";
 import {sprintf} from "sprintf-js";
 import {boundMethod} from 'autobind-decorator'
-import {HibikiNode, HibikiVal, HibikiValObj, HibikiValEx, InjectedAttrs, HibikiReactProps} from "./types";
+import {HibikiNode, HibikiVal, HibikiValObj, HibikiValEx, HibikiReactProps, NodeAttrType} from "./types";
 import * as NodeUtils from "./nodeutils";
 import {nodeStr, isObject} from "./utils";
 import {RtContext} from "./error";
@@ -48,7 +48,7 @@ async function convertFormData(formData : FormData) : Promise<Record<string, any
     return params;
 }
 
-function makeCustomDBCtx(nodeArg : HibikiNode, dataenvArg : DataEnvironment, injectedAttrs : InjectedAttrs) : DBCtx {
+function makeCustomDBCtx(nodeArg : HibikiNode, dataenvArg : DataEnvironment, injectedAttrs : DataCtx.InjectedAttrsObj) : DBCtx {
     return new DBCtx(null, nodeArg, dataenvArg, injectedAttrs);
 }
 
@@ -60,13 +60,13 @@ class DBCtx {
     dataenv : DataEnvironment;
     node : HibikiNode;
     uuid : string;
-    injectedAttrs : InjectedAttrs;
+    injectedAttrs : DataCtx.InjectedAttrsObj;
     
-    constructor(elem : React.Component<HibikiReactProps, {}>, nodeArg : HibikiNode, dataenvArg : DataEnvironment, injectedAttrs : InjectedAttrs) {
+    constructor(elem : React.Component<HibikiReactProps, {}>, nodeArg : HibikiNode, dataenvArg : DataEnvironment, injectedAttrs : DataCtx.InjectedAttrsObj) {
         if (elem != null) {
             this.dataenv = elem.props.dataenv;
             this.node = elem.props.node;
-            this.injectedAttrs = elem.props.injectedAttrs ?? {};
+            this.injectedAttrs = elem.props.injectedAttrs ?? new DataCtx.InjectedAttrsObj();
             let elemAny = elem as any;
             if (elemAny.uuid == null) {
                 elemAny.uuid = uuidv4();
@@ -77,7 +77,7 @@ class DBCtx {
             this.dataenv = dataenvArg;
             this.node = nodeArg;
             this.uuid = uuidv4();
-            this.injectedAttrs = injectedAttrs ?? {};
+            this.injectedAttrs = injectedAttrs ?? new DataCtx.InjectedAttrsObj();
         }
         if (this.node == null) {
             throw new Error("DBCtx no node prop");
@@ -105,27 +105,15 @@ class DBCtx {
         return this.dataenv.evalExpr(expr, keepMobx);
     }
 
-    getInjectedValPair(attrName : string) : [HibikiVal, boolean] {
-        if (!(attrName in this.injectedAttrs) || attrName.endsWith(".handler")) {
-            return [null, false];
+    resolveAttrExpr(attrName : string) : NodeAttrType {
+        if (this.node.attrs == null) {
+            return null;
         }
-        let val = this.injectedAttrs[attrName];
-        if (val instanceof DataCtx.LValue) {
-            let resolvedVal = val.getEx();
-            if (resolvedVal === DataCtx.SYM_NOATTR) {
-                return [null, false];
-            }
-            return [DataCtx.exValToVal(resolvedVal), true];
-        }
-        if (isObject(val) && (val as EHandlerType).dataenv instanceof DataEnvironment) {
-            return ["[ehandler]", true];
-        }
-        let hval = val as HibikiVal;
-        return [DataCtx.exValToVal(hval), true];
+        return this.node.attrs[attrName];
     }
 
     resolveAttrStr(attrName : string) : string {
-        let [ival, exists] = this.getInjectedValPair(attrName);
+        let [ival, exists] = this.injectedAttrs.getInjectedValPair(attrName);
         if (exists) {
             return DataCtx.valToString(ival);
         }
@@ -133,7 +121,7 @@ class DBCtx {
     }
 
     resolveAttrVal(attrName : string) : HibikiVal {
-        let [ival, iexists] = this.getInjectedValPair(attrName);
+        let [ival, iexists] = this.injectedAttrs.getInjectedValPair(attrName);
         if (iexists) {
             return ival;
         }
@@ -142,7 +130,7 @@ class DBCtx {
     }
 
     resolveAttrValPair(attrName : string) : [HibikiVal, boolean] {
-        let [ival, iexists] = this.getInjectedValPair(attrName);
+        let [ival, iexists] = this.injectedAttrs.getInjectedValPair(attrName);
         if (iexists) {
             return [ival, true];
         }
@@ -160,8 +148,7 @@ class DBCtx {
     }
 
     hasHandler(handlerName : string) : boolean {
-        let ihname = handlerName + ".handler";
-        if (ihname in this.injectedAttrs) {
+        if (handlerName in this.injectedAttrs.handlers) {
             return true;
         }
         return (this.node.handlers != null && this.node.handlers[handlerName] != null);
@@ -183,12 +170,10 @@ class DBCtx {
     }
 
     resolveNsStyleMap(ns : string, initStyles? : any) : any {
-        let [ival, exists] = this.getInjectedValPair(DataCtx.nsAttrName("@style", ns));
-        if (exists && isObject(ival)) {
-            let ivalObj : HibikiValObj = ival as HibikiValObj;
+        if (ns === "self" && this.injectedAttrs.styleMap != null) {
             initStyles = initStyles ?? {};
-            for (let skey in ivalObj) {
-                initStyles[skey] = ivalObj[skey];
+            for (let skey in this.injectedAttrs.styleMap) {
+                initStyles[skey] = this.injectedAttrs.styleMap[skey];
             }
         }
         return DataCtx.getStyleMap(this.node, ns, this.dataenv, initStyles);
@@ -199,7 +184,7 @@ class DBCtx {
     }
 
     resolveNsCnArray(ns : string, moreClasses? : string) : Record<string, boolean>[] {
-        let [ival, exists] = this.getInjectedValPair(DataCtx.nsAttrName("class", ns));
+        let [ival, exists] = this.injectedAttrs.getInjectedValPair(DataCtx.nsAttrName("class", ns));
         if (exists) {
             moreClasses = (moreClasses ?? "") + " " + DataCtx.valToString(ival);
         }
@@ -290,16 +275,9 @@ class DBCtx {
     }
 
     resolveLValueAttr(dataName : string) : DataCtx.LValue {
-        if (dataName in this.injectedAttrs) {
-            let ival = this.injectedAttrs[dataName];
-            if (!(ival instanceof DataCtx.LValue)) {
-                return null;
-            }
-            let resolvedVal = ival.getEx();
-            if (resolvedVal !== DataCtx.SYM_NOATTR) {
-                return ival;
-            }
-            // fall-through
+        let ivalLv = this.injectedAttrs.getInjectedLValue(dataName);
+        if (ivalLv != null) {
+            return ivalLv;
         }
         return DataCtx.resolveLValueAttr(this.node, dataName, this.dataenv);
     }

@@ -149,7 +149,7 @@ function loadTag(elem : HTMLElement) : HibikiExtState {
     }
 }
 
-function autoloadTags() {
+function autoloadTags() : void {
     let elems = document.querySelectorAll("hibiki, template[hibiki]");
     let htmlElem = document.querySelector("html");
     let bodyElem = document.querySelector("body");

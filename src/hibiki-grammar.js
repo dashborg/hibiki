@@ -73,6 +73,8 @@ let lexer = moo.states({
                         KW_THROW: "throw",
                         KW_REF: "ref",
                         KW_IN: "in",
+                        KW_BIND: "bind",
+                        KW_UNBIND: "unbind",
                     }),
                   },
         LBRACK:   "[",
@@ -363,12 +365,20 @@ var grammar = {
     {"name": "primaryExpr", "symbols": ["literalArray"], "postprocess": id},
     {"name": "primaryExpr", "symbols": ["literalMap"], "postprocess": id},
     {"name": "primaryExpr", "symbols": ["fnExpr"], "postprocess": id},
+    {"name": "primaryExpr", "symbols": ["bindExpr"], "postprocess": id},
+    {"name": "primaryExpr", "symbols": ["unbindExpr"], "postprocess": id},
     {"name": "primaryExpr", "symbols": [(lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "fullExpr", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => data[1]},
     {"name": "primaryExpr", "symbols": ["pathExprNonTerm"], "postprocess": id},
     {"name": "fnExpr", "symbols": [(lexer.has("FN") ? {type: "FN"} : FN), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "optionalLiteralArrayElements", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess":  (data) => {
             return {etype: "fn", fn: data[0].value, exprs: data[2]};
         } },
     {"name": "fnExpr", "symbols": [(lexer.has("KW_REF") ? {type: "KW_REF"} : KW_REF), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "lvaluePath", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => ({etype: "ref", path: data[2]})},
+    {"name": "bindExpr", "symbols": [(lexer.has("KW_BIND") ? {type: "KW_BIND"} : KW_BIND), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "fullExpr", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess":  (data) => {
+            return {etype: "bind", exprs: [data[2]]};
+        } },
+    {"name": "unbindExpr", "symbols": [(lexer.has("KW_UNBIND") ? {type: "KW_UNBIND"} : KW_UNBIND), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "fullExpr", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess":  (data) => {
+            return {etype: "unbind", exprs: [data[2]]};
+        } },
     {"name": "literalArray", "symbols": [(lexer.has("LBRACK") ? {type: "LBRACK"} : LBRACK), "optionalLiteralArrayElements", (lexer.has("RBRACK") ? {type: "RBRACK"} : RBRACK)], "postprocess":  (data) => {
             return {etype: "array", exprs: data[1]};
         } },
@@ -501,6 +511,8 @@ var grammar = {
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_CALLHANDLER") ? {type: "KW_CALLHANDLER"} : KW_CALLHANDLER)], "postprocess": id},
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_NAVTO") ? {type: "KW_NAVTO"} : KW_NAVTO)], "postprocess": id},
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_IN") ? {type: "KW_IN"} : KW_IN)], "postprocess": id},
+    {"name": "idOrKeyword", "symbols": [(lexer.has("KW_BIND") ? {type: "KW_BIND"} : KW_BIND)], "postprocess": id},
+    {"name": "idOrKeyword", "symbols": [(lexer.has("KW_UNBIND") ? {type: "KW_UNBIND"} : KW_UNBIND)], "postprocess": id},
     {"name": "_$ebnf$1", "symbols": []},
     {"name": "_$ebnf$1", "symbols": ["_$ebnf$1", (lexer.has("WS") ? {type: "WS"} : WS)], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
     {"name": "_", "symbols": ["_$ebnf$1"]}
