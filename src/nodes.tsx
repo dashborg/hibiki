@@ -14,12 +14,12 @@ import dayjsRelativeTime from "dayjs/plugin/relativeTime";
 import dayjsUtc from "dayjs/plugin/utc";
 import dayjsRelative from "dayjs/plugin/relativeTime";
 
-import type {HibikiNode, ComponentType, LibraryType, HibikiExtState, LibComponentType, NodeAttrType, HibikiVal, HibikiReactProps} from "./types";
+import type {ComponentType, LibraryType, HibikiExtState, LibComponentType, HibikiVal, HibikiReactProps} from "./types";
 import {DBCtx, makeDBCtx, makeCustomDBCtx} from "./dbctx";
 import * as DataCtx from "./datactx";
 import {HibikiState, DataEnvironment} from "./state";
-import {resolveNumber, isObject, textContent, SYM_PROXY, SYM_FLATTEN, jseval, nodeStr, getHibiki, addToArrayDupCheck, removeFromArray, valInArray, blobPrintStr, subMapKey, unbox, bindLibContext} from "./utils";
-import {parseHtml} from "./html-parser";
+import {resolveNumber, isObject, textContent, SYM_PROXY, SYM_FLATTEN, jseval, nodeStr, getHibiki, addToArrayDupCheck, removeFromArray, valInArray, subMapKey, unbox, bindLibContext} from "./utils";
+import {parseHtml, HibikiNode, NodeAttrType} from "./html-parser";
 import * as NodeUtils from "./nodeutils";
 import {RtContext, HibikiError} from "./error";
 import type {HAction} from "./datactx";
@@ -599,7 +599,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
                     elemProps[k] = v.makeDataUrl();
                 }
                 else {
-                    elemProps[k] = blobPrintStr(v);
+                    elemProps[k] = DataCtx.blobPrintStr(v);
                 }
                 continue;
             }
@@ -1149,7 +1149,7 @@ function addCoreComponent(name : string, impl : any) {
 
 let CORE_LIBRARY : LibraryType = {
     name: "@hibiki/core",
-    libNode: {tag: "#def", list: []},
+    libNode: new HibikiNode("#def", {list: []}),
     libComponents: {},
     importedComponents: {},
     localHandlers: {},

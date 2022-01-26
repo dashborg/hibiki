@@ -4,10 +4,11 @@ import * as mobx from "mobx";
 import {v4 as uuidv4} from 'uuid';
 import {DataEnvironment, HibikiState} from "./state";
 import {sprintf} from "sprintf-js";
-import {parseHtml} from "./html-parser";
+import {parseHtml, HibikiNode} from "./html-parser";
 import {RtContext, getShortEMsg, HibikiError} from "./error";
-import {SYM_PROXY, SYM_FLATTEN, isObject, stripAtKeys, unpackPositionalArgs, nodeStr, parseHandler, fullPath, blobPrintStr, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP, splitTrim, bindLibContext} from "./utils";
-import {PathPart, PathType, PathUnionType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue, HandlerBlock, NodeAttrType, HibikiVal, HibikiNode, HibikiValObj, HibikiValEx, AutoMergeExpr, JSFuncType} from "./types";
+import {SYM_PROXY, SYM_FLATTEN, isObject, stripAtKeys, unpackPositionalArgs, nodeStr, parseHandler, fullPath, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP, splitTrim, bindLibContext} from "./utils";
+import {PathPart, PathType, PathUnionType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue, HandlerBlock, HibikiVal, HibikiValObj, HibikiValEx, AutoMergeExpr, JSFuncType} from "./types";
+import type {NodeAttrType} from "./html-parser";
 import {HibikiRequest} from "./request";
 import type {EHandlerType} from "./state";
 import {doParse} from "./hibiki-parser";
@@ -1282,7 +1283,7 @@ function makeIteratorFromValue(bindVal : any) : [any, boolean] {
     if (bindVal == null) {
         return [[], false];
     }
-    if (bindVal instanceof HibikiBlob || (isObject(bindVal) && bindVal._type === "HibikiNode")) {
+    if (bindVal instanceof HibikiBlob) {
         return [[bindVal], false];
     }
     if (bindVal instanceof DataEnvironment || bindVal instanceof LValue) {
@@ -2132,19 +2133,16 @@ function DeepEqual(data1 : any, data2 : any) : boolean {
         return false;
     }
     if (data1 instanceof HibikiBlob && data2 instanceof HibikiBlob) {
-        return data1.mimetype === data2.mimetype && data1.data === data2.data;
-    }
-    if (data1 instanceof HibikiBlob || data2 instanceof HibikiBlob) {
-        return false;
+        return data1 === data2;
     }
     if (data1 instanceof DataEnvironment || data2 instanceof DataEnvironment) {
         return (data1 instanceof DataEnvironment) && (data2 instanceof DataEnvironment);
     }
     if (data1 instanceof HibikiRequest || data2 instanceof HibikiRequest) {
-        return data1.reqid == data2.reqid;
+        return data1 === data2;
     }
     if (data1 instanceof RtContext || data2 instanceof RtContext) {
-        return data1.rtid == data2.rtid;
+        return data1 === data2;
     }
     if (typeof(data1) !== typeof(data2)) {
         return false;
@@ -2152,8 +2150,8 @@ function DeepEqual(data1 : any, data2 : any) : boolean {
     if (typeof(data1) !== "object" || typeof(data2) !== "object") {
         return false;
     }
-    if (data1._type === "HibikiNode" || data2._type === "HibikiNode") {
-        return data1.uuid === data2.uuid;
+    if (data1 instanceof HibikiNode || data2 instanceof HibikiNode) {
+        return data1 === data2;
     }
     // objects and maps...
     let d1map = (data1 instanceof Map || mobx.isObservableMap(data1));
@@ -2202,7 +2200,7 @@ function demobxInternal(v : any) : [any, boolean] {
     if (typeof(v) !== "object") {
         return [v, false];
     }
-    if (v instanceof HibikiBlob || v instanceof LValue || v instanceof DataEnvironment || v._type === "HibikiNode") {
+    if (v instanceof HibikiBlob || v instanceof LValue || v instanceof DataEnvironment || v instanceof HibikiNode) {
         return [v, false];
     }
     if (v instanceof Blob) {
@@ -2407,6 +2405,12 @@ function evalExprAstEx(exprAst : HExpr, dataenv : DataEnvironment) : HibikiValEx
     else if (exprAst.etype === "ref") {
         let lv = new BoundLValue(exprAst.path, dataenv);
         return lv;
+    }
+    else if (exprAst.etype === "isref") {
+        return false;
+    }
+    else if (exprAst.etype === "refinfo") {
+        return null;
     }
     else if (exprAst.etype === "fn") {
         return evalFnAst(exprAst, dataenv);
@@ -3183,7 +3187,31 @@ function convertSimpleType(typeName : string, value : string, defaultValue : Hib
     return value;
 }
 
-export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, makeIteratorFromExpr, rawAttrStr, resolveStrAttrs, resolveValAttrs, getStyleMap, getAttributeStr, getAttributeValPair, attrValToStr, exValToVal, resolveLValueAttr, resolveArgsRoot, SYM_NOATTR, resolveCnArray, HActionBlock, valToString, compileActionStr, FireEvent, makeErrorObj, OpaqueValue, ChildrenVar, Watcher, makeCnArr, nsAttrName, InjectedAttrsObj, UnboundExpr};
+function blobPrintStr(blob : Blob | HibikiBlob) : string {
+    if (blob == null) {
+        return null;
+    }
+    if (blob instanceof HibikiBlob) {
+        let hblob : HibikiBlob = (blob as any);
+        let bloblen = 0;
+        if (hblob.data != null) {
+            bloblen = hblob.data.length;
+        }
+        if (hblob.name != null) {
+            return sprintf("[hibikiblob type=%s, len=%s, name=%s]", hblob.mimetype, Math.ceil((bloblen/4)*3), hblob.name);
+        }
+        return sprintf("[hibikiblob type=%s, len=%s]", hblob.mimetype, Math.ceil((bloblen/4)*3))
+    }
+    if (blob instanceof File && blob.name != null) {
+        sprintf("[jsblob type=%s, len=%s, name=%s]", blob.type, blob.size, blob.name);
+    }
+    if (blob instanceof Blob) {
+        return sprintf("[jsblob type=%s, len=%s]", blob.type, blob.size);
+    }
+    return null;
+}
+
+export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, makeIteratorFromExpr, rawAttrStr, resolveStrAttrs, resolveValAttrs, getStyleMap, getAttributeStr, getAttributeValPair, attrValToStr, exValToVal, resolveLValueAttr, resolveArgsRoot, SYM_NOATTR, resolveCnArray, HActionBlock, valToString, compileActionStr, FireEvent, makeErrorObj, OpaqueValue, ChildrenVar, Watcher, makeCnArr, nsAttrName, InjectedAttrsObj, UnboundExpr, blobPrintStr};
 
 export type {PathType, HAction, HExpr, HIteratorExpr};
 

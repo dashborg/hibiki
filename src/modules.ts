@@ -1,6 +1,6 @@
 // Copyright 2021-2022 Dashborg Inc
 
-import {isObject, unpackPositionalArgs, stripAtKeys, getHibiki, fullPath, getSS, setSS, smartEncodeParam, unpackArg, unpackAtArgs, blobPrintStr, base64ToArray, callHook} from "./utils";
+import {isObject, unpackPositionalArgs, stripAtKeys, getHibiki, fullPath, getSS, setSS, smartEncodeParam, unpackArg, unpackAtArgs, base64ToArray, callHook} from "./utils";
 import {sprintf} from "sprintf-js";
 import type {HibikiState} from "./state";
 import type {FetchHookFn, Hibiki, HibikiAction, HandlerPathType, HibikiExtState, HttpConfig, HibikiActionString, HibikiVal} from "./types";
@@ -100,10 +100,10 @@ function urlSearchParamsConvertVal(val : any, inArray? : boolean) : any {
         return val.toString();
     }
     else if (val instanceof Blob) {
-        throw new Error(sprintf("Cannot serialize Blob %s with url encoding (use 'multipart' encoding)", blobPrintStr(val)));
+        throw new Error(sprintf("Cannot serialize Blob %s with url encoding (use 'multipart' encoding)", DataCtx.blobPrintStr(val)));
     }
     else if (val instanceof DataCtx.HibikiBlob) {
-        throw new Error(sprintf("Cannot serialize HibikiBlob %s with url encoding (use 'multipart' encoding)", blobPrintStr(val)));
+        throw new Error(sprintf("Cannot serialize HibikiBlob %s with url encoding (use 'multipart' encoding)", DataCtx.blobPrintStr(val)));
     }
     else if (!inArray && mobx.isArrayLike(val)) {
         let rtn = [];
@@ -139,7 +139,7 @@ function urlSearchParamsFromParams(params : Record<string, any>) : URLSearchPara
 
 function jsonReplacer(key : string, value : any) : any {
     if (this[key] instanceof Blob) {
-        throw new Error(sprintf("Cannot serialize Blob %s with json encoding (use 'multipart' encoding)", blobPrintStr(this[key])));
+        throw new Error(sprintf("Cannot serialize Blob %s with json encoding (use 'multipart' encoding)", DataCtx.blobPrintStr(this[key])));
     }
     if (this[key] instanceof DataCtx.HibikiBlob) {
         let val = this[key];

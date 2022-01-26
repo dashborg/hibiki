@@ -9,7 +9,8 @@ import * as ReactDOM from "react-dom";
 import {HibikiRootNode, CORE_LIBRARY} from "./nodes";
 import {deepTextContent, evalDeepTextContent, isObject, bindLibContext} from "./utils";
 import merge from "lodash/merge";
-import type {HibikiNode, HibikiConfig, Hibiki, HibikiExtState, ReactClass, LibraryType} from "./types";
+import type {HibikiConfig, Hibiki, HibikiExtState, ReactClass, LibraryType} from "./types";
+import type {HibikiNode} from "./html-parser";
 import {LocalModule, HttpModule, LibModule, HibikiModule} from "./modules";
 
 declare var window : any;

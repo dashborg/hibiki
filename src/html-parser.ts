@@ -1,7 +1,7 @@
 // Copyright 2021-2022 Dashborg Inc
 
 import camelCase from "camelcase";
-import type {HibikiNode, HtmlParserOpts, PathType, AutoMergeExpr, AutoFireExpr, NodeAttrType} from "./types";
+import type {HtmlParserOpts, PathType, AutoMergeExpr, AutoFireExpr} from "./types";
 import merge from "lodash/merge";
 import {sprintf} from "sprintf-js";
 import {doParse} from "./hibiki-parser";
@@ -9,6 +9,43 @@ import type {HAction, HExpr, HIteratorExpr} from "./datactx";
 import {textContent, rawAttrFromNode} from "./utils";
 
 const styleAttrPartRe = new RegExp("^(style(?:-[a-z][a-z0-9-])?)\\.(.*)");
+
+type NodeAttrType = string | HExpr;
+
+class HibikiNode {
+    _type  : "HibikiNode";
+    tag    : string;
+    text?  : string;
+    attrs? : Record<string, NodeAttrType>;
+    foreachAttr? : HIteratorExpr;
+    handlers? : Record<string, HAction[]>;
+    bindings? : Record<string, HExpr>;
+    exprs? : Record<string, HExpr>;
+    list?  : HibikiNode[];
+    style? : Record<string, NodeAttrType>;
+    morestyles? : Record<string, Record<string, NodeAttrType>>;
+    automerge? : AutoMergeExpr[];
+    autofire? : AutoFireExpr[];
+    innerhtml? : string;
+    outerhtml? : string;
+    libContext? : string;
+
+    constructor(tag : string, opts? : {text? : string, list? : HibikiNode[], attrs? : Record<string, NodeAttrType>}) {
+        this._type = "HibikiNode";
+        this.tag = tag;
+        if (opts != null) {
+            if (opts.text != null) {
+                this.text = opts.text;
+            }
+            if (opts.list != null) {
+                this.list = opts.list;
+            }
+            if (opts.attrs != null) {
+                this.attrs = opts.attrs;
+            }
+        }
+    }
+};
 
 const PARSED_ATTRS = {
     "bind": true,
@@ -223,20 +260,20 @@ class HtmlParser {
         }
         if (this.opts.noInlineText
             || parentTag === "script" || parentTag === "define-handler" || parentTag.startsWith("hibiki-")) {
-            return {tag: "#text", text: text};
+            return new HibikiNode("#text", {text: text});
         }
         if (text.indexOf("{{") === -1) {
-            return {tag: "#text", text: escapeBrackets(text)};
+            return new HibikiNode("#text", {text: escapeBrackets(text)});
         }
         let textParts = parseDelimitedSections(text, "{{", "}}");
         let parts : HibikiNode[] = textParts.map((part) => {
             if (part.parttype === "plain") {
                 let tval = escapeBrackets(part.text);
-                return {tag: "#text", text: tval};
+                return new HibikiNode("#text", {text: tval});
             }
             else {
                 let tval = part.text.trim();
-                let node : HibikiNode = {tag: "h-text", attrs: {}};
+                let node : HibikiNode = new HibikiNode("h-text", {attrs: {}});
                 this.parseStandardAttr(node, "bind", tval, pctx);
                 this.parseStandardAttr(node, "inline", "1", pctx);
                 return node;
@@ -403,8 +440,7 @@ class HtmlParser {
             return this.parseText(parentTag, htmlNode.textContent, pctx);
         }
         if (htmlNode.nodeType === 8) { // COMMENT_NODE
-            let node = {tag: "#comment", text: htmlNode.textContent};
-            return node;
+            return new HibikiNode("#comment", {text: htmlNode.textContent});
         }
         if (htmlNode.nodeType !== 1) { // ELEMENT_NODE
             return null;
@@ -412,7 +448,7 @@ class HtmlParser {
         let htmlElem : Element = htmlNode as Element;
         let tagName = (htmlNode as Element).tagName.toLowerCase();
         pctx.tagStack.push(sprintf("<%s>", tagName));
-        let node : HibikiNode = {tag: tagName};
+        let node : HibikiNode = new HibikiNode(tagName);
         let nodeAttrs = (htmlNode as Element).attributes;
         if (nodeAttrs.length > 0) {
             node.attrs = {};
@@ -494,8 +530,8 @@ class HtmlParser {
         }
         let pctx = {sourceName : sourceName, tagStack: []};
         let rootNode = (elem.tagName.toLowerCase() === "template" ? elem.content : elem);
-        let rtn : HibikiNode = {tag: "#def", list: []};
-        rtn.list = this.parseNodeChildren(rtn.tag, rootNode, pctx) || [];
+        let rtn : HibikiNode = new HibikiNode("#def");
+        rtn.list = this.parseNodeChildren(rtn.tag, rootNode, pctx) ?? [];
         return rtn;
     }
 }
@@ -543,4 +579,6 @@ function parseDelimitedSections(text : string, openDelim : string, closeDelim : 
     return parts;
 }
 
-export {parseHtml, parseDelimitedSections};
+export {parseHtml, parseDelimitedSections, HibikiNode};
+
+export type {NodeAttrType};

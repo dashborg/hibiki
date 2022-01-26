@@ -3,7 +3,7 @@
 import {v4 as uuidv4} from 'uuid';
 import type {DataEnvironment} from "./state";
 import {sprintf} from "sprintf-js";
-import type {HibikiNode} from "./types";
+import type {HibikiNode} from "./html-parser";
 
 type RtContextItem = {
     desc : string,

@@ -5,7 +5,8 @@ import * as React from "react";
 import cn from "classnames/dedupe";
 
 import {DBCtx, makeCustomDBCtx} from "./dbctx";
-import type {HibikiNode, HandlerValType, HibikiVal} from "./types";
+import type {HandlerValType, HibikiVal} from "./types";
+import type {HibikiNode} from "./html-parser";
 import * as DataCtx from "./datactx";
 import {sprintf} from "sprintf-js";
 import {isObject, textContent, rawAttrFromNode, nodeStr} from "./utils";

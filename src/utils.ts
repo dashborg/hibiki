@@ -1,9 +1,10 @@
 // Copyright 2021-2022 Dashborg Inc
 
 import * as mobx from "mobx";
-import {HibikiNode, Hibiki, HandlerPathType, NodeAttrType, HibikiVal, HibikiValObj, JSFuncStr} from "./types";
+import {Hibiki, HandlerPathType, HibikiVal, HibikiValObj, JSFuncStr} from "./types";
 import {sprintf} from "sprintf-js";
 import type {HibikiBlob} from "./datactx";
+import type {HibikiNode, NodeAttrType} from "./html-parser";
 
 declare var window : any;
 
@@ -546,30 +547,6 @@ function getHibiki() : Hibiki {
     return (window as any).Hibiki;
 }
 
-function blobPrintStr(blob : Blob | HibikiBlob) : string {
-    if (blob == null) {
-        return null;
-    }
-    if (isObject(blob) && (blob as any)._type == "HibikiBlob") {
-        let hblob : HibikiBlob = (blob as any);
-        let bloblen = 0;
-        if (hblob.data != null) {
-            bloblen = hblob.data.length;
-        }
-        if (hblob.name != null) {
-            return sprintf("[hibikiblob type=%s, len=%s, name=%s]", hblob.mimetype, Math.ceil((bloblen/4)*3), hblob.name);
-        }
-        return sprintf("[hibikiblob type=%s, len=%s]", hblob.mimetype, Math.ceil((bloblen/4)*3))
-    }
-    if (blob instanceof File && blob.name != null) {
-        sprintf("[jsblob type=%s, len=%s, name=%s]", blob.type, blob.size, blob.name);
-    }
-    if (blob instanceof Blob) {
-        return sprintf("[jsblob type=%s, len=%s]", blob.type, blob.size);
-    }
-    return null;
-}
-
 function base64ToArray(b64 : string) : Uint8Array {
     let binaryStr = atob(b64);
     let arr = new Uint8Array(binaryStr.length);
@@ -677,5 +654,5 @@ function bindLibContext(node : HibikiNode, libContext : string) {
     }
 }
 
-export {jsonRespHandler, parseUrlParams, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs, blobPrintStr, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy, valInArray, rawAttrFromNode, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP, subMapKey, subArrayIndex, unbox, splitTrim, bindLibContext};
+export {jsonRespHandler, parseUrlParams, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy, valInArray, rawAttrFromNode, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP, subMapKey, subArrayIndex, unbox, splitTrim, bindLibContext};
 
