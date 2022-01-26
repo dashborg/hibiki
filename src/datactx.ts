@@ -2089,12 +2089,23 @@ function MapReplacer(key : string, value : any) : any {
     }
 }
 
-// does not copy blobs correctly
-function DeepCopy(data : any) : any {
-    return JSON.parse(JSON.stringify(data, MapReplacer));
+function isSpecial(data : HibikiVal) : boolean {
+    return (data instanceof HibikiBlob || data instanceof HibikiNode || data instanceof OpaqueValue || data instanceof ChildrenVar || data instanceof UnboundExpr || data instanceof LValue);
 }
 
-function DeepEqual(data1 : any, data2 : any) : boolean {
+function isArrayEqual(data1 : HibikiVal[], data2 : HibikiVal[]) : boolean {
+    if (data1.length !== data2.length) {
+        return false;
+    }
+    for (let i=0; i<data1.length; i++) {
+        if (!DeepEqual(data1[i], data2[i])) {
+            return false;
+        }
+    }
+    return true;
+}
+
+function DeepEqual(data1 : HibikiVal, data2 : HibikiVal) : boolean {
     if (data1 === data2) {
         return true;
     }
@@ -2104,73 +2115,50 @@ function DeepEqual(data1 : any, data2 : any) : boolean {
     if (data2 instanceof LValue) {
         data2 = data2.get();
     }
+    if ((data1 == null && data2 == null) || data1 === data2) {
+        return true;
+    }
     if (data1 == null || data2 == null) {
         return false;
     }
-    if (typeof(data1) === "number" && typeof(data2) === "number") {
-        if (isNaN(data1) && isNaN(data2)) {
-            return true;
-        }
-        return false;
-    }
-    if (typeof(data1) === "boolean" && typeof(data2) === "boolean") {
-        return data1 === data2;
+    if (isSpecial(data1) || isSpecial(data2)) {
+        return false;  // special values are only equal if "===" (already checked above)
     }
     let d1arr = mobx.isArrayLike(data1);
     let d2arr = mobx.isArrayLike(data2);
     if (d1arr && d2arr) {
-        if (data1.length !== data2.length) {
-            return false;
-        }
-        for (let i=0; i<data1.length; i++) {
-            if (!DeepEqual(data1[i], data2[i])) {
-                return false;
-            }
-        }
-        return true;
+        return isArrayEqual(data1 as HibikiVal[], data2 as HibikiVal[]);
     }
     if (d1arr || d2arr) {
         return false;
     }
-    if (data1 instanceof HibikiBlob && data2 instanceof HibikiBlob) {
-        return data1 === data2;
+    let d1obj = isObject(data1);
+    let d2obj = isObject(data2);
+    if (!d1obj && !d2obj) {
+        console.log("prim-equal", d1obj, d2obj, data1, data2);
+        return data1 == data2;  // js primitive equality (string, number, boolean, symbol)
     }
-    if (data1 instanceof DataEnvironment || data2 instanceof DataEnvironment) {
-        return (data1 instanceof DataEnvironment) && (data2 instanceof DataEnvironment);
+    if (!d1obj || !d2obj) {
+        return false;           // objects are never equal to primitives
     }
-    if (data1 instanceof HibikiRequest || data2 instanceof HibikiRequest) {
-        return data1 === data2;
-    }
-    if (data1 instanceof RtContext || data2 instanceof RtContext) {
-        return data1 === data2;
-    }
-    if (typeof(data1) !== typeof(data2)) {
-        return false;
-    }
-    if (typeof(data1) !== "object" || typeof(data2) !== "object") {
-        return false;
-    }
-    if (data1 instanceof HibikiNode || data2 instanceof HibikiNode) {
-        return data1 === data2;
-    }
-    // objects and maps...
     let d1map = (data1 instanceof Map || mobx.isObservableMap(data1));
     let d2map = (data2 instanceof Map || mobx.isObservableMap(data2));
-    let d1keys = (d1map ? Array.from(data1.keys()) : Object.keys(data1));
-    let d2keys = (d2map ? Array.from(data2.keys()) : Object.keys(data2));
+    let d1keys : string[] = (d1map ? Array.from((data1 as any).keys()) : Object.keys(data1));
+    let d2keys : string[] = (d2map ? Array.from((data2 as any).keys()) : Object.keys(data2));
     if (d1keys.length !== d2keys.length) {
         return false;
     }
-    for (let i=0; i<d1keys.length; i++) {
-        let k1 : any = d1keys[i];
-        let v1 = (d1map ? data1.get(k1) : data1[k1]);
-        let v2 = (d2map ? data2.get(k1) : data2[k1]);
+    for (let key of d1keys) {
+        let v1 : HibikiVal = (d1map ? (data1 as any).get(key) : data1[key]);
+        let v2 : HibikiVal = (d2map ? (data2 as any).get(key) : data2[key]);
         if (!DeepEqual(v1, v2)) {
             return false;
         }
     }
     return true;
 }
+
+window.DeepEqual = DeepEqual;
 
 function demobxInternal(v : any) : [any, boolean] {
     if (v == null) {
@@ -3211,7 +3199,7 @@ function blobPrintStr(blob : Blob | HibikiBlob) : string {
     return null;
 }
 
-export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, DeepCopy, MapReplacer, JsonStringify, EvalSimpleExpr, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, makeIteratorFromExpr, rawAttrStr, resolveStrAttrs, resolveValAttrs, getStyleMap, getAttributeStr, getAttributeValPair, attrValToStr, exValToVal, resolveLValueAttr, resolveArgsRoot, SYM_NOATTR, resolveCnArray, HActionBlock, valToString, compileActionStr, FireEvent, makeErrorObj, OpaqueValue, ChildrenVar, Watcher, makeCnArr, nsAttrName, InjectedAttrsObj, UnboundExpr, blobPrintStr};
+export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, MapReplacer, JsonStringify, EvalSimpleExpr, JsonEqual, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, JsonStringifyForCall, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, makeIteratorFromExpr, rawAttrStr, resolveStrAttrs, resolveValAttrs, getStyleMap, getAttributeStr, getAttributeValPair, attrValToStr, exValToVal, resolveLValueAttr, resolveArgsRoot, SYM_NOATTR, resolveCnArray, HActionBlock, valToString, compileActionStr, FireEvent, makeErrorObj, OpaqueValue, ChildrenVar, Watcher, makeCnArr, nsAttrName, InjectedAttrsObj, UnboundExpr, blobPrintStr};
 
 export type {PathType, HAction, HExpr, HIteratorExpr};
 

@@ -125,7 +125,7 @@ function isObject(v : any) : boolean {
     if (mobx.isArrayLike(v)) {
         return false;
     }
-    return typeof(v) == "object";
+    return typeof(v) === "object";
 }
 
 function subMapKey(v : HibikiVal, mapKey : string) : HibikiVal {
