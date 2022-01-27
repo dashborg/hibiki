@@ -5,6 +5,7 @@ import type {JSFuncType} from "./types";
 import {sprintf} from "sprintf-js";
 import {isObject, addToArrayDupCheck, removeFromArray} from "./utils";
 import {v4 as uuidv4} from 'uuid';
+import * as DataCtx from "./datactx";
 
 let DefaultJSFuncs : Record<string, JSFuncType> = {};
 
@@ -316,6 +317,10 @@ function jsUuid() : string {
     return uuidv4();
 }
 
+function jsTypeOf(val : HibikiVal) : string {
+    return DataCtx.hibikiTypeOf(val);
+}
+
 reg("len", jsLen, true);
 reg("indexof", jsIndexOf, true);
 reg("min", jsMin, false);
@@ -351,6 +356,7 @@ reg("blobmimetype", jsBlobMimeType, true);
 reg("bloblen", jsBlobLen, true);
 reg("blobname", jsBlobName, true);
 reg("uuid", jsUuid, true);
+reg("typeof", jsTypeOf, true);
 
 function reg(name : string, fn : any, native : boolean) {
     DefaultJSFuncs[name] = {fn, native};

@@ -12,6 +12,13 @@ const styleAttrPartRe = new RegExp("^(style(?:-[a-z][a-z0-9-])?)\\.(.*)");
 
 type NodeAttrType = string | HExpr;
 
+const NODE_ALLOWED_GETTERS : Record<string, boolean> = {
+    "tag": true,
+    "list": true,
+    "innerhtml": true,
+    "outerhtml": true,
+};
+
 class HibikiNode {
     _type  : "HibikiNode";
     tag    : string;
@@ -44,6 +51,10 @@ class HibikiNode {
                 this.attrs = opts.attrs;
             }
         }
+    }
+
+    allowedGetters(key : string) : boolean {
+        return NODE_ALLOWED_GETTERS[key];
     }
 };
 

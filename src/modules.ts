@@ -173,7 +173,7 @@ function setParams(method : string, url : URL, fetchInit : Record<string, any>, 
     }
     let atData = unpackArg(data, "@data");
     if (atData != null && !isObject(atData)) {
-        throw new Error("Invalid @data, must be an object: type=" + typeof(atData));
+        throw new Error("Invalid @data, must be an object: type=" + DataCtx.hibikiTypeOf(atData));
     }
     let params = Object.assign({}, fetchInit["csrfParams"], (atData ?? {}), stripAtKeys(data));
     let encoding = unpackArg(data, "@encoding");

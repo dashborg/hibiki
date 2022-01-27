@@ -11,7 +11,11 @@ import type {HibikiNode} from "./html-parser";
 
 type HibikiValEx = HibikiVal | LValue | symbol;
 type HibikiValObj = {[k : string] : HibikiVal};
-type HibikiVal = string | number | boolean | HibikiValObj | HibikiVal[] | HibikiBlob | HibikiNode | OpaqueValue | ChildrenVar | UnboundExpr;
+type HibikiVal = HibikiPrimitiveVal | HibikiSpecialVal | HibikiValObj | HibikiVal[];
+type HibikiPrimitiveVal = null | string | number | boolean
+type HibikiSpecialVal = HibikiBlob | HibikiNode | OpaqueValue | ChildrenVar | UnboundExpr | LValue | HibikiError | symbol;
+
+// type HibikiVal = string | number | boolean | HibikiValObj | HibikiVal[] | HibikiBlob | HibikiNode | OpaqueValue | ChildrenVar | UnboundExpr;
 
 type HibikiReactProps = {
     node : HibikiNode,
@@ -143,7 +147,7 @@ type PathPart = {
     pathindex? : number,
     pathkey? : string,
 
-    value? : any,
+    value? : HibikiVal,
     caret? : number,
     expr? : any;
 };
@@ -214,5 +218,5 @@ interface HibikiExtState {
     makeWatcher(exprStr : string, callback : (v : HibikiVal) => void) : (() => void);
 };
 
-export type {HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, ComponentType, LibraryType, HibikiRequest, Hibiki, HibikiAction, HibikiActionString, HibikiActionValue, HibikiExtState, EventType, HandlerValType, JSFuncType, FetchHookFn, CsrfHookFn, ReactClass, HandlerPathType, ErrorCallbackFn, EventCallbackFn, HtmlParserOpts, LibComponentType, HandlerBlock, HibikiVal, HibikiValObj, HibikiValEx, AutoMergeExpr, AutoFireExpr, HibikiReactProps, HttpConfig, JSFuncStr};
+export type {HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, ComponentType, LibraryType, HibikiRequest, Hibiki, HibikiAction, HibikiActionString, HibikiActionValue, HibikiExtState, EventType, HandlerValType, JSFuncType, FetchHookFn, CsrfHookFn, ReactClass, HandlerPathType, ErrorCallbackFn, EventCallbackFn, HtmlParserOpts, LibComponentType, HandlerBlock, HibikiVal, HibikiValObj, HibikiValEx, AutoMergeExpr, AutoFireExpr, HibikiReactProps, HttpConfig, JSFuncStr, HibikiSpecialVal, HibikiPrimitiveVal};
 
