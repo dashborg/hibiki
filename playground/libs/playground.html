@@ -38,15 +38,17 @@
     if (!@data.ispop) {
         //@hibiki/update-url(page=@page);
     }
-    $.activepage = @page;
-    @blob = callhandler(@url='/tutorial/'+$.activepage+'.html');
-    @match = fn:match(fn:blobastext(@blob), "^([\\s\\S]*)--------([\\s\\S]*)$");
-    $.codetext = @match[1];
-    //@lib-codemirror/setCMText(text=$.codetext);
-    //@lib/make-iframe(text=$.codetext, bulma=$.bulma);
-    $.tutorial_content = "";
-    //@hibiki/sleep(ms=1);  /* creates a render gap forcing content container to scroll up */
-    $.tutorial_content = @match[2];
+    if ($.activepage != @page) {
+        $.activepage = @page;
+        @blob = callhandler(@url='/tutorial/'+$.activepage+'.html');
+        @match = fn:match(fn:blobastext(@blob), "^([\\s\\S]*)--------([\\s\\S]*)$");
+        $.codetext = @match[1];
+        //@lib-codemirror/setCMText(text=$.codetext);
+        //@lib/make-iframe(text=$.codetext, bulma=$.bulma);
+        $.tutorial_content = "";
+        //@hibiki/sleep(ms=10);  /* creates a render gap forcing content container to scroll up */
+        $.tutorial_content = @match[2];
+    }
   </define-handler>
 
   <script>
