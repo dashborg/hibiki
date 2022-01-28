@@ -57,6 +57,7 @@ let lexer = moo.states({
                         KW_NOATTR: "noattr",
                         KW_CALLHANDLER: "callhandler",
                         KW_SETRETURN: "setreturn",
+                        KW_RETURN: "return",
                         KW_INVALIDATE: "invalidate",
                         KW_FIRE: "fire",
                         KW_NOP: "nop",
@@ -70,6 +71,8 @@ let lexer = moo.states({
                         KW_ELSE: "else",
                         KW_THROW: "throw",
                         KW_REF: "ref",
+                        KW_ISREF: "isref",
+                        KW_REFINFO: "refinfo",
                         KW_IN: "in",
                         KW_BIND: "bind",
                         KW_UNBIND: "unbind",
@@ -185,12 +188,15 @@ statement ->
     | alertStatement        {% id %}
     | exprStatement         {% id %}
     | throwStatement        {% id %}
-    | setReturnStatement    {% id %}
+    | returnStatement       {% id %}
     | nopStatement          {% id %}
 
 throwStatement -> %KW_THROW callParamsSingle {% (data) => ({actiontype: "throw", data: data[1]}) %}
 
-setReturnStatement -> %KW_SETRETURN %LPAREN fullExpr %RPAREN {% (data) => ({actiontype: "setreturn", data: data[2]}) %}
+returnStatement -> 
+      %KW_SETRETURN %LPAREN fullExpr %RPAREN {% (data) => ({actiontype: "setreturn", data: data[2], exithandler: false}) %}
+    | %KW_RETURN %LPAREN fullExpr:? %RPAREN {% (data) => ({actiontype: "setreturn", data: data[2], exithandler: true}) %}
+    | %KW_RETURN {% (data) => ({actiontype: "setreturn", data: null, exithandler: true}) %}
 
 ifStatement -> %KW_IF %LPAREN fullExpr %RPAREN %LBRACE statementBlock %RBRACE (%KW_ELSE %LBRACE statementBlock %RBRACE):? {% (data) => {
         let rtn = {actiontype: "ifblock", data: data[2], actions: {}};
@@ -321,11 +327,11 @@ fireStatement ->
         return rtn;
     } %}
 
-logStatement -> %KW_LOG callParams {% (data) => ({actiontype: "log", data: {etype: "array", exprs: data[1]}}) %}
+logStatement -> %KW_LOG namedCallParams {% (data) => ({actiontype: "log", data: data[1]}) %}
 
-debugStatement -> %KW_DEBUG callParams {% (data) => ({actiontype: "log", debug: true, data: {etype: "array", exprs: data[1]}}) %}
+debugStatement -> %KW_DEBUG namedCallParams {% (data) => ({actiontype: "log", debug: true, data: data[1]}) %}
 
-alertStatement -> %KW_ALERT callParams {% (data) => ({actiontype: "log", alert: true, data: {etype: "array", exprs: data[1]}}) %}
+alertStatement -> %KW_ALERT namedCallParams {% (data) => ({actiontype: "log", alert: true, data: data[1]}) %}
 
 # [setop : string, PathType]
 lvalue ->
@@ -410,6 +416,7 @@ primaryExpr ->
     | fnExpr          {% id %}
     | bindExpr        {% id %}
     | unbindExpr      {% id %}
+    | refExpr         {% id %}
     | %LPAREN fullExpr %RPAREN {% (data) => data[1] %}
     | pathExprNonTerm {% id %}
 
@@ -418,7 +425,10 @@ fnExpr ->
       %FN %LPAREN optionalLiteralArrayElements %RPAREN {% (data) => {
           return {etype: "fn", fn: data[0].value, exprs: data[2]};
       } %}
-    | %KW_REF %LPAREN lvaluePath %RPAREN {% (data) => ({etype: "ref", path: data[2]}) %}
+
+refExpr -> 
+      %KW_REF %LPAREN lvaluePath %RPAREN {% (data) => ({etype: "ref", path: data[2]}) %}
+    | %KW_ISREF %LPAREN lvaluePath %RPAREN {% (data) => ({etype: "isref", path: data[2]}) %}
 
 bindExpr -> %KW_BIND %LPAREN fullExpr %RPAREN {% (data) => {
           return {etype: "bind", exprs: [data[2]]};
@@ -560,7 +570,10 @@ idOrKeyword ->
     | %KW_ELSE   {% id %}
     | %KW_THROW  {% id %}
     | %KW_REF    {% id %}
+    | %KW_ISREF  {% id %}
+    | %KW_REFINFO     {% id %}
     | %KW_SETRETURN   {% id %}
+    | %KW_RETURN      {% id %}
     | %KW_INVALIDATE  {% id %}
     | %KW_CALLHANDLER {% id %}
     | %KW_NAVTO       {% id %}

@@ -6,7 +6,7 @@ import {DataEnvironment, HibikiState, HibikiExtState} from "./state";
 import {sprintf} from "sprintf-js";
 import {parseHtml, HibikiNode} from "./html-parser";
 import {RtContext, getShortEMsg, HibikiError} from "./error";
-import {SYM_PROXY, SYM_FLATTEN, isObject, stripAtKeys, unpackPositionalArgs, nodeStr, parseHandler, fullPath, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP, splitTrim, bindLibContext} from "./utils";
+import {SYM_PROXY, SYM_FLATTEN, isObject, stripAtKeys, unpackPositionalArgs, nodeStr, parseHandler, fullPath, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP, splitTrim, bindLibContext, unpackPositionalArgArray} from "./utils";
 import {PathPart, PathType, PathUnionType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue, HandlerBlock, HibikiVal, HibikiValObj, AutoMergeExpr, JSFuncType, HibikiSpecialVal, HibikiPrimitiveVal} from "./types";
 import type {NodeAttrType} from "./html-parser";
 import {HibikiRequest} from "./request";
@@ -1203,7 +1203,7 @@ function formatFilter(val : any, args : HibikiValObj) {
     return formatVal(val, valToString(format));
 }
 
-function forceAsArray(val : any) : any[] {
+function forceAsArray(val : HibikiVal) : HibikiVal[] {
     if (mobx.isArrayLike(val)) {
         return val;
     }
@@ -2807,7 +2807,7 @@ function evalExprAstEx(exprAst : HExpr, dataenv : DataEnvironment) : HibikiVal {
     else if (exprAst.etype === "noattr") {
         return SYM_NOATTR;
     }
-    else if (exprAst.etype == "bind") {
+    else if (exprAst.etype === "bind") {
         let expr = exprAst.exprs[0];
         if (expr == null) {
             return null;
@@ -2818,7 +2818,7 @@ function evalExprAstEx(exprAst : HExpr, dataenv : DataEnvironment) : HibikiVal {
         }
         return evalExprAst(val.expr, dataenv);
     }
-    else if (exprAst.etype == "unbind") {
+    else if (exprAst.etype === "unbind") {
         let expr = exprAst.exprs[0];
         if (expr == null) {
             return null;
@@ -3008,7 +3008,8 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
         return FireEvent(event, dataenv, rtctx, false);
     }
     else if (action.actiontype === "log") {
-        let dataValArr = forceAsArray(demobx(evalExprAst(action.data, dataenv)));
+        let exprData : HibikiValObj = demobx(evalExprAst(action.data, dataenv)) as HibikiValObj;
+        let dataValArr = unpackPositionalArgArray(exprData);
         dataValArr = dataValArr.map((val) => {
             if (val instanceof HibikiError) {
                 return val.toString();

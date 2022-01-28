@@ -436,6 +436,17 @@ function unpackPositionalArgs(data : HibikiValObj, posArgNames : string[]) : Hib
     return rtn;
 }
 
+function unpackPositionalArgArray(data : HibikiValObj) : HibikiVal[] {
+    if (data == null) {
+        return [];
+    }
+    let posArgs = data["*args"];
+    if (posArgs == null || !mobx.isArrayLike(posArgs)) {
+        return [];
+    }
+    return posArgs;
+}
+
 function callHook(hookName : string, hookFn : JSFuncStr | Function, ...rest : any[]) : any {
     if (hookFn == null) {
         return null;
@@ -654,5 +665,5 @@ function bindLibContext(node : HibikiNode, libContext : string) {
     }
 }
 
-export {jsonRespHandler, parseUrlParams, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy, valInArray, rawAttrFromNode, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP, subMapKey, subArrayIndex, unbox, splitTrim, bindLibContext};
+export {jsonRespHandler, parseUrlParams, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy, valInArray, rawAttrFromNode, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP, subMapKey, subArrayIndex, unbox, splitTrim, bindLibContext, unpackPositionalArgArray};
 

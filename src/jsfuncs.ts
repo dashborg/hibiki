@@ -1,7 +1,7 @@
 // Copyright 2021-2022 Dashborg Inc
 
 import * as mobx from "mobx";
-import type {JSFuncType} from "./types";
+import type {JSFuncType, HibikiVal} from "./types";
 import {sprintf} from "sprintf-js";
 import {isObject, addToArrayDupCheck, removeFromArray} from "./utils";
 import {v4 as uuidv4} from 'uuid';
