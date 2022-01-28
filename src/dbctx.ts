@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import {DataEnvironment} from "./state";
 import {sprintf} from "sprintf-js";
 import {boundMethod} from 'autobind-decorator'
-import type {HibikiVal, HibikiValObj, HibikiValEx, HibikiReactProps} from "./types";
+import type {HibikiVal, HibikiValObj, HibikiReactProps} from "./types";
 import type {HibikiNode, NodeAttrType} from "./html-parser";
 import * as NodeUtils from "./nodeutils";
 import {nodeStr, isObject} from "./utils";
@@ -283,7 +283,7 @@ class DBCtx {
         return DataCtx.resolveLValueAttr(this.node, dataName, this.dataenv);
     }
 
-    resolveArgsRoot(implNode : HibikiNode) : Record<string, HibikiValEx> {
+    resolveArgsRoot(implNode : HibikiNode) : HibikiValObj {
         return DataCtx.resolveArgsRoot(this.node, this.dataenv, this.injectedAttrs, implNode);
     }
 

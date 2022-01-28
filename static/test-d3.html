@@ -6,12 +6,7 @@
         {"mode": "scatter"}
       </hibiki-data>
       <import-library src="/libs/d3.html" prefix="d3"></import-library>
-      <hibiki-config>
-        {
-            "modules": {"app": {"type": "http", "baseUrl": "https://testapi.hibikihtml.com/"}}
-        }
-      </hibiki-config>
-      <h-data name="get-data" query="//@app/api/d3-test" load.handler="$.data = @value.data"></h-data>
+      <h-data name="get-data" query="GET https://testapi.hibikihtml.com/api/d3-test" load.handler="$.data = @value.data"></h-data>
       <section class="hero is-primary mb-3">
         <div class="hero-body">
           <h1 class="title">D3 Test</h1>

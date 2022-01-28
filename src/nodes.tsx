@@ -915,7 +915,7 @@ function createInjectObj(ctx : DBCtx, child : HibikiNode, nodeDataenv : DataEnvi
             }
             let shortName = hname.substr(7);
             let handlerBlock = ctx.node.handlers[hname];
-            let ehandler = {handler: new DataCtx.HActionBlock(handlerBlock, ctx.dataenv.getLibContext()), node: ctx.node, dataenv: evalInjectAttrsEnv};
+            let ehandler = {handler: new DataCtx.HActionBlock("handler", handlerBlock, ctx.dataenv.getLibContext()), node: ctx.node, dataenv: evalInjectAttrsEnv};
             toInject.handlers[shortName] = ehandler;
         }
     }

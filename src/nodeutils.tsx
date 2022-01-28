@@ -173,7 +173,7 @@ function renderTextSpan(text : string, style : any, className : string) : any {
 function renderTextData(ctx : DBCtx, onlyText? : boolean) : any {
     let style = ctx.resolveStyleMap();
     let cnArr = ctx.resolveCnArray();
-    let bindVal = DataCtx.demobx(ctx.resolveAttrVal("bind"));
+    let bindVal = ctx.resolveAttrVal("bind");
     let rtn : string = null;
     let nullTextAttr : string = null;
     if (bindVal == null) {
@@ -316,7 +316,7 @@ function makeHandlers(node : HibikiNode, injectedAttrs : DataCtx.InjectedAttrsOb
             if (hname in handlers) {
                 continue;
             }
-            handlers[hname] = {block: new DataCtx.HActionBlock(node.handlers[eventName], libContext), node: node};
+            handlers[hname] = {block: new DataCtx.HActionBlock("handler", node.handlers[eventName], libContext), node: node};
         }
     }
     if (handlerPrefixes != null && node.list != null) {
@@ -341,7 +341,7 @@ function makeHandlers(node : HibikiNode, injectedAttrs : DataCtx.InjectedAttrsOb
                 }
             }
             if (prefixOk) {
-                handlers[hname] = {block: new DataCtx.HActionBlock(subNode.handlers["handler"], libContext), node: subNode};
+                handlers[hname] = {block: new DataCtx.HActionBlock("handler", subNode.handlers["handler"], libContext), node: subNode};
             }
         }
     }

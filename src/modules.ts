@@ -151,7 +151,7 @@ function jsonReplacer(key : string, value : any) : any {
         }
         return blob;
     }
-    return DataCtx.MapReplacer.bind(this)(key, value);
+    return DataCtx.JsonReplacerFn.bind(this)(key, value);
 }
 
 function DefaultCsrfValueFn() {
