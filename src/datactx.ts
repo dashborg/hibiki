@@ -6,13 +6,12 @@ import {DataEnvironment, HibikiState, HibikiExtState} from "./state";
 import {sprintf} from "sprintf-js";
 import {parseHtml, HibikiNode} from "./html-parser";
 import {RtContext, getShortEMsg, HibikiError} from "./error";
-import {SYM_PROXY, SYM_FLATTEN, isObject, stripAtKeys, unpackPositionalArgs, nodeStr, parseHandler, fullPath, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP, splitTrim, bindLibContext, unpackPositionalArgArray} from "./utils";
+import {SYM_PROXY, SYM_FLATTEN, isObject, stripAtKeys, unpackPositionalArgs, nodeStr, parseHandler, fullPath, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP, splitTrim, bindLibContext, unpackPositionalArgArray, classStringToCnArr, cnArrToClassAttr} from "./utils";
 import {PathPart, PathType, PathUnionType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue, HandlerBlock, HibikiVal, HibikiValObj, AutoMergeExpr, JSFuncType, HibikiSpecialVal, HibikiPrimitiveVal} from "./types";
 import type {NodeAttrType} from "./html-parser";
 import {HibikiRequest} from "./request";
 import type {EHandlerType} from "./state";
 import {doParse} from "./hibiki-parser";
-import cn from "classnames/dedupe";
 import {DefaultJSFuncs} from "./jsfuncs";
 
 declare var window : any;
@@ -350,29 +349,11 @@ function nsAttrName(attrName : string, ns : string) : string {
     return ns + ":" + attrName;
 }
 
-function makeCnArr(cnVal : any) : Record<string, boolean>[] {
-    let rtn : Record<string, boolean>[] = [];
-    let classVal = cn(cnVal);
-    let splitArr = classVal.split(/\s+/);
-    for (let i=0; i<splitArr.length; i++) {
-        let val = splitArr[i];
-        if (val === "" || val === "hibiki-cloak") {
-            continue;
-        }
-        if (val.startsWith("!")) {
-            rtn.push({[val.substr(1)]: false});
-            continue;
-        }
-        rtn.push({[val]: true});
-    }
-    return rtn;
-}
-
 function resolveNonAmCnArray(node : HibikiNode, ns : string, dataenv : DataEnvironment, moreClasses : string) : Record<string, boolean>[] {
-    let cnArr = makeCnArr(moreClasses);
+    let cnArr = classStringToCnArr(moreClasses);
     let baseClassAttrName = nsAttrName("class", ns);
-    let [classAttrVal, _] = getAttributeValPair(node, baseClassAttrName, dataenv);
-    cnArr.push(...makeCnArr(classAttrVal));
+    let classAttrVal = getAttributeStr(node, baseClassAttrName, dataenv);
+    cnArr.push(...classStringToCnArr(classAttrVal));
     if (node.attrs == null) {
         return cnArr;
     }
@@ -508,6 +489,7 @@ function valToString(val : HibikiVal) : string {
     if (val == null) {
         return null;
     }
+    val = resolveLValue(val);
     let [pval, isPrim] = asPrimitive(val);
     if (isPrim) {
         return pval.toString();
@@ -516,7 +498,7 @@ function valToString(val : HibikiVal) : string {
     if (isArr) {
         return arrVal.toString();
     }
-    let [objVal, isObj] = asObject(val, false);
+    let [objVal, isObj] = asPlainObject(val, false);
     if (isObj) {
         return "[Object object]";
     }
@@ -714,7 +696,7 @@ function resolveAutoMergeCnArraySingle(source : string, argsRoot : HibikiValObj)
     }
     let srcRoot = argsRootSource(argsRoot, source);
     let exists = ("class" in srcRoot);
-    let cnArr = makeCnArr(srcRoot["class"]);
+    let cnArr = classStringToCnArr(valToString(srcRoot["class"]));
     for (let [k,v] of Object.entries(srcRoot)) {
         if (!k.startsWith("class.")) {
             continue;
@@ -766,7 +748,8 @@ function resolveAutoMergePair(sourceArr : string[], attrName : string, dataenv :
             continue;
         }
         if (attrName in nsArgs) {
-            return [exValToVal(nsArgs[attrName]), true];
+            // return [exValToVal(nsArgs[attrName]), true];
+            return [nsArgs[attrName], true];
         }
     }
     return [null, false];
@@ -791,7 +774,8 @@ function getAttributeValPair(node : HibikiNode, attrName : string, dataenv : Dat
     if (!opts.noBindings && node.bindings && node.bindings[attrName] != null) {
         let [lv, rtnVal, exists] = resolveLValueAttrParts(node, attrName, dataenv, {noAutoMerge: true});
         if (exists) {
-            return [exValToVal(rtnVal), true];
+            // return [exValToVal(rtnVal), true];
+            return [rtnVal, true];
         }
     }
 
@@ -871,7 +855,8 @@ function resolveAutoMergeAttrs(node : HibikiNode, destNs : string, dataenv : Dat
             }
             let [include, includeForce] = checkAMAttr(amExpr, srcAttr);
             if (forced && includeForce || !forced && include && !includeForce) {
-                rtn[srcAttr] = exValToVal(nsRoot[srcAttr]);
+                // rtn[srcAttr] = exValToVal(nsRoot[srcAttr]);
+                rtn[srcAttr] = nsRoot[srcAttr];
             }
         }
     }
@@ -928,7 +913,7 @@ function resolveValAttrs(node : HibikiNode, dataenv : DataEnvironment, injectedA
     }
     let cnArr = resolveCnArray(node, "self", dataenv, null);
     if (cnArr != null && cnArr.length > 0) {
-        rtn["class"] = cn(cnArr);
+        rtn["class"] = cnArrToClassAttr(cnArr);
     }
     return rtn;
 }
@@ -951,7 +936,7 @@ function _assignToArgsRootNs(argsRoot : HibikiValObj, key : string, val : Hibiki
     else {
         ns = key.substr(0, colonIdx);
         baseName = key.substr(colonIdx+1);
-        if (baseName == "") {
+        if (baseName === "") {
             return;
         }
     }
@@ -962,7 +947,7 @@ function _assignToArgsRootNs(argsRoot : HibikiValObj, key : string, val : Hibiki
         argsRoot["@ns"][ns] = {};
     }
     let nsRoot = argsRoot["@ns"][ns];
-    if (baseName == "class" || baseName.startsWith("class.")) {
+    if (baseName === "class" || baseName.startsWith("class.")) {
         if (!forced && nsRoot["@classlock"]) {
             return;
         }
@@ -970,7 +955,9 @@ function _assignToArgsRootNs(argsRoot : HibikiValObj, key : string, val : Hibiki
             nsRoot["@classlock"] = true;
         }
         if (baseName == "class") {
-            nsRoot["class"] = cn(nsRoot["class"], exValToVal(val));
+            let cnArr1 = classStringToCnArr(valToString(nsRoot["class"]));
+            let cnArr2 = classStringToCnArr(valToString(val));
+            nsRoot["class"] = cnArrToClassAttr([...cnArr1, ...cnArr2]);
         }
         else {
             if (baseName in nsRoot) {
@@ -1150,7 +1137,7 @@ function resolveArgsRoot(node : HibikiNode, dataenv : DataEnvironment, injectedA
     // specially compute class for argsRoot
     let cnArr = resolveCnArray(node, "self", dataenv, null);
     if (cnArr != null && cnArr.length > 0) {
-        argsRoot["class"] = cn(cnArr);
+        argsRoot["class"] = cnArrToClassAttr(cnArr);
     }
 
     return argsRoot;
@@ -1462,7 +1449,8 @@ class ObjectLValue extends LValue {
     }
 
     get() : HibikiVal {
-        return exValToVal(this.getEx());
+        return this.getEx();
+        // return exValToVal(this.getEx());
     }
 
     getEx() : HibikiVal {
@@ -1683,7 +1671,7 @@ function internalResolvePath(path : PathType, irData : HibikiVal, dataenv : Data
         if ((irData instanceof Map) || mobx.isObservableMap(irData)) {
             return internalResolvePath(path, irData.get(pp.pathkey), dataenv, level+1);
         }
-        let [dataObj, isObj] = asObject(irData, false);
+        let [dataObj, isObj] = asPlainObject(irData, false);
         if (!isObj) {
             throw new Error(sprintf("Cannot resolve map key (non-object) in ResolvePath, path=%s, level=%d, type=%s", StringPath(path), level, hibikiTypeOf(irData)));
         }
@@ -1979,7 +1967,7 @@ function internalSetPath(dataenv : DataEnvironment, op : string, path : PathType
             mapVal.set(pp.pathkey, newVal);
         }
         else {
-            let [objVal, isObj] = asObject(resolvedVal, false);
+            let [objVal, isObj] = asPlainObject(resolvedVal, false);
             if (!isObj) {
                 throw new Error(sprintf("SetPath cannot resolve map key through non-object, path=%s, level=%d, type=%s", StringPath(path), level, hibikiTypeOf(resolvedVal)));
             }
@@ -2036,9 +2024,6 @@ function SetPathThrow(pathUnion : PathUnionType, dataenv : DataEnvironment, setD
 }
 
 function specialValToString(val : any) : string {
-    if (val === SYM_NOATTR) {
-        return null;
-    }
     if (typeof(val) === "symbol" || val instanceof Symbol) {
         return val.toString();
     }
@@ -2183,7 +2168,7 @@ function CheckCycle(data : HibikiVal, detector? : CycleDetector) : [boolean, str
         detector.removeObj(arrData);
         return [false, null];
     }
-    let [objData, isObj] = asObject(data, false);
+    let [objData, isObj] = asPlainObject(data, false);
     if (isObj) {
         let cyclePath = detector.addObj(objData);
         if (cyclePath != null) {
@@ -2251,7 +2236,7 @@ function DeepCopy(data : HibikiVal, opts? : {resolve? : boolean, json? : boolean
         opts.cycleArr.pop();
         return rtn;
     }
-    let [objData, isObj] = asObject(data, false);
+    let [objData, isObj] = asPlainObject(data, false);
     if (isObj) {
         if (opts.cycleArr.indexOf(objData) !== -1) {
             throw new Error(sprintf("DeepCopy circular-reference cycle: %s", opts.cyclePath.join("")));
@@ -2359,7 +2344,7 @@ function asSpecial(data : HibikiVal, nullOk : boolean) : [HibikiSpecialVal, bool
     return [null, false];
 }
 
-function asObject(data : HibikiVal, nullOk : boolean) : [HibikiValObj, boolean] {
+function asPlainObject(data : HibikiVal, nullOk : boolean) : [HibikiValObj, boolean] {
     if (data == null) {
         return [null, nullOk];
     }
@@ -2458,8 +2443,8 @@ function DeepEqual(data1 : HibikiVal, data2 : HibikiVal) : boolean {
     if (d1IsPrim || d2IsPrim) {
         return false;
     }
-    let [d1obj, d1IsObj] = asObject(data1, false);
-    let [d2obj, d2IsObj] = asObject(data2, false);
+    let [d1obj, d1IsObj] = asPlainObject(data1, false);
+    let [d2obj, d2IsObj] = asPlainObject(data2, false);
     if (!d1IsObj || !d2IsObj) {
         return false;
     }
@@ -2506,7 +2491,7 @@ function demobxInternal<T extends HibikiVal>(v : T) : [T, boolean] {
         }
         return [varr as T, false];
     }
-    let [vobj, isObj] = asObject(v, false);
+    let [vobj, isObj] = asPlainObject(v, false);
     if (isObj) {
         let rtnObj : HibikiValObj = {};
         let objUpdated = mobx.isObservable(vobj);
@@ -3548,7 +3533,7 @@ function setLValue(lv : LValue, setVal : HibikiVal) : void {
     rlv.set(setVal);
 }
 
-export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, JsonStringify, EvalSimpleExpr, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, DeepCopy, CheckCycle, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, makeIteratorFromExpr, rawAttrStr, resolveStrAttrs, resolveValAttrs, getStyleMap, getAttributeStr, getAttributeValPair, attrValToStr, resolveLValueAttr, resolveArgsRoot, SYM_NOATTR, resolveCnArray, HActionBlock, valToString, compileActionStr, FireEvent, makeErrorObj, OpaqueValue, ChildrenVar, Watcher, makeCnArr, nsAttrName, InjectedAttrsObj, UnboundExpr, blobPrintStr, asNumber, hibikiTypeOf, JsonReplacerFn};
+export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, JsonStringify, EvalSimpleExpr, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, DeepCopy, CheckCycle, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, makeIteratorFromExpr, rawAttrStr, resolveStrAttrs, resolveValAttrs, getStyleMap, getAttributeStr, getAttributeValPair, attrValToStr, resolveLValueAttr, resolveArgsRoot, SYM_NOATTR, resolveCnArray, HActionBlock, valToString, compileActionStr, FireEvent, makeErrorObj, OpaqueValue, ChildrenVar, Watcher, nsAttrName, InjectedAttrsObj, UnboundExpr, blobPrintStr, asNumber, hibikiTypeOf, JsonReplacerFn};
 
 export type {PathType, HAction, HExpr, HIteratorExpr};
 

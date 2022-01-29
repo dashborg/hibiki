@@ -2,14 +2,12 @@
 
 import * as mobx from "mobx";
 import * as React from "react";
-import cn from "classnames/dedupe";
-
 import {DBCtx, makeCustomDBCtx} from "./dbctx";
 import type {HandlerValType, HibikiVal} from "./types";
 import type {HibikiNode} from "./html-parser";
 import * as DataCtx from "./datactx";
 import {sprintf} from "sprintf-js";
-import {isObject, textContent, rawAttrFromNode, nodeStr} from "./utils";
+import {isObject, textContent, rawAttrFromNode, nodeStr, cnArrToClassAttr} from "./utils";
 import {DataEnvironment} from "./state";
 import type {EHandlerType} from "./state";
 
@@ -188,7 +186,7 @@ function renderTextData(ctx : DBCtx, onlyText? : boolean) : any {
     if (onlyText) {
         return rtn;
     }
-    return renderTextSpan(rtn, style, cn(cnArr));
+    return renderTextSpan(rtn, style, cnArrToClassAttr(cnArr));
 }
 
 function makeNodeVar(ctx : DBCtx, withAttrs : boolean) : any {

@@ -3,7 +3,6 @@
 import * as React from "react";
 import * as mobxReact from "mobx-react";
 import * as mobx from "mobx";
-import cn from "classnames/dedupe";
 import {sprintf} from "sprintf-js";
 import {boundMethod} from 'autobind-decorator'
 import {If, For, When, Otherwise, Choose} from "tsx-control-statements/components";
@@ -18,7 +17,7 @@ import type {ComponentType, LibraryType, HibikiExtState, LibComponentType, Hibik
 import {DBCtx, makeDBCtx, makeCustomDBCtx} from "./dbctx";
 import * as DataCtx from "./datactx";
 import {HibikiState, DataEnvironment} from "./state";
-import {resolveNumber, isObject, textContent, SYM_PROXY, SYM_FLATTEN, jseval, nodeStr, getHibiki, addToArrayDupCheck, removeFromArray, valInArray, subMapKey, unbox, bindLibContext} from "./utils";
+import {resolveNumber, isObject, textContent, SYM_PROXY, SYM_FLATTEN, jseval, nodeStr, getHibiki, addToArrayDupCheck, removeFromArray, valInArray, subMapKey, unbox, bindLibContext, cnArrToClassAttr} from "./utils";
 import {parseHtml, HibikiNode, NodeAttrType} from "./html-parser";
 import * as NodeUtils from "./nodeutils";
 import {RtContext, HibikiError} from "./error";
@@ -659,7 +658,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
             elemProps["style"] = style;
         }
         if (Object.keys(cnArr).length > 0) {
-            elemProps["className"] = cn(cnArr);
+            elemProps["className"] = cnArrToClassAttr(cnArr);
         }
         let elemChildren = ctxRenderHtmlChildren(ctx);
         return React.createElement(tagName, elemProps, elemChildren);
@@ -804,7 +803,7 @@ class DateFormatNode extends React.Component<HibikiReactProps, {}> {
             try {
                 bindVal = parseFloat(dayjs(bindVal).format("x"));
             } catch (e) {
-                return NodeUtils.renderTextSpan("invalid", style, cn(cnArr));
+                return NodeUtils.renderTextSpan("invalid", style, cnArrToClassAttr(cnArr));
             }
         }
         let relativeAttr = !!ctx.resolveAttrStr("relative");
@@ -813,13 +812,13 @@ class DateFormatNode extends React.Component<HibikiReactProps, {}> {
             bindVal = parseFloat(bindVal);
         }
         if (bindVal == null) {
-            return NodeUtils.renderTextSpan(nulltext ?? "null", style, cn(cnArr));
+            return NodeUtils.renderTextSpan(nulltext ?? "null", style, cnArrToClassAttr(cnArr));
         }
         if (bindVal == 0 && !durationAttr) {
-            return NodeUtils.renderTextSpan(nulltext ?? "null", style, cn(cnArr));
+            return NodeUtils.renderTextSpan(nulltext ?? "null", style, cnArrToClassAttr(cnArr));
         }
         if (typeof(bindVal) != "number" || isNaN(bindVal)) {
-            return NodeUtils.renderTextSpan("invalid", style, cn(cnArr));
+            return NodeUtils.renderTextSpan("invalid", style, cnArrToClassAttr(cnArr));
         }
         let text = null;
         try {
@@ -856,7 +855,7 @@ class DateFormatNode extends React.Component<HibikiReactProps, {}> {
         } catch (e) {
             text = "ERR[" + e + "]";
         }
-        return NodeUtils.renderTextSpan(text, style, cn(cnArr));
+        return NodeUtils.renderTextSpan(text, style, cnArrToClassAttr(cnArr));
     }
 }
 

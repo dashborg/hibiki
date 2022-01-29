@@ -665,5 +665,50 @@ function bindLibContext(node : HibikiNode, libContext : string) {
     }
 }
 
-export {jsonRespHandler, parseUrlParams, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy, valInArray, rawAttrFromNode, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP, subMapKey, subArrayIndex, unbox, splitTrim, bindLibContext, unpackPositionalArgArray};
+function cnArrToClassAttr(cnArr : Record<string, boolean>[]) : string {
+    if (cnArr == null || cnArr.length == 0) {
+        return null;
+    }
+    let rtn : Record<string, boolean> = {};
+    for (let part of cnArr) {
+        if (part == null) {
+            continue;
+        }
+        for (let key in part) {
+            if (key === "hibiki-cloak") {
+                continue;
+            }
+            if (part[key]) {
+                rtn[key] = true;
+            }
+            else {
+                delete rtn[key];
+            }
+        }
+    }
+    return Object.keys(rtn).join(" ");
+}
+
+function classStringToCnArr(cstr : string) : Record<string, boolean>[] {
+    if (cstr == null || cstr === "") {
+        return [];
+    }
+    let rtn : Record<string, boolean>[] = [];
+    let parts = cstr.split(/\s+/);
+    for (let part of parts) {
+        part = part.trim();
+        if (part === "" || part === "!") {
+            continue;
+        }
+        if (part.startsWith("!")) {
+            rtn.push({[part.substr(1)]: false});
+        }
+        else {
+            rtn.push({[part]: true});
+        }
+    }
+    return rtn;
+}
+
+export {jsonRespHandler, parseUrlParams, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy, valInArray, rawAttrFromNode, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP, subMapKey, subArrayIndex, unbox, splitTrim, bindLibContext, unpackPositionalArgArray, cnArrToClassAttr, classStringToCnArr};
 
