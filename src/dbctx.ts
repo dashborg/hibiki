@@ -264,17 +264,6 @@ class DBCtx {
         return false;
     }
 
-    getNodeLValueRoot() : DataCtx.LValue {
-        let dbstate = this.dataenv.dbstate;
-        let nodeData = dbstate.NodeDataMap.get(this.uuid);
-        if (nodeData == null) {
-            let uuidName = "id_" + this.uuid.replace(/-/g, "_");
-            nodeData = mobx.observable.box(null, {name: uuidName});
-            dbstate.NodeDataMap.set(this.uuid, nodeData);
-        }
-        return new DataCtx.ObjectLValue(null, nodeData);
-    }
-
     resolveLValueAttr(dataName : string) : DataCtx.LValue {
         let ivalLv = this.injectedAttrs.getInjectedLValue(dataName);
         if (ivalLv != null) {

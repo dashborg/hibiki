@@ -570,16 +570,10 @@ function resolveAttrValPair(k : string, v : NodeAttrType, dataenv : DataEnvironm
         return [null, true];
     }
     if (resolvedVal instanceof LValue) {
-        resolvedVal = resolvedVal.getEx();
-    }
-    if (typeof(resolvedVal) == "symbol" || resolvedVal instanceof Symbol) {
-        if (resolvedVal === SYM_NOATTR) {
+        let lvVal = resolveLValue(resolvedVal);
+        if (lvVal === SYM_NOATTR) {
             return [null, false];
         }
-        return [resolvedVal.toString(), true];
-    }
-    if (resolvedVal instanceof LValue) { // satisfy typescript
-        return ["[lvalue]", true];
     }
     return [resolvedVal, true];
 }
@@ -1347,7 +1341,8 @@ class BoundLValue extends LValue {
     }
 
     get() : HibikiVal {
-        return exValToVal(this.getEx());
+        // return exValToVal(this.getEx());
+        return this.getEx();
     }
     
     getEx() : HibikiVal {
@@ -1771,7 +1766,7 @@ function appendArrData(path : PathType, curData : HibikiVal, newData : HibikiVal
     throw new Error(sprintf("SetPath cannot appendarr newData, path=%s, typeof=%s", StringPath(path), hibikiTypeOf(curData)));
 }
 
-function setPathWrapper(op : string, path : PathType, dataenv : DataEnvironment, setData : any, opts : {allowContext : boolean}) {
+function setPathWrapper(op : string, path : PathType, dataenv : DataEnvironment, setData : HibikiVal, opts : {allowContext : boolean}) {
     let allowContext = opts.allowContext;
     if (path == null) {
         throw new Error(sprintf("Invalid set path expression, null path"));
@@ -1786,7 +1781,7 @@ function setPathWrapper(op : string, path : PathType, dataenv : DataEnvironment,
             return;
         }
         let irData = dataenv.resolveRoot(rootpp.pathkey);
-        internalSetPath(dataenv, op, path, irData, setData, 1);
+        internalSetPath(dataenv, op, path, irData, false, setData, 1);
         return;
     }
     if (path.length <= 1) {
@@ -1794,27 +1789,27 @@ function setPathWrapper(op : string, path : PathType, dataenv : DataEnvironment,
     }
     else if (rootpp.pathkey === "state") {
         let irData = dataenv.resolveRoot("state");
-        internalSetPath(dataenv, op, path, irData, setData, 1);
+        internalSetPath(dataenv, op, path, irData, false, setData, 1);
         return;
     }
     else if (rootpp.pathkey === "context" && allowContext) {
         let irData = dataenv.resolveRoot("context", {caret: rootpp.caret});
-        internalSetPath(dataenv, op, path, irData, setData, 1);
+        internalSetPath(dataenv, op, path, irData, false, setData, 1);
         return;
     }
     else if (rootpp.pathkey === "currentcontext" && allowContext) {
         let irData = dataenv.resolveRoot("currentcontext", {caret: rootpp.caret});
-        internalSetPath(dataenv, op, path, irData, setData, 1);
+        internalSetPath(dataenv, op, path, irData, false, setData, 1);
         return;
     }
     else if (rootpp.pathkey === "c" || rootpp.pathkey === "component") {
         let irData = dataenv.resolveRoot("c");
-        internalSetPath(dataenv, op, path, irData, setData, 1);
+        internalSetPath(dataenv, op, path, irData, false, setData, 1);
         return;
     }
     else if (rootpp.pathkey === "args") {
         let irData = dataenv.resolveRoot("args");
-        internalSetPath(dataenv, op, path, irData, setData, 1);
+        internalSetPath(dataenv, op, path, irData, true, setData, 1);
         return;
     }
     else {
@@ -1837,7 +1832,7 @@ function ObjectSetPath(pathStr : string, localRoot : any, setData : any) : any {
     if (rootpp.pathtype !== "root" || rootpp.pathkey !== "global") {
         return;
     }
-    return internalSetPath(null, op, path, localRoot, setData, 1, {nomap: true});
+    return internalSetPath(null, op, path, localRoot, false, setData, 1, {nomap: true});
 }
 
 function quickObjectResolvePath(path : PathType, localRoot : any) : any {
@@ -1866,7 +1861,7 @@ function quickObjectSetPath(path : PathType, localRoot : any, setData : any) : a
         return;
     }
     try {
-        return internalSetPath(null, "set", path, localRoot, setData, 1, {nomap: true});
+        return internalSetPath(null, "set", path, localRoot, false, setData, 1, {nomap: true});
     }
     catch (e) {
         console.log("Error setting object path", e);
@@ -1874,7 +1869,7 @@ function quickObjectSetPath(path : PathType, localRoot : any, setData : any) : a
     }
 }
 
-function internalSetPath(dataenv : DataEnvironment, op : string, path : PathType, localRoot : HibikiVal, setData : HibikiVal, level : number, opts? : {}) : any {
+function internalSetPath(dataenv : DataEnvironment, op : string, path : PathType, localRoot : HibikiVal, readOnly : boolean, setData : HibikiVal, level : number, opts? : {}) : any {
     if (mobx.isBoxedObservable(localRoot)) {
         throw new Error("Bad localRoot -- cannot be boxed observable.");
     }
@@ -1882,13 +1877,19 @@ function internalSetPath(dataenv : DataEnvironment, op : string, path : PathType
     if (level >= path.length) {
         if (localRoot instanceof LValue) {
             if (op === "set") {
-                localRoot.set(setData);
+                setLValue(localRoot, setData);
                 return localRoot;
+            }
+            if (readOnly) {
+                throw new Error(sprintf("Cannot set read-only path: %s", StringPath(path)));
             }
             if (op === "setraw") {
                 return setData;
             }
             throw new Error(sprintf("Invalid setPath op=%s for LValue bindpath", op));
+        }
+        if (readOnly) {
+            throw new Error(sprintf("Cannot set read-only path: %s", StringPath(path)));
         }
         if (op === "append") {
             return appendData(path, localRoot, setData);
@@ -1896,7 +1897,7 @@ function internalSetPath(dataenv : DataEnvironment, op : string, path : PathType
         if (op === "appendarr") {
             return appendArrData(path, localRoot, setData);
         }
-        else if (op === "set") {
+        else if (op === "set" || op === "setraw") {
             return setData;
         }
         else if (op === "setunless") {
@@ -1920,50 +1921,78 @@ function internalSetPath(dataenv : DataEnvironment, op : string, path : PathType
         if (pp.pathindex < 0 || pp.pathindex > MAX_ARRAY_SIZE) {
             throw new Error(sprintf("SetPath bad array index=%d, path=%s, level=%d", pp.pathindex, StringPath(path), level));
         }
-        if (localRoot == null) {
-            localRoot = [];
-        }
+        let resolvedVal : HibikiVal = null;
+        let originalResolvedVal : HibikiVal = null;
+        let rlv : LValue = null;
         if (localRoot instanceof LValue) {
-            internalSetPath(dataenv, op, path, localRoot.subArrayIndex(pp.pathindex), setData, level+1, opts);
-            return localRoot;
+            rlv = resolveToLValue(localRoot);
+            resolvedVal = rlv.get();
+            originalResolvedVal = resolvedVal;
         }
-        if (isOpaqueType(localRoot, true)) {
-            throw new Error(sprintf("SetPath cannot resolve array index through %s, path=%s, level=%d", specialValToString(localRoot), StringPath(path), level));
+        else {
+            resolvedVal = localRoot;
         }
-        let [arrVal, isArr] = asArray(localRoot, false);
+        if (resolvedVal == null) {
+            resolvedVal = [];
+        }
+        if (isOpaqueType(resolvedVal, true)) {
+            throw new Error(sprintf("SetPath cannot resolve array index through %s, path=%s, level=%d", specialValToString(resolvedVal), StringPath(path), level));
+        }
+        let [arrVal, isArr] = asArray(resolvedVal, false);
         if (!isArr) {
-            throw new Error(sprintf("SetPath cannot resolve array index through non-array, path=%s, level=%d", StringPath(path), level));
+            throw new Error(sprintf("SetPath cannot resolve array index through non-array, path=%s, level=%d, type=%s", StringPath(path), level, hibikiTypeOf(resolvedVal)));
         }
         if (arrVal.length < pp.pathindex + 1) {
             arrVal.length = pp.pathindex + 1;
         }
-        let newVal = internalSetPath(dataenv, op, path, arrVal[pp.pathindex], setData, level+1, opts);
+        let newVal = internalSetPath(dataenv, op, path, arrVal[pp.pathindex], readOnly, setData, level+1, opts);
         arrVal[pp.pathindex] = newVal;
+        if (localRoot instanceof LValue) {
+            if (arrVal !== originalResolvedVal) {
+                rlv.set(arrVal);
+            }
+            return localRoot;
+        }
         return arrVal;
     }
     else if (pp.pathtype === "map") {
-        if (localRoot == null) {
-            localRoot = {};
+        let resolvedVal : HibikiVal = null;
+        let originalResolvedVal : HibikiVal = null;
+        let rlv : LValue = null;
+        if (localRoot instanceof LValue) {
+            rlv = resolveToLValue(localRoot);
+            resolvedVal = rlv.get();
+            originalResolvedVal = resolvedVal;
         }
-        if (isOpaqueType(localRoot, true)) {
-            throw new Error(sprintf("SetPath cannot resolve map key through %s, path=%s, level=%d", specialValToString(localRoot), StringPath(path), level));
+        else {
+            resolvedVal = localRoot;
+        }
+        if (resolvedVal == null) {
+            resolvedVal = {};
+        }
+        if (isOpaqueType(resolvedVal, true)) {
+            throw new Error(sprintf("SetPath cannot resolve map key through %s, path=%s, level=%d", specialValToString(resolvedVal), StringPath(path), level));
+        }
+        if ((resolvedVal instanceof Map) || mobx.isObservableMap(localRoot)) {
+            let mapVal = (resolvedVal as any) as Map<string, HibikiVal>;
+            let newVal = internalSetPath(dataenv, op, path, mapVal.get(pp.pathkey), readOnly, setData, level+1, opts);
+            mapVal.set(pp.pathkey, newVal);
+        }
+        else {
+            let [objVal, isObj] = asObject(resolvedVal, false);
+            if (!isObj) {
+                throw new Error(sprintf("SetPath cannot resolve map key through non-object, path=%s, level=%d, type=%s", StringPath(path), level, hibikiTypeOf(resolvedVal)));
+            }
+            let newVal = internalSetPath(dataenv, op, path, objVal[pp.pathkey], readOnly, setData, level+1, opts);
+            objVal[pp.pathkey] = newVal;  // sets resolvedVal (objVal is just a typed version of resolvedVal)
         }
         if (localRoot instanceof LValue) {
-            internalSetPath(dataenv, op, path, localRoot.subMapKey(pp.pathkey), setData, level+1, opts);
+            if (resolvedVal !== originalResolvedVal) {
+                rlv.set(resolvedVal);
+            }
             return localRoot;
         }
-        if ((localRoot instanceof Map) || mobx.isObservableMap(localRoot)) {
-            let newVal = internalSetPath(dataenv, op, path, localRoot.get(pp.pathkey), setData, level+1, opts);
-            localRoot.set(pp.pathkey, newVal);
-            return localRoot;
-        }
-        let [objVal, isObj] = asObject(localRoot, false);
-        if (!isObj) {
-            throw new Error(sprintf("SetPath cannot resolve map key through non-object, path=%s, level=%d", StringPath(path), level));
-        }
-        let newVal = internalSetPath(dataenv, op, path, objVal[pp.pathkey], setData, level+1, opts);
-        objVal[pp.pathkey] = newVal;
-        return objVal;
+        return resolvedVal;
     }
     else {
         throw new Error(sprintf("Bad PathPart in SetPath, path=%s, level=%d", StringPath(path), level));
@@ -2197,7 +2226,6 @@ function DeepCopy(data : HibikiVal, opts? : {resolve? : boolean, json? : boolean
     }
     let [sdata, isSpecial] = asSpecial(data, false);
     if (isSpecial) {
-        console.log("DeepCopy-special", sdata, opts.resolve);
         if (opts.resolve && sdata instanceof LValue) {
             opts.cyclePath.push(".*");
             return DeepCopy(sdata.get(), opts);
@@ -2504,9 +2532,7 @@ function demobx<T extends HibikiVal>(v : T) : T {
 
 function JsonStringify(v : HibikiVal, opts? : {space? : number, noresolve? : boolean}) : string {
     opts = opts ?? {};
-    console.log("JS-1", v, !opts.noresolve);
     v = DeepCopy(v, {resolve: !opts.noresolve});
-    console.log("JS-2", v);
     return JSON.stringify(v, JsonReplacerFn, opts.space);
 }
 
@@ -2608,7 +2634,8 @@ function evalPathExprAst(exprAst : HExpr, dataenv : DataEnvironment) : (PathType
 
 function evalExprAst(exprAst : HExpr, dataenv : DataEnvironment) : HibikiVal {
     let exVal = evalExprAstEx(exprAst, dataenv);
-    return exValToVal(exVal);
+    // return exValToVal(exVal);
+    return exVal;
 }
 
 function evalExprAstEx(exprAst : HExpr, dataenv : DataEnvironment) : HibikiVal {
@@ -2618,9 +2645,9 @@ function evalExprAstEx(exprAst : HExpr, dataenv : DataEnvironment) : HibikiVal {
     if (exprAst.etype === "path") {
         let staticPath = evalPath(exprAst.path, dataenv);
         let val = internalResolvePath(staticPath, null, dataenv, 0);
-        if (val instanceof LValue) {
-            return val.getEx();
-        }
+        // if (val instanceof LValue) {
+        //     return val.getEx();
+        // }
         return val;
     }
     else if (exprAst.etype === "literal") {
@@ -2658,8 +2685,19 @@ function evalExprAstEx(exprAst : HExpr, dataenv : DataEnvironment) : HibikiVal {
         return rtn;
     }
     else if (exprAst.etype === "ref") {
-        let lv = new BoundLValue(exprAst.path, dataenv);
-        return lv;
+        if (exprAst.path == null || exprAst.path.length === 0) {
+            return null;
+        }
+        let rootpp = exprAst.path[0];
+        if (rootpp.pathtype !== "root") {
+            throw new Error(sprintf("Invalid non-rooted path expression [[%s]]", StringPath(exprAst.path)));
+        }
+        if (rootpp.pathkey === "global" || rootpp.pathkey === "data" || rootpp.pathkey === "c" || rootpp.pathkey === "component") {
+            let lv = new BoundLValue(exprAst.path, dataenv);
+            return lv;
+        }
+        throw new Error(sprintf("Can only take a ref of global ($) or component ($c) path [[%s]]", StringPath(exprAst.path)));
+
     }
     else if (exprAst.etype === "isref") {
         return false;
@@ -3488,7 +3526,7 @@ function resolveLValue(val : HibikiVal) : HibikiVal {
     return val;
 }
 
-function setLValue(lv : LValue, setVal : HibikiVal) : void {
+function resolveToLValue(lv : LValue) : LValue {
     let level = 0;
     let origLv = lv;
     while (true) {
@@ -3499,10 +3537,15 @@ function setLValue(lv : LValue, setVal : HibikiVal) : void {
         lv = val;
         level++;
         if (level > MAX_LVALUE_LEVEL) {
-            throw new Error(sprintf("Cannot set lv=%s, depth exceeds MAX_LVALUE_LEVEL=%d", origLv.asString(), MAX_LVALUE_LEVEL));
+            throw new Error(sprintf("Cannot resolve lv=%s, depth exceeds MAX_LVALUE_LEVEL=%d", origLv.asString(), MAX_LVALUE_LEVEL));
         }
     }
-    lv.set(setVal);
+    return lv;
+}
+
+function setLValue(lv : LValue, setVal : HibikiVal) : void {
+    let rlv = resolveToLValue(lv);
+    rlv.set(setVal);
 }
 
 export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, JsonStringify, EvalSimpleExpr, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, DeepCopy, CheckCycle, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, makeIteratorFromExpr, rawAttrStr, resolveStrAttrs, resolveValAttrs, getStyleMap, getAttributeStr, getAttributeValPair, attrValToStr, resolveLValueAttr, resolveArgsRoot, SYM_NOATTR, resolveCnArray, HActionBlock, valToString, compileActionStr, FireEvent, makeErrorObj, OpaqueValue, ChildrenVar, Watcher, makeCnArr, nsAttrName, InjectedAttrsObj, UnboundExpr, blobPrintStr, asNumber, hibikiTypeOf, JsonReplacerFn};
