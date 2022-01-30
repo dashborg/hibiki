@@ -32,15 +32,16 @@ type HActionResult = {
 };
 
 type HExpr = {
-    etype    : string,
-    filter?  : string,
-    exprs?   : HExpr[],
-    op?      : string,
-    fn?      : string,
-    val?     : any,
-    key?     : HExpr,
-    path?    : PathType,
-    valexpr? : HExpr,
+    etype      : string,
+    filter?    : string,
+    exprs?     : HExpr[],
+    op?        : string,
+    fn?        : string,
+    val?       : HibikiVal,
+    key?       : HExpr,
+    path?      : PathType,
+    valexpr?   : HExpr,
+    pathexpr?  : HExpr,
     sourcestr? : string,
 };
 
@@ -565,19 +566,21 @@ function resolveNonAmLValueAttrParts(node : HibikiNode, attrName : string, datae
         return [null, null, false];
     }
     let pathExpr = node.bindings[attrName];
-    let pathVal = evalPathExprAst(pathExpr, dataenv);
-    if (typeof(pathVal) === "symbol" || pathVal instanceof Symbol) {
-        if (pathVal === SYM_NOATTR) {
-            return [null, null, false];
-        }
-        throw new Error(sprintf("Invalid path expression symbol: %s", pathVal.toString()));
-    }
-    let lvRtn = new BoundLValue(pathVal, dataenv, sprintf("%s@%s", nodeStr(node), attrName));
-    let exVal = lvRtn.getEx();
-    if (exVal === SYM_NOATTR) {
+    let val = evalExprAst(pathExpr, dataenv);
+    if (val === SYM_NOATTR) {
         return [null, null, false];
     }
-    return [lvRtn, exVal, true];
+    if (val == null) {
+        return [null, null, true];
+    }
+    if (val instanceof LValue) {
+        let exVal = val.getEx();
+        if (exVal === SYM_NOATTR) {
+            return [null, null, false];
+        }
+        return [val, exVal, true];
+    }
+    throw new Error(sprintf("Invalid path expr in %s (did not evaluate to a path), type=%s", sprintf("%s@%s", nodeStr(node), attrName, hibikiTypeOf(val))));
 }
 
 function resolveAutoMergeLValue(sourceArr : string[], attrName : string, dataenv : DataEnvironment) : LValue {
@@ -2024,6 +2027,9 @@ function SetPathThrow(pathUnion : PathUnionType, dataenv : DataEnvironment, setD
 }
 
 function specialValToString(val : any) : string {
+    if (val === SYM_NOATTR) {
+        return "[noattr]";
+    }
     if (typeof(val) === "symbol" || val instanceof Symbol) {
         return val.toString();
     }
@@ -2593,26 +2599,51 @@ function evalExprArray(exprArray : HExpr[], dataenv : DataEnvironment) : any[] {
     return rtn;
 }
 
-function evalPathExprAst(exprAst : HExpr, dataenv : DataEnvironment) : (PathType | symbol) {
+function makeRef(path : PathType, dataenv : DataEnvironment, ctxStr : string) : LValue {
+    if (path == null || path.length == 0) {
+        return null;
+    }
+    let rootpp = path[0];
+    if (rootpp.pathtype !== "root") {
+        throw new Error(sprintf("Invalid non-rooted path expression [[%s]]", StringPath(path)));
+    }
+    if (rootpp.pathkey === "global" || rootpp.pathkey === "data" || rootpp.pathkey === "c" || rootpp.pathkey === "component") {
+        let lv = new BoundLValue(path, dataenv, ctxStr);
+        return lv;
+    }
+    throw new Error(sprintf("Can only make a reference/bindpath of global ($) or component ($c) path [[%s]]", StringPath(path)));
+}
+
+function evalPathExprAst(exprAst : HExpr, dataenv : DataEnvironment, ctxStr : string) : [LValue, boolean] {
     if (exprAst.etype === "path") {
-        return exprAst.path;
+        let lv = makeRef(exprAst.path, dataenv, ctxStr);
+        if (lv == null) {
+            return [null, true];
+        }
+        return [lv, true];
     }
     if (exprAst.etype === "noattr") {
-        return SYM_NOATTR;
+        return [null, false];
     }
     if (exprAst.etype === "op") {
         if (exprAst.op === "?:") {
             let econd = evalExprAst(exprAst.exprs[0], dataenv);
             if (econd) {
-                return evalPathExprAst(exprAst.exprs[1], dataenv);
+                return evalPathExprAst(exprAst.exprs[1], dataenv, ctxStr);
             }
             else {
-                return evalPathExprAst(exprAst.exprs[2], dataenv);
+                return evalPathExprAst(exprAst.exprs[2], dataenv, ctxStr);
             }
         }
         else {
             new Error(sprintf("Invalid path expression op type: '%s'", exprAst.op));
         }
+    }
+    if (exprAst.etype === "literal") {
+        if (exprAst.val == null) {
+            return [null, true];
+        }
+        throw new Error(sprintf("Invalid literal in path expr (only 'null' is allowed), type=%s", hibikiTypeOf(exprAst.val)));
     }
     throw new Error(sprintf("Invalid path expression etype: '%s'", exprAst.etype));
 }
@@ -2670,19 +2701,11 @@ function evalExprAstEx(exprAst : HExpr, dataenv : DataEnvironment) : HibikiVal {
         return rtn;
     }
     else if (exprAst.etype === "ref") {
-        if (exprAst.path == null || exprAst.path.length === 0) {
-            return null;
+        let [lv, exists] = evalPathExprAst(exprAst.pathexpr, dataenv);
+        if (!exists) {
+            return SYM_NOATTR;
         }
-        let rootpp = exprAst.path[0];
-        if (rootpp.pathtype !== "root") {
-            throw new Error(sprintf("Invalid non-rooted path expression [[%s]]", StringPath(exprAst.path)));
-        }
-        if (rootpp.pathkey === "global" || rootpp.pathkey === "data" || rootpp.pathkey === "c" || rootpp.pathkey === "component") {
-            let lv = new BoundLValue(exprAst.path, dataenv);
-            return lv;
-        }
-        throw new Error(sprintf("Can only take a ref of global ($) or component ($c) path [[%s]]", StringPath(exprAst.path)));
-
+        return lv;
     }
     else if (exprAst.etype === "isref") {
         return false;

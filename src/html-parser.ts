@@ -332,13 +332,14 @@ class HtmlParser {
         }
         let baseName = baseAttrName(name);
         if (NON_BINDABLE_ATTRS[baseName] || name.startsWith("class.")) {
-            return false;
+            console.log(sprintf("WARNING Invalid bindpath attribute, cannot bind %s, ignoring", name));
+            return true;
         }
         if (value.trim() === "") {
             return true;
         }
         try {
-            let path : HExpr = doParse(value, "ext_fullPathExpr");
+            let path : HExpr = doParse(value, "ext_refAttribute");
             path.sourcestr = value;
             if (node.bindings == null) {
                 node.bindings = {};

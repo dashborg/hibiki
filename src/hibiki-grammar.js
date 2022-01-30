@@ -137,7 +137,7 @@ var grammar = {
     {"name": "ext_statementBlock", "symbols": ["statementBlock"], "postprocess": id},
     {"name": "ext_callStatementNoAssign", "symbols": ["callStatementNoAssign"], "postprocess": id},
     {"name": "ext_contextAssignList", "symbols": ["contextAssignList"], "postprocess": id},
-    {"name": "ext_fullPathExpr", "symbols": ["fullPathExpr"], "postprocess": id},
+    {"name": "ext_refAttribute", "symbols": ["refAttribute"], "postprocess": id},
     {"name": "ext_pathExprNonTerm", "symbols": ["pathExprNonTerm"], "postprocess": id},
     {"name": "ext_iteratorExpr", "symbols": ["iteratorExpr"], "postprocess": id},
     {"name": "fullExpr", "symbols": ["filterExpr"], "postprocess": id},
@@ -329,9 +329,11 @@ var grammar = {
             }
             return [setop, data[1]];
         } },
-    {"name": "lvaluePath", "symbols": ["pathExprNonTerm"], "postprocess": (data) => { return data[0].path }},
+    {"name": "lvaluePath", "symbols": ["pathExprNonTerm"], "postprocess": (data) => data[0].path},
+    {"name": "refAttribute", "symbols": ["fullPathExpr"], "postprocess": (data) => ({etype: "ref", pathexpr: data[0]})},
     {"name": "fullPathExpr", "symbols": ["ternaryPathExpr"], "postprocess": id},
     {"name": "ternaryPathExpr", "symbols": [(lexer.has("KW_NOATTR") ? {type: "KW_NOATTR"} : KW_NOATTR)], "postprocess": (data) => ({etype: "noattr"})},
+    {"name": "ternaryPathExpr", "symbols": [(lexer.has("KW_NULL") ? {type: "KW_NULL"} : KW_NULL)], "postprocess": (data) => ({etype: "literal", val: null})},
     {"name": "ternaryPathExpr", "symbols": ["pathExprNonTerm"], "postprocess": id},
     {"name": "ternaryPathExpr", "symbols": ["fullExpr", (lexer.has("QUESTION") ? {type: "QUESTION"} : QUESTION), "fullPathExpr", (lexer.has("COLON") ? {type: "COLON"} : COLON), "fullPathExpr"], "postprocess":  (data) => {
             return {etype: "op", op: "?:", exprs: [data[0], data[2], data[4]]};
@@ -380,8 +382,9 @@ var grammar = {
     {"name": "fnExpr", "symbols": [(lexer.has("FN") ? {type: "FN"} : FN), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "optionalLiteralArrayElements", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess":  (data) => {
             return {etype: "fn", fn: data[0].value, exprs: data[2]};
         } },
-    {"name": "refExpr", "symbols": [(lexer.has("KW_REF") ? {type: "KW_REF"} : KW_REF), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "lvaluePath", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => ({etype: "ref", path: data[2]})},
-    {"name": "refExpr", "symbols": [(lexer.has("KW_ISREF") ? {type: "KW_ISREF"} : KW_ISREF), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "lvaluePath", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => ({etype: "isref", path: data[2]})},
+    {"name": "refExpr", "symbols": [(lexer.has("KW_REF") ? {type: "KW_REF"} : KW_REF), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "fullPathExpr", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => ({etype: "ref", pathexpr: data[2]})},
+    {"name": "refExpr", "symbols": [(lexer.has("KW_ISREF") ? {type: "KW_ISREF"} : KW_ISREF), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "fullExpr", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => ({etype: "isref", exprs: [data[2]]})},
+    {"name": "refExpr", "symbols": [(lexer.has("KW_REFINFO") ? {type: "KW_REFINFO"} : KW_REFINFO), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "fullExpr", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => ({etype: "refinfo", exprs: [data[2]]})},
     {"name": "bindExpr", "symbols": [(lexer.has("KW_BIND") ? {type: "KW_BIND"} : KW_BIND), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "fullExpr", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess":  (data) => {
             return {etype: "bind", exprs: [data[2]]};
         } },
