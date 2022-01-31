@@ -424,8 +424,12 @@ function getNonAmStyleMap(node : HibikiNode, ns : string, dataenv : DataEnvironm
             style: true,
             rtContext: sprintf("resolving style property '%s' in attribute '%s' in %s", k, styleAttr, nodeStr(node)),
         };
-        let rval = resolveAttrStr(k, v, dataenv, opts);
-        if (rval == null) {
+        let [rval, exists] = resolveNodeAttrPair(k, v, dataenv, opts);
+        if (!exists) {
+            continue;
+        }
+        let rstr = attrValToStr(rval, k);
+        if (rstr == null) {
             continue;
         }
         let skm = STYLE_KEY_MAP[k];
@@ -441,7 +445,7 @@ function getNonAmStyleMap(node : HibikiNode, ns : string, dataenv : DataEnvironm
             rtn[skm.key] = skm.val;
             continue;
         }
-        rtn[k] = rval;
+        rtn[k] = rstr;
     }
     return rtn;
 }
@@ -506,36 +510,8 @@ function valToString(val : HibikiVal) : string {
     return specialValToString(val);
 }
 
-// turns empty string into null
-function resolveAttrStr(k : string, v : NodeAttrType, dataenv : DataEnvironment, opts? : ResolveOpts) : string {
-    opts = opts ?? {};
-    let [resolvedVal, exists] = resolveAttrValPair(k, v, dataenv, opts);
-    if (!exists || resolvedVal == null || resolvedVal === false || resolvedVal === "") {
-        return null;
-    }
-    if (resolvedVal === true) {
-        resolvedVal = 1;
-    }
-    if (opts.style && typeof(resolvedVal) === "number") {
-        if (!STYLE_UNITLESS_NUMBER[k]) {
-            resolvedVal = String(resolvedVal) + "px";
-        }
-    }
-    return valToString(resolvedVal);
-}
-
-function attrValToStr(v : HibikiVal) : string {
-    if (v == null || v === false || v === "") {
-        return null;
-    }
-    if (v === true) {
-        v = 1;
-    }
-    return valToString(v);
-}
-
 // returns [value, exists]
-function resolveAttrValPair(k : string, v : NodeAttrType, dataenv : DataEnvironment, opts? : ResolveOpts) : [HibikiVal, boolean] {
+function resolveNodeAttrPair(k : string, v : NodeAttrType, dataenv : DataEnvironment, opts? : ResolveOpts) : [HibikiVal, boolean] {
     opts = opts || {};
     if (v == null) {
         return [null, false];
@@ -552,13 +528,23 @@ function resolveAttrValPair(k : string, v : NodeAttrType, dataenv : DataEnvironm
         console.log(sprintf("ERROR %s expression\n\"%s\"\n", rtContext, k, v.sourcestr), e.toString());
         return [null, true];
     }
-    if (resolvedVal instanceof LValue) {
-        let lvVal = resolveLValue(resolvedVal);
-        if (lvVal === SYM_NOATTR) {
-            return [null, false];
-        }
+    if (isNoAttr(resolvedVal)) {
+        return [null, false];
     }
     return [resolvedVal, true];
+}
+
+function attrValToStr(val : HibikiVal, styleProp? : string) : string {
+    if (val == null || val === false || val === "") {
+        return null;
+    }
+    if (val === true) {
+        val = 1;
+    }
+    if (typeof(val) === "number" && styleProp != null && !STYLE_UNITLESS_NUMBER[styleProp]) {
+        return String(val) + "px";
+    }
+    return valToString(val);
 }
 
 function resolveNonAmLValueAttrParts(node : HibikiNode, attrName : string, dataenv : DataEnvironment) : [LValue, HibikiVal, boolean] {
@@ -787,7 +773,7 @@ function getAttributeValPair(node : HibikiNode, attrName : string, dataenv : Dat
         opts = opts || {};
         opts.rtContext = sprintf("resolving attribute '%s' in <%s>", attrName, node.tag);
         let aval = node.attrs[attrName];
-        let [rtnVal, exists] = resolveAttrValPair(attrName, aval, dataenv, opts);
+        let [rtnVal, exists] = resolveNodeAttrPair(attrName, aval, dataenv, opts);
         if (exists) {
             return [rtnVal, true];
         }
@@ -2350,6 +2336,13 @@ function asSpecial(data : HibikiVal, nullOk : boolean) : [HibikiSpecialVal, bool
     return [null, false];
 }
 
+function isNoAttr(data : HibikiVal) : boolean {
+    if (data instanceof LValue) {
+        data = resolveLValue(data)
+    }
+    return (data === SYM_NOATTR);
+}
+
 function asPlainObject(data : HibikiVal, nullOk : boolean) : [HibikiValObj, boolean] {
     if (data == null) {
         return [null, nullOk];
@@ -2701,7 +2694,7 @@ function evalExprAstEx(exprAst : HExpr, dataenv : DataEnvironment) : HibikiVal {
         return rtn;
     }
     else if (exprAst.etype === "ref") {
-        let [lv, exists] = evalPathExprAst(exprAst.pathexpr, dataenv);
+        let [lv, exists] = evalPathExprAst(exprAst.pathexpr, dataenv, null);
         if (!exists) {
             return SYM_NOATTR;
         }
