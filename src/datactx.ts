@@ -505,7 +505,7 @@ function valToString(val : HibikiVal) : string {
     }
     let [objVal, isObj] = asPlainObject(val, false);
     if (isObj) {
-        return "[Object object]";
+        return "[object]";
     }
     return specialValToString(val);
 }
@@ -521,7 +521,7 @@ function resolveNodeAttrPair(k : string, v : NodeAttrType, dataenv : DataEnviron
     }
     let resolvedVal : HibikiVal = null;
     try {
-        resolvedVal = evalExprAstEx(v, dataenv);
+        resolvedVal = evalExprAst(v, dataenv);
     }
     catch (e) {
         let rtContext = opts.rtContext ?? "resolving attribute '%s'";
@@ -1595,10 +1595,8 @@ function ParseSetPathThrow(setpath : string) : { op : string, path : PathType } 
 }
 
 function internalResolvePath(path : PathType, irData : HibikiVal, dataenv : DataEnvironment, level : number) : HibikiVal {
-    if (level >= path.length) {
-        return irData;
-    }
-    if (irData === SYM_NOATTR) {
+    // note that irData starts as null when resolving a root path
+    if (level >= path.length || irData === SYM_NOATTR) {
         return irData;
     }
     let pp = path[level];
@@ -1620,11 +1618,11 @@ function internalResolvePath(path : PathType, irData : HibikiVal, dataenv : Data
         return internalResolvePath(path, newIrData, dataenv, level+1);
     }
     else if (pp.pathtype === "array") {
-        if (irData == null) {
-            return null;
-        }
         if (irData instanceof LValue) {
-            return internalResolvePath(path, irData.subArrayIndex(pp.pathindex), dataenv, level+1);
+            irData = resolveLValue(irData);
+        }
+        if (irData == null || irData === SYM_NOATTR) {
+            return irData;
         }
         if (isOpaqueType(irData, false)) {
             return null;
@@ -1642,11 +1640,11 @@ function internalResolvePath(path : PathType, irData : HibikiVal, dataenv : Data
         return internalResolvePath(path, arrObj[pp.pathindex], dataenv, level+1);
     }
     else if (pp.pathtype === "map") {
-        if (irData == null) {
-            return null;
-        }
         if (irData instanceof LValue) {
-            return internalResolvePath(path, irData.subMapKey(pp.pathkey), dataenv, level+1);
+            irData = resolveLValue(irData);
+        }
+        if (irData == null || irData === SYM_NOATTR) {
+            return null;
         }
         if (irData instanceof ChildrenVar || irData instanceof HibikiError || irData instanceof HibikiNode) {
             if (!irData.allowedGetters(pp.pathkey)) {
@@ -2362,7 +2360,7 @@ function asPlainObject(data : HibikiVal, nullOk : boolean) : [HibikiValObj, bool
 }
 
 function asNumber(data : HibikiVal) : number {
-    if (data == null) {
+    if (data == null || data === SYM_NOATTR) {
         return 0;
     }
     if (typeof(data) === "string") {
@@ -2642,12 +2640,6 @@ function evalPathExprAst(exprAst : HExpr, dataenv : DataEnvironment, ctxStr : st
 }
 
 function evalExprAst(exprAst : HExpr, dataenv : DataEnvironment) : HibikiVal {
-    let exVal = evalExprAstEx(exprAst, dataenv);
-    // return exValToVal(exVal);
-    return exVal;
-}
-
-function evalExprAstEx(exprAst : HExpr, dataenv : DataEnvironment) : HibikiVal {
     if (exprAst == null) {
         return null;
     }
@@ -2753,8 +2745,14 @@ function evalExprAstEx(exprAst : HExpr, dataenv : DataEnvironment) : HibikiVal {
                 return null;
             }
             let rtnVal : any = evalExprAst(exprAst.exprs[0], dataenv) ?? null;
+            if (typeof(rtnVal) === "symbol") {
+                rtnVal = asNumber(rtnVal);
+            }
             for (let i=1; i<exprAst.exprs.length; i++) {
                 let ev : any = evalExprAst(exprAst.exprs[i], dataenv) ?? null;
+                if (typeof(ev) === "symbol") {
+                    ev = asNumber(ev);
+                }
                 rtnVal = rtnVal + ev;
             }
             return rtnVal;
@@ -2824,11 +2822,11 @@ function evalExprAstEx(exprAst : HExpr, dataenv : DataEnvironment) : HibikiVal {
         }
         else if (exprAst.op === "u-") {
             let e1 : any = evalExprAst(exprAst.exprs[0], dataenv) ?? null;
-            return -e1;
+            return -asNumber(e1);
         }
         else if (exprAst.op === "u+") {
             let e1 : any = evalExprAst(exprAst.exprs[0], dataenv) ?? null;
-            return +e1;
+            return +asNumber(e1);
         }
         else if (exprAst.op === "?:") {
             let econd = evalExprAst(exprAst.exprs[0], dataenv);
