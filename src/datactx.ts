@@ -6,7 +6,7 @@ import {DataEnvironment, HibikiState, HibikiExtState} from "./state";
 import {sprintf} from "sprintf-js";
 import {parseHtml, HibikiNode} from "./html-parser";
 import {RtContext, getShortEMsg, HibikiError} from "./error";
-import {SYM_PROXY, SYM_FLATTEN, isObject, stripAtKeys, unpackPositionalArgs, nodeStr, parseHandler, fullPath, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP, splitTrim, bindLibContext, unpackPositionalArgArray, classStringToCnArr, cnArrToClassAttr} from "./utils";
+import {SYM_PROXY, SYM_FLATTEN, isObject, stripAtKeys, unpackPositionalArgs, nodeStr, parseHandler, fullPath, STYLE_UNITLESS_NUMBER, splitTrim, bindLibContext, unpackPositionalArgArray, classStringToCnArr, cnArrToClassAttr} from "./utils";
 import {PathPart, PathType, PathUnionType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue, HandlerBlock, HibikiVal, HibikiValObj, AutoMergeExpr, JSFuncType, HibikiSpecialVal, HibikiPrimitiveVal} from "./types";
 import type {NodeAttrType} from "./html-parser";
 import {HibikiRequest} from "./request";
@@ -432,19 +432,6 @@ function getNonAmStyleMap(node : HibikiNode, ns : string, dataenv : DataEnvironm
         if (rstr == null) {
             continue;
         }
-        let skm = STYLE_KEY_MAP[k];
-        if (skm != null) {
-            if (skm.flex) {
-                rtn.display = "flex";
-            }
-            if (k == "fullcenter") {
-                rtn.justifyContent = "center";
-                rtn.alignItems = "center";
-                continue;
-            }
-            rtn[skm.key] = skm.val;
-            continue;
-        }
         rtn[k] = rstr;
     }
     return rtn;
@@ -516,7 +503,7 @@ function resolveNodeAttrPair(k : string, v : NodeAttrType, dataenv : DataEnviron
     if (v == null) {
         return [null, false];
     }
-    if (typeof(v) == "string") {
+    if (typeof(v) === "string") {
         return [v, true];
     }
     let resolvedVal : HibikiVal = null;
@@ -796,7 +783,7 @@ function getAttributeValPair(node : HibikiNode, attrName : string, dataenv : Dat
 // start with exclude, then includeForce, then include.
 // returns [include, includeForced]
 function checkAMAttr(amExpr : AutoMergeExpr, attrName : string) : [boolean, boolean] {
-    if (attrName == "@style") {
+    if (attrName === "@style") {
         attrName = "style";
     }
     if (attrName.startsWith("class.")) {
@@ -839,7 +826,7 @@ function resolveAutoMergeAttrs(node : HibikiNode, destNs : string, dataenv : Dat
         }
         let nsRoot = argsRootSource(argsRoot, amExpr.source);
         for (let srcAttr in nsRoot) {
-            if (NON_ARGS_ATTRS[srcAttr] || srcAttr.startsWith("@") || srcAttr == "class" || srcAttr.startsWith("class.")) {
+            if (NON_ARGS_ATTRS[srcAttr] || srcAttr.startsWith("@") || srcAttr === "class" || srcAttr.startsWith("class.")) {
                 continue;
             }
             let [include, includeForce] = checkAMAttr(amExpr, srcAttr);
@@ -884,7 +871,7 @@ function resolveValAttrs(node : HibikiNode, dataenv : DataEnvironment, injectedA
     }
     if (node.attrs != null) {
         for (let key in node.attrs) {
-            if (key in rtn || NON_ARGS_ATTRS[key] || key == "class" || key.startsWith("class.")) {
+            if (key in rtn || NON_ARGS_ATTRS[key] || key === "class" || key.startsWith("class.")) {
                 continue;
             }
             let [val, exists] = getAttributeValPair(node, key, dataenv, {noAutoMerge: true, noBindings: true});
@@ -943,7 +930,7 @@ function _assignToArgsRootNs(argsRoot : HibikiValObj, key : string, val : Hibiki
         if (forced) {
             nsRoot["@classlock"] = true;
         }
-        if (baseName == "class") {
+        if (baseName === "class") {
             let cnArr1 = classStringToCnArr(valToString(nsRoot["class"]));
             let cnArr2 = classStringToCnArr(valToString(val));
             nsRoot["class"] = cnArrToClassAttr([...cnArr1, ...cnArr2]);
@@ -1015,7 +1002,7 @@ function mergeArgsRootNs(argsRoot : HibikiValObj, ns : string) {
         if (key.startsWith("@")) {
             continue;
         }
-        if (key == "class" || key.startsWith("class.")) {
+        if (key === "class" || key.startsWith("class.")) {
             continue;
         }
         argsRoot[key] = nsRoot[key];
@@ -1472,7 +1459,7 @@ class ObjectLValue extends LValue {
 }
 
 function StringPath(path : PathUnionType) : string {
-    if (typeof(path) == "string") {
+    if (typeof(path) === "string") {
         return path;
     }
     if (path.length === 0) {
@@ -3220,7 +3207,7 @@ function convertActions(actions : HibikiAction[]) : HAction[] {
 }
 
 async function FireEvent(event : EventType, dataenv : DataEnvironment, rtctx : RtContext, throwErrors : boolean) : Promise<HibikiVal> {
-    if (event.event == "unhandlederror" && !event.native) {
+    if (event.event === "unhandlederror" && !event.native) {
         throw new Error("Cannot fire->unhandlederror from handler");
     }
     let ehandler : EHandlerType = null;
@@ -3266,7 +3253,7 @@ async function FireEvent(event : EventType, dataenv : DataEnvironment, rtctx : R
             datacontext: {error: errorObj, event: event.event},
         };
         let errorHandler = dataenv.resolveEventHandler(errorEventObj, rtctx);
-        if (event.event == "error" || errorHandler == null) {
+        if (event.event === "error" || errorHandler == null) {
             // no error handler or error while running error handler
             if (throwErrors) {
                 throw errorObj;

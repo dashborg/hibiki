@@ -634,22 +634,6 @@ const STYLE_UNITLESS_NUMBER = { // from react
     "stroke-width": true,
 };
 
-const STYLE_KEY_MAP : Record<string, {key? : string, val? : string, flex? : boolean}> = {
-    "bold": {key: "fontWeight", val: "bold"},
-    "italic": {key: "fontStyle", val: "italic"},
-    "underline": {key: "textDecoration", val: "underline"},
-    "strike": {key: "textDecoration", val: "line-through"},
-    "pre": {key: "whiteSpace", val: "pre"},
-    "fixedfont": {key: "fontFamily", val: "\"courier new\", fixed"},
-    "grow": {key: "flex", val: "1 0 0"},
-    "noshrink": {key: "flexShrink", val: "0"},
-    "shrink": {key: "flexShrink", val: "1"},
-    "scroll": {key: "overflow", val: "scroll"},
-    "center": {flex: true, key: "justifyContent", val: "center"},
-    "xcenter": {flex: true, key: "alignItems", val: "center"},
-    "fullcenter": {flex: true},
-};
-
 function bindLibContext(node : HibikiNode, libContext : string) {
     if (node == null) {
         return;
@@ -710,5 +694,5 @@ function classStringToCnArr(cstr : string) : Record<string, boolean>[] {
     return rtn;
 }
 
-export {jsonRespHandler, parseUrlParams, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy, valInArray, rawAttrFromNode, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP, subMapKey, subArrayIndex, unbox, splitTrim, bindLibContext, unpackPositionalArgArray, cnArrToClassAttr, classStringToCnArr};
+export {jsonRespHandler, parseUrlParams, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy, valInArray, rawAttrFromNode, STYLE_UNITLESS_NUMBER, subMapKey, subArrayIndex, unbox, splitTrim, bindLibContext, unpackPositionalArgArray, cnArrToClassAttr, classStringToCnArr};
 
