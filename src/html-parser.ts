@@ -6,7 +6,7 @@ import merge from "lodash/merge";
 import {sprintf} from "sprintf-js";
 import {doParse} from "./hibiki-parser";
 import type {HAction, HExpr, HIteratorExpr} from "./datactx";
-import {textContent, rawAttrFromNode} from "./utils";
+import {textContent, rawAttrFromNode, attrBaseName} from "./utils";
 
 const styleAttrPartRe = new RegExp("^(style(?:-[a-z][a-z0-9-])?)\\.(.*)");
 
@@ -79,14 +79,6 @@ const NON_BINDABLE_ATTRS = {
 type ParseContext = {
     sourceName : string,
     tagStack : string[],
-}
-
-function baseAttrName(attrName : string) : string {
-    let colonIdx = attrName.indexOf(":");
-    if (colonIdx === -1) {
-        return attrName;
-    }
-    return attrName.substr(colonIdx+1);
 }
 
 // returns [source, dest, parts]
@@ -327,10 +319,14 @@ class HtmlParser {
     }
 
     parseBindPathAttr(node : HibikiNode, name : string, value : string, pctx : ParseContext) : boolean {
-        if (name !== "bindpath" && !name.endsWith(".bindpath")) {
+        if (!name.endsWith(".bindpath")) {
             return false;
         }
-        let baseName = baseAttrName(name);
+        let baseName = attrBaseName(name.substr(0, name.length-9));
+        if (baseName === "") {
+            console.log(sprintf("WARNING Invalid bindpath attribute, cannot end with ':', cannot bind %s, ignoring", name));
+            return true;
+        }
         if (NON_BINDABLE_ATTRS[baseName] || name.startsWith("class.")) {
             console.log(sprintf("WARNING Invalid bindpath attribute, cannot bind %s, ignoring", name));
             return true;
@@ -344,7 +340,7 @@ class HtmlParser {
             if (node.bindings == null) {
                 node.bindings = {};
             }
-            let bindName = (name === "bindpath" ? name : name.substr(0, name.length-9));
+            let bindName = name.substr(0, name.length-9);
             node.bindings[bindName] = lvExpr;
             if (node.attrs == null) {
                 node.attrs = {};

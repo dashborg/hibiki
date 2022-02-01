@@ -654,39 +654,18 @@ function resolveAutoMergePair(sourceArr : string[], attrName : string, dataenv :
     return [null, false];
 }
 
-function getUnmergedAttributeStr(node : HibikiNode, attrName : string, dataenv : DataEnvironment, opts? : ResolveOpts) : string {
-    let [hval, exists] = getUnmergedAttributeValPair(node, attrName, dataenv, opts);
+function getUnmergedAttributeStr(node : HibikiNode, attrName : string, dataenv : DataEnvironment) : string {
+    let [hval, exists] = getUnmergedAttributeValPair(node, attrName, dataenv);
     if (!exists) {
         return null;
     }
     return valToAttrStr(hval);
 }
 
-function getUnmergedAttributeValPair(node : HibikiNode, attrName : string, dataenv : DataEnvironment, opts? : ResolveOpts) : [HibikiVal, boolean] {
+function getUnmergedAttributeValPair(node : HibikiNode, attrName : string, dataenv : DataEnvironment) : [HibikiVal, boolean] {
     if (!node) {
         return [null, false];
     }
-    opts = opts ?? {};
-
-    // check forceInclude automerge
-    let am = (opts.noAutoMerge ? [[], []] : checkSingleAutoMerge(node, attrName, "self"));
-    if (am[1].length > 0) {
-        let [amVal, exists] = resolveAutoMergePair(am[1], attrName, dataenv);
-        if (exists) {
-            return [amVal, true];
-        }
-    }
-
-    // check node.bindings
-    if (!opts.noBindings && node.bindings && node.bindings[attrName] != null) {
-        let [lv, rtnVal, exists] = resolveLValueAttrParts(node, attrName, dataenv, {noAutoMerge: true});
-        if (exists) {
-            // return [exValToVal(rtnVal), true];
-            return [rtnVal, true];
-        }
-    }
-
-    // check node.attrs
     if (node.attrs && node.attrs[attrName] != null) {
         let aval = node.attrs[attrName];
         let ctxStr = sprintf("resolving attribute '%s' in %s", attrName, nodeStr(node));
@@ -695,16 +674,6 @@ function getUnmergedAttributeValPair(node : HibikiNode, attrName : string, datae
             return [rtnVal, true];
         }
     }
-
-    // check remaining automerge
-    if (am[0].length > 0) {
-        let [amVal, exists] = resolveAutoMergePair(am[0], attrName, dataenv);
-        if (exists) {
-            return [amVal, true];
-        }
-    }
-
-    // no attr
     return [null, false];
 }
 
@@ -765,61 +734,6 @@ function resolveAutoMergeAttrs(node : HibikiNode, destNs : string, dataenv : Dat
                 rtn[srcAttr] = nsRoot[srcAttr];
             }
         }
-    }
-    return rtn;
-}
-
-// no style, class is fully resolved.
-function resolveValAttrs(node : HibikiNode, dataenv : DataEnvironment, injectedAttrs : InjectedAttrsObj) : HibikiValObj {
-    if (node.attrs == null && node.automerge == null && injectedAttrs == null) {
-        return {};
-    }
-    let rtn : HibikiValObj = {};
-    if (injectedAttrs != null) {
-        let ivals = injectedAttrs.getInjectedVals();
-        for (let key in ivals) {
-            rtn[key] = ivals[key];
-        }
-    }
-    let amForced = resolveAutoMergeAttrs(node, "self", dataenv, true);
-    for (let key in amForced) {
-        if (key in rtn || NON_ARGS_ATTRS[key]) {
-            continue;
-        }
-        rtn[key] = amForced[key];
-    }
-    if (node.bindings != null) {
-        for (let key in node.bindings) {
-            if (key in rtn || NON_ARGS_ATTRS[key]) {
-                continue;
-            }
-            let [val, exists] = getUnmergedAttributeValPair(node, key, dataenv, {noAutoMerge: true});
-            if (exists) {
-                rtn[key] = val;
-            }
-        }
-    }
-    if (node.attrs != null) {
-        for (let key in node.attrs) {
-            if (key in rtn || NON_ARGS_ATTRS[key] || key === "class" || key.startsWith("class.")) {
-                continue;
-            }
-            let [val, exists] = getUnmergedAttributeValPair(node, key, dataenv, {noAutoMerge: true, noBindings: true});
-            if (exists) {
-                rtn[key] = val;
-            }
-        }
-    }
-    let amAttrs = resolveAutoMergeAttrs(node, "self", dataenv, false);
-    for (let key in amAttrs) {
-        if (key in rtn || NON_ARGS_ATTRS[key]) {
-            continue;
-        }
-        rtn[key] = amAttrs[key];
-    }
-    let cnArr = resolveCnArray(node, "self", dataenv, null);
-    if (cnArr != null && cnArr.length > 0) {
-        rtn["class"] = cnArrToClassAttr(cnArr);
     }
     return rtn;
 }
@@ -986,7 +900,7 @@ function resolveArgsRoot(node : HibikiNode, dataenv : DataEnvironment, injectedA
             _assignToArgsRootNs(argsRoot, key, lvalue);
             continue;
         }
-        let [val, exists] = getUnmergedAttributeValPair(node, key, dataenv, {noAutoMerge: true, noBindings: true});
+        let [val, exists] = getUnmergedAttributeValPair(node, key, dataenv);
         if (exists) {
             let lv = CreateReadOnlyLValue(val, sprintf("$args.%s:readonly", key));
             _assignToArgsRootNs(argsRoot, key, lv);
@@ -1015,7 +929,7 @@ function resolveArgsRoot(node : HibikiNode, dataenv : DataEnvironment, injectedA
             if (key in argsRoot || NON_ARGS_ATTRS[key]) {
                 continue;
             }
-            let [val, exists] = getUnmergedAttributeValPair(node, key, dataenv, {noAutoMerge: true, noBindings: true});
+            let [val, exists] = getUnmergedAttributeValPair(node, key, dataenv);
             if (exists) {
                 _assignToArgsRootNs(argsRoot, key, val);
             }
@@ -1047,15 +961,6 @@ function resolveArgsRoot(node : HibikiNode, dataenv : DataEnvironment, injectedA
     }
 
     return argsRoot;
-}
-
-function resolveStrAttrs(node : HibikiNode, dataenv : DataEnvironment, injectedAttrs : InjectedAttrsObj) : Record<string, string> {
-    let vals = resolveValAttrs(node, dataenv, injectedAttrs);
-    let rtn : Record<string, string> = {};
-    for (let key in vals) {
-        rtn[key] = valToAttrStr(vals[key]);
-    }
-    return rtn;
 }
 
 function formatVal(val : HibikiVal, format : string) : string {
@@ -3466,7 +3371,7 @@ function setLValue(lv : LValue, setVal : HibikiVal) : void {
     rlv.set(setVal);
 }
 
-export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, JsonStringify, EvalSimpleExpr, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, DeepCopy, CheckCycle, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, makeIteratorFromExpr, rawAttrStr, resolveStrAttrs, resolveValAttrs, getStyleMap, getUnmergedAttributeStr, getUnmergedAttributeValPair, resolveLValueAttr, resolveArgsRoot, SYM_NOATTR, resolveCnArray, HActionBlock, valToString, compileActionStr, FireEvent, makeErrorObj, OpaqueValue, ChildrenVar, Watcher, nsAttrName, UnboundExpr, blobPrintStr, asNumber, hibikiTypeOf, JsonReplacerFn, valToAttrStr, checkAMAttr, resolveLValue};
+export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, JsonStringify, EvalSimpleExpr, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, DeepCopy, CheckCycle, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, makeIteratorFromExpr, rawAttrStr, getStyleMap, getUnmergedAttributeStr, getUnmergedAttributeValPair, resolveLValueAttr, resolveArgsRoot, SYM_NOATTR, resolveCnArray, HActionBlock, valToString, compileActionStr, FireEvent, makeErrorObj, OpaqueValue, ChildrenVar, Watcher, nsAttrName, UnboundExpr, blobPrintStr, asNumber, hibikiTypeOf, JsonReplacerFn, valToAttrStr, checkAMAttr, resolveLValue};
 
 export type {PathType, HAction, HExpr, HIteratorExpr};
 

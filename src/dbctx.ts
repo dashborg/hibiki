@@ -9,7 +9,7 @@ import {boundMethod} from 'autobind-decorator'
 import type {HibikiVal, HibikiValObj, HibikiReactProps, StyleMapType} from "./types";
 import type {HibikiNode, NodeAttrType} from "./html-parser";
 import * as NodeUtils from "./nodeutils";
-import {nodeStr, isObject} from "./utils";
+import {nodeStr, isObject, attrBaseName, cnArrToClassAttr} from "./utils";
 import {RtContext} from "./error";
 import type {EHandlerType} from "./state";
 
@@ -217,6 +217,9 @@ class AutoMergeData {
                 continue;
             }
             for (let srcAttr in srcRoot) {
+                if (NON_MERGED_ATTRS[srcAttr]) {
+                    continue;
+                }
                 let [include, includeForce] = DataCtx.checkAMAttr(amExpr, srcAttr);
                 if (include && includeForce) {
                     this.forcedAttrs[destNs][srcAttr] = srcRoot[srcAttr];
@@ -244,6 +247,18 @@ class AutoMergeData {
             return this.forcedAttrs[ns] ?? {};
         }
         return this.attrs[ns] ?? {};
+    }
+}
+
+function mergeAttrVals(vals : HibikiValObj, toMerge : HibikiValObj) {
+    if (toMerge == null) {
+        return;
+    }
+    for (let key in toMerge) {
+        if (key === "" || key in vals || NON_MERGED_ATTRS[key] || key.startsWith("@")) {
+            continue;
+        }
+        vals[key] = toMerge[key];
     }
 }
 
@@ -360,8 +375,37 @@ class DBCtx {
         return (this.node.handlers != null && this.node.handlers[handlerName] != null);
     }
 
-    resolveAttrVals() : Record<string, HibikiVal> {
-        return DataCtx.resolveValAttrs(this.node, this.dataenv, this.injectedAttrs);
+    resolveUnmergedAttrVals() : HibikiValObj {
+        let node = this.node;
+        if (node.attrs == null) {
+            return {};
+        }
+        let rtn = {};
+        for (let key in node.attrs) {
+            let baseName = attrBaseName(key);
+            if (NON_MERGED_ATTRS[key] || key === "class" || key.startsWith("class.")) {
+                continue;
+            }
+            let [val, exists] = DataCtx.getUnmergedAttributeValPair(node, key, this.dataenv);
+            if (exists) {
+                rtn[key] = val;
+            }
+        }
+        return rtn;
+    }
+
+    // no style, class is fully resolved
+    resolveAttrVals() : HibikiValObj {
+        let rtn : HibikiValObj = {};
+        mergeAttrVals(rtn, this.injectedAttrs.getInjectedVals());
+        mergeAttrVals(rtn, this.amData.getAMVals("self", true));
+        mergeAttrVals(rtn, this.resolveUnmergedAttrVals());
+        mergeAttrVals(rtn, this.amData.getAMVals("self", false));
+        let cnArr = this.resolveCnArray(null);
+        if (cnArr != null && cnArr.length > 0) {
+            rtn["class"] = cnArrToClassAttr(cnArr);
+        }
+        return rtn;
     }
 
     getRawAttr(attrName : string) : string {
