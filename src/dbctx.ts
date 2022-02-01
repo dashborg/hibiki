@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import {DataEnvironment} from "./state";
 import {sprintf} from "sprintf-js";
 import {boundMethod} from 'autobind-decorator'
-import type {HibikiVal, HibikiValObj, HibikiReactProps} from "./types";
+import type {HibikiVal, HibikiValObj, HibikiReactProps, StyleMapType} from "./types";
 import type {HibikiNode, NodeAttrType} from "./html-parser";
 import * as NodeUtils from "./nodeutils";
 import {nodeStr, isObject} from "./utils";
@@ -48,7 +48,206 @@ async function convertFormData(formData : FormData) : Promise<Record<string, any
     return params;
 }
 
-function makeCustomDBCtx(nodeArg : HibikiNode, dataenvArg : DataEnvironment, injectedAttrs : DataCtx.InjectedAttrsObj) : DBCtx {
+const NON_MERGED_ATTRS = {
+    "if": true,
+    "foreach": true,
+    "component": true,
+    "eid": true,
+    "ref": true,
+    "condition": true,
+    "automerge": true,
+    "slot": true,
+};
+
+function createInjectObj(ctx : DBCtx, child : HibikiNode, nodeDataenv : DataEnvironment) : InjectedAttrsObj {
+    let childCtx = makeCustomDBCtx(child, nodeDataenv, null);
+    let nodeVar = NodeUtils.makeNodeVar(childCtx, true);
+    let evalInjectAttrsEnv = ctx.dataenv.makeChildEnv({node: nodeVar}, null);
+    let evalInjectCtx = makeCustomDBCtx(ctx.node, evalInjectAttrsEnv, null);
+    let injectAttrs = evalInjectCtx.resolveAttrVals();
+    let toInject = new InjectedAttrsObj();
+    for (let k in injectAttrs) {
+        if (!k.startsWith("inject:")) {
+            continue;
+        }
+        let shortName = k.substr(7);
+        let lv = ctx.resolveLValueAttr(k);
+        if (lv != null) {
+            toInject.attrs[shortName] = lv;
+        }
+        else {
+            toInject.attrs[shortName] = injectAttrs[k];
+        }
+    }
+    let styleMap = evalInjectCtx.resolveNsStyleMap("inject", null);
+    if (styleMap != null && Object.keys(styleMap).length > 0) {
+        toInject.styleMap = styleMap;
+    }
+    if (ctx.node.handlers != null) {
+        for (let hname in ctx.node.handlers) {
+            if (!hname.startsWith("inject:")) {
+                continue;
+            }
+            let shortName = hname.substr(7);
+            let handlerBlock = ctx.node.handlers[hname];
+            let ehandler = {handler: new DataCtx.HActionBlock("handler", handlerBlock, ctx.dataenv.getLibContext()), node: ctx.node, dataenv: evalInjectAttrsEnv};
+            toInject.handlers[shortName] = ehandler;
+        }
+    }
+    return toInject;
+}
+
+class InjectedAttrsObj {
+    attrs : HibikiValObj;
+    styleMap : StyleMapType;
+    handlers : Record<string, EHandlerType>;
+    
+    constructor() {
+        this.attrs = {};
+        this.styleMap = null;
+        this.handlers = {};
+    }
+
+    getInjectedLValues() : Record<string, DataCtx.LValue> {
+        let rtn : Record<string, DataCtx.LValue> = {};
+        for (let key in this.attrs) {
+            if (key in rtn) {
+                continue;
+            }
+            let lv = this.getInjectedLValue(key);
+            if (lv != null) {
+                rtn[key] = lv;
+            }
+        }
+        return rtn;
+    }
+
+    getInjectedVals() : HibikiValObj {
+        let rtn : HibikiValObj = {};
+        for (let key in this.attrs) {
+            if (key in rtn) {
+                continue;
+            }
+            let [ival, exists] = this.getInjectedValPair(key);
+            if (exists) {
+                rtn[key] = ival;
+            }
+        }
+        return rtn;
+    }
+
+    getInjectedValPair(attrName : string) : [HibikiVal, boolean] {
+        if (!(attrName in this.attrs)) {
+            return [null, false];
+        }
+        let val = DataCtx.resolveLValue(this.attrs[attrName]);
+        if (val === DataCtx.SYM_NOATTR) {
+            return [null, false];
+        }
+        return [val, true];
+    }
+
+    getInjectedLValue(attrName : string) : DataCtx.LValue {
+        if (!(attrName in this.attrs)) {
+            return null;
+        }
+        let val = this.attrs[attrName];
+        if (val == null || !(val instanceof DataCtx.LValue)) {
+            return null;
+        }
+        let resolvedVal = val.getEx();
+        if (resolvedVal === DataCtx.SYM_NOATTR) {
+            return null;
+        }
+        return val;
+    }
+
+    getHandler(name : string) : EHandlerType {
+        return this.handlers[name];
+    }
+}
+
+class AutoMergeData {
+    ctx : DBCtx;
+    attrs : Record<string, HibikiValObj>;
+    forcedAttrs : Record<string, HibikiValObj>;
+    resolvedSelf : boolean;
+    resolvedAll : boolean;
+
+    constructor(ctx : DBCtx) {
+        this.ctx = ctx;
+        this.attrs = {};
+        this.forcedAttrs = {};
+        this.resolvedSelf = false;
+        this.resolvedAll = false;
+    }
+
+    resolveAM(resolveAll : boolean) {
+        if (this.resolvedAll || (this.resolvedSelf && !resolveAll)) {
+            return;
+        }
+        this.resolveAMInternal(resolveAll);
+        this.resolvedSelf = true;
+        this.resolvedAll = resolveAll;
+    }
+
+    resolveAMInternal(resolveAll : boolean) {
+        let node = this.ctx.node;
+        let dataenv = this.ctx.dataenv;
+        let argsRoot = dataenv.getArgsRoot();
+        if (node.automerge == null || node.automerge.length === 0 || argsRoot == null || argsRoot["@ns"] == null) {
+            return;
+        }
+        for (let amExpr of node.automerge) {
+            let destNs = amExpr.dest;
+            if (destNs === "self" && this.resolvedSelf) {
+                continue;
+            }
+            if (destNs !== "self" && !resolveAll) {
+                continue;
+            }
+            if (this.attrs[destNs] == null) {
+                this.attrs[destNs] = {};
+            }
+            if (this.forcedAttrs[destNs] == null) {
+                this.forcedAttrs[destNs] = {};
+            }
+            let srcRoot = argsRoot["@ns"][amExpr.source];
+            if (srcRoot == null) {
+                continue;
+            }
+            for (let srcAttr in srcRoot) {
+                let [include, includeForce] = DataCtx.checkAMAttr(amExpr, srcAttr);
+                if (include && includeForce) {
+                    this.forcedAttrs[destNs][srcAttr] = srcRoot[srcAttr];
+                }
+                else if (include) {
+                    this.attrs[destNs][srcAttr] = srcRoot[srcAttr];
+                }
+            }
+        }
+    }
+
+    resolveAMPair(attrName : string, forced : boolean) : [HibikiVal, boolean] {
+        this.resolveAM(false);
+        let attrRoot = (forced ? this.forcedAttrs : this.attrs);
+        if (attrRoot == null || attrRoot["self"] == null || !(attrName in attrRoot)) {
+            return [null, false];
+        }
+        let val = attrRoot[attrName];
+        return [val, true];
+    }
+
+    getAMVals(ns : string, forced : boolean) : HibikiValObj {
+        this.resolveAM(ns !== "self");
+        if (forced) {
+            return this.forcedAttrs[ns] ?? {};
+        }
+        return this.attrs[ns] ?? {};
+    }
+}
+
+function makeCustomDBCtx(nodeArg : HibikiNode, dataenvArg : DataEnvironment, injectedAttrs : InjectedAttrsObj) : DBCtx {
     return new DBCtx(null, nodeArg, dataenvArg, injectedAttrs);
 }
 
@@ -60,13 +259,14 @@ class DBCtx {
     dataenv : DataEnvironment;
     node : HibikiNode;
     uuid : string;
-    injectedAttrs : DataCtx.InjectedAttrsObj;
+    injectedAttrs : InjectedAttrsObj;
+    amData : AutoMergeData;
     
-    constructor(elem : React.Component<HibikiReactProps, {}>, nodeArg : HibikiNode, dataenvArg : DataEnvironment, injectedAttrs : DataCtx.InjectedAttrsObj) {
+    constructor(elem : React.Component<HibikiReactProps, {}>, nodeArg : HibikiNode, dataenvArg : DataEnvironment, injectedAttrs : InjectedAttrsObj) {
         if (elem != null) {
             this.dataenv = elem.props.dataenv;
             this.node = elem.props.node;
-            this.injectedAttrs = elem.props.injectedAttrs ?? new DataCtx.InjectedAttrsObj();
+            this.injectedAttrs = elem.props.injectedAttrs ?? new InjectedAttrsObj();
             let elemAny = elem as any;
             if (elemAny.uuid == null) {
                 elemAny.uuid = uuidv4();
@@ -77,7 +277,7 @@ class DBCtx {
             this.dataenv = dataenvArg;
             this.node = nodeArg;
             this.uuid = uuidv4();
-            this.injectedAttrs = injectedAttrs ?? new DataCtx.InjectedAttrsObj();
+            this.injectedAttrs = injectedAttrs ?? new InjectedAttrsObj();
         }
         if (this.node == null) {
             throw new Error("DBCtx no node prop");
@@ -85,6 +285,7 @@ class DBCtx {
         if (this.dataenv == null) {
             throw new Error("DBCtx no dataenv prop");
         }
+        this.amData = new AutoMergeData(this);
     }
 
     getHtmlTagName() : string {
@@ -105,41 +306,46 @@ class DBCtx {
         return this.dataenv.evalExpr(expr, keepMobx);
     }
 
-    resolveAttrExpr(attrName : string) : NodeAttrType {
-        if (this.node.attrs == null) {
+    resolveAttrStr(attrName : string) : string {
+        let [val, exists] = this.resolveAttrValPair(attrName);
+        if (!exists) {
             return null;
         }
-        return this.node.attrs[attrName];
-    }
-
-    resolveAttrStr(attrName : string) : string {
-        let [ival, exists] = this.injectedAttrs.getInjectedValPair(attrName);
-        if (exists) {
-            return DataCtx.valToString(ival);
-        }
-        return DataCtx.getAttributeStr(this.node, attrName, this.dataenv);
+        return DataCtx.valToAttrStr(val);
     }
 
     resolveAttrVal(attrName : string) : HibikiVal {
-        let [ival, iexists] = this.injectedAttrs.getInjectedValPair(attrName);
-        if (iexists) {
-            return ival;
-        }
-        let [rval, exists] = DataCtx.getAttributeValPair(this.node, attrName, this.dataenv);
-        return rval;
-    }
-
-    resolveAttrValPair(attrName : string) : [HibikiVal, boolean] {
-        let [ival, iexists] = this.injectedAttrs.getInjectedValPair(attrName);
-        if (iexists) {
-            return [ival, true];
-        }
-        return DataCtx.getAttributeValPair(this.node, attrName, this.dataenv);
+        let [val, exists] = this.resolveAttrValPair(attrName);
+        return val;
     }
 
     hasAttr(attrName : string) : boolean {
-        let [rval, exists] = DataCtx.getAttributeValPair(this.node, attrName, this.dataenv);
+        let [val, exists] = this.resolveAttrValPair(attrName);
         return exists;
+    }
+
+    resolveAttrValPair(attrName : string) : [HibikiVal, boolean] {
+        if (!NON_MERGED_ATTRS[attrName]) {
+            let [ival, iexists] = this.injectedAttrs.getInjectedValPair(attrName);
+            if (iexists) {
+                return [ival, true];
+            }
+            let [amVal, amExists] = this.amData.resolveAMPair(attrName, true);
+            if (amExists) {
+                return [amVal, true];
+            }
+        }
+        let [attrVal, attrExists] = DataCtx.getUnmergedAttributeValPair(this.node, attrName, this.dataenv);
+        if (attrExists) {
+            return [attrVal, true];
+        }
+        if (!NON_MERGED_ATTRS[attrName]) {
+            let [amVal, amExists] = this.amData.resolveAMPair(attrName, false);
+            if (amExists) {
+                return [amVal, true];
+            }
+        }
+        return [null, false];
     }
 
     // does not check for automerge or noattr!
@@ -169,9 +375,9 @@ class DBCtx {
         return false;
     }
 
-    resolveNsStyleMap(ns : string, initStyles? : any) : any {
+    resolveNsStyleMap(ns : string, initStyles? : StyleMapType) : StyleMapType {
         if (ns === "self" && this.injectedAttrs.styleMap != null) {
-            initStyles = initStyles ?? {};
+            initStyles = Object.assign({}, initStyles);
             for (let skey in this.injectedAttrs.styleMap) {
                 initStyles[skey] = this.injectedAttrs.styleMap[skey];
             }
@@ -179,7 +385,7 @@ class DBCtx {
         return DataCtx.getStyleMap(this.node, ns, this.dataenv, initStyles);
     }
 
-    resolveStyleMap(initStyles? : Record<string, any>) : any {
+    resolveStyleMap(initStyles? : StyleMapType) : StyleMapType {
         return this.resolveNsStyleMap("self", initStyles);
     }
 
@@ -305,4 +511,4 @@ class DBCtx {
     }
 }
 
-export {DBCtx, makeDBCtx, makeCustomDBCtx};
+export {DBCtx, makeDBCtx, makeCustomDBCtx, InjectedAttrsObj, createInjectObj};

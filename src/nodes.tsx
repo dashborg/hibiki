@@ -14,7 +14,7 @@ import dayjsUtc from "dayjs/plugin/utc";
 import dayjsRelative from "dayjs/plugin/relativeTime";
 
 import type {ComponentType, LibraryType, HibikiExtState, LibComponentType, HibikiVal, HibikiReactProps} from "./types";
-import {DBCtx, makeDBCtx, makeCustomDBCtx} from "./dbctx";
+import {DBCtx, makeDBCtx, makeCustomDBCtx, InjectedAttrsObj, createInjectObj} from "./dbctx";
 import * as DataCtx from "./datactx";
 import {HibikiState, DataEnvironment} from "./state";
 import {resolveNumber, isObject, textContent, SYM_PROXY, SYM_FLATTEN, jseval, nodeStr, getHibiki, addToArrayDupCheck, removeFromArray, valInArray, subMapKey, unbox, bindLibContext, cnArrToClassAttr} from "./utils";
@@ -113,7 +113,7 @@ function ctxRenderHtmlChildren(ctx : DBCtx, dataenv? : DataEnvironment) : (Eleme
     return rtn;
 }
 
-function baseRenderOneNode(node : HibikiNode, dataenv : DataEnvironment, injectedAttrs : DataCtx.InjectedAttrsObj, isRoot : boolean) : [any, boolean, DataEnvironment] {
+function baseRenderOneNode(node : HibikiNode, dataenv : DataEnvironment, injectedAttrs : InjectedAttrsObj, isRoot : boolean) : [any, boolean, DataEnvironment] {
     if (node.tag == "#text") {
         return [node.text, false, dataenv];
     }
@@ -476,7 +476,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
         let formValueLV = ctx.resolveLValueAttr("formvalue");
         if (formValueLV != null) {
             let value = ctx.resolveAttrStr("value") ?? "";
-            if (DataCtx.attrValToStr(formValueLV.get()) !== value) {
+            if (DataCtx.valToAttrStr(formValueLV.get()) !== value) {
                 setTimeout(() => formValueLV.set(value), 0);
             }
         }
@@ -576,7 +576,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
         let tagName = ctx.getHtmlTagName();
         let elemProps : Record<string, any> = {};
         let attrVals : Record<string, HibikiVal> = ctx.resolveAttrVals();
-        let typeAttr = DataCtx.attrValToStr(attrVals["type"]);
+        let typeAttr = DataCtx.valToAttrStr(attrVals["type"]);
         let managedType = NodeUtils.getManagedType(tagName, typeAttr);
         let managedAttrs = NodeUtils.MANAGED_ATTRS[managedType] ?? {};
         for (let [k,v] of Object.entries(attrVals)) {
@@ -602,7 +602,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
                 }
                 continue;
             }
-            let strVal = DataCtx.attrValToStr(v);
+            let strVal = DataCtx.valToAttrStr(v);
             if (k == "download" && strVal == "1") {
                 elemProps["download"] = "";
                 continue;
@@ -784,7 +784,7 @@ class ScriptNode extends React.Component<HibikiReactProps, {}> {
             ctx.dataenv.dbstate.queueScriptSrc(srcAttr.makeDataUrl(), isSync);
         }
         else {
-            ctx.dataenv.dbstate.queueScriptSrc(DataCtx.attrValToStr(srcAttr), isSync);
+            ctx.dataenv.dbstate.queueScriptSrc(DataCtx.valToAttrStr(srcAttr), isSync);
         }
         return null;
     }
@@ -884,43 +884,6 @@ class WithContextNode extends React.Component<HibikiReactProps, {}> {
     }
 }
 
-function createInjectObj(ctx : DBCtx, child : HibikiNode, nodeDataenv : DataEnvironment) : DataCtx.InjectedAttrsObj {
-    let childCtx = makeCustomDBCtx(child, nodeDataenv, null);
-    let nodeVar = NodeUtils.makeNodeVar(childCtx, true);
-    let evalInjectAttrsEnv = ctx.dataenv.makeChildEnv({node: nodeVar}, null);
-    let injectAttrs = DataCtx.resolveValAttrs(ctx.node, evalInjectAttrsEnv, null);
-    let toInject = new DataCtx.InjectedAttrsObj();
-    for (let k in injectAttrs) {
-        if (!k.startsWith("inject:")) {
-            continue;
-        }
-        let shortName = k.substr(7);
-        let lv = ctx.resolveLValueAttr(k);
-        if (lv != null) {
-            toInject.attrs[shortName] = lv;
-        }
-        else {
-            toInject.attrs[shortName] = injectAttrs[k];
-        }
-    }
-    let styleMap = DataCtx.getStyleMap(ctx.node, "inject", evalInjectAttrsEnv, null);
-    if (styleMap != null && Object.keys(styleMap).length > 0) {
-        toInject.styleMap = styleMap;
-    }
-    if (ctx.node.handlers != null) {
-        for (let hname in ctx.node.handlers) {
-            if (!hname.startsWith("inject:")) {
-                continue;
-            }
-            let shortName = hname.substr(7);
-            let handlerBlock = ctx.node.handlers[hname];
-            let ehandler = {handler: new DataCtx.HActionBlock("handler", handlerBlock, ctx.dataenv.getLibContext()), node: ctx.node, dataenv: evalInjectAttrsEnv};
-            toInject.handlers[shortName] = ehandler;
-        }
-    }
-    return toInject;
-}
-
 @mobxReact.observer
 class ChildrenNode extends React.Component<HibikiReactProps, {}> {
     render() : React.ReactNode {
@@ -958,7 +921,7 @@ class ChildrenNode extends React.Component<HibikiReactProps, {}> {
         }
         let rtnElems = [];
         for (let child of nodeList) {
-            let toInject : DataCtx.InjectedAttrsObj = null;
+            let toInject : InjectedAttrsObj = null;
             if (!NodeUtils.NON_INJECTABLE[child.tag] && !child.tag.startsWith("#")) {
                 toInject = createInjectObj(ctx, child, nodeDataenv);
             }

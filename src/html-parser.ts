@@ -339,13 +339,17 @@ class HtmlParser {
             return true;
         }
         try {
-            let path : HExpr = doParse(value, "ext_refAttribute");
-            path.sourcestr = value;
+            let lvExpr : HExpr = doParse(value, "ext_refAttribute");
+            lvExpr.sourcestr = value;
             if (node.bindings == null) {
                 node.bindings = {};
             }
             let bindName = (name === "bindpath" ? name : name.substr(0, name.length-9));
-            node.bindings[bindName] = path;
+            node.bindings[bindName] = lvExpr;
+            if (node.attrs == null) {
+                node.attrs = {};
+            }
+            node.attrs[bindName] = lvExpr;
         }
         catch (e) {
             console.log(sprintf("ERROR evaluating '%s' in <%s>\n\"%s\"\n", name, node.tag, value), e.toString());

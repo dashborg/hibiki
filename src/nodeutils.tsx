@@ -2,7 +2,7 @@
 
 import * as mobx from "mobx";
 import * as React from "react";
-import {DBCtx, makeCustomDBCtx} from "./dbctx";
+import {DBCtx, makeCustomDBCtx, InjectedAttrsObj} from "./dbctx";
 import type {HandlerValType, HibikiVal} from "./types";
 import type {HibikiNode} from "./html-parser";
 import * as DataCtx from "./datactx";
@@ -292,7 +292,7 @@ function handleConvertType(ctx : DBCtx, value : string) : any {
     return value;
 }
 
-function makeHandlers(node : HibikiNode, injectedAttrs : DataCtx.InjectedAttrsObj, libContext : string, handlerPrefixes : string[]) : Record<string, HandlerValType> {
+function makeHandlers(node : HibikiNode, injectedAttrs : InjectedAttrsObj, libContext : string, handlerPrefixes : string[]) : Record<string, HandlerValType> {
     let handlers : Record<string, HandlerValType> = {};
     if (injectedAttrs != null) {
         for (let iname in injectedAttrs.handlers) {
