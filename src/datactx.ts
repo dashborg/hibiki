@@ -6,7 +6,7 @@ import {DataEnvironment, HibikiState, HibikiExtState} from "./state";
 import {sprintf} from "sprintf-js";
 import {parseHtml, HibikiNode} from "./html-parser";
 import {RtContext, getShortEMsg, HibikiError} from "./error";
-import {SYM_PROXY, SYM_FLATTEN, isObject, stripAtKeys, unpackPositionalArgs, nodeStr, parseHandler, fullPath, STYLE_UNITLESS_NUMBER, splitTrim, bindLibContext, unpackPositionalArgArray, classStringToCnArr, cnArrToClassAttr, cnArrToLosslessStr, attrBaseName, parseAttrName, nsAttrName} from "./utils";
+import {SYM_PROXY, SYM_FLATTEN, isObject, stripAtKeys, unpackPositionalArgs, unpackAtArgs, nodeStr, parseHandler, fullPath, STYLE_UNITLESS_NUMBER, splitTrim, bindLibContext, unpackPositionalArgArray, classStringToCnArr, cnArrToClassAttr, cnArrToLosslessStr, attrBaseName, parseAttrName, nsAttrName} from "./utils";
 import {PathPart, PathType, PathUnionType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue, HandlerBlock, HibikiVal, HibikiValObj, JSFuncType, HibikiSpecialVal, HibikiPrimitiveVal, StyleMapType} from "./types";
 import type {NodeAttrType} from "./html-parser";
 import {HibikiRequest} from "./request";
@@ -2418,6 +2418,7 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
     else if (action.actiontype === "log") {
         let exprData : HibikiValObj = demobx(evalExprAst(action.data, dataenv, "natural")) as HibikiValObj;
         let dataValArr = unpackPositionalArgArray(exprData);
+        let {debug: debugAtArg} = unpackAtArgs(exprData);
         dataValArr = dataValArr.map((val) => {
             if (val instanceof HibikiError) {
                 return val.toString();
@@ -2425,7 +2426,7 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
             return val;
         });
         console.log("HibikiLog", ...dataValArr);
-        if (action.debug) {
+        if (action.debug || debugAtArg) {
             console.log("DataEnvironment Stack");
             dataenv.printStack();
             console.log(rtctx.asString("> "));

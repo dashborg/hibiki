@@ -101,9 +101,9 @@
         </tr>
         <tr component="local-test-tr">
           <td slot="test" innerhtml>
-            {{ noattr }} | {{ $.noattr.foo | format("json-noresolve") }}
+            {{ noattr }} | {{ $.noattr.foo | format("json-noresolve") }} | {{ !!noattr }}
           </td>
-          <td slot="result">null | "[noattr]"</td>
+          <td slot="result">null | "[noattr]" | false</td>
         </tr>
         <tr component="local-test-tr">
           <td slot="test" innerhtml>

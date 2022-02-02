@@ -63,7 +63,6 @@ let lexer = moo.states({
                         KW_NOP: "nop",
                         KW_BUBBLE: "bubble",
                         KW_LOG: "log",
-                        KW_DEBUG: "debug",
                         KW_ALERT: "alert",
                         KW_EXPR: "expr",
                         KW_LOCAL: "local",
@@ -185,7 +184,6 @@ statement ->
     | fireStatement         {% id %}
     | bubbleStatement       {% id %}
     | logStatement          {% id %}
-    | debugStatement        {% id %}
     | alertStatement        {% id %}
     | exprStatement         {% id %}
     | throwStatement        {% id %}
@@ -329,8 +327,6 @@ fireStatement ->
     } %}
 
 logStatement -> %KW_LOG namedCallParams {% (data) => ({actiontype: "log", data: data[1]}) %}
-
-debugStatement -> %KW_DEBUG namedCallParams {% (data) => ({actiontype: "log", debug: true, data: data[1]}) %}
 
 alertStatement -> %KW_ALERT namedCallParams {% (data) => ({actiontype: "log", alert: true, data: data[1]}) %}
 
@@ -568,7 +564,6 @@ idOrKeyword ->
     | %KW_NOP    {% id %}
     | %KW_BUBBLE {% id %}
     | %KW_LOG    {% id %}
-    | %KW_DEBUG  {% id %}
     | %KW_ALERT  {% id %}
     | %KW_EXPR   {% id %}
     | %KW_LOCAL  {% id %}
