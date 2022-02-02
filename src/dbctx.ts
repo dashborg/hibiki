@@ -156,9 +156,9 @@ class InjectedAttrsObj {
     getInjectedLValues() : Record<string, DataCtx.LValue> {
         let rtn : Record<string, DataCtx.LValue> = {};
         for (let key in this.attrs) {
-            let lv = this.getInjectedLValue(key);
-            if (lv != null) {
-                rtn[key] = lv;
+            let val = this.attrs[key];
+            if (val instanceof DataCtx.LValue) {
+                rtn[key] = val;
             }
         }
         return rtn;
@@ -177,18 +177,42 @@ class InjectedAttrsObj {
         return [val, true];
     }
 
-    getInjectedLValue(attrName : string) : DataCtx.LValue {
-        let [val, exists] = this.getInjectedValPair(attrName);
-        if (!exists || !(val instanceof DataCtx.LValue)) {
-            return null;
-        }
-        return val;
-    }
-
     getHandler(name : string) : EHandlerType {
         return this.handlers[name];
     }
 }
+
+// the order matters here.  first check for specific attr, then check for all.
+// start with exclude, then includeForce, then include.
+// returns [include, includeForced]
+function checkAMAttr(amExpr : AutoMergeExpr, attrName : string) : [boolean, boolean] {
+    if (attrName === "@style") {
+        attrName = "style";
+    }
+    if (attrName.startsWith("class.")) {
+        attrName = "class";
+    }
+    if (amExpr.exclude != null && amExpr.exclude[attrName]) {
+        return [false, false];
+    }
+    if (amExpr.includeForce != null && amExpr.includeForce[attrName]) {
+        return [true, true];
+    }
+    if (amExpr.include != null && amExpr.include[attrName]) {
+        return [true, false];
+    }
+    if (amExpr.exclude != null && amExpr.exclude["all"]) {
+        return [false, false];
+    }
+    if (amExpr.includeForce != null && amExpr.includeForce["all"]) {
+        return [true, true];
+    }
+    if (amExpr.include != null && amExpr.include["all"]) {
+        return [true, false];
+    }
+    return [false, false];
+}
+
 
 // class and style are pre-merged
 class AutoMergeData {
@@ -244,7 +268,7 @@ class AutoMergeData {
                 if (srcAttr.startsWith("@")) {
                     continue;
                 }
-                let [include, includeForce] = DataCtx.checkAMAttr(amExpr, srcAttr);
+                let [include, includeForce] = checkAMAttr(amExpr, srcAttr);
                 if (include && includeForce) {
                     this.forcedAttrs[destNs][srcAttr] = srcRoot[srcAttr];
                 }
@@ -608,11 +632,11 @@ class DBCtx {
     }
 
     resolveLValueAttr(dataName : string) : DataCtx.LValue {
-        let ivalLv = this.injectedAttrs.getInjectedLValue(dataName);
-        if (ivalLv != null) {
-            return ivalLv;
+        let [val, exists] = this.resolveAttrValPair(dataName);
+        if (!exists || !(val instanceof DataCtx.LValue)) {
+            return null;
         }
-        return DataCtx.resolveLValueAttr(this.node, dataName, this.dataenv);
+        return val;
     }
 
     registerUuid() {
