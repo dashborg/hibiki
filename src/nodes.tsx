@@ -7,11 +7,6 @@ import {sprintf} from "sprintf-js";
 import {boundMethod} from 'autobind-decorator'
 import {If, For, When, Otherwise, Choose} from "tsx-control-statements/components";
 import {v4 as uuidv4} from 'uuid';
-import dayjs from "dayjs";
-import dayjsDuration from "dayjs/plugin/duration";
-import dayjsRelativeTime from "dayjs/plugin/relativeTime";
-import dayjsUtc from "dayjs/plugin/utc";
-import dayjsRelative from "dayjs/plugin/relativeTime";
 
 import type {ComponentType, LibraryType, HibikiExtState, LibComponentType, HibikiVal, HibikiReactProps} from "./types";
 import {DBCtx, makeDBCtx, makeCustomDBCtx, InjectedAttrsObj, createInjectObj, resolveArgsRoot} from "./dbctx";
@@ -25,12 +20,6 @@ import type {HAction} from "./datactx";
 import type {EHandlerType} from "./state";
 
 declare var window : any;
-
-dayjs.extend(dayjsDuration);
-dayjs.extend(dayjsRelativeTime);
-dayjs.extend(dayjsUtc)
-dayjs.extend(dayjsRelativeTime);
-window.dayjs = dayjs;
 
 let welcomeMessage = false;
 let usageFired = false;
@@ -795,75 +784,6 @@ class ScriptNode extends React.Component<HibikiReactProps, {}> {
 }
 
 @mobxReact.observer
-class DateFormatNode extends React.Component<HibikiReactProps, {}> {
-    render() {
-        let ctx = makeDBCtx(this);
-        let bindVal = DataCtx.demobx(ctx.resolveAttrVal("bind"));
-        let modeAttr = ctx.resolveAttrStr("mode");
-        let nulltext = ctx.resolveAttrStr("nulltext");
-        let style = ctx.resolveStyleMap();
-        let cnArr = ctx.resolveCnArray();
-        if (typeof(bindVal) == "string" && modeAttr == "parse") {
-            try {
-                bindVal = parseFloat(dayjs(bindVal).format("x"));
-            } catch (e) {
-                return NodeUtils.renderTextSpan("invalid", style, cnArrToClassAttr(cnArr));
-            }
-        }
-        let relativeAttr = !!ctx.resolveAttrStr("relative");
-        let durationAttr = ctx.resolveAttrStr("duration");
-        if (typeof(bindVal) == "string") {
-            bindVal = parseFloat(bindVal);
-        }
-        if (bindVal == null) {
-            return NodeUtils.renderTextSpan(nulltext ?? "null", style, cnArrToClassAttr(cnArr));
-        }
-        if (bindVal == 0 && !durationAttr) {
-            return NodeUtils.renderTextSpan(nulltext ?? "null", style, cnArrToClassAttr(cnArr));
-        }
-        if (typeof(bindVal) != "number" || isNaN(bindVal)) {
-            return NodeUtils.renderTextSpan("invalid", style, cnArrToClassAttr(cnArr));
-        }
-        let text = null;
-        try {
-            let val = bindVal;
-            let formatAttr = ctx.resolveAttrStr("format");
-            if (modeAttr == "s") {
-                val = val * 1000;
-            }
-            else if (modeAttr == "ms") {
-                val = val;
-            }
-            else if (modeAttr == "us") {
-                val = val / 1000;
-            }
-            else if (modeAttr == "ns") {
-                val = val / 1000000;
-            }
-            if (durationAttr) {
-                let dur = dayjs.duration(val);
-                if (formatAttr == null || formatAttr == "humanize") {
-                    text = dur.humanize();
-                }
-                else {
-                    text = dayjs.utc(dur.as("milliseconds")).format(formatAttr);
-                }
-            }
-            else if (relativeAttr) {
-                text = dayjs(val).fromNow();
-            }
-            else {
-                text = dayjs(val).format(formatAttr);
-            }
-            
-        } catch (e) {
-            text = "ERR[" + e + "]";
-        }
-        return NodeUtils.renderTextSpan(text, style, cnArrToClassAttr(cnArr));
-    }
-}
-
-@mobxReact.observer
 class NopNode extends React.Component<HibikiReactProps, {}> {
     render() : React.ReactNode {
         return null;
@@ -1127,17 +1047,14 @@ addCoreComponent("if", IfNode);
 addCoreComponent("if-break", IfNode);
 addCoreComponent("foreach", FragmentNode);
 addCoreComponent("script", ScriptNode);
-
 addCoreComponent("define-vars", NopNode);
 addCoreComponent("define-handler", NopNode);
 addCoreComponent("define-component", NopNode);
 addCoreComponent("import-library", NopNode);
-
 addCoreComponent("h-if", IfNode);
 addCoreComponent("h-if-break", IfNode);
 addCoreComponent("h-foreach", FragmentNode);
 addCoreComponent("h-text", TextNode);
-addCoreComponent("h-dateformat", DateFormatNode);
 addCoreComponent("h-dyn", DynNode);
 addCoreComponent("h-withcontext", WithContextNode);
 addCoreComponent("h-children", ChildrenNode);
