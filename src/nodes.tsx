@@ -8,7 +8,7 @@ import {boundMethod} from 'autobind-decorator'
 import {If, For, When, Otherwise, Choose} from "tsx-control-statements/components";
 import {v4 as uuidv4} from 'uuid';
 
-import type {ComponentType, LibraryType, HibikiExtState, LibComponentType, HibikiVal, HibikiReactProps} from "./types";
+import type {ComponentType, LibraryType, HibikiExtState, LibComponentType, HibikiVal, HibikiValObj, HibikiReactProps} from "./types";
 import {DBCtx, makeDBCtx, makeCustomDBCtx, InjectedAttrsObj, createInjectObj, resolveArgsRoot} from "./dbctx";
 import * as DataCtx from "./datactx";
 import {HibikiState, DataEnvironment} from "./state";
@@ -311,7 +311,7 @@ class CustomReactNode extends React.Component<HibikiReactProps & {component : Co
         if (reactImpl == null) {
             return null;
         }
-        let reactProps : Record<string, any> = ctx.resolveAttrVals();
+        let reactProps : Record<string, any> = DataCtx.DeepCopy(ctx.resolveAttrVals(), {resolve: true}) as HibikiValObj;
         reactProps["hibikicontext"] = ctx;
         let nodeVar = NodeUtils.makeNodeVar(ctx, false);
         let htmlContext = sprintf("react:%s", nodeStr(ctx.node));

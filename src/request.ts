@@ -2,12 +2,12 @@
 
 import {v4 as uuidv4} from 'uuid';
 import type {RtContext} from "./error";
-import type {HibikiAction, HibikiExtState, HandlerPathType} from "./types";
+import type {HibikiAction, HibikiExtState, HandlerPathType, HibikiValObj} from "./types";
 
 class HibikiRequest {
     reqid : string;
     callpath : HandlerPathType;
-    data : Record<string, any>;
+    data : HibikiValObj;
     rtContext : RtContext;
     state : HibikiExtState;
     pure : boolean;

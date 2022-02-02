@@ -581,19 +581,22 @@ class Watcher {
 
 class LambdaValue {
     expr : HExpr;
-    invokeFn : (dataenv : DataEnvironment) => HibikiVal;
+    invokeFn : (dataenv : DataEnvironment, params : HibikiValObj) => HibikiVal;
     
     constructor(expr : HExpr, invokeFn : (dataenv : DataEnvironment) => HibikiVal) {
         this.expr = expr;
         this.invokeFn = invokeFn;
     }
 
-    invoke(dataenv : DataEnvironment) : HibikiVal {
+    invoke(dataenv : DataEnvironment, params : HibikiValObj) : HibikiVal {
         if (this.expr) {
+            if (params != null) {
+                dataenv = dataenv.makeChildEnv(params, null);
+            }
             return evalExprAst(this.expr, dataenv, "natural");
         }
         if (this.invokeFn) {
-            return this.invokeFn(dataenv);
+            return this.invokeFn(dataenv, params);
         }
         return null;
     }
@@ -2223,7 +2226,11 @@ function evalExprAstInternal(exprAst : HExpr, dataenv : DataEnvironment, rtype :
         if (!(val instanceof LambdaValue)) {
             return val;
         }
-        return val.invoke(dataenv);
+        let invokeData = null;
+        if (exprAst.exprs.length > 1) {
+            invokeData = evalExprAst(exprAst.exprs[1], dataenv, "natural");
+        }
+        return val.invoke(dataenv, invokeData);
     }
     else if (exprAst.etype === "lambda") {
         let expr = exprAst.exprs[0];
@@ -2416,7 +2423,7 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
         return FireEvent(event, dataenv, rtctx, false);
     }
     else if (action.actiontype === "log") {
-        let exprData : HibikiValObj = demobx(evalExprAst(action.data, dataenv, "natural")) as HibikiValObj;
+        let exprData : HibikiValObj = DeepCopy(evalExprAst(action.data, dataenv, "natural")) as HibikiValObj;
         let dataValArr = unpackPositionalArgArray(exprData);
         let {debug: debugAtArg} = unpackAtArgs(exprData);
         dataValArr = dataValArr.map((val) => {

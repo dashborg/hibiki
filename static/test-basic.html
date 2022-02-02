@@ -8,6 +8,7 @@
   <define-handler name="//@event/init">
     $.noattr = noattr;
     $.lv = ref($.point);
+    $.fn = lambda(@v ? 'v-true' : 'v-false');
   </define-handler>
   <div class="container m-4" style="min-width: 1400px;">
     <h1 class="title">Test Basic</h1>
@@ -110,6 +111,12 @@
             {{ $.lv }} | {{ $.lv.x }}
           </td>
           <td slot="result">[object] | 5</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{ invoke($.fn) }} | {{ invoke($.fn, v=true) }}
+          </td>
+          <td slot="result">v-false | v-true</td>
         </tr>
       </table>
     </div>

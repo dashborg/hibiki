@@ -266,17 +266,19 @@ namedParamList -> namedParamPart (%COMMA namedParamPart):*   {% (data) => {
 
 namedCallParams -> 
       null                   {% (data) => { return null; } %}
-    | %LPAREN %RPAREN        {% (data) => { return null; } %}
-    | %LPAREN literalArrayElements %RPAREN {% (data) => {
-          let arrData = {etype: "array", exprs: data[1]};
+    | %LPAREN innerNamedCallParams:? %RPAREN {% (data) => { return data[1]; } %}
+
+innerNamedCallParams ->
+      literalArrayElements {% (data) => {
+          let arrData = {etype: "array", exprs: data[0]};
           let argsExpr = {etype: "kv", key: {etype: "literal", val: "*args"}, valexpr: arrData};
           let mapData = {etype: "map", exprs: [argsExpr]};
           return mapData;
       } %}
-    | %LPAREN namedParamList %RPAREN {% (data) => { return data[1]; } %}
-    | %LPAREN literalArrayElementsNoComma %COMMA namedParamList %RPAREN {% (data) => {
-          let arrData = {etype: "array", exprs: data[1]};
-          let mapData = data[3];
+    | namedParamList {% (data) => { return data[0]; } %}
+    | literalArrayElementsNoComma %COMMA namedParamList {% (data) => {
+          let arrData = {etype: "array", exprs: data[0]};
+          let mapData = data[2];
           let argsExpr = {etype: "kv", key: {etype: "literal", val: "*args"}, valexpr: arrData};
           mapData.exprs.push(argsExpr);
           return mapData;
@@ -432,8 +434,12 @@ refExpr ->
     | %KW_REFINFO %LPAREN fullExpr %RPAREN {% (data) => ({etype: "refinfo", exprs: [data[2]]}) %}
     | %KW_RAW %LPAREN fullPathExpr %RPAREN {% (data) => ({etype: "raw", exprs: [data[2]]}) %}
 
-invokeExpr -> %KW_INVOKE %LPAREN fullExpr %RPAREN {% (data) => {
-          return {etype: "invoke", exprs: [data[2]]};
+invokeExpr -> %KW_INVOKE %LPAREN fullExpr (%COMMA innerNamedCallParams):? %RPAREN {% (data) => {
+          let rtn = {etype: "invoke", exprs: [data[2]]};
+          if (data[3] != null) {
+              rtn.exprs.push(data[3][1]);
+          }
+          return rtn;
       } %}
 
 lambdaExpr -> %KW_LAMBDA %LPAREN fullExpr %RPAREN {% (data) => {

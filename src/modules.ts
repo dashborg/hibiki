@@ -3,7 +3,7 @@
 import {isObject, unpackPositionalArgs, stripAtKeys, getHibiki, fullPath, getSS, setSS, smartEncodeParam, unpackArg, unpackAtArgs, base64ToArray, callHook} from "./utils";
 import {sprintf} from "sprintf-js";
 import type {HibikiState} from "./state";
-import type {FetchHookFn, Hibiki, HibikiAction, HandlerPathType, HibikiExtState, HttpConfig, HibikiActionString, HibikiVal} from "./types";
+import type {FetchHookFn, Hibiki, HibikiAction, HandlerPathType, HibikiExtState, HttpConfig, HibikiActionString, HibikiVal, HibikiValObj} from "./types";
 import * as DataCtx from "./datactx";
 import type {HibikiRequest} from "./request";
 import merge from "lodash/merge";
@@ -418,7 +418,7 @@ class LocalModule {
         if (handler == null) {
             throw new Error(sprintf("Local handler '%s' not found", req.callpath.url));
         }
-        req.data = DataCtx.DeepCopy(req.data, {resolve: true});
+        req.data = DataCtx.DeepCopy(req.data, {resolve: true}) as HibikiValObj;
         let rtn = handler(req);
         let p = Promise.resolve(rtn).then((rtnVal) => {
             if (rtnVal != null) {
@@ -452,7 +452,7 @@ class LibModule {
         if (handler == null) {
             throw new Error(sprintf("Lib '%s' handler '%s' not found", libContext, req.callpath.url));
         }
-        req.data = DataCtx.DeepCopy(req.data, {resolve: true});
+        req.data = DataCtx.DeepCopy(req.data, {resolve: true}) as HibikiValObj;
         let rtn = handler(req);
         let p = Promise.resolve(rtn).then((rtnVal) => {
             if (rtnVal != null) {
