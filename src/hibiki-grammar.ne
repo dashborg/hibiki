@@ -75,8 +75,8 @@ let lexer = moo.states({
                         KW_REFINFO: "refinfo",
                         KW_RAW: "raw",
                         KW_IN: "in",
-                        KW_BIND: "bind",
-                        KW_UNBIND: "unbind",
+                        KW_INVOKE: "invoke",
+                        KW_LAMBDA: "lambda",
                     }),
                   },
         LBRACK:   "[",
@@ -418,8 +418,8 @@ primaryExpr ->
     | literalArray    {% id %}
     | literalMap      {% id %}
     | fnExpr          {% id %}
-    | bindExpr        {% id %}
-    | unbindExpr      {% id %}
+    | invokeExpr      {% id %}
+    | lambdaExpr      {% id %}
     | refExpr         {% id %}
     | %LPAREN fullExpr %RPAREN {% (data) => data[1] %}
     | pathExprNonTerm {% id %}
@@ -436,12 +436,12 @@ refExpr ->
     | %KW_REFINFO %LPAREN fullExpr %RPAREN {% (data) => ({etype: "refinfo", exprs: [data[2]]}) %}
     | %KW_RAW %LPAREN fullPathExpr %RPAREN {% (data) => ({etype: "raw", exprs: [data[2]]}) %}
 
-bindExpr -> %KW_BIND %LPAREN fullExpr %RPAREN {% (data) => {
-          return {etype: "bind", exprs: [data[2]]};
+invokeExpr -> %KW_INVOKE %LPAREN fullExpr %RPAREN {% (data) => {
+          return {etype: "invoke", exprs: [data[2]]};
       } %}
 
-unbindExpr -> %KW_UNBIND %LPAREN fullExpr %RPAREN {% (data) => {
-          return {etype: "unbind", exprs: [data[2]]};
+lambdaExpr -> %KW_LAMBDA %LPAREN fullExpr %RPAREN {% (data) => {
+          return {etype: "lambda", exprs: [data[2]]};
       } %}
 
 literalArray ->
@@ -585,8 +585,8 @@ idOrKeyword ->
     | %KW_CALLHANDLER {% id %}
     | %KW_NAVTO       {% id %}
     | %KW_IN          {% id %}
-    | %KW_BIND        {% id %}
-    | %KW_UNBIND      {% id %}
+    | %KW_INVOKE      {% id %}
+    | %KW_LAMBDA      {% id %}
 
 _ -> %WS:*
 

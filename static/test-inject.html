@@ -47,7 +47,7 @@
         <div class="box">
           selected-row: {{ $.selectedrow }}
           <br>
-          <bulma-table class="is-bordered" bind="$.data" selected.bindpath="$.selectedrow" rowkey="* unbind('k' + @row.x)">
+          <bulma-table class="is-bordered" bind="$.data" selected.bindpath="$.selectedrow" rowkey="* lambda('k' + @row.x)">
             <bulma-col label="#">
               {{ @rownum + 1 }}
             </bulma-col>
@@ -72,7 +72,7 @@
 
   <define-component name="menu">
     <html-ul class="menu-list" automerge="@class|style">
-      <h-children bind="@children.tags" inject:selected.bindpath="$args.selected"></h-children>
+      <h-children bind="@children.tags" inject:selected="*$args.selected"></h-children>
     </html-ul>
   </define-component>
 </body>

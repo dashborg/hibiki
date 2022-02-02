@@ -7,7 +7,7 @@
         </html-tr>
       </html-thead>
       <html-tbody>
-        <html-tr foreach="(@row, @rownum) in $args.bind" click.handler="$args.selected = bind($args.rowkey)" class.is-selected="* $args.selected != null && $args.selected == bind($args.rowkey)">
+        <html-tr foreach="(@row, @rownum) in $args.bind" click.handler="$args.selected = invoke($args.rowkey)" class.is-selected="* $args.selected != null && $args.selected == invoke($args.rowkey)">
           <h-children bind="@children.bycomp['bulma-table:col']" datacontext="@header=false; @row=@row; @rownum=@rownum;" inject:rowkey="*$args.rowkey"></h-children>
         </html-tr>
       </html-tbody>

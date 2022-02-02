@@ -2476,7 +2476,7 @@ function evalExprAstInternal(exprAst : HExpr, dataenv : DataEnvironment, rtype :
     else if (exprAst.etype === "noattr") {
         return SYM_NOATTR;
     }
-    else if (exprAst.etype === "bind") {
+    else if (exprAst.etype === "invoke") {
         let expr = exprAst.exprs[0];
         if (expr == null) {
             return null;
@@ -2487,7 +2487,7 @@ function evalExprAstInternal(exprAst : HExpr, dataenv : DataEnvironment, rtype :
         }
         return evalExprAst(val.expr, dataenv, "natural");
     }
-    else if (exprAst.etype === "unbind") {
+    else if (exprAst.etype === "lambda") {
         let expr = exprAst.exprs[0];
         if (expr == null) {
             return null;
