@@ -329,6 +329,32 @@ class HtmlParser {
         return true;
     }
 
+    parseCCAttr(node : HibikiNode, name : string, value : string, pctx : ParseContext) : boolean {
+        if (!name.startsWith("cc:")) {
+            return false;
+        }
+        if (name.length === 3) {
+            return true;
+        }
+        let baseName = name.substr(3);
+        let newName = "";
+        for (let i=0; i<baseName.length; i++) {
+            if (baseName[i] === "_") {
+                if (i+1 == baseName.length) {
+                    continue;
+                }
+                let nextCh = baseName[i+1];
+                newName = newName + nextCh.toUpperCase();
+                i++;
+            }
+            else {
+                newName = newName + baseName[i];
+            }
+        }
+        this.parseStandardAttr(node, newName, value, pctx);
+        return true;
+    }
+
     parseBindPathAttr(node : HibikiNode, name : string, value : string, pctx : ParseContext) : boolean {
         if (!name.endsWith(".bindpath")) {
             return false;
@@ -400,6 +426,9 @@ class HtmlParser {
 
     parseRawTagAttr(node : HibikiNode, attrName : string, attrValue : string, pctx : ParseContext) : boolean {
         if (node.tag === "define-component" || node.tag === "define-handler" || node.tag === "import-library" || node.tag === "define-vars" || node.tag.startsWith("hibiki-")) {
+            if (attrValue === "") {
+                attrValue = "1";
+            }
             node.attrs[attrName] = attrValue;
             return true;
         }
@@ -504,6 +533,9 @@ class HtmlParser {
                 continue;
             }
             else if (this.parseBindPathAttr(node, attrName, attrValue, pctx)) {
+                continue;
+            }
+            else if (this.parseCCAttr(node, attrName, attrValue, pctx)) {
                 continue;
             }
             else if (attrName == "automerge" || attrName == "autofire") {
