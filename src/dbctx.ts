@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import {DataEnvironment} from "./state";
 import {sprintf} from "sprintf-js";
 import {boundMethod} from 'autobind-decorator'
-import type {HibikiVal, HibikiValObj, HibikiReactProps, StyleMapType} from "./types";
+import type {HibikiVal, HibikiValObj, HibikiReactProps, StyleMapType, AutoMergeExpr} from "./types";
 import type {HibikiNode, NodeAttrType} from "./html-parser";
 import * as NodeUtils from "./nodeutils";
 import {nodeStr, isObject, attrBaseName, cnArrToClassAttr, classStringToCnArr, nsAttrName, cnArrToLosslessStr, parseAttrName, isClassStringLocked, joinClassStrs} from "./utils";

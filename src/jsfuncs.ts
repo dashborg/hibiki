@@ -321,6 +321,10 @@ function jsTypeOf(val : HibikiVal) : string {
     return DataCtx.hibikiTypeOf(val);
 }
 
+function jsDeepEqual(val1 : HibikiVal, val2 : HibikiVal) : boolean {
+    return DataCtx.DeepEqual(val1, val2);
+}
+
 reg("len", jsLen, true);
 reg("indexof", jsIndexOf, true);
 reg("min", jsMin, false);
@@ -357,6 +361,7 @@ reg("bloblen", jsBlobLen, true);
 reg("blobname", jsBlobName, true);
 reg("uuid", jsUuid, true);
 reg("typeof", jsTypeOf, true);
+reg("deepequal", jsDeepEqual, true);
 
 function reg(name : string, fn : any, native : boolean) {
     DefaultJSFuncs[name] = {fn, native};

@@ -7,7 +7,7 @@ import {sprintf} from "sprintf-js";
 import {parseHtml, HibikiNode} from "./html-parser";
 import {RtContext, getShortEMsg, HibikiError} from "./error";
 import {SYM_PROXY, SYM_FLATTEN, isObject, stripAtKeys, unpackPositionalArgs, nodeStr, parseHandler, fullPath, STYLE_UNITLESS_NUMBER, splitTrim, bindLibContext, unpackPositionalArgArray, classStringToCnArr, cnArrToClassAttr, cnArrToLosslessStr, attrBaseName, parseAttrName, nsAttrName} from "./utils";
-import {PathPart, PathType, PathUnionType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue, HandlerBlock, HibikiVal, HibikiValObj, AutoMergeExpr, JSFuncType, HibikiSpecialVal, HibikiPrimitiveVal, StyleMapType} from "./types";
+import {PathPart, PathType, PathUnionType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue, HandlerBlock, HibikiVal, HibikiValObj, JSFuncType, HibikiSpecialVal, HibikiPrimitiveVal, StyleMapType} from "./types";
 import type {NodeAttrType} from "./html-parser";
 import {HibikiRequest} from "./request";
 import type {EHandlerType} from "./state";
@@ -1137,49 +1137,54 @@ function quickObjectSetPath(path : PathType, localRoot : any, setData : any) : a
     }
 }
 
+function runSetOp(path : PathType, localRoot : HibikiVal, op : string, origSetData : HibikiVal, readOnly : boolean) : HibikiVal {
+    let setData = DeepCopy(origSetData);
+    if (localRoot instanceof LValue) {
+        if (op === "set") {
+            setLValue(localRoot, setData);
+            return localRoot;
+        }
+        if (readOnly) {
+            throw new Error(sprintf("Cannot set read-only path: %s", StringPath(path)));
+        }
+        if (op === "setraw") {
+            return setData;
+        }
+        throw new Error(sprintf("Invalid setPath op=%s for LValue bindpath", op));
+    }
+    if (readOnly) {
+        throw new Error(sprintf("Cannot set read-only path: %s", StringPath(path)));
+    }
+    if (op === "append") {
+        return appendData(path, localRoot, setData);
+    }
+    if (op === "appendarr") {
+        return appendArrData(path, localRoot, setData);
+    }
+    else if (op === "set" || op === "setraw") {
+        return setData;
+    }
+    else if (op === "setunless") {
+        if (localRoot != null) {
+            return localRoot;
+        }
+        return setData;
+    }
+    else if (op === "blobext") {
+        return blobExtDataPath(path, localRoot, setData);
+    }
+    else {
+        throw new Error(sprintf("Invalid setPath op=%s", op));
+    }
+}
+
 function internalSetPath(dataenv : DataEnvironment, op : string, path : PathType, localRoot : HibikiVal, readOnly : boolean, setData : HibikiVal, level : number, opts? : {}) : any {
     if (mobx.isBoxedObservable(localRoot)) {
         throw new Error("Bad localRoot -- cannot be boxed observable.");
     }
     opts = opts || {};
     if (level >= path.length) {
-        if (localRoot instanceof LValue) {
-            if (op === "set") {
-                setLValue(localRoot, setData);
-                return localRoot;
-            }
-            if (readOnly) {
-                throw new Error(sprintf("Cannot set read-only path: %s", StringPath(path)));
-            }
-            if (op === "setraw") {
-                return setData;
-            }
-            throw new Error(sprintf("Invalid setPath op=%s for LValue bindpath", op));
-        }
-        if (readOnly) {
-            throw new Error(sprintf("Cannot set read-only path: %s", StringPath(path)));
-        }
-        if (op === "append") {
-            return appendData(path, localRoot, setData);
-        }
-        if (op === "appendarr") {
-            return appendArrData(path, localRoot, setData);
-        }
-        else if (op === "set" || op === "setraw") {
-            return setData;
-        }
-        else if (op === "setunless") {
-            if (localRoot != null) {
-                return localRoot;
-            }
-            return setData;
-        }
-        else if (op === "blobext") {
-            return blobExtDataPath(path, localRoot, setData);
-        }
-        else {
-            throw new Error(sprintf("Invalid setPath op=%s", op));
-        }
+        return runSetOp(path, localRoot, op, setData, readOnly);
     }
     let pp = path[level];
     if (pp.pathtype === "root") {
