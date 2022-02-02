@@ -418,6 +418,7 @@ class LocalModule {
         if (handler == null) {
             throw new Error(sprintf("Local handler '%s' not found", req.callpath.url));
         }
+        req.data = DataCtx.DeepCopy(req.data, {resolve: true});
         let rtn = handler(req);
         let p = Promise.resolve(rtn).then((rtnVal) => {
             if (rtnVal != null) {
@@ -451,6 +452,7 @@ class LibModule {
         if (handler == null) {
             throw new Error(sprintf("Lib '%s' handler '%s' not found", libContext, req.callpath.url));
         }
+        req.data = DataCtx.DeepCopy(req.data, {resolve: true});
         let rtn = handler(req);
         let p = Promise.resolve(rtn).then((rtnVal) => {
             if (rtnVal != null) {

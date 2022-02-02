@@ -1515,6 +1515,9 @@ function DeepCopy(data : HibikiVal, opts? : {resolve? : boolean, json? : boolean
             opts.cyclePath.push(".*");
             return DeepCopy(sdata.get(), opts);
         }
+        if (opts.resolve && sdata === SYM_NOATTR) {
+            return null;
+        }
         if (opts.json) {
             return specialValToString(sdata);
         }
@@ -1974,13 +1977,17 @@ function evalPathExprAst(exprAst : HExpr, dataenv : DataEnvironment, ctxStr : st
 }
 
 // rtype (controls lvalue resolution)
-//   "resolve" - always resolve values
+//   "resolve" - always resolve lvalues, resolve SYM_NOATTR to null
 //   "raw"     - no extra resolution
-//   "natural" - resolve "path" exprs (no extra resolution)
+//   "natural" - resolve "path" exprs lvalues (no extra resolution)
 function evalExprAst(exprAst : HExpr, dataenv : DataEnvironment, rtype : "resolve" | "raw" | "natural") : HibikiVal {
     if (rtype === "resolve") {
         let rtn = evalExprAstInternal(exprAst, dataenv, "natural");
-        return resolveLValue(rtn);
+        rtn = resolveLValue(rtn);
+        if (rtn === SYM_NOATTR) {
+            return null;
+        }
+        return rtn;
     }
     else {
         return evalExprAstInternal(exprAst, dataenv, rtype);

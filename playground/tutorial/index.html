@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta chartset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <meta name="viewport" content="width=1200">
     <title>Hibiki HTML Tutorial</title>
     <link rel="preconnect" href="https://fonts.gstatic.com">
     <script src="https://cdn.hibikihtml.com/hibiki/latest/hibiki-prod.min.js"></script>
@@ -47,14 +47,14 @@
           <div class="content-container">
               <div class="tutorial-content p-3">
                 <div class="content mb-5">
-                  <h-dyn bind.bindpath="$.tutorial_content"></h-dyn>
+                  <h-dyn bind="$.tutorial_content"></h-dyn>
                 </div>
               </div>
           </div>
           <div class="spacer"></div>
           <div class="runtime-container">
             <div class="editor-container">
-              <codemirror-editor text.bindpath="$.codetext" change.handler="//@lib-play/make-iframe(text=@value, bulma=true)"></codemirror-editor>
+              <codemirror-editor initialtext.bindpath="$.codetext" change.handler="//@lib-play/make-iframe(text=@value, bulma=true)"></codemirror-editor>
             </div>
             <div id="iframe-container" class="p-2 mr-2 mb-2">
               <iframe></iframe>
