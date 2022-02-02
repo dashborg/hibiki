@@ -3,6 +3,7 @@
 import * as React from "react";
 import * as mobx from "mobx";
 import * as mobxReact from "mobx-react";
+import * as DataCtx from "./datactx";
 import {parseHtml} from "./html-parser";
 import {HibikiState, DataEnvironment} from "./state";
 import * as ReactDOM from "react-dom";
@@ -223,6 +224,7 @@ let hibiki : Hibiki = {
     States: {},
     VERSION: VERSION,
     BUILD: BUILD,
+    DataCtx: DataCtx,
 };
 
 window.Hibiki = hibiki;

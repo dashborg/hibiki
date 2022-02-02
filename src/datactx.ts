@@ -579,11 +579,23 @@ class Watcher {
     }
 }
 
-class UnboundExpr {
+class LambdaValue {
     expr : HExpr;
+    invokeFn : (dataenv : DataEnvironment) => HibikiVal;
     
-    constructor(expr : HExpr) {
+    constructor(expr : HExpr, invokeFn : (dataenv : DataEnvironment) => HibikiVal) {
         this.expr = expr;
+        this.invokeFn = invokeFn;
+    }
+
+    invoke(dataenv : DataEnvironment) : HibikiVal {
+        if (this.expr) {
+            return evalExprAst(this.expr, dataenv, "natural");
+        }
+        if (this.invokeFn) {
+            return this.invokeFn(dataenv);
+        }
+        return null;
     }
 }
 
@@ -1342,8 +1354,8 @@ function specialValToString(val : any) : string {
     if (val instanceof ChildrenVar) {
         return val.asString();
     }
-    if (val instanceof UnboundExpr) {
-        return "[unbound-expr]";
+    if (val instanceof LambdaValue) {
+        return "[lambda]";
     }
     if (val instanceof OpaqueValue) {
         return "[opaque]";
@@ -1570,8 +1582,8 @@ function hibikiTypeOf(val : HibikiVal) : string {
     if (val instanceof ChildrenVar) {
         return "hibiki:children";
     }
-    if (val instanceof UnboundExpr) {
-        return "hibiki:unbound";
+    if (val instanceof LambdaValue) {
+        return "hibiki:lambda";
     }
     if (val instanceof LValue) {
         return "hibiki:lvalue";
@@ -1616,7 +1628,7 @@ function asSpecial(data : HibikiVal, nullOk : boolean) : [HibikiSpecialVal, bool
     if (data == null) {
         return [null, false];
     }
-    if (typeof(data) === "symbol" || data instanceof HibikiBlob || data instanceof HibikiNode || data instanceof OpaqueValue || data instanceof ChildrenVar || data instanceof UnboundExpr || data instanceof LValue || data instanceof HibikiError) {
+    if (typeof(data) === "symbol" || data instanceof HibikiBlob || data instanceof HibikiNode || data instanceof OpaqueValue || data instanceof ChildrenVar || data instanceof LambdaValue || data instanceof LValue || data instanceof HibikiError) {
         return [data, true];
     };
     if (typeof(data) === "object") {
@@ -2201,17 +2213,17 @@ function evalExprAstInternal(exprAst : HExpr, dataenv : DataEnvironment, rtype :
             return null;
         }
         let val = evalExprAst(expr, dataenv, "resolve");
-        if (!(val instanceof UnboundExpr)) {
+        if (!(val instanceof LambdaValue)) {
             return val;
         }
-        return evalExprAst(val.expr, dataenv, "natural");
+        return val.invoke(dataenv);
     }
     else if (exprAst.etype === "lambda") {
         let expr = exprAst.exprs[0];
         if (expr == null) {
             return null;
         }
-        return new UnboundExpr(expr);
+        return new LambdaValue(expr, null);
     }
     else {
         console.log("BAD ETYPE", exprAst);
@@ -2899,7 +2911,7 @@ function setLValue(lv : LValue, setVal : HibikiVal) : void {
     rlv.set(setVal);
 }
 
-export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, JsonStringify, EvalSimpleExpr, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, DeepCopy, CheckCycle, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, makeIteratorFromExpr, rawAttrStr, getUnmergedAttributeStr, getUnmergedAttributeValPair, SYM_NOATTR, HActionBlock, valToString, compileActionStr, FireEvent, makeErrorObj, OpaqueValue, ChildrenVar, Watcher, UnboundExpr, blobPrintStr, asNumber, hibikiTypeOf, JsonReplacerFn, valToAttrStr, resolveLValue, resolveUnmergedCnArray, isUnmerged, resolveUnmergedStyleMap, asStyleMap, asStyleMapFromPair};
+export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, JsonStringify, EvalSimpleExpr, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, DeepCopy, CheckCycle, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, makeIteratorFromExpr, rawAttrStr, getUnmergedAttributeStr, getUnmergedAttributeValPair, SYM_NOATTR, HActionBlock, valToString, compileActionStr, FireEvent, makeErrorObj, OpaqueValue, ChildrenVar, Watcher, LambdaValue, blobPrintStr, asNumber, hibikiTypeOf, JsonReplacerFn, valToAttrStr, resolveLValue, resolveUnmergedCnArray, isUnmerged, resolveUnmergedStyleMap, asStyleMap, asStyleMapFromPair};
 
 export type {PathType, HAction, HExpr, HIteratorExpr};
 

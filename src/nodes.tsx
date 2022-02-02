@@ -322,13 +322,13 @@ class CustomReactNode extends React.Component<HibikiReactProps & {component : Co
         if (reactImpl == null) {
             return null;
         }
-        let attrs = ctx.resolveAttrVals();
-        attrs["hibikicontext"] = ctx;
+        let reactProps : Record<string, any> = ctx.resolveAttrVals();
+        reactProps["hibikicontext"] = ctx;
         let nodeVar = NodeUtils.makeNodeVar(ctx, false);
         let htmlContext = sprintf("react:%s", nodeStr(ctx.node));
         let childEnv = ctx.dataenv.makeChildEnv({node: nodeVar}, {htmlContext: htmlContext, libContext: component.libName});
         let rtnElems = baseRenderHtmlChildren(ctx.node.list, childEnv, false)
-        let reactElem = React.createElement(reactImpl, attrs, rtnElems);
+        let reactElem = React.createElement(reactImpl, reactProps, rtnElems);
         return reactElem;
     }
 }

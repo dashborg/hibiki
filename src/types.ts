@@ -4,7 +4,7 @@ import type {HibikiState} from "./state";
 import type {RtContext, HibikiError} from "./error";
 import type {HibikiRequest} from "./request";
 import * as mobx from "mobx";
-import type {HExpr, HibikiBlob, LValue, HIteratorExpr, HAction, HActionBlock, OpaqueValue, ChildrenVar, UnboundExpr} from "./datactx";
+import type {HExpr, HibikiBlob, LValue, HIteratorExpr, HAction, HActionBlock, OpaqueValue, ChildrenVar, LambdaValue} from "./datactx";
 import type {DataEnvironment, EHandlerType} from "./state";
 import type {HibikiNode} from "./html-parser";
 import type {InjectedAttrsObj} from "./dbctx";
@@ -12,10 +12,8 @@ import type {InjectedAttrsObj} from "./dbctx";
 type HibikiValObj = {[k : string] : HibikiVal};
 type HibikiVal = HibikiPrimitiveVal | HibikiSpecialVal | HibikiValObj | HibikiVal[];
 type HibikiPrimitiveVal = null | string | number | boolean
-type HibikiSpecialVal = HibikiBlob | HibikiNode | OpaqueValue | ChildrenVar | UnboundExpr | LValue | HibikiError | symbol;
+type HibikiSpecialVal = HibikiBlob | HibikiNode | OpaqueValue | ChildrenVar | LambdaValue | LValue | HibikiError | symbol;
 type StyleMapType = Record<string, number|string>;
-
-// type HibikiVal = string | number | boolean | HibikiValObj | HibikiVal[] | HibikiBlob | HibikiNode | OpaqueValue | ChildrenVar | UnboundExpr;
 
 type HibikiReactProps = {
     node : HibikiNode,
@@ -205,6 +203,7 @@ interface Hibiki {
     States : Record<string, HibikiExtState>;
     VERSION : string;
     BUILD : string;
+    DataCtx : any;
 };
 
 interface HibikiExtState {
