@@ -6,7 +6,7 @@ import {DataEnvironment, HibikiState, HibikiExtState} from "./state";
 import {sprintf} from "sprintf-js";
 import {parseHtml, HibikiNode} from "./html-parser";
 import {RtContext, getShortEMsg, HibikiError} from "./error";
-import {SYM_PROXY, SYM_FLATTEN, isObject, stripAtKeys, unpackPositionalArgs, nodeStr, parseHandler, fullPath, STYLE_UNITLESS_NUMBER, splitTrim, bindLibContext, unpackPositionalArgArray, classStringToCnArr, cnArrToClassAttr} from "./utils";
+import {SYM_PROXY, SYM_FLATTEN, isObject, stripAtKeys, unpackPositionalArgs, nodeStr, parseHandler, fullPath, STYLE_UNITLESS_NUMBER, splitTrim, bindLibContext, unpackPositionalArgArray, classStringToCnArr, cnArrToClassAttr, cnArrToLosslessStr, attrBaseName, parseAttrName, nsAttrName} from "./utils";
 import {PathPart, PathType, PathUnionType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue, HandlerBlock, HibikiVal, HibikiValObj, AutoMergeExpr, JSFuncType, HibikiSpecialVal, HibikiPrimitiveVal, StyleMapType} from "./types";
 import type {NodeAttrType} from "./html-parser";
 import {HibikiRequest} from "./request";
@@ -281,21 +281,32 @@ function rawAttrStr(attr : NodeAttrType) : string {
     return attr.sourcestr;
 }
 
-function nsAttrName(attrName : string, ns : string) : string {
-    if (ns == null || ns === "self") {
-        return attrName;
+const NON_MERGED_ATTRS = {
+    "if": true,
+    "foreach": true,
+    "component": true,
+    "eid": true,
+    "ref": true,
+    "condition": true,
+    "automerge": true,
+    "slot": true,
+    "class": true,
+    "style": true,
+};
+
+function isUnmerged(attrName : string) : boolean {
+    if (attrName == null || attrName === "" || attrName.startsWith("@")) {
+        return false;
     }
-    if (ns === "root") {
-        return ":" + attrName;
-    }
-    return ns + ":" + attrName;
+    let baseName = attrBaseName(attrName);
+    return NON_MERGED_ATTRS[baseName] || baseName.startsWith("class.");
 }
 
-function resolveNonAmCnArray(node : HibikiNode, ns : string, dataenv : DataEnvironment, moreClasses : string) : Record<string, boolean>[] {
-    let cnArr = classStringToCnArr(moreClasses);
+// coalesces 'class' and 'class.[foo]' attributes
+function resolveUnmergedCnArray(node : HibikiNode, ns : string, dataenv : DataEnvironment) : Record<string, boolean>[] {
     let baseClassAttrName = nsAttrName("class", ns);
     let classStr = getUnmergedAttributeStr(node, baseClassAttrName, dataenv);
-    cnArr.push(...classStringToCnArr(classStr));
+    let cnArr = classStringToCnArr(classStr);
     if (node.attrs == null) {
         return cnArr;
     }
@@ -304,6 +315,9 @@ function resolveNonAmCnArray(node : HibikiNode, ns : string, dataenv : DataEnvir
             continue;
         }
         let kval = k.substr(baseClassAttrName.length+1);
+        if (kval === "") {
+            continue;
+        }
         let rval = getUnmergedAttributeStr(node, k, dataenv);
         if (rval && rval !== "0" && kval !== "hibiki-cloak") {
             cnArr.push({[kval]: true});
@@ -315,67 +329,27 @@ function resolveNonAmCnArray(node : HibikiNode, ns : string, dataenv : DataEnvir
     return cnArr;
 }
 
-function resolveCnArray(node : HibikiNode, ns : string, dataenv : DataEnvironment, moreClasses : string) : Record<string, boolean>[] {
-    let am = checkSingleAutoMerge(node, "class", ns);
-
-    // check includeForce automerge
-    if (am[1].length > 0) {
-        let [cnArr, exists] = resolveAutoMergeCnArray(am[1], dataenv);
-        if (exists) {
-            return cnArr;
-        }
-    }
-
-    // base class from node (includes moreClasses)
-    let rtn = resolveNonAmCnArray(node, ns, dataenv, moreClasses);
-
-    // check include automerge
-    if (am[0].length > 0) {
-        let [cnArr, exists] = resolveAutoMergeCnArray(am[0], dataenv);
-        if (exists && cnArr != null) {
-            // automerge class will always merge.
-            rtn.push(...cnArr);
-        }
-    }
-    return rtn;
-}
-
-function getNonAmStyleMap(node : HibikiNode, ns : string, dataenv : DataEnvironment, initStyles? : any) : StyleMapType {
-    let rtn = initStyles ?? {};
-    let styleMap : Record<string, NodeAttrType> = null;
-    let styleAttr : string = null;
-    if (ns === "self") {
-        styleMap = node.style;
-        styleAttr = "style";
-    }
-    else if (node.morestyles != null) {
-        if (ns === "root") {
-            styleAttr = ":style";
-        }
-        else {
-            styleAttr = ns + ":style";
-        }
-        styleMap = node.morestyles[styleAttr];
-    }
+function resolveUnmergedStyleMap(styleMap : Record<string, NodeAttrType>, dataenv : DataEnvironment, ctxStr : string) : StyleMapType {
     if (styleMap == null) {
-        return rtn;
+        return {};
     }
-    for (let [k,v] of Object.entries(styleMap)) {
-        let ctxStr = sprintf("resolving style property '%s' in attribute '%s' in %s", k, styleAttr, nodeStr(node));
-        let [rval, exists] = resolveNodeAttrPair(v, dataenv, ctxStr);
+    let rtn : StyleMapType = {};
+    for (let [styleProp, nodeAttr] of Object.entries(styleMap)) {
+        let fullCtxStr = sprintf("Resolving style property '%s' in %s", ctxStr);
+        let [rval, exists] = resolveNodeAttrPair(nodeAttr, dataenv, fullCtxStr);
         if (!exists) {
             continue;
         }
-        let rstr = valToStyleProp(rval);
-        if (rstr == null) {
+        let styleVal = valToStyleProp(rval);
+        if (styleVal == null) {
             continue;
         }
-        rtn[k] = rstr;
+        rtn[styleProp] = styleVal;
     }
     return rtn;
 }
 
-function getStyleMap(node : HibikiNode, ns : string, dataenv : DataEnvironment, initStyles? : any) : StyleMapType {
+function getStyleMap(node : HibikiNode, ns : string, dataenv : DataEnvironment, initStyles? : StyleMapType) : StyleMapType {
     ns = ns ?? "self";
     let am = checkSingleAutoMerge(node, "style", ns);
 
@@ -391,7 +365,12 @@ function getStyleMap(node : HibikiNode, ns : string, dataenv : DataEnvironment, 
     }
 
     // get base node style (includes initStyles)
-    let rtn = getNonAmStyleMap(node, ns, dataenv, initStyles);
+    let nodeStyleMap = node.getStyleMap(nsAttrName("style", ns));
+    let ctxStr = sprintf("'%s' attr in %s", nsAttrName("style", ns), nodeStr(node));
+    let rtn = resolveUnmergedStyleMap(nodeStyleMap, dataenv, ctxStr);
+    if (initStyles != null) {
+        rtn = Object.assign(initStyles, rtn);
+    }
 
     // check include automerge
     if (am[0].length > 0) {
@@ -420,6 +399,9 @@ function valToString(val : HibikiVal) : string {
         return null;
     }
     val = resolveLValue(val);
+    if (val == null) {
+        return null;
+    }
     let [pval, isPrim] = asPrimitive(val);
     if (isPrim) {
         return pval.toString();
@@ -445,7 +427,7 @@ function resolveNodeAttrPair(val : NodeAttrType, dataenv : DataEnvironment, rtCo
     }
     let resolvedVal : HibikiVal = null;
     try {
-        resolvedVal = evalExprAst(val, dataenv);
+        resolvedVal = evalExprAst(val, dataenv, "raw");
     }
     catch (e) {
         console.log(sprintf("ERROR %s expression\n\"%s\"\n", rtContextStr, val.sourcestr), e.toString());
@@ -738,231 +720,6 @@ function resolveAutoMergeAttrs(node : HibikiNode, destNs : string, dataenv : Dat
     return rtn;
 }
 
-function _assignToArgsRootNs(argsRoot : HibikiValObj, key : string, val : HibikiVal, forced? : boolean) {
-    let colonIdx = key.indexOf(":");
-    let ns : string = null;
-    let baseName : string = null;
-    if (colonIdx === -1) {
-        ns = "self";
-        baseName = key;
-    }
-    else if (colonIdx === 0) {
-        if (key.length === 1) {
-            return;
-        }
-        ns = "root";
-        baseName = key.substr(1);
-    }
-    else {
-        ns = key.substr(0, colonIdx);
-        baseName = key.substr(colonIdx+1);
-        if (baseName === "") {
-            return;
-        }
-    }
-    if (NON_ARGS_ATTRS[baseName]) {
-        return;
-    }
-    if (argsRoot["@ns"][ns] == null) {
-        argsRoot["@ns"][ns] = {};
-    }
-    let nsRoot = argsRoot["@ns"][ns];
-    if (baseName === "class" || baseName.startsWith("class.")) {
-        if (!forced && nsRoot["@classlock"]) {
-            return;
-        }
-        if (forced) {
-            nsRoot["@classlock"] = true;
-        }
-        if (baseName === "class") {
-            let cnArr1 = classStringToCnArr(valToString(nsRoot["class"]));
-            let cnArr2 = classStringToCnArr(valToString(val));
-            nsRoot["class"] = cnArrToClassAttr([...cnArr1, ...cnArr2]);
-        }
-        else {
-            if (baseName in nsRoot) {
-                return;
-            }
-            nsRoot[baseName] = val;
-        }
-        return;
-    }
-    if (baseName in nsRoot) {
-        return;
-    }
-    nsRoot[baseName] = val;
-    if (val instanceof LValue) {
-        if (nsRoot["@bound"] == null) {
-            nsRoot["@bound"] = {};
-        }
-        nsRoot["@bound"][baseName] = true;
-    }
-}
-
-function resolveArgsRootAutoMerge(outputArgsRoot : HibikiValObj, node : HibikiNode, dataenv : DataEnvironment, forced : boolean) {
-    if (node.automerge == null || node.automerge.length === 0) {
-        return;
-    }
-    let argsRoot = dataenv.getArgsRoot();
-    if (argsRoot == null || argsRoot["@ns"] == null) {
-        return;
-    }
-
-    for (let i=0; i<node.automerge.length; i++) {
-        let amExpr = node.automerge[i];
-        let srcRoot = argsRootSource(argsRoot, amExpr.source);
-        if (srcRoot == null) {
-            continue;
-        }
-        for (let srcAttr in srcRoot) {
-            if (srcAttr.startsWith("@") && srcAttr != "@style") {
-                continue;
-            }
-            let [include, includeForce] = checkAMAttr(amExpr, srcAttr);
-            if (forced && includeForce || !forced && include && !includeForce) {
-                let val = srcRoot[srcAttr];
-                let destAttrName : string = null;
-                if (amExpr.dest === "self") {
-                    destAttrName = srcAttr;
-                }
-                else if (amExpr.dest === "root") {
-                    destAttrName = ":" + srcAttr;
-                }
-                else {
-                    destAttrName = amExpr.dest + ":" + srcAttr;
-                }
-                _assignToArgsRootNs(outputArgsRoot, destAttrName, val, forced);
-            }
-        }
-    }
-}
-
-function mergeArgsRootNs(argsRoot : HibikiValObj, ns : string) {
-    if (argsRoot["@ns"][ns] == null) {
-        return;
-    }
-    let nsRoot = argsRoot["@ns"][ns];
-    for (let key in nsRoot) {
-        if (key.startsWith("@")) {
-            continue;
-        }
-        if (key === "class" || key.startsWith("class.")) {
-            continue;
-        }
-        argsRoot[key] = nsRoot[key];
-    }
-    if (nsRoot["@bound"] != null) {
-        if (argsRoot["@bound"] == null) {
-            argsRoot["@bound"] = {};
-        }
-        for (let key in nsRoot["@bound"]) {
-            argsRoot["@bound"][key] = nsRoot["@bound"][key];
-        }
-    }
-}
-
-function resolveArgsRoot(node : HibikiNode, dataenv : DataEnvironment, injectedAttrs : InjectedAttrsObj, implNode : HibikiNode) : HibikiValObj {
-    let argsRoot = {"@ns": {}};
-
-    if (injectedAttrs != null) {
-        let lvvals = injectedAttrs.getInjectedLValues();
-        for (let key in lvvals) {
-            if (key in argsRoot || NON_ARGS_ATTRS[key]) {
-                continue;
-            }
-            _assignToArgsRootNs(argsRoot, key, lvvals[key]);
-        }
-        
-        let ivals = injectedAttrs.getInjectedVals();
-        for (let key in ivals) {
-            if (key in argsRoot || NON_ARGS_ATTRS[key]) {
-                continue;
-            }
-            _assignToArgsRootNs(argsRoot, key, ivals[key]);
-        }
-    }
-
-    // forced automerge
-    resolveArgsRootAutoMerge(argsRoot, node, dataenv, true);
-
-    let boundArgs = [];
-    if (implNode != null && implNode.attrs != null && implNode.attrs.boundargs != null) {
-        let baAttr = rawAttrStr(implNode.attrs.boundargs);
-        boundArgs = splitTrim(baAttr, ",");
-    }
-    for (let i=0; i<boundArgs.length; i++) {
-        let key = boundArgs[i];
-        if (key in argsRoot || NON_ARGS_ATTRS[key]) {
-            continue;
-        }
-        let lvalue = resolveLValueAttr(node, key, dataenv, {noAutoMerge: true});
-        if (lvalue != null) {
-            _assignToArgsRootNs(argsRoot, key, lvalue);
-            continue;
-        }
-        let [val, exists] = getUnmergedAttributeValPair(node, key, dataenv);
-        if (exists) {
-            let lv = CreateReadOnlyLValue(val, sprintf("$args.%s:readonly", key));
-            _assignToArgsRootNs(argsRoot, key, lv);
-            continue;
-        }
-        else {
-            let lv = CreateObjectLValue(null, sprintf("$args.%s", key));
-            _assignToArgsRootNs(argsRoot, key, lv);
-            continue;
-        }
-    }
-    
-    if (node.bindings != null) {
-        for (let key in node.bindings) {
-            if (key in argsRoot || NON_ARGS_ATTRS[key]) {
-                continue;
-            }
-            let lvalue = resolveLValueAttr(node, key, dataenv, {noAutoMerge: true});
-            if (lvalue != null) {
-                _assignToArgsRootNs(argsRoot, key, lvalue);
-            }
-        }
-    }
-    if (node.attrs != null) {
-        for (let key in node.attrs) {
-            if (key in argsRoot || NON_ARGS_ATTRS[key]) {
-                continue;
-            }
-            let [val, exists] = getUnmergedAttributeValPair(node, key, dataenv);
-            if (exists) {
-                _assignToArgsRootNs(argsRoot, key, val);
-            }
-        }
-    }
-    if (node.style != null) {
-        _assignToArgsRootNs(argsRoot, "@style", node.style);
-    }
-    if (node.morestyles != null) {
-        for (let key in node.morestyles) {
-            let styleNs = key.replace(":style", "");
-            let styleMap = getStyleMap(node, styleNs, dataenv);
-            let styleName = key.replace(":style", ":@style");
-            _assignToArgsRootNs(argsRoot, styleName, styleMap);
-        }
-    }
-
-    // automerge
-    resolveArgsRootAutoMerge(argsRoot, node, dataenv, false);
-
-    // merge to $args from self, then overwrite with root.  does not merge "class" args
-    mergeArgsRootNs(argsRoot, "self");
-    mergeArgsRootNs(argsRoot, "root");
-
-    // specially compute class for argsRoot
-    let cnArr = resolveCnArray(node, "self", dataenv, null);
-    if (cnArr != null && cnArr.length > 0) {
-        argsRoot["class"] = cnArrToClassAttr(cnArr);
-    }
-
-    return argsRoot;
-}
-
 function formatVal(val : HibikiVal, format : string) : string {
     try {
         if (format == null || format === "") {
@@ -1061,7 +818,7 @@ function getKV(ival : any, isMap : boolean) : [any, any] {
 }
 
 function* makeIteratorFromExpr(iteratorExpr : HIteratorExpr, dataenv : DataEnvironment) : Generator<Record<string, any>, void, void> {
-    let rawData = evalExprAst(iteratorExpr.data, dataenv);
+    let rawData = evalExprAst(iteratorExpr.data, dataenv, "resolve");
     let [iterator, isMap] = makeIteratorFromValue(rawData);
     let index = 0;
     for (let rawVal of iterator) {
@@ -1097,7 +854,7 @@ class Watcher {
     }
 
     checkValue(dataenv : DataEnvironment) : [HibikiVal, boolean] {
-        let val = evalExprAst(this.expr, dataenv);
+        let val = evalExprAst(this.expr, dataenv, "resolve");
         let valUpdated = !DeepEqual(val, this.lastVal);
         if (this.firstRun) {
             valUpdated = this.fireOnInitialRun;
@@ -1419,7 +1176,7 @@ function ParseSetPathThrow(setpath : string) : { op : string, path : PathType } 
 function internalResolvePath(path : PathType, irData : HibikiVal, dataenv : DataEnvironment, level : number) : HibikiVal {
     // note that irData starts as null when resolving a root path
     if (level >= path.length || irData === SYM_NOATTR) {
-        return irData;
+        return irData ?? null;   // remove 'undefined'
     }
     let pp = path[level];
     if (pp.pathtype === "root") {
@@ -1444,7 +1201,7 @@ function internalResolvePath(path : PathType, irData : HibikiVal, dataenv : Data
             irData = resolveLValue(irData);
         }
         if (irData == null || irData === SYM_NOATTR) {
-            return irData;
+            return irData ?? null;   // remove 'undefined'
         }
         if (isOpaqueType(irData, false)) {
             return null;
@@ -2181,6 +1938,30 @@ function asPlainObject(data : HibikiVal, nullOk : boolean) : [HibikiValObj, bool
     return [null, false];
 }
 
+function asStyleMap(data : HibikiVal, nullOk : boolean) : [StyleMapType, boolean] {
+    if (data == null) {
+        return [null, nullOk];
+    }
+    let [objVal, isObj] = asPlainObject(data, false);
+    if (!isObj) {
+        return [null, false];
+    }
+    for (let styleProp in objVal) {
+        let val = objVal[styleProp];
+        if (val != null && typeof(val) !== "string" && typeof(val) !== "number") {
+            return [null, false];
+        }
+    }
+    return [objVal as StyleMapType, true];
+}
+
+function asStyleMapFromPair([val, exists] : [HibikiVal, boolean]) : [StyleMapType, boolean] {
+    if (!exists) {
+        return [null, false];
+    }
+    return asStyleMap(val, false);
+}
+
 function asNumber(data : HibikiVal) : number {
     if (data == null || data === SYM_NOATTR) {
         return 0;
@@ -2353,7 +2134,7 @@ function evalFnAst(fnAst : any, dataenv : DataEnvironment) : HibikiVal {
         stateFn = state.JSFuncs[fnName];
     }
     if (stateFn != null) {
-        let elist : HibikiVal[] = evalExprArray(fnAst.exprs, dataenv);
+        let elist : HibikiVal[] = evalExprArray(fnAst.exprs, dataenv, "natural");
         if (!stateFn.native) {
             elist = (DeepCopy(elist, {resolve: true}) as HibikiVal[]);
         }
@@ -2375,7 +2156,7 @@ function evalPath(path : PathType, dataenv : DataEnvironment, depth? : number) :
     for (let i=0; i<path.length; i++) {
         let pp = path[i];
         if (pp.pathtype === "dyn") {
-            let e = evalExprAst(pp.expr, dataenv);
+            let e = evalExprAst(pp.expr, dataenv, "resolve");
             if (typeof(e) === "number") {
                 staticPath.push({pathtype: "array", pathindex: e});
             }
@@ -2384,7 +2165,7 @@ function evalPath(path : PathType, dataenv : DataEnvironment, depth? : number) :
             }
         }
         else if (pp.pathtype === "deref") {
-            let e = evalExprAst(pp.expr, dataenv);
+            let e = evalExprAst(pp.expr, dataenv, "resolve");
             if (e == null || typeof(e) !== "string") {
                 staticPath.push({pathtype: "root", pathkey: "null"});
                 continue;
@@ -2400,13 +2181,13 @@ function evalPath(path : PathType, dataenv : DataEnvironment, depth? : number) :
     return staticPath;
 }
 
-function evalExprArray(exprArray : HExpr[], dataenv : DataEnvironment) : HibikiVal[] {
+function evalExprArray(exprArray : HExpr[], dataenv : DataEnvironment, rtype : "resolve" | "natural" | "raw") : HibikiVal[] {
     if (exprArray == null || exprArray.length === 0) {
         return [];
     }
     let rtn = [];
     for (let i=0; i<exprArray.length; i++) {
-        let expr = evalExprAst(exprArray[i], dataenv);
+        let expr = evalExprAst(exprArray[i], dataenv, rtype);
         rtn.push(expr);
     }
     return rtn;
@@ -2440,7 +2221,7 @@ function evalPathExprAst(exprAst : HExpr, dataenv : DataEnvironment, ctxStr : st
     }
     if (exprAst.etype === "op") {
         if (exprAst.op === "?:") {
-            let econd = evalExprAst(exprAst.exprs[0], dataenv);
+            let econd = evalExprAst(exprAst.exprs[0], dataenv, "resolve");
             if (econd) {
                 return evalPathExprAst(exprAst.exprs[1], dataenv, ctxStr);
             }
@@ -2461,13 +2242,30 @@ function evalPathExprAst(exprAst : HExpr, dataenv : DataEnvironment, ctxStr : st
     throw new Error(sprintf("Invalid path expression etype: '%s'", exprAst.etype));
 }
 
-function evalExprAst(exprAst : HExpr, dataenv : DataEnvironment) : HibikiVal {
+// rtype (controls lvalue resolution)
+//   "resolve" - always resolve values
+//   "raw"     - no extra resolution
+//   "natural" - resolve "path" exprs (no extra resolution)
+function evalExprAst(exprAst : HExpr, dataenv : DataEnvironment, rtype : "resolve" | "raw" | "natural") : HibikiVal {
+    if (rtype === "resolve") {
+        let rtn = evalExprAstInternal(exprAst, dataenv, "natural");
+        return resolveLValue(rtn);
+    }
+    else {
+        return evalExprAstInternal(exprAst, dataenv, rtype);
+    }
+}
+
+function evalExprAstInternal(exprAst : HExpr, dataenv : DataEnvironment, rtype : "raw" | "natural") : HibikiVal {
     if (exprAst == null) {
         return null;
     }
     if (exprAst.etype === "path") {
         let staticPath = evalPath(exprAst.path, dataenv);
         let val = internalResolvePath(staticPath, null, dataenv, 0);
+        if (rtype === "natural") {
+            return resolveLValue(val);
+        }
         return val;
     }
     else if (exprAst.etype === "literal") {
@@ -2475,12 +2273,12 @@ function evalExprAst(exprAst : HExpr, dataenv : DataEnvironment) : HibikiVal {
         return val;
     }
     else if (exprAst.etype === "array") {
-        let rtn = evalExprArray(exprAst.exprs, dataenv);
+        let rtn = evalExprArray(exprAst.exprs, dataenv, "natural");
         return rtn;
     }
     else if (exprAst.etype === "array-range") {
-        let e1 = asNumber(evalExprAst(exprAst.exprs[0], dataenv));
-        let e2 = asNumber(evalExprAst(exprAst.exprs[1], dataenv));
+        let e1 = asNumber(evalExprAst(exprAst.exprs[0], dataenv, "resolve"));
+        let e2 = asNumber(evalExprAst(exprAst.exprs[1], dataenv, "resolve"));
         if (isNaN(e1) || isNaN(e2) || e1 > e2) {
             return [];
         }
@@ -2496,13 +2294,17 @@ function evalExprAst(exprAst : HExpr, dataenv : DataEnvironment) : HibikiVal {
             return rtn;
         }
         for (let i=0; i<exprAst.exprs.length; i++) {
-            let k = evalExprAst(exprAst.exprs[i].key, dataenv);
-            let v = evalExprAst(exprAst.exprs[i].valexpr, dataenv);
+            let k = evalExprAst(exprAst.exprs[i].key, dataenv, "resolve");
+            let v = evalExprAst(exprAst.exprs[i].valexpr, dataenv, "natural");
             if (k != null) {
                 rtn[valToString(k)] = v;
             }
         }
         return rtn;
+    }
+    else if (exprAst.etype === "raw") {
+        let val = evalExprAst(exprAst.exprs[0], dataenv, "raw");
+        return val;
     }
     else if (exprAst.etype === "ref") {
         let [lv, exists] = evalPathExprAst(exprAst.pathexpr, dataenv, null);
@@ -2512,11 +2314,11 @@ function evalExprAst(exprAst : HExpr, dataenv : DataEnvironment) : HibikiVal {
         return lv;
     }
     else if (exprAst.etype === "isref") {
-        let val = evalExprAst(exprAst.exprs[0], dataenv);
+        let val = evalExprAst(exprAst.exprs[0], dataenv, "raw");
         return (val instanceof BoundLValue);
     }
     else if (exprAst.etype === "refinfo") {
-        let val = evalExprAst(exprAst.exprs[0], dataenv);
+        let val = evalExprAst(exprAst.exprs[0], dataenv, "raw");
         if (val instanceof BoundLValue) {
             return val.asString();
         }
@@ -2528,8 +2330,8 @@ function evalExprAst(exprAst : HExpr, dataenv : DataEnvironment) : HibikiVal {
     else if (exprAst.etype === "filter") {
         let filter = exprAst.filter;
         if (filter === "format") {
-            let e1 = evalExprAst(exprAst.exprs[0], dataenv);
-            let args = evalExprAst(exprAst.exprs[1], dataenv);
+            let e1 = evalExprAst(exprAst.exprs[0], dataenv, "natural");
+            let args = evalExprAst(exprAst.exprs[1], dataenv, "resolve");
             return formatFilter(e1, args as HibikiValObj);
         }
         else {
@@ -2538,29 +2340,29 @@ function evalExprAst(exprAst : HExpr, dataenv : DataEnvironment) : HibikiVal {
     }
     else if (exprAst.etype === "op") {
         if (exprAst.op === "&&") {
-            let e1 = evalExprAst(exprAst.exprs[0], dataenv);
+            let e1 = evalExprAst(exprAst.exprs[0], dataenv, "natural");
             if (!e1) {
                 return e1;
             }
-            return evalExprAst(exprAst.exprs[1], dataenv);
+            return evalExprAst(exprAst.exprs[1], dataenv, "natural");
         }
         else if (exprAst.op === "||") {
-            let e1 = evalExprAst(exprAst.exprs[0], dataenv);
+            let e1 = evalExprAst(exprAst.exprs[0], dataenv, "natural");
             if (e1) {
                 return e1;
             }
-            return evalExprAst(exprAst.exprs[1], dataenv);
+            return evalExprAst(exprAst.exprs[1], dataenv, "natural");
         }
         else if (exprAst.op === "??") {
-            let e1 = evalExprAst(exprAst.exprs[0], dataenv);
+            let e1 = evalExprAst(exprAst.exprs[0], dataenv, "natural");
             if (e1 != null) {
                 return e1;
             }
-            return evalExprAst(exprAst.exprs[1], dataenv);
+            return evalExprAst(exprAst.exprs[1], dataenv, "natural");
         }
         else if (exprAst.op === "*") {
-            let e1 : any = evalExprAst(exprAst.exprs[0], dataenv);
-            let e2 : any = evalExprAst(exprAst.exprs[1], dataenv);
+            let e1 : any = evalExprAst(exprAst.exprs[0], dataenv, "resolve");
+            let e2 : any = evalExprAst(exprAst.exprs[1], dataenv, "resolve");
             return asNumber(e1) * asNumber(e2);
         }
         else if (exprAst.op === "+") {
@@ -2568,12 +2370,12 @@ function evalExprAst(exprAst : HExpr, dataenv : DataEnvironment) : HibikiVal {
             if (exprAst.exprs == null || exprAst.exprs.length === 0) {
                 return null;
             }
-            let rtnVal : any = evalExprAst(exprAst.exprs[0], dataenv) ?? null;
+            let rtnVal : any = evalExprAst(exprAst.exprs[0], dataenv, "resolve") ?? null;
             if (typeof(rtnVal) === "symbol") {
                 rtnVal = asNumber(rtnVal);
             }
             for (let i=1; i<exprAst.exprs.length; i++) {
-                let ev : any = evalExprAst(exprAst.exprs[i], dataenv) ?? null;
+                let ev : any = evalExprAst(exprAst.exprs[i], dataenv, "resolve") ?? null;
                 if (typeof(ev) === "symbol") {
                     ev = asNumber(ev);
                 }
@@ -2582,42 +2384,42 @@ function evalExprAst(exprAst : HExpr, dataenv : DataEnvironment) : HibikiVal {
             return rtnVal;
         }
         else if (exprAst.op === "/") {
-            let e1 : any = evalExprAst(exprAst.exprs[0], dataenv);
-            let e2 : any = evalExprAst(exprAst.exprs[1], dataenv);
+            let e1 = evalExprAst(exprAst.exprs[0], dataenv, "resolve");
+            let e2 = evalExprAst(exprAst.exprs[1], dataenv, "resolve");
             return asNumber(e1) / asNumber(e2);
         }
         else if (exprAst.op === "%") {
-            let e1 : any = evalExprAst(exprAst.exprs[0], dataenv);
-            let e2 : any = evalExprAst(exprAst.exprs[1], dataenv);
+            let e1 = evalExprAst(exprAst.exprs[0], dataenv, "resolve");
+            let e2 = evalExprAst(exprAst.exprs[1], dataenv, "resolve");
             return asNumber(e1) % asNumber(e2);
         }
         else if (exprAst.op === ">=") {
-            let e1 = evalExprAst(exprAst.exprs[0], dataenv);
-            let e2 = evalExprAst(exprAst.exprs[1], dataenv);
+            let e1 = evalExprAst(exprAst.exprs[0], dataenv, "resolve");
+            let e2 = evalExprAst(exprAst.exprs[1], dataenv, "resolve");
             if (typeof(e1) === "string" && typeof(e2) === "string") {
                 return e1 >= e2;
             }
             return asNumber(e1) >= asNumber(e2);
         }
         else if (exprAst.op === "<=") {
-            let e1 = evalExprAst(exprAst.exprs[0], dataenv);
-            let e2 = evalExprAst(exprAst.exprs[1], dataenv);
+            let e1 = evalExprAst(exprAst.exprs[0], dataenv, "resolve");
+            let e2 = evalExprAst(exprAst.exprs[1], dataenv, "resolve");
             if (typeof(e1) === "string" && typeof(e2) === "string") {
                 return e1 <= e2;
             }
             return asNumber(e1) <= asNumber(e2);
         }
         else if (exprAst.op === ">") {
-            let e1 = evalExprAst(exprAst.exprs[0], dataenv);
-            let e2 = evalExprAst(exprAst.exprs[1], dataenv);
+            let e1 = evalExprAst(exprAst.exprs[0], dataenv, "resolve");
+            let e2 = evalExprAst(exprAst.exprs[1], dataenv, "resolve");
             if (typeof(e1) === "string" && typeof(e2) === "string") {
                 return e1 > e2;
             }
             return asNumber(e1) > asNumber(e2);
         }
         else if (exprAst.op === "<") {
-            let e1 = evalExprAst(exprAst.exprs[0], dataenv);
-            let e2 = evalExprAst(exprAst.exprs[1], dataenv);
+            let e1 = evalExprAst(exprAst.exprs[0], dataenv, "resolve");
+            let e2 = evalExprAst(exprAst.exprs[1], dataenv, "resolve");
             if (typeof(e1) === "string" && typeof(e2) === "string") {
                 return e1 < e2;
             }
@@ -2625,40 +2427,46 @@ function evalExprAst(exprAst : HExpr, dataenv : DataEnvironment) : HibikiVal {
         }
         else if (exprAst.op === "==") {
             // TODO: fix == bug (toString())
-            let e1 = evalExprAst(exprAst.exprs[0], dataenv) ?? null;
-            let e2 = evalExprAst(exprAst.exprs[1], dataenv) ?? null;
-            return e1 == e2;
+            let e1 = evalExprAst(exprAst.exprs[0], dataenv, "natural") ?? null;
+            let e2 = evalExprAst(exprAst.exprs[1], dataenv, "natural") ?? null;
+            if (e1 === e2) {
+                return true;
+            }
+            return resolveLValue(e1) == resolveLValue(e2);
         }
         else if (exprAst.op === "!=") {
             // TODO: fix == bug (toString())
-            let e1 = evalExprAst(exprAst.exprs[0], dataenv) ?? null;
-            let e2 = evalExprAst(exprAst.exprs[1], dataenv) ?? null;
-            return e1 != e2;
+            let e1 = evalExprAst(exprAst.exprs[0], dataenv, "natural") ?? null;
+            let e2 = evalExprAst(exprAst.exprs[1], dataenv, "natural") ?? null;
+            if (e1 === e2) {
+                return false;
+            }
+            return resolveLValue(e1) != resolveLValue(e2);
         }
         else if (exprAst.op === "!") {
-            let e1 = evalExprAst(exprAst.exprs[0], dataenv);
+            let e1 = evalExprAst(exprAst.exprs[0], dataenv, "resolve");
             return !e1;
         }
         else if (exprAst.op === "-") {
-            let e1 : any = evalExprAst(exprAst.exprs[0], dataenv);
-            let e2 : any = evalExprAst(exprAst.exprs[1], dataenv);
+            let e1 = evalExprAst(exprAst.exprs[0], dataenv, "resolve");
+            let e2 = evalExprAst(exprAst.exprs[1], dataenv, "resolve");
             return asNumber(e1) - asNumber(e2);
         }
         else if (exprAst.op === "u-") {
-            let e1 : any = evalExprAst(exprAst.exprs[0], dataenv) ?? null;
+            let e1 = evalExprAst(exprAst.exprs[0], dataenv, "resolve") ?? null;
             return -asNumber(e1);
         }
         else if (exprAst.op === "u+") {
-            let e1 : any = evalExprAst(exprAst.exprs[0], dataenv) ?? null;
+            let e1 = evalExprAst(exprAst.exprs[0], dataenv, "resolve") ?? null;
             return +asNumber(e1);
         }
         else if (exprAst.op === "?:") {
-            let econd = evalExprAst(exprAst.exprs[0], dataenv);
+            let econd = evalExprAst(exprAst.exprs[0], dataenv, "resolve");
             if (econd) {
-                return evalExprAst(exprAst.exprs[1], dataenv);
+                return evalExprAst(exprAst.exprs[1], dataenv, "natural");
             }
             else {
-                return evalExprAst(exprAst.exprs[2], dataenv);
+                return evalExprAst(exprAst.exprs[2], dataenv, "natural");
             }
         }
         else {
@@ -2673,11 +2481,11 @@ function evalExprAst(exprAst : HExpr, dataenv : DataEnvironment) : HibikiVal {
         if (expr == null) {
             return null;
         }
-        let val = evalExprAst(expr, dataenv);
+        let val = evalExprAst(expr, dataenv, "resolve");
         if (!(val instanceof UnboundExpr)) {
             return val;
         }
-        return evalExprAst(val.expr, dataenv);
+        return evalExprAst(val.expr, dataenv, "natural");
     }
     else if (exprAst.etype === "unbind") {
         let expr = exprAst.exprs[0];
@@ -2688,6 +2496,7 @@ function evalExprAst(exprAst : HExpr, dataenv : DataEnvironment) : HibikiVal {
     }
     else {
         console.log("BAD ETYPE", exprAst);
+        console.trace();
         throw new Error(sprintf("Invalid expression etype: '%s'", exprAst.etype));
     }
 }
@@ -2720,7 +2529,7 @@ function RequestFromAction(action : HAction, pure : boolean, dataenv : DataEnvir
         throw new Error(sprintf("Cannot create HibikiRequest from actiontype: '%s'", action.actiontype));
     }
     let req = new HibikiRequest(dataenv.dbstate.getExtState());
-    let fullData : HibikiValObj = demobx(evalExprAst(action.data, dataenv)) as HibikiValObj;
+    let fullData : HibikiValObj = demobx(evalExprAst(action.data, dataenv, "resolve")) as HibikiValObj;
     if (fullData != null && !isObject(fullData)) {
         throw new Error(sprintf("HibikiAction 'callhandler' data must be null or an object, cannot be '%s'", hibikiTypeOf(fullData)));
     }
@@ -2729,7 +2538,7 @@ function RequestFromAction(action : HAction, pure : boolean, dataenv : DataEnvir
     req.pure = pure || action.pure;
     req.libContext = dataenv.getLibContext() ?? "main";
     if (action.callpath != null) {
-        let callPath = valToString(evalExprAst(action.callpath, dataenv));
+        let callPath = valToString(evalExprAst(action.callpath, dataenv, "resolve"));
         let hpath = parseHandler(callPath);
         if (hpath == null) {
             throw new Error("Invalid handler path: " + callPath);
@@ -2779,11 +2588,11 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
     }
     rtctx.pushContext(sprintf("Running action '%s'", action.actiontype), null);
     if (action.actiontype === "setdata") {
-        let expr = evalExprAst(action.data, dataenv);
+        let expr = evalExprAst(action.data, dataenv, "natural");
         doAssignment(action, expr, pure, dataenv);
     }
     else if (action.actiontype === "ifblock") {
-        let condVal = evalExprAst(action.data, dataenv);
+        let condVal = evalExprAst(action.data, dataenv, "resolve");
         let actions = action.actions ?? {};
         if (condVal) {
             rtctx.pushContext("Executing then clause", null);
@@ -2796,7 +2605,7 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
         return null;
     }
     else if (action.actiontype === "setreturn") {
-        let val = evalExprAst(action.data, dataenv);
+        let val = evalExprAst(action.data, dataenv, "natural");
         return val;
     }
     else if (action.actiontype === "callhandler") {
@@ -2819,7 +2628,7 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
         if (pure) {
             return null;
         }
-        let ivVal = evalExprAst(action.data, dataenv);
+        let ivVal = evalExprAst(action.data, dataenv, "resolve");
         if (ivVal == null) {
             dataenv.dbstate.invalidateAll();
         }
@@ -2841,7 +2650,7 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
         if (action.native) {
             rtctx.popContext();
         }
-        let eventStr = valToString(evalExprAst(action.event, dataenv));
+        let eventStr = valToString(evalExprAst(action.event, dataenv, "resolve"));
         if (eventStr == null || eventStr === "") {
             return null;
         }
@@ -2855,7 +2664,7 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
             }
         }
         let datacontext = null;
-        let params = evalExprAst(action.data, dataenv);
+        let params = evalExprAst(action.data, dataenv, "natural");
         if (params != null && isObject(params)) {
             let objParams : HibikiValObj = params as HibikiValObj;
             let {value} = unpackPositionalArgs(objParams, ["value"]);
@@ -2869,7 +2678,7 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
         return FireEvent(event, dataenv, rtctx, false);
     }
     else if (action.actiontype === "log") {
-        let exprData : HibikiValObj = demobx(evalExprAst(action.data, dataenv)) as HibikiValObj;
+        let exprData : HibikiValObj = demobx(evalExprAst(action.data, dataenv, "natural")) as HibikiValObj;
         let dataValArr = unpackPositionalArgArray(exprData);
         dataValArr = dataValArr.map((val) => {
             if (val instanceof HibikiError) {
@@ -2892,7 +2701,7 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
     }
     else if (action.actiontype === "throw") {
         rtctx.popContext();
-        let errVal = evalExprAst(action.data, dataenv);
+        let errVal = evalExprAst(action.data, dataenv, "resolve");
         if (errVal instanceof HibikiError) {
             if (errVal.rtctx != null) {
                 let hctx = rtctx.getTopHandlerContext();
@@ -3178,7 +2987,7 @@ function ParseAndCreateContextThrow(ctxStr : string, rootName : "context" | "c",
     rtctx.pushContext(htmlContext, null);
     for (let i=0; i<caList.length; i++) {
         let caVal = caList[i];
-        let expr = evalExprAst(caVal.expr, ctxDataenv);
+        let expr = evalExprAst(caVal.expr, ctxDataenv, "natural");
         let setop = caVal.setop ?? "set";
         let path : PathType = [{pathtype: "root", pathkey: rootName}, {pathtype: "map", pathkey: caVal.key}];
         setPathWrapper(setop, path, ctxDataenv, expr, {allowContext: true});
@@ -3204,12 +3013,12 @@ function ParseSimpleExprThrow(exprStr : string) : HExpr {
 }
 
 // function EvalSimpleExpr(exprStr : string, localRoot : any, globalRoot : any, specials? : any) : any {
-function EvalSimpleExprThrow(exprStr : string, dataenv : DataEnvironment, rtContext? : string) : any {
+function EvalSimpleExprThrow(exprStr : string, dataenv : DataEnvironment, rtContext? : string) : HibikiVal {
     if (exprStr == null || exprStr === "") {
         return null;
     }
     let exprAst = ParseSimpleExprThrow(exprStr);
-    let val = evalExprAst(exprAst, dataenv);
+    let val = evalExprAst(exprAst, dataenv, "natural");
     return val;
 }
 
@@ -3371,7 +3180,7 @@ function setLValue(lv : LValue, setVal : HibikiVal) : void {
     rlv.set(setVal);
 }
 
-export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, JsonStringify, EvalSimpleExpr, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, DeepCopy, CheckCycle, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, makeIteratorFromExpr, rawAttrStr, getStyleMap, getUnmergedAttributeStr, getUnmergedAttributeValPair, resolveLValueAttr, resolveArgsRoot, SYM_NOATTR, resolveCnArray, HActionBlock, valToString, compileActionStr, FireEvent, makeErrorObj, OpaqueValue, ChildrenVar, Watcher, nsAttrName, UnboundExpr, blobPrintStr, asNumber, hibikiTypeOf, JsonReplacerFn, valToAttrStr, checkAMAttr, resolveLValue};
+export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, JsonStringify, EvalSimpleExpr, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, DeepCopy, CheckCycle, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, ParseAndCreateContextThrow, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, makeIteratorFromExpr, rawAttrStr, getStyleMap, getUnmergedAttributeStr, getUnmergedAttributeValPair, resolveLValueAttr, SYM_NOATTR, HActionBlock, valToString, compileActionStr, FireEvent, makeErrorObj, OpaqueValue, ChildrenVar, Watcher, UnboundExpr, blobPrintStr, asNumber, hibikiTypeOf, JsonReplacerFn, valToAttrStr, checkAMAttr, resolveLValue, resolveUnmergedCnArray, isUnmerged, resolveUnmergedStyleMap, asStyleMap, asStyleMapFromPair};
 
 export type {PathType, HAction, HExpr, HIteratorExpr};
 

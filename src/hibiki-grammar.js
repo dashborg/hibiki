@@ -75,6 +75,7 @@ let lexer = moo.states({
                         KW_REF: "ref",
                         KW_ISREF: "isref",
                         KW_REFINFO: "refinfo",
+                        KW_RAW: "raw",
                         KW_IN: "in",
                         KW_BIND: "bind",
                         KW_UNBIND: "unbind",
@@ -385,6 +386,7 @@ var grammar = {
     {"name": "refExpr", "symbols": [(lexer.has("KW_REF") ? {type: "KW_REF"} : KW_REF), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "fullPathExpr", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => ({etype: "ref", pathexpr: data[2]})},
     {"name": "refExpr", "symbols": [(lexer.has("KW_ISREF") ? {type: "KW_ISREF"} : KW_ISREF), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "fullExpr", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => ({etype: "isref", exprs: [data[2]]})},
     {"name": "refExpr", "symbols": [(lexer.has("KW_REFINFO") ? {type: "KW_REFINFO"} : KW_REFINFO), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "fullExpr", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => ({etype: "refinfo", exprs: [data[2]]})},
+    {"name": "refExpr", "symbols": [(lexer.has("KW_RAW") ? {type: "KW_RAW"} : KW_RAW), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "fullPathExpr", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => ({etype: "raw", exprs: [data[2]]})},
     {"name": "bindExpr", "symbols": [(lexer.has("KW_BIND") ? {type: "KW_BIND"} : KW_BIND), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "fullExpr", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess":  (data) => {
             return {etype: "bind", exprs: [data[2]]};
         } },
@@ -517,6 +519,7 @@ var grammar = {
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_IF") ? {type: "KW_IF"} : KW_IF)], "postprocess": id},
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_ELSE") ? {type: "KW_ELSE"} : KW_ELSE)], "postprocess": id},
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_THROW") ? {type: "KW_THROW"} : KW_THROW)], "postprocess": id},
+    {"name": "idOrKeyword", "symbols": [(lexer.has("KW_RAW") ? {type: "KW_RAW"} : KW_RAW)], "postprocess": id},
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_REF") ? {type: "KW_REF"} : KW_REF)], "postprocess": id},
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_ISREF") ? {type: "KW_ISREF"} : KW_ISREF)], "postprocess": id},
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_REFINFO") ? {type: "KW_REFINFO"} : KW_REFINFO)], "postprocess": id},

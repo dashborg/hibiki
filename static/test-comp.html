@@ -16,8 +16,8 @@
     </local-box>
 
     <local-box>
-      <local-onoff-button value.bindpath="$.onoff" change.handler="//@app/foo(x=22)">Test On/Off</local-onoff-button>
-      <p>The value is {{ $.onoff ? "on" : "off" }}.</p>
+      <local-onoff-button value.bindpath="$.onoff" change.handler="$.changecount = $.changecount+1;">Test On/Off</local-onoff-button>
+      <p>The value is {{ $.onoff ? "on" : "off" }} change-count:{{ $.changecount }}</p>
     </local-box>
 
     <define-component name="box">

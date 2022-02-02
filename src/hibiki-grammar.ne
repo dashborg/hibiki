@@ -73,6 +73,7 @@ let lexer = moo.states({
                         KW_REF: "ref",
                         KW_ISREF: "isref",
                         KW_REFINFO: "refinfo",
+                        KW_RAW: "raw",
                         KW_IN: "in",
                         KW_BIND: "bind",
                         KW_UNBIND: "unbind",
@@ -433,6 +434,7 @@ refExpr ->
       %KW_REF %LPAREN fullPathExpr %RPAREN {% (data) => ({etype: "ref", pathexpr: data[2]}) %}
     | %KW_ISREF %LPAREN fullExpr %RPAREN {% (data) => ({etype: "isref", exprs: [data[2]]}) %}
     | %KW_REFINFO %LPAREN fullExpr %RPAREN {% (data) => ({etype: "refinfo", exprs: [data[2]]}) %}
+    | %KW_RAW %LPAREN fullPathExpr %RPAREN {% (data) => ({etype: "raw", exprs: [data[2]]}) %}
 
 bindExpr -> %KW_BIND %LPAREN fullExpr %RPAREN {% (data) => {
           return {etype: "bind", exprs: [data[2]]};
@@ -573,6 +575,7 @@ idOrKeyword ->
     | %KW_IF     {% id %}
     | %KW_ELSE   {% id %}
     | %KW_THROW  {% id %}
+    | %KW_RAW    {% id %}
     | %KW_REF    {% id %}
     | %KW_ISREF  {% id %}
     | %KW_REFINFO     {% id %}

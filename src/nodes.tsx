@@ -14,7 +14,7 @@ import dayjsUtc from "dayjs/plugin/utc";
 import dayjsRelative from "dayjs/plugin/relativeTime";
 
 import type {ComponentType, LibraryType, HibikiExtState, LibComponentType, HibikiVal, HibikiReactProps} from "./types";
-import {DBCtx, makeDBCtx, makeCustomDBCtx, InjectedAttrsObj, createInjectObj} from "./dbctx";
+import {DBCtx, makeDBCtx, makeCustomDBCtx, InjectedAttrsObj, createInjectObj, resolveArgsRoot} from "./dbctx";
 import * as DataCtx from "./datactx";
 import {HibikiState, DataEnvironment} from "./state";
 import {resolveNumber, isObject, textContent, SYM_PROXY, SYM_FLATTEN, jseval, nodeStr, getHibiki, addToArrayDupCheck, removeFromArray, valInArray, subMapKey, unbox, bindLibContext, cnArrToClassAttr} from "./utils";
@@ -204,8 +204,11 @@ function staticEvalTextNode(node : HibikiNode, dataenv : DataEnvironment) : stri
     }
     if (!ctx.isEditMode()) {
         let [ifAttr, exists] = ctx.resolveAttrValPair("if");
-        if (exists && !ifAttr) {
-            return null;
+        if (exists) {
+            ifAttr = DataCtx.resolveLValue(ifAttr);
+            if (!ifAttr) {
+                return null;
+            }
         }
     }
     // TODO foreach
@@ -247,7 +250,7 @@ class AnyNode extends React.Component<HibikiReactProps, {}> {
             }
             let ifExists = ctx.hasRawAttr("if");
             if (ifExists) {
-                let ifAttrVal = ctx.resolveAttrVal("if");
+                let ifAttrVal = DataCtx.resolveLValue(ctx.resolveAttrVal("if"));
                 if (!ifAttrVal) {
                     return null;
                 }
@@ -686,7 +689,7 @@ class CustomNode extends React.Component<HibikiReactProps & {component : Compone
         let specials : Record<string, any> = {};
         specials.children = new DataCtx.ChildrenVar(ctx.node.list, ctx.dataenv);
         specials.node = nodeVar;
-        let argsRoot = ctx.resolveArgsRoot(implNode);
+        let argsRoot = resolveArgsRoot(ctx);
         let handlers = NodeUtils.makeHandlers(implNode, null, component.libName, ["event"]);
         let envOpts = {
             componentRoot: unbox(ctx.getNodeData(componentName)),

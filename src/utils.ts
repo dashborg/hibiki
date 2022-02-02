@@ -659,7 +659,7 @@ function cnArrToClassAttr(cnArr : Record<string, boolean>[]) : string {
             continue;
         }
         for (let key in part) {
-            if (key === "hibiki-cloak") {
+            if (key === "hibiki-cloak" || key.startsWith("@")) {
                 continue;
             }
             if (part[key]) {
@@ -673,6 +673,33 @@ function cnArrToClassAttr(cnArr : Record<string, boolean>[]) : string {
     return Object.keys(rtn).join(" ");
 }
 
+function cnArrToLosslessStr(cnArr : Record<string, boolean>[], locked? : boolean) : string {
+    if (cnArr == null || cnArr.length == 0) {
+        return null;
+    }
+    let rtn : string[] = [];
+    if (locked) {
+        rtn.push("@classlock");
+    }
+    for (let part of cnArr) {
+        if (part == null) {
+            continue;
+        }
+        for (let key in part) {
+            if (key === "hibiki-cloak") {
+                continue;
+            }
+            if (part[key]) {
+                rtn.push(key);
+            }
+            else {
+                rtn.push("!" + key);
+            }
+        }
+    }
+    return rtn.join(" ");
+}
+
 function classStringToCnArr(cstr : string) : Record<string, boolean>[] {
     if (cstr == null || cstr === "") {
         return [];
@@ -681,7 +708,7 @@ function classStringToCnArr(cstr : string) : Record<string, boolean>[] {
     let parts = cstr.split(/\s+/);
     for (let part of parts) {
         part = part.trim();
-        if (part === "" || part === "!") {
+        if (part === "" || part === "!" || part.startsWith("@")) {
             continue;
         }
         if (part.startsWith("!")) {
@@ -689,6 +716,29 @@ function classStringToCnArr(cstr : string) : Record<string, boolean>[] {
         }
         else {
             rtn.push({[part]: true});
+        }
+    }
+    return rtn;
+}
+
+function isClassStringLocked(cstr : string) : boolean {
+    if (cstr == null) {
+        return false;
+    }
+    return cstr.startsWith("@classlock");
+}
+
+function joinClassStrs(...cstrs : string[]) : string {
+    if (cstrs.length == 0) {
+        return null;
+    }
+    let rtn = cstrs[0];
+    for (let i=1; i<cstrs.length; i++) {
+        if (rtn == null || rtn === "") {
+            rtn = cstrs[i];
+        }
+        else {
+            rtn = rtn + " " + cstrs[i];
         }
     }
     return rtn;
@@ -702,5 +752,26 @@ function attrBaseName(attrName : string) : string {
     return attrName.substr(colonIdx+1);
 }
 
-export {jsonRespHandler, parseUrlParams, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy, valInArray, rawAttrFromNode, STYLE_UNITLESS_NUMBER, subMapKey, subArrayIndex, unbox, splitTrim, bindLibContext, unpackPositionalArgArray, cnArrToClassAttr, classStringToCnArr, attrBaseName};
+function parseAttrName(attrName : string) : [string, string] {
+    let colonIdx = attrName.indexOf(":");
+    if (colonIdx === -1) {
+        return ["self", attrName];
+    }
+    if (colonIdx === 0) {
+        return ["root", attrName.substr(1)];
+    }
+    return [attrName.substr(0, colonIdx), attrName.substr(colonIdx+1)];
+}
+
+function nsAttrName(attrName : string, ns : string) : string {
+    if (ns == null || ns === "self") {
+        return attrName;
+    }
+    if (ns === "root") {
+        return ":" + attrName;
+    }
+    return ns + ":" + attrName;
+}
+
+export {jsonRespHandler, parseUrlParams, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy, valInArray, rawAttrFromNode, STYLE_UNITLESS_NUMBER, subMapKey, subArrayIndex, unbox, splitTrim, bindLibContext, unpackPositionalArgArray, cnArrToClassAttr, classStringToCnArr, isClassStringLocked, joinClassStrs, attrBaseName, cnArrToLosslessStr, parseAttrName, nsAttrName};
 

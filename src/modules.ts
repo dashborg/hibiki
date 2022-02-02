@@ -220,7 +220,7 @@ function evalCsrfHExpr(hexpr : DataCtx.HExpr, state : HibikiState, datacontext :
         return null;
     }
     let dataenv = state.rootDataenv().makeChildEnv(datacontext, null);
-    let val = DataCtx.evalExprAst(hexpr, dataenv);
+    let val = DataCtx.evalExprAst(hexpr, dataenv, "resolve");
     return DataCtx.valToString(val);
 }
 
@@ -380,7 +380,7 @@ function evalHExprMap(m : Record<string, DataCtx.HExpr>, state : HibikiState, da
     let dataenv = state.rootDataenv().makeChildEnv(datacontext, null);
     let rtn : Record<string, any> = {};
     for (let key in m) {
-        let val = DataCtx.evalExprAst(m[key], dataenv);
+        let val = DataCtx.evalExprAst(m[key], dataenv, "resolve");
         rtn[key] = val;
     }
     return DataCtx.demobx(rtn);

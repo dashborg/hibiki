@@ -36,6 +36,7 @@ class HibikiNode {
     innerhtml? : string;
     outerhtml? : string;
     libContext? : string;
+    mark? : boolean;
 
     constructor(tag : string, opts? : {text? : string, list? : HibikiNode[], attrs? : Record<string, NodeAttrType>}) {
         this._type = "HibikiNode";
@@ -55,6 +56,16 @@ class HibikiNode {
 
     allowedGetters(key : string) : boolean {
         return NODE_ALLOWED_GETTERS[key];
+    }
+
+    getStyleMap(attrName : string) : Record<string, NodeAttrType> {
+        if (attrName === "style") {
+            return this.style;
+        }
+        if (this.morestyles == null) {
+            return null;
+        }
+        return this.morestyles[attrName];
     }
 };
 
@@ -395,6 +406,14 @@ class HtmlParser {
         return false;
     }
 
+    parseMarkAttr(node : HibikiNode, attrName : string, attrValue : string) : boolean {
+        if (attrName == "hibiki-mark") {
+            node.mark = true;
+            return true;
+        }
+        return false;
+    }
+
     parseAutoAttrs(node : HibikiNode, attrName : string, attrValue : string, pctx : ParseContext) {
         if (attrValue === "") {
             attrValue = "1";
@@ -473,6 +492,9 @@ class HtmlParser {
                 continue;
             }
             if (this.parseRawTagAttr(node, attrName, attrValue, pctx)) {
+                continue;
+            }
+            if (this.parseMarkAttr(node, attrName, attrValue)) {
                 continue;
             }
             if (this.parseStyleAttr(node, attrName, attrValue, pctx)) {
