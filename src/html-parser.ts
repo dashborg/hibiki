@@ -26,7 +26,6 @@ class HibikiNode {
     attrs? : Record<string, NodeAttrType>;
     foreachAttr? : HIteratorExpr;
     handlers? : Record<string, HAction[]>;
-    bindings? : Record<string, HExpr>;
     exprs? : Record<string, HExpr>;
     list?  : HibikiNode[];
     style? : Record<string, NodeAttrType>;
@@ -374,11 +373,7 @@ class HtmlParser {
         try {
             let lvExpr : HExpr = doParse(value, "ext_refAttribute");
             lvExpr.sourcestr = value;
-            if (node.bindings == null) {
-                node.bindings = {};
-            }
             let bindName = name.substr(0, name.length-9);
-            node.bindings[bindName] = lvExpr;
             if (node.attrs == null) {
                 node.attrs = {};
             }
