@@ -1,9 +1,10 @@
 // Copyright 2021-2022 Dashborg Inc
 
 import * as mobx from "mobx";
-import {HibikiNode, Hibiki, HandlerPathType, NodeAttrType, HibikiVal, HibikiValObj, JSFuncStr} from "./types";
+import {Hibiki, HandlerPathType, HibikiVal, HibikiValObj, JSFuncStr} from "./types";
 import {sprintf} from "sprintf-js";
 import type {HibikiBlob} from "./datactx";
+import type {HibikiNode, NodeAttrType} from "./html-parser";
 
 declare var window : any;
 
@@ -74,7 +75,7 @@ function jsonRespHandler(resp) {
 
 function parseUrlParams() : Record<string,string> {
     let urlParams = new URLSearchParams(window.location.search);
-    let paramsObj = {};
+    let paramsObj : Record<string, string> = {};
     for (let [k, v] of (urlParams as any).entries()) {
         paramsObj[k] = v;
     }
@@ -103,7 +104,7 @@ function valToFloat(val : any, def : number) : number {
     return ival;
 }
 
-function resolveNumber(val : any, test : (number) => boolean, def : number) : number {
+function resolveNumber(val : any, test : (v : number) => boolean, def : number) : number {
     if (val == null) {
         return def;
     }
@@ -124,7 +125,7 @@ function isObject(v : any) : boolean {
     if (mobx.isArrayLike(v)) {
         return false;
     }
-    return typeof(v) == "object";
+    return typeof(v) === "object";
 }
 
 function subMapKey(v : HibikiVal, mapKey : string) : HibikiVal {
@@ -207,8 +208,8 @@ function parseDisplayStr(displayStr : string) : {path : string, pagename : strin
     return {path, pagename};
 }
 
-function smartDecodeParams(paramsStr : string) : {[e : string] : any} {
-    let rtn = {};
+function smartDecodeParams(paramsStr : string) : Record<string, any> {
+    let rtn : Record<string, any> = {};
     if (paramsStr == null || paramsStr == "") {
         return rtn;
     }
@@ -435,6 +436,17 @@ function unpackPositionalArgs(data : HibikiValObj, posArgNames : string[]) : Hib
     return rtn;
 }
 
+function unpackPositionalArgArray(data : HibikiValObj) : HibikiVal[] {
+    if (data == null) {
+        return [];
+    }
+    let posArgs = data["*args"];
+    if (posArgs == null || !mobx.isArrayLike(posArgs)) {
+        return [];
+    }
+    return posArgs;
+}
+
 function callHook(hookName : string, hookFn : JSFuncStr | Function, ...rest : any[]) : any {
     if (hookFn == null) {
         return null;
@@ -546,30 +558,6 @@ function getHibiki() : Hibiki {
     return (window as any).Hibiki;
 }
 
-function blobPrintStr(blob : Blob | HibikiBlob) : string {
-    if (blob == null) {
-        return null;
-    }
-    if (isObject(blob) && (blob as any)._type == "HibikiBlob") {
-        let hblob : HibikiBlob = (blob as any);
-        let bloblen = 0;
-        if (hblob.data != null) {
-            bloblen = hblob.data.length;
-        }
-        if (hblob.name != null) {
-            return sprintf("[hibikiblob type=%s, len=%s, name=%s]", hblob.mimetype, Math.ceil((bloblen/4)*3), hblob.name);
-        }
-        return sprintf("[hibikiblob type=%s, len=%s]", hblob.mimetype, Math.ceil((bloblen/4)*3))
-    }
-    if (blob instanceof File && blob.name != null) {
-        sprintf("[jsblob type=%s, len=%s, name=%s]", blob.type, blob.size, blob.name);
-    }
-    if (blob instanceof Blob) {
-        return sprintf("[jsblob type=%s, len=%s]", blob.type, blob.size);
-    }
-    return null;
-}
-
 function base64ToArray(b64 : string) : Uint8Array {
     let binaryStr = atob(b64);
     let arr = new Uint8Array(binaryStr.length);
@@ -646,22 +634,6 @@ const STYLE_UNITLESS_NUMBER = { // from react
     "stroke-width": true,
 };
 
-const STYLE_KEY_MAP = {
-    "bold": {key: "fontWeight", val: "bold"},
-    "italic": {key: "fontStyle", val: "italic"},
-    "underline": {key: "textDecoration", val: "underline"},
-    "strike": {key: "textDecoration", val: "line-through"},
-    "pre": {key: "whiteSpace", val: "pre"},
-    "fixedfont": {key: "fontFamily", val: "\"courier new\", fixed"},
-    "grow": {key: "flex", val: "1 0 0"},
-    "noshrink": {key: "flexShrink", val: "0"},
-    "shrink": {key: "flexShrink", val: "1"},
-    "scroll": {key: "overflow", val: "scroll"},
-    "center": {flex: true, key: "justifyContent", val: "center"},
-    "xcenter": {flex: true, key: "alignItems", val: "center"},
-    "fullcenter": {flex: true},
-};
-
 function bindLibContext(node : HibikiNode, libContext : string) {
     if (node == null) {
         return;
@@ -677,5 +649,143 @@ function bindLibContext(node : HibikiNode, libContext : string) {
     }
 }
 
-export {jsonRespHandler, parseUrlParams, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs, blobPrintStr, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy, valInArray, rawAttrFromNode, STYLE_UNITLESS_NUMBER, STYLE_KEY_MAP, subMapKey, subArrayIndex, unbox, splitTrim, bindLibContext};
+function cnArrToClassAttr(cnArr : Record<string, boolean>[]) : string {
+    if (cnArr == null || cnArr.length == 0) {
+        return null;
+    }
+    let rtn : Record<string, boolean> = {};
+    for (let part of cnArr) {
+        if (part == null) {
+            continue;
+        }
+        for (let key in part) {
+            if (key === "hibiki-cloak" || key.startsWith("@")) {
+                continue;
+            }
+            if (part[key]) {
+                rtn[key] = true;
+            }
+            else {
+                delete rtn[key];
+            }
+        }
+    }
+    return Object.keys(rtn).join(" ");
+}
+
+function cnArrToLosslessStr(cnArr : Record<string, boolean>[], locked? : boolean) : string {
+    if (cnArr == null || cnArr.length == 0) {
+        return null;
+    }
+    let rtn : string[] = [];
+    if (locked) {
+        rtn.push("@classlock");
+    }
+    for (let part of cnArr) {
+        if (part == null) {
+            continue;
+        }
+        for (let key in part) {
+            if (key === "hibiki-cloak") {
+                continue;
+            }
+            if (part[key]) {
+                rtn.push(key);
+            }
+            else {
+                rtn.push("!" + key);
+            }
+        }
+    }
+    return rtn.join(" ");
+}
+
+function classStringToCnArr(cstr : string) : Record<string, boolean>[] {
+    if (cstr == null || cstr === "") {
+        return [];
+    }
+    let rtn : Record<string, boolean>[] = [];
+    let parts = cstr.split(/\s+/);
+    for (let part of parts) {
+        part = part.trim();
+        if (part === "" || part === "!" || part.startsWith("@")) {
+            continue;
+        }
+        if (part.startsWith("!")) {
+            rtn.push({[part.substr(1)]: false});
+        }
+        else {
+            rtn.push({[part]: true});
+        }
+    }
+    return rtn;
+}
+
+function isClassStringLocked(cstr : string) : boolean {
+    if (cstr == null) {
+        return false;
+    }
+    return cstr.startsWith("@classlock");
+}
+
+function joinClassStrs(...cstrs : string[]) : string {
+    if (cstrs.length == 0) {
+        return null;
+    }
+    let rtn = cstrs[0];
+    for (let i=1; i<cstrs.length; i++) {
+        if (rtn == null || rtn === "") {
+            rtn = cstrs[i];
+        }
+        else {
+            rtn = rtn + " " + cstrs[i];
+        }
+    }
+    return rtn;
+}
+
+function attrBaseName(attrName : string) : string {
+    let colonIdx = attrName.indexOf(":");
+    if (colonIdx === -1) {
+        return attrName;
+    }
+    return attrName.substr(colonIdx+1);
+}
+
+function parseAttrName(attrName : string) : [string, string] {
+    let colonIdx = attrName.indexOf(":");
+    if (colonIdx === -1) {
+        return ["self", attrName];
+    }
+    if (colonIdx === 0) {
+        return ["root", attrName.substr(1)];
+    }
+    return [attrName.substr(0, colonIdx), attrName.substr(colonIdx+1)];
+}
+
+function nsAttrName(attrName : string, ns : string) : string {
+    if (ns == null || ns === "self") {
+        return attrName;
+    }
+    if (ns === "root") {
+        return ":" + attrName;
+    }
+    return ns + ":" + attrName;
+}
+
+function urlSameOrigin(urlStr : string) {
+    let url = new URL(urlStr, window.location.href);
+    return url.origin == window.location.origin;
+}
+
+function validateModulePath(modName : string, hpath : HandlerPathType) {
+    if (hpath.url.startsWith("http://") || hpath.url.startsWith("https://") || hpath.url.startsWith("//") || !urlSameOrigin(hpath.url)) {
+        throw new Error(sprintf("Invalid %s module URL, must not specify a protocol or host: %s", modName, fullPath(hpath)));
+    }
+    if (!hpath.url.startsWith("/")) {
+        throw new Error(sprintf("Invalid %s module URL, must not specify a relative url: %s", modName, fullPath(hpath)));
+    }
+}
+
+export {jsonRespHandler, parseUrlParams, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy, valInArray, rawAttrFromNode, STYLE_UNITLESS_NUMBER, subMapKey, subArrayIndex, unbox, splitTrim, bindLibContext, unpackPositionalArgArray, cnArrToClassAttr, classStringToCnArr, isClassStringLocked, joinClassStrs, attrBaseName, cnArrToLosslessStr, parseAttrName, nsAttrName, validateModulePath};
 

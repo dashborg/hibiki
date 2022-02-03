@@ -3,14 +3,17 @@
 import * as React from "react";
 import * as mobx from "mobx";
 import * as mobxReact from "mobx-react";
+import * as DataCtx from "./datactx";
 import {parseHtml} from "./html-parser";
 import {HibikiState, DataEnvironment} from "./state";
 import * as ReactDOM from "react-dom";
 import {HibikiRootNode, CORE_LIBRARY} from "./nodes";
 import {deepTextContent, evalDeepTextContent, isObject, bindLibContext} from "./utils";
 import merge from "lodash/merge";
-import type {HibikiNode, HibikiConfig, Hibiki, HibikiExtState, ReactClass, LibraryType} from "./types";
-import {LocalModule, HttpModule, LibModule, HibikiModule} from "./modules";
+import type {HibikiConfig, Hibiki, HibikiExtState, ReactClass, LibraryType} from "./types";
+import type {HibikiNode} from "./html-parser";
+import {LocalModule, HttpModule, LibModule} from "./modules";
+import {HibikiModule} from "./hibiki-module";
 
 declare var window : any;
 
@@ -149,7 +152,7 @@ function loadTag(elem : HTMLElement) : HibikiExtState {
     }
 }
 
-function autoloadTags() {
+function autoloadTags() : void {
     let elems = document.querySelectorAll("hibiki, template[hibiki]");
     let htmlElem = document.querySelector("html");
     let bodyElem = document.querySelector("body");
@@ -222,6 +225,7 @@ let hibiki : Hibiki = {
     States: {},
     VERSION: VERSION,
     BUILD: BUILD,
+    DataCtx: DataCtx,
 };
 
 window.Hibiki = hibiki;

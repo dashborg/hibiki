@@ -1,15 +1,15 @@
 // Copyright 2021-2022 Dashborg Inc
 
-import {isObject, unpackPositionalArgs, stripAtKeys, getHibiki, fullPath, getSS, setSS, smartEncodeParam, unpackArg, unpackAtArgs, blobPrintStr, base64ToArray, callHook} from "./utils";
+import {isObject, unpackPositionalArgs, stripAtKeys, getHibiki, fullPath, getSS, setSS, smartEncodeParam, unpackArg, unpackAtArgs, base64ToArray, callHook, validateModulePath} from "./utils";
 import {sprintf} from "sprintf-js";
 import type {HibikiState} from "./state";
-import type {FetchHookFn, Hibiki, HibikiAction, HandlerPathType, HibikiExtState, HttpConfig, HibikiActionString, HibikiVal} from "./types";
+import type {FetchHookFn, Hibiki, HibikiAction, HandlerPathType, HibikiExtState, HttpConfig, HibikiActionString, HibikiVal, HibikiValObj} from "./types";
 import * as DataCtx from "./datactx";
 import type {HibikiRequest} from "./request";
 import merge from "lodash/merge";
 import * as mobx from "mobx";
 
-let VALID_METHODS = {"GET": true, "POST": true, "PUT": true, "PATCH": true, "DELETE": true};
+let VALID_METHODS : Record<string, boolean> = {"GET": true, "POST": true, "PUT": true, "PATCH": true, "DELETE": true};
 
 function handleFetchResponse(url : URL, resp : any) : Promise<any> {
     if (!resp.ok) {
@@ -100,10 +100,10 @@ function urlSearchParamsConvertVal(val : any, inArray? : boolean) : any {
         return val.toString();
     }
     else if (val instanceof Blob) {
-        throw new Error(sprintf("Cannot serialize Blob %s with url encoding (use 'multipart' encoding)", blobPrintStr(val)));
+        throw new Error(sprintf("Cannot serialize Blob %s with url encoding (use 'multipart' encoding)", DataCtx.blobPrintStr(val)));
     }
     else if (val instanceof DataCtx.HibikiBlob) {
-        throw new Error(sprintf("Cannot serialize HibikiBlob %s with url encoding (use 'multipart' encoding)", blobPrintStr(val)));
+        throw new Error(sprintf("Cannot serialize HibikiBlob %s with url encoding (use 'multipart' encoding)", DataCtx.blobPrintStr(val)));
     }
     else if (!inArray && mobx.isArrayLike(val)) {
         let rtn = [];
@@ -139,7 +139,7 @@ function urlSearchParamsFromParams(params : Record<string, any>) : URLSearchPara
 
 function jsonReplacer(key : string, value : any) : any {
     if (this[key] instanceof Blob) {
-        throw new Error(sprintf("Cannot serialize Blob %s with json encoding (use 'multipart' encoding)", blobPrintStr(this[key])));
+        throw new Error(sprintf("Cannot serialize Blob %s with json encoding (use 'multipart' encoding)", DataCtx.blobPrintStr(this[key])));
     }
     if (this[key] instanceof DataCtx.HibikiBlob) {
         let val = this[key];
@@ -151,7 +151,7 @@ function jsonReplacer(key : string, value : any) : any {
         }
         return blob;
     }
-    return DataCtx.MapReplacer.bind(this)(key, value);
+    return DataCtx.JsonReplacerFn.bind(this)(key, value);
 }
 
 function DefaultCsrfValueFn() {
@@ -173,7 +173,7 @@ function setParams(method : string, url : URL, fetchInit : Record<string, any>, 
     }
     let atData = unpackArg(data, "@data");
     if (atData != null && !isObject(atData)) {
-        throw new Error("Invalid @data, must be an object: type=" + typeof(atData));
+        throw new Error("Invalid @data, must be an object: type=" + DataCtx.hibikiTypeOf(atData));
     }
     let params = Object.assign({}, fetchInit["csrfParams"], (atData ?? {}), stripAtKeys(data));
     let encoding = unpackArg(data, "@encoding");
@@ -220,7 +220,7 @@ function evalCsrfHExpr(hexpr : DataCtx.HExpr, state : HibikiState, datacontext :
         return null;
     }
     let dataenv = state.rootDataenv().makeChildEnv(datacontext, null);
-    let val = DataCtx.evalExprAst(hexpr, dataenv);
+    let val = DataCtx.evalExprAst(hexpr, dataenv, "resolve");
     return DataCtx.valToString(val);
 }
 
@@ -280,20 +280,6 @@ function makeFetchInit(req : HibikiRequest, url : URL, opts : HttpConfig) : Reco
         callHook("FetchHook", opts.fetchHookFn, url, fetchInit);
     }
     return fetchInit;
-}
-
-function validateModulePath(modName : string, hpath : HandlerPathType) {
-    if (hpath.url.startsWith("http://") || hpath.url.startsWith("https://") || hpath.url.startsWith("//") || !urlSameOrigin(hpath.url)) {
-        throw new Error(sprintf("Invalid %s module URL, must not specify a protocol or host: %s", modName, fullPath(hpath)));
-    }
-    if (!hpath.url.startsWith("/")) {
-        throw new Error(sprintf("Invalid %s module URL, must not specify a relative url: %s", modName, fullPath(hpath)));
-    }
-}
-
-function urlSameOrigin(urlStr : string) {
-    let url = new URL(urlStr, window.location.href);
-    return url.origin == window.location.origin;
 }
 
 function isActionStr(v : any) : boolean {
@@ -380,7 +366,7 @@ function evalHExprMap(m : Record<string, DataCtx.HExpr>, state : HibikiState, da
     let dataenv = state.rootDataenv().makeChildEnv(datacontext, null);
     let rtn : Record<string, any> = {};
     for (let key in m) {
-        let val = DataCtx.evalExprAst(m[key], dataenv);
+        let val = DataCtx.evalExprAst(m[key], dataenv, "resolve");
         rtn[key] = val;
     }
     return DataCtx.demobx(rtn);
@@ -418,6 +404,7 @@ class LocalModule {
         if (handler == null) {
             throw new Error(sprintf("Local handler '%s' not found", req.callpath.url));
         }
+        req.data = DataCtx.DeepCopy(req.data, {resolve: true}) as HibikiValObj;
         let rtn = handler(req);
         let p = Promise.resolve(rtn).then((rtnVal) => {
             if (rtnVal != null) {
@@ -451,6 +438,7 @@ class LibModule {
         if (handler == null) {
             throw new Error(sprintf("Lib '%s' handler '%s' not found", libContext, req.callpath.url));
         }
+        req.data = DataCtx.DeepCopy(req.data, {resolve: true}) as HibikiValObj;
         let rtn = handler(req);
         let p = Promise.resolve(rtn).then((rtnVal) => {
             if (rtnVal != null) {
@@ -462,98 +450,4 @@ class LibModule {
     }
 }
 
-class HibikiModule {
-    state : HibikiState;
-
-    constructor(state : HibikiState, config : any) {
-        this.state = state;
-    }
-
-    callHandler(req : HibikiRequest) : Promise<any> {
-        validateModulePath("hibiki", req.callpath);
-        let handlerName = req.callpath.url;
-        if (handlerName == "/get-session-storage") {
-            return this.getSS(req);
-        }
-        else if (handlerName == "/set-session-storage") {
-            return this.setSS(req);
-        }
-        else if (handlerName == "/set-title") {
-            return this.setTitle(req);
-        }
-        else if (handlerName == "/update-url") {
-            return this.updateUrl(req);
-        }
-        else if (handlerName == "/sleep") {
-            return this.sleep(req);
-        }
-        else {
-            throw new Error("Invalid Hibiki Module handler: " + fullPath(req.callpath));
-        }
-    }
-
-    sleep(req : HibikiRequest) : Promise<any> {
-        let sleepMs = unpackArg(req.data, "ms", 0);
-        if (sleepMs == null || typeof(sleepMs) !== "number") {
-            throw new Error("sleep requires 'ms' parameter (must be number)");
-        }
-        return new Promise((resolve, reject) => {
-            setTimeout(() => resolve(true), sleepMs);
-        });
-    }
-
-    getSS(req : HibikiRequest) : Promise<any> {
-        let key = unpackArg(req.data, "key", 0);
-        if (key == null) {
-            throw new Error("get-session-storage requires 'key' parameter");
-        }
-        return getSS(key);
-    }
-
-    setSS(req : HibikiRequest) : Promise<any> {
-        let key = unpackArg(req.data, "key", 0);
-        if (key == null) {
-            throw new Error("set-session-storage requires 'key' parameter");
-        }
-        let val = DataCtx.demobx(unpackArg(req.data, "value", 1));
-        setSS(key, val);
-        return null;
-    }
-
-    setTitle(req : HibikiRequest) : Promise<any> {
-        let title = unpackArg(req.data, "title", 0);
-        if (title == null) {
-            throw new Error("set-title requires 'title' parameter");
-        }
-        document.title = String(title);
-        req.setData("$state.title", document.title);
-        return null;
-    }
-
-    updateUrl(req : HibikiRequest) : Promise<any> {
-        let data = stripAtKeys(req.data);
-        let {path: urlStr, raw: isRaw, replace, title} = unpackAtArgs(req.data);
-        let url = new URL((urlStr ?? ""), window.location.href);
-        for (let key in data) {
-            let val = data[key];
-            if (val == null) {
-                url.searchParams.delete(key);
-                continue;
-            }
-            url.searchParams.set(key, smartEncodeParam(val, isRaw));
-        }
-        if (title != null) {
-            document.title = title;
-        }
-        if (replace) {
-            window.history.replaceState(null, document.title, url.toString());
-        }
-        else {
-            window.history.pushState(null, document.title, url.toString());
-        }
-        hibikiState(req.state).setStateVars();
-        return null;
-    }
-}
-
-export {LocalModule, HttpModule, LibModule, HibikiModule};
+export {LocalModule, HttpModule, LibModule};

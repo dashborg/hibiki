@@ -2,16 +2,16 @@
 
 import * as mobx from "mobx";
 import * as React from "react";
-import * as cn from "classnames/dedupe";
-
-import {DBCtx} from "./dbctx";
-import type {HibikiNode, HandlerValType, HibikiVal} from "./types";
+import {DBCtx, makeCustomDBCtx, InjectedAttrsObj} from "./dbctx";
+import type {HandlerValType, HibikiVal} from "./types";
+import type {HibikiNode} from "./html-parser";
 import * as DataCtx from "./datactx";
 import {sprintf} from "sprintf-js";
-import {isObject, textContent, rawAttrFromNode, nodeStr} from "./utils";
+import {isObject, textContent, rawAttrFromNode, nodeStr, cnArrToClassAttr} from "./utils";
 import {DataEnvironment} from "./state";
+import type {EHandlerType} from "./state";
 
-let BLOCKED_ELEMS = {
+let BLOCKED_ELEMS : Record<string, boolean> = {
     "html": true,
     "body": true,
     "meta": true,
@@ -21,7 +21,12 @@ let BLOCKED_ELEMS = {
     "applet": true,
 };
 
-let INLINE_ELEMS = {
+let NON_INJECTABLE : Record<string, boolean> = {
+    "define-vars": true,
+    "if-break": true,
+};
+
+let INLINE_ELEMS : Record<string, boolean> = {
     "a": true,
     "abbr": true,
     "acronym": true,
@@ -57,16 +62,16 @@ let INLINE_ELEMS = {
     "var": true,
 };
 
-let SUBMIT_ELEMS = {
+let SUBMIT_ELEMS : Record<string, boolean> = {
     "form": true,
 };
 
-let BLOB_ATTRS = {
+let BLOB_ATTRS : Record<string, boolean> = {
     "src": true,
     "href": true,
 };
 
-let SPECIAL_ATTRS = {
+let SPECIAL_ATTRS : Record<string, boolean> = {
     "style": true,
     "class": true,
     "if": true,
@@ -78,14 +83,14 @@ let SPECIAL_ATTRS = {
     "defaultvalue": true,
 };
 
-let UNMANAGED_INPUT_TYPES = {
+let UNMANAGED_INPUT_TYPES : Record<string, boolean> = {
     "submit": true,
     "button": true,
     "reset": true,
     "image": true,
 };
 
-let MANAGED_ATTRS = {
+let MANAGED_ATTRS : Record<string, Record<string, boolean>> = {
     "value": {"value": true, "defaultvalue": true},
     "radio": {"checked": true, "defaultchecked": true},
     "checkbox": {"checked": true, "defaultchecked": true},
@@ -163,11 +168,10 @@ function renderTextSpan(text : string, style : any, className : string) : any {
     return text;
 }
 
-function renderTextData(node : HibikiNode, dataenv : DataEnvironment, onlyText? : boolean) : any {
-    let ctx = new DBCtx(null, node, dataenv);
+function renderTextData(ctx : DBCtx, onlyText? : boolean) : any {
     let style = ctx.resolveStyleMap();
     let cnArr = ctx.resolveCnArray();
-    let bindVal = DataCtx.demobx(ctx.resolveAttrVal("bind"));
+    let bindVal = ctx.resolveAttrVal("bind");
     let rtn : string = null;
     let nullTextAttr : string = null;
     if (bindVal == null) {
@@ -182,10 +186,10 @@ function renderTextData(node : HibikiNode, dataenv : DataEnvironment, onlyText? 
     if (onlyText) {
         return rtn;
     }
-    return renderTextSpan(rtn, style, cn(cnArr));
+    return renderTextSpan(rtn, style, cnArrToClassAttr(cnArr));
 }
 
-function makeNodeVar(ctx : DBCtx) : any {
+function makeNodeVar(ctx : DBCtx, withAttrs : boolean) : any {
     let node = ctx.node;
     if (node == null) {
         return null;
@@ -193,9 +197,11 @@ function makeNodeVar(ctx : DBCtx) : any {
     let rtn : any = {};
     rtn.tag = ctx.getHtmlTagName();
     rtn.rawtag = ctx.node.tag;
-    rtn._type = "HibikiNode";
     rtn.uuid = ctx.uuid;
-    rtn.dataenv = ctx.dataenv;
+    if (withAttrs) {
+        rtn.attrs = ctx.resolveAttrVals();
+    }
+    rtn.children = new DataCtx.ChildrenVar(ctx.node.list, ctx.dataenv);
     return rtn;
 }
 
@@ -286,15 +292,29 @@ function handleConvertType(ctx : DBCtx, value : string) : any {
     return value;
 }
 
-function makeHandlers(node : HibikiNode, libContext : string, handlerPrefixes : string[]) : Record<string, HandlerValType> {
+function makeHandlers(node : HibikiNode, injectedAttrs : InjectedAttrsObj, libContext : string, handlerPrefixes : string[]) : Record<string, HandlerValType> {
     let handlers : Record<string, HandlerValType> = {};
+    if (injectedAttrs != null) {
+        for (let iname in injectedAttrs.handlers) {
+            let hname = sprintf("//@event/%s", iname);
+            let ehandler : EHandlerType = injectedAttrs.handlers[iname];
+            handlers[hname] = {
+                block: ehandler.handler,
+                node: ehandler.node,
+                boundDataenv: ehandler.dataenv,
+            };
+        }
+    }
     if (node.handlers != null) {
         for (let eventName in node.handlers) {
             if (node.handlers[eventName] == null) {
                 continue;
             }
             let hname = sprintf("//@event/%s", eventName);
-            handlers[hname] = {block: new DataCtx.HActionBlock(node.handlers[eventName], libContext), node: node};
+            if (hname in handlers) {
+                continue;
+            }
+            handlers[hname] = {block: new DataCtx.HActionBlock("handler", node.handlers[eventName], libContext), node: node};
         }
     }
     if (handlerPrefixes != null && node.list != null) {
@@ -319,7 +339,7 @@ function makeHandlers(node : HibikiNode, libContext : string, handlerPrefixes : 
                 }
             }
             if (prefixOk) {
-                handlers[hname] = {block: new DataCtx.HActionBlock(subNode.handlers["handler"], libContext), node: subNode};
+                handlers[hname] = {block: new DataCtx.HActionBlock("handler", subNode.handlers["handler"], libContext), node: subNode};
             }
         }
     }
@@ -362,4 +382,4 @@ function getRawAttrs(node : HibikiNode) : Record<string, string> {
     return rtn;
 }
 
-export {BLOCKED_ELEMS, INLINE_ELEMS, SPECIAL_ATTRS, BLOB_ATTRS, SUBMIT_ELEMS, MANAGED_ATTRS, renderTextSpan, renderTextData, makeNodeVar, parseArgsDecl, handleConvertType, makeHandlers, subNodesByTag, firstSubNodeByTag, getManagedType, getRawAttrs};
+export {BLOCKED_ELEMS, INLINE_ELEMS, SPECIAL_ATTRS, BLOB_ATTRS, SUBMIT_ELEMS, MANAGED_ATTRS, NON_INJECTABLE, renderTextSpan, renderTextData, makeNodeVar, parseArgsDecl, handleConvertType, makeHandlers, subNodesByTag, firstSubNodeByTag, getManagedType, getRawAttrs};

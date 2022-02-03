@@ -20,6 +20,10 @@
         (2-way binding, initial value="mike", current value="{{ $.name }}", onchange counter={{ $.f1counter }})
       </div>
       <div class="field">
+        <input class="input" value="*ref($.name)" change.handler="$.f1counter = $.f1counter+1"><br>
+        (2-way binding using ref())
+      </div>
+      <div class="field">
         <input class="input" bound value="*$.i2name" change.handler="$.f2counter = $.f2counter+1; if ($.f2counter % 2 == 0) { $.i2name = @value; }"><br>
         (1-way binding, current value="{{$.i2name}}", onchange counter={{ $.f2counter }}, every other character registers)
       </div>

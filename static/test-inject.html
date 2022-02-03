@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<script src="/hibiki-test.js"></script>
+<body hibiki class="hibiki-cloak">
+  <hibiki-data>
+    {"data": [
+      {"x": 1, "y": 1},
+      {"x": 2, "y": 4},
+      {"x": 3, "y": 9}
+     ]
+    }
+  </hibiki-data>
+  <import-library src="/libs/bulma-table.html" prefix="bulma"></import-library>
+  <div class="container">
+    <h1 class="title">Menu Example</h1>
+    <div style="display: flex; flex-direction: row;">
+      <aside class="menu" style="width: 300px;">
+        <p class="menu-label">
+          General
+        </p>
+        <ul class="menu-list">
+          <li component="local-menu-item" value="dashboard" selected.bindpath="$.selected">Dashboard</li>
+          <li component="local-menu-item" value="accounts" selected.bindpath="$.selected">Accounts</li>
+          <li component="local-menu-item" value="zones" selected.bindpath="$.selected">Zones</li>
+        </ul>
+        <local-menu selected.bindpath="$.selected" class="mt-4">
+          <local-menu-item value="dashboard">Dashboard</local-menu-item>
+          <local-menu-item value="accounts" class="has-text-weight-bold" anchor:style="color: blue;">Accounts</local-menu-item>
+          <local-menu-item value="zones">Zones</local-menu-item>
+        </local-menu>
+      </aside>
+      <div class="container">
+        <div class="box" style="width: 100%;">
+          Selected Menu Item: {{ $.selected }}
+          <div>
+            <h-children inject:href="/test-basic.html" inject:style="color: red" inject:class="has-text-weight-bold">
+              <a href="#">Test Inject Link</a>
+            </h-children>
+            (Should be <span style="color: red; font-weight: bold">red/bold</span> and link to /test-basic.html)
+          </div>
+          <div>
+            <h-children inject:click.handler="$.selected = 'accounts'">
+              <a href="#">Test Inject Handler</a>
+            </h-children>
+            (Should set menu to 'accounts' when clicked)
+          </div>
+        </div>
+        <div class="box">
+          selected-row: {{ $.selectedrow }}
+          <br>
+          <bulma-table class="is-bordered" bind="$.data" selected.bindpath="$.selectedrow" rowkey="* lambda('k' + @row.x)">
+            <bulma-col label="#">
+              {{ @rownum + 1 }}
+            </bulma-col>
+            <bulma-col label="X" bind="@row.x"></bulma-col>
+            <bulma-col>
+              <h-fragment slot="label">hello<span style="color:blue">!!</span></h-fragment>
+              squared={{ @row.y }}
+            </bulma-col>
+          </bulma-table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <define-component name="menu-item">
+    <html-li automerge="@style|class">
+      <a automerge="anchor@style|class" class.is-active="* $args.selected == $args.value" click.handler="$args.selected = $args.value">
+        <h-children bind="@children"></h-children>
+      </a>
+    </html-li>
+  </define-component>
+
+  <define-component name="menu">
+    <html-ul class="menu-list" automerge="@class|style">
+      <h-children bind="@children.tags" inject:selected="*$args.selected"></h-children>
+    </html-ul>
+  </define-component>
+</body>

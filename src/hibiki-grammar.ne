@@ -57,12 +57,12 @@ let lexer = moo.states({
                         KW_NOATTR: "noattr",
                         KW_CALLHANDLER: "callhandler",
                         KW_SETRETURN: "setreturn",
+                        KW_RETURN: "return",
                         KW_INVALIDATE: "invalidate",
                         KW_FIRE: "fire",
                         KW_NOP: "nop",
                         KW_BUBBLE: "bubble",
                         KW_LOG: "log",
-                        KW_DEBUG: "debug",
                         KW_ALERT: "alert",
                         KW_EXPR: "expr",
                         KW_LOCAL: "local",
@@ -70,7 +70,12 @@ let lexer = moo.states({
                         KW_ELSE: "else",
                         KW_THROW: "throw",
                         KW_REF: "ref",
+                        KW_ISREF: "isref",
+                        KW_REFINFO: "refinfo",
+                        KW_RAW: "raw",
                         KW_IN: "in",
+                        KW_INVOKE: "invoke",
+                        KW_LAMBDA: "lambda",
                     }),
                   },
         LBRACK:   "[",
@@ -133,7 +138,7 @@ ext_fullExpr              -> fullExpr              {% id %}
 ext_statementBlock        -> statementBlock        {% id %}
 ext_callStatementNoAssign -> callStatementNoAssign {% id %}
 ext_contextAssignList     -> contextAssignList     {% id %}
-ext_fullPathExpr          -> fullPathExpr          {% id %}
+ext_refAttribute          -> refAttribute          {% id %}
 ext_pathExprNonTerm       -> pathExprNonTerm       {% id %}
 ext_iteratorExpr          -> iteratorExpr          {% id %}
 
@@ -179,16 +184,18 @@ statement ->
     | fireStatement         {% id %}
     | bubbleStatement       {% id %}
     | logStatement          {% id %}
-    | debugStatement        {% id %}
     | alertStatement        {% id %}
     | exprStatement         {% id %}
     | throwStatement        {% id %}
-    | setReturnStatement    {% id %}
+    | returnStatement       {% id %}
     | nopStatement          {% id %}
 
 throwStatement -> %KW_THROW callParamsSingle {% (data) => ({actiontype: "throw", data: data[1]}) %}
 
-setReturnStatement -> %KW_SETRETURN %LPAREN fullExpr %RPAREN {% (data) => ({actiontype: "setreturn", data: data[2]}) %}
+returnStatement -> 
+      %KW_SETRETURN %LPAREN fullExpr %RPAREN {% (data) => ({actiontype: "setreturn", data: data[2], exithandler: false}) %}
+    | %KW_RETURN %LPAREN fullExpr:? %RPAREN {% (data) => ({actiontype: "setreturn", data: data[2], exithandler: true}) %}
+    | %KW_RETURN {% (data) => ({actiontype: "setreturn", data: null, exithandler: true}) %}
 
 ifStatement -> %KW_IF %LPAREN fullExpr %RPAREN %LBRACE statementBlock %RBRACE (%KW_ELSE %LBRACE statementBlock %RBRACE):? {% (data) => {
         let rtn = {actiontype: "ifblock", data: data[2], actions: {}};
@@ -259,17 +266,19 @@ namedParamList -> namedParamPart (%COMMA namedParamPart):*   {% (data) => {
 
 namedCallParams -> 
       null                   {% (data) => { return null; } %}
-    | %LPAREN %RPAREN        {% (data) => { return null; } %}
-    | %LPAREN literalArrayElements %RPAREN {% (data) => {
-          let arrData = {etype: "array", exprs: data[1]};
+    | %LPAREN innerNamedCallParams:? %RPAREN {% (data) => { return data[1]; } %}
+
+innerNamedCallParams ->
+      literalArrayElements {% (data) => {
+          let arrData = {etype: "array", exprs: data[0]};
           let argsExpr = {etype: "kv", key: {etype: "literal", val: "*args"}, valexpr: arrData};
           let mapData = {etype: "map", exprs: [argsExpr]};
           return mapData;
       } %}
-    | %LPAREN namedParamList %RPAREN {% (data) => { return data[1]; } %}
-    | %LPAREN literalArrayElementsNoComma %COMMA namedParamList %RPAREN {% (data) => {
-          let arrData = {etype: "array", exprs: data[1]};
-          let mapData = data[3];
+    | namedParamList {% (data) => { return data[0]; } %}
+    | literalArrayElementsNoComma %COMMA namedParamList {% (data) => {
+          let arrData = {etype: "array", exprs: data[0]};
+          let mapData = data[2];
           let argsExpr = {etype: "kv", key: {etype: "literal", val: "*args"}, valexpr: arrData};
           mapData.exprs.push(argsExpr);
           return mapData;
@@ -319,11 +328,9 @@ fireStatement ->
         return rtn;
     } %}
 
-logStatement -> %KW_LOG callParams {% (data) => ({actiontype: "log", data: {etype: "array", exprs: data[1]}}) %}
+logStatement -> %KW_LOG namedCallParams {% (data) => ({actiontype: "log", data: data[1]}) %}
 
-debugStatement -> %KW_DEBUG callParams {% (data) => ({actiontype: "log", debug: true, data: {etype: "array", exprs: data[1]}}) %}
-
-alertStatement -> %KW_ALERT callParams {% (data) => ({actiontype: "log", alert: true, data: {etype: "array", exprs: data[1]}}) %}
+alertStatement -> %KW_ALERT namedCallParams {% (data) => ({actiontype: "log", alert: true, data: data[1]}) %}
 
 # [setop : string, PathType]
 lvalue ->
@@ -336,12 +343,15 @@ lvalue ->
     } %}
 
 # PathType
-lvaluePath -> pathExprNonTerm {% (data) => { return data[0].path } %}
+lvaluePath -> pathExprNonTerm {% (data) => data[0].path %}
+
+refAttribute -> fullPathExpr {% (data) => ({etype: "ref", pathexpr: data[0]}) %}
 
 fullPathExpr -> ternaryPathExpr {% id %}
 
 ternaryPathExpr ->
       %KW_NOATTR         {% (data) => ({etype: "noattr"}) %}
+    | %KW_NULL           {% (data) => ({etype: "literal", val: null}) %}
     | pathExprNonTerm    {% id %}
     | fullExpr %QUESTION fullPathExpr %COLON fullPathExpr {% (data) => {
           return {etype: "op", op: "?:", exprs: [data[0], data[2], data[4]]};
@@ -406,6 +416,9 @@ primaryExpr ->
     | literalArray    {% id %}
     | literalMap      {% id %}
     | fnExpr          {% id %}
+    | invokeExpr      {% id %}
+    | lambdaExpr      {% id %}
+    | refExpr         {% id %}
     | %LPAREN fullExpr %RPAREN {% (data) => data[1] %}
     | pathExprNonTerm {% id %}
 
@@ -414,7 +427,24 @@ fnExpr ->
       %FN %LPAREN optionalLiteralArrayElements %RPAREN {% (data) => {
           return {etype: "fn", fn: data[0].value, exprs: data[2]};
       } %}
-    | %KW_REF %LPAREN lvaluePath %RPAREN {% (data) => ({etype: "ref", path: data[2]}) %}
+
+refExpr -> 
+      %KW_REF %LPAREN fullPathExpr %RPAREN {% (data) => ({etype: "ref", pathexpr: data[2]}) %}
+    | %KW_ISREF %LPAREN fullExpr %RPAREN {% (data) => ({etype: "isref", exprs: [data[2]]}) %}
+    | %KW_REFINFO %LPAREN fullExpr %RPAREN {% (data) => ({etype: "refinfo", exprs: [data[2]]}) %}
+    | %KW_RAW %LPAREN fullPathExpr %RPAREN {% (data) => ({etype: "raw", exprs: [data[2]]}) %}
+
+invokeExpr -> %KW_INVOKE %LPAREN fullExpr (%COMMA innerNamedCallParams):? %RPAREN {% (data) => {
+          let rtn = {etype: "invoke", exprs: [data[2]]};
+          if (data[3] != null) {
+              rtn.exprs.push(data[3][1]);
+          }
+          return rtn;
+      } %}
+
+lambdaExpr -> %KW_LAMBDA %LPAREN fullExpr %RPAREN {% (data) => {
+          return {etype: "lambda", exprs: [data[2]]};
+      } %}
 
 literalArray ->
       %LBRACK optionalLiteralArrayElements %RBRACK {% (data) => {
@@ -540,19 +570,24 @@ idOrKeyword ->
     | %KW_NOP    {% id %}
     | %KW_BUBBLE {% id %}
     | %KW_LOG    {% id %}
-    | %KW_DEBUG  {% id %}
     | %KW_ALERT  {% id %}
     | %KW_EXPR   {% id %}
     | %KW_LOCAL  {% id %}
     | %KW_IF     {% id %}
     | %KW_ELSE   {% id %}
     | %KW_THROW  {% id %}
+    | %KW_RAW    {% id %}
     | %KW_REF    {% id %}
+    | %KW_ISREF  {% id %}
+    | %KW_REFINFO     {% id %}
     | %KW_SETRETURN   {% id %}
+    | %KW_RETURN      {% id %}
     | %KW_INVALIDATE  {% id %}
     | %KW_CALLHANDLER {% id %}
     | %KW_NAVTO       {% id %}
     | %KW_IN          {% id %}
+    | %KW_INVOKE      {% id %}
+    | %KW_LAMBDA      {% id %}
 
 _ -> %WS:*
 

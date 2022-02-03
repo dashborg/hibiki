@@ -50,7 +50,7 @@
     </div>
 
     <div class="box">
-      <button class="button is-danger" click.handler="https://testapi.hibikihtml.com/api/notfound; $.clicked = true;" error.handler="$.error=@error; debug('simple')">Simple Error Handler</button>
+      <button class="button is-danger" click.handler="https://testapi.hibikihtml.com/api/notfound; $.clicked = true;" error.handler="$.error=@error; log('simple', @debug=true)">Simple Error Handler</button>
       <p>Clicked = {{ $.clicked }} (should stay null after click)</p>
     </div>
 

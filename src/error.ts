@@ -3,7 +3,7 @@
 import {v4 as uuidv4} from 'uuid';
 import type {DataEnvironment} from "./state";
 import {sprintf} from "sprintf-js";
-import type {HibikiNode} from "./types";
+import type {HibikiNode} from "./html-parser";
 
 type RtContextItem = {
     desc : string,
@@ -137,6 +137,15 @@ class RtContext {
     }
 }
 
+const ERROR_ALLOWED_GETTERS : Record<string, boolean> = {
+    "event": true,
+    "node": true,
+    "context": true,
+    "stack": true,
+    "jsstack": true,
+    "message": true,
+};
+
 class HibikiError {
     _type : "HibikiError";
     message : string;
@@ -150,6 +159,10 @@ class HibikiError {
         if (rtctx != null) {
             this.rtctx = rtctx.copy();
         }
+    }
+
+    allowedGetters(key : string) : boolean {
+        return ERROR_ALLOWED_GETTERS[key];
     }
 
     get event() : string {

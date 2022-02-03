@@ -5,6 +5,11 @@
     {"color": "blue", "name": "mike", "PI": 3.14159, "x": 55, "idx": 2, "arr": [1,1,2,3,5,8],
     "point": {"x": 5, "y": 2}, "fruits1": ["apple"]}
   </hibiki-data>
+  <define-handler name="//@event/init">
+    $.noattr = noattr;
+    $.lv = ref($.point);
+    $.fn = lambda(@v ? 'v-true' : 'v-false');
+  </define-handler>
   <div class="container m-4" style="min-width: 1400px;">
     <h1 class="title">Test Basic</h1>
     <div class="box">
@@ -76,7 +81,7 @@
           <td slot="test" innerhtml>
             {{ {x: 55, "name": "mike"} }}
           </td>
-          <td slot="result">[Object object]</td>
+          <td slot="result">[object]</td>
         </tr>
         <tr component="local-test-tr">
           <td slot="test" innerhtml>
@@ -94,6 +99,24 @@
   "name": "mike"
 }</pre>
           </td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{ noattr }} | {{ $.noattr.foo | format("json-noresolve") }} | {{ !!noattr }}
+          </td>
+          <td slot="result">null | "[noattr]" | false</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{ $.lv }} | {{ $.lv.x }}
+          </td>
+          <td slot="result">[object] | 5</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{ invoke($.fn) }} | {{ invoke($.fn, v=true) }}
+          </td>
+          <td slot="result">v-false | v-true</td>
         </tr>
       </table>
     </div>

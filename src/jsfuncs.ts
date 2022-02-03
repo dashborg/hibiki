@@ -1,10 +1,11 @@
 // Copyright 2021-2022 Dashborg Inc
 
 import * as mobx from "mobx";
-import type {JSFuncType} from "./types";
+import type {JSFuncType, HibikiVal} from "./types";
 import {sprintf} from "sprintf-js";
 import {isObject, addToArrayDupCheck, removeFromArray} from "./utils";
 import {v4 as uuidv4} from 'uuid';
+import * as DataCtx from "./datactx";
 
 let DefaultJSFuncs : Record<string, JSFuncType> = {};
 
@@ -316,6 +317,14 @@ function jsUuid() : string {
     return uuidv4();
 }
 
+function jsTypeOf(val : HibikiVal) : string {
+    return DataCtx.hibikiTypeOf(val);
+}
+
+function jsDeepEqual(val1 : HibikiVal, val2 : HibikiVal) : boolean {
+    return DataCtx.DeepEqual(val1, val2);
+}
+
 reg("len", jsLen, true);
 reg("indexof", jsIndexOf, true);
 reg("min", jsMin, false);
@@ -351,6 +360,8 @@ reg("blobmimetype", jsBlobMimeType, true);
 reg("bloblen", jsBlobLen, true);
 reg("blobname", jsBlobName, true);
 reg("uuid", jsUuid, true);
+reg("typeof", jsTypeOf, true);
+reg("deepequal", jsDeepEqual, true);
 
 function reg(name : string, fn : any, native : boolean) {
     DefaultJSFuncs[name] = {fn, native};

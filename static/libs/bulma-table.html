@@ -1,0 +1,26 @@
+<define-library name="bulma-table">
+  <define-component name="table">
+    <html-table automerge="@class|style" class="table">
+      <html-thead>
+        <html-tr>
+          <h-children bind="@children.bycomp['bulma-table:col']" datacontext="@header=true"></h-children>
+        </html-tr>
+      </html-thead>
+      <html-tbody>
+        <html-tr foreach="(@row, @rownum) in $args.bind" click.handler="$args.selected = invoke($args.rowkey)" class.is-selected="* $args.selected != null && $args.selected == invoke($args.rowkey)">
+          <h-children bind="@children.bycomp['bulma-table:col']" datacontext="@header=false; @row=@row; @rownum=@rownum;" inject:rowkey="*$args.rowkey"></h-children>
+        </html-tr>
+      </html-tbody>
+    </html-table>
+    <pre>{{ $args | format("json") }}</pre>
+  </define-component>
+
+  <define-component name="col">
+    <html-th if="@header">
+      <h-children text="*$args.label" bind="@children.byslot.label"></h-children>
+    </html-th>
+    <html-td if="!@header" automerge="@class|style">
+      <h-children text="*$args.bind" bind="@children.noslot"></h-children>
+    </html-td>
+  </define-component>
+</define-library>

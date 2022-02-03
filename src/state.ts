@@ -5,9 +5,10 @@ import md5 from "md5";
 import {sprintf} from "sprintf-js";
 import {boundMethod} from 'autobind-decorator'
 import {v4 as uuidv4} from 'uuid';
-import type {HibikiNode, ComponentType, LibraryType, HibikiConfig, HibikiHandlerModule, HibikiAction, EventType, HandlerValType, JSFuncType, Hibiki, ErrorCallbackFn, HtmlParserOpts, HandlerBlock, NodeAttrType, HibikiVal, HibikiValObj, HibikiValEx} from "./types";
+import type {ComponentType, LibraryType, HibikiConfig, HibikiHandlerModule, HibikiAction, EventType, HandlerValType, JSFuncType, Hibiki, ErrorCallbackFn, HtmlParserOpts, HandlerBlock, HibikiVal, HibikiValObj} from "./types";
+import type {HibikiNode, NodeAttrType} from "./html-parser";
 import * as DataCtx from "./datactx";
-import {isObject, textContent, SYM_PROXY, SYM_FLATTEN, nodeStr, callHook, getHibiki, parseHandler, fullPath, parseUrlParams, smartDecodeParams, blobPrintStr, unbox, bindLibContext} from "./utils";
+import {isObject, textContent, SYM_PROXY, SYM_FLATTEN, nodeStr, callHook, getHibiki, parseHandler, fullPath, parseUrlParams, smartDecodeParams, unbox, bindLibContext} from "./utils";
 import {subNodesByTag, firstSubNodeByTag} from "./nodeutils";
 import {RtContext, HibikiError} from "./error";
 import {HibikiRequest} from "./request";
@@ -46,8 +47,8 @@ function eventBubbles(event : string) : boolean {
 }
 
 type DataEnvironmentOpts = {
-    componentRoot? : HibikiVal,
-    argsRoot? : Record<string, HibikiValEx>,
+    componentRoot? : HibikiValObj,
+    argsRoot? : HibikiValObj,
     description? : string,
     handlers? : Record<string, HandlerValType>,
     htmlContext? : string,
@@ -61,8 +62,8 @@ class DataEnvironment {
     dbstate : HibikiState;
     specials : Record<string, any>;
     handlers : Record<string, HandlerValType>;
-    componentRoot : HibikiVal;
-    argsRoot? : Record<string, HibikiValEx>;
+    componentRoot : HibikiValObj;
+    argsRoot? : HibikiValObj;
     htmlContext : string;
     libContext : string;
     description : string;
@@ -134,7 +135,7 @@ class DataEnvironment {
         return rtn;
     }
 
-    resolveRoot(rootName : string, opts?: {caret? : number}) : HibikiVal | Record<string, HibikiValEx> {
+    resolveRoot(rootName : string, opts?: {caret? : number}) : HibikiValObj | HibikiVal[] {
         opts = opts || {};
         if (opts.caret != null && opts.caret < 0 || opts.caret > 1) {
             throw new Error("Invalid caret value, must be 0 or 1");
@@ -290,6 +291,9 @@ class DataEnvironment {
         let evHandlerName = sprintf("//@event/%s", event.event);
         if ((evHandlerName in env.handlers) && !rtctx.isHandlerInStack(env, event.event)) {
             let hval = env.handlers[evHandlerName];
+            if (hval.boundDataenv != null) {
+                return {handler: hval.block, node: hval.node, dataenv: hval.boundDataenv};
+            }
             return {handler: hval.block, node: hval.node, dataenv: env};
         }
         if (env.parent == null) {
@@ -318,7 +322,7 @@ class DataEnvironment {
         return this.parent.getContextKey(contextkey);
     }
 
-    getComponentRoot() : HibikiVal {
+    getComponentRoot() : HibikiValObj {
         if (this.componentRoot != null) {
             return this.componentRoot;
         }
@@ -328,7 +332,7 @@ class DataEnvironment {
         return this.parent.getComponentRoot();
     }
 
-    getArgsRoot() : Record<string, HibikiValEx> {
+    getArgsRoot() : Record<string, HibikiVal> {
         if (this.argsRoot != null) {
             return this.argsRoot;
         }
@@ -403,7 +407,7 @@ class ComponentLibrary {
         this.srcUrlToLibNameMap = new Map();
     }
 
-    addLibrary(libObj : LibraryType) {
+    addLibrary(libObj : LibraryType) : void {
         this.libs[libObj.name] = libObj;
     }
 
@@ -415,7 +419,7 @@ class ComponentLibrary {
         return sprintf("%s(%s)", libName, libObj.url);
     }
 
-    registerLocalJSHandler(libName : string, handlerName : string, fn : (HibikiRequest) => any) {
+    registerLocalJSHandler(libName : string, handlerName : string, fn : (req : HibikiRequest) => any) : void {
         let libObj = this.libs[libName];
         if (libObj == null) {
             console.log("Hibiki registerLocalHandler library '%s' not found", libName);
@@ -424,7 +428,7 @@ class ComponentLibrary {
         libObj.localHandlers[handlerName] = fn;
     }
 
-    registerModule(libName : string, moduleName : string, module : HibikiHandlerModule) {
+    registerModule(libName : string, moduleName : string, module : HibikiHandlerModule) : void {
         let libObj = this.libs[libName];
         if (libObj == null) {
             console.log("Hibiki registerModule library '%s' not found", libName);
@@ -433,7 +437,7 @@ class ComponentLibrary {
         libObj.modules[moduleName] = module;
     }
 
-    registerReactComponentImpl(libName : string, componentName : string, impl : any) {
+    registerReactComponentImpl(libName : string, componentName : string, impl : any) : void {
         let libObj = this.libs[libName];
         if (libObj == null) {
             console.log("Hibiki registerReactComponentImpl library '%s' not found", libName);
@@ -451,7 +455,7 @@ class ComponentLibrary {
         ctype.reactimpl.set(impl);
     }
 
-    registerNativeComponentImpl(libName : string, componentName : string, impl : any) {
+    registerNativeComponentImpl(libName : string, componentName : string, impl : any) : void {
         let libObj = this.libs[libName];
         if (libObj == null) {
             console.log("Hibiki registerNativeComponentImpl library '%s' not found", libName);
@@ -524,7 +528,7 @@ class ComponentLibrary {
         return libObj.modules[moduleName];
     }
 
-    removeModule(moduleName : string, libContext : string) {
+    removeModule(moduleName : string, libContext : string) : void {
         let libObj = this.libs[libContext];
         if (libObj == null) {
             return null;
@@ -532,7 +536,7 @@ class ComponentLibrary {
         delete libObj.modules[moduleName];
     }
 
-    addModule(moduleName : string, module : HibikiHandlerModule, libContext : string) {
+    addModule(moduleName : string, module : HibikiHandlerModule, libContext : string) : void {
         let libObj = this.libs[libContext];
         if (libObj == null) {
             return null;
@@ -540,7 +544,7 @@ class ComponentLibrary {
         libObj.modules[moduleName] = module;
     }
 
-    makeLocalModule(libContext : string, libName : string, prefix : string) {
+    makeLocalModule(libContext : string, libName : string, prefix : string) : void {
         if (libContext == null) {
             throw new Error("null libContext in makeLocalModule");
         }
@@ -605,7 +609,7 @@ class ComponentLibrary {
         let libPrintStr = sprintf("%s(%s)", libName, srcUrl);
         let parr = [];
         let scriptTags = subNodesByTag(libNode, "script");
-        let srcs = [];
+        let srcs : string[] = [];
         for (let i=0; i<scriptTags.length; i++) {
             let stag = scriptTags[i];
             let attrs = NodeUtils.getRawAttrs(stag);
@@ -680,10 +684,10 @@ class ComponentLibrary {
 
         // handlers
         if (libName == "main") {
-            libObj.handlers = NodeUtils.makeHandlers(libNode, libName, ["local", "event"]);
+            libObj.handlers = NodeUtils.makeHandlers(libNode, null, libName, ["local", "event"]);
         }
         else {
-            libObj.handlers = NodeUtils.makeHandlers(libNode, libName, ["lib"]);
+            libObj.handlers = NodeUtils.makeHandlers(libNode, null, libName, ["lib"]);
         }
 
         // modules
@@ -754,7 +758,7 @@ class ComponentLibrary {
         });
     }
 
-    importLibrary(libContext : string, libName : string, prefix : string, system? : boolean) {
+    importLibrary(libContext : string, libName : string, prefix : string, system? : boolean) : void {
         if (!system && (prefix == null || RESTRICTED_MODS[prefix])) {
             throw new Error(sprintf("Cannot import library with reserved '%s' prefix", prefix));
         }
@@ -796,22 +800,22 @@ class HibikiExtState {
         this.state = state;
     }
 
-    initialize(force : boolean) {
+    initialize(force : boolean) : void {
         this.state.initialize(force);
     }
 
-    setHtml(html : string | HTMLElement) {
+    setHtml(html : string | HTMLElement) : void {
         let htmlObj = parseHtml(html);
         bindLibContext(htmlObj, "main");
         this.state.setHtml(htmlObj);
     }
 
-    setData(path : string, data : any) {
+    setData(path : string, data : any) : void {
         let dataenv = this.state.rootDataenv();
         dataenv.setDataPath(path, data, "HibikiExtState.setDataPath");
     }
 
-    getData(path : string) : any {
+    getData(path : string) : HibikiVal {
         let dataenv = this.state.rootDataenv();
         return dataenv.resolvePath(path, {keepMobx: false, rtContext: "HibikiExtState.getData"});
     }
@@ -829,7 +833,7 @@ class HibikiExtState {
         return this.state.executeHandlerBlock({hibikiactions: actions}, pure);
     }
 
-    setPageName(pageName : string) {
+    setPageName(pageName : string) : void {
         this.state.setPageName(pageName);
     }
 
@@ -868,8 +872,8 @@ class HibikiState {
     ComponentLibrary : ComponentLibrary;
     Initialized : mobx.IObservableValue<boolean> = mobx.observable.box(false, {name: "Initialized"});
     RenderVersion : mobx.IObservableValue<number> = mobx.observable.box(0, {name: "RenderVersion"});
-    DataNodeStates = {};
-    ResourceCache = {};
+    DataNodeStates : Record<string, {query : string, dnstate : any}> = {};
+    ResourceCache : Record<string, boolean> = {};
     HasRendered = false;
     NodeDataMap : Map<string, mobx.IObservableValue<HibikiVal>> = new Map();  // TODO clear on unmount
     ExtHtmlObj : mobx.ObservableMap<string,any> = mobx.observable.map({}, {name: "ExtHtmlObj", deep: false});
@@ -997,7 +1001,7 @@ class HibikiState {
         return new HibikiExtState(this);
     }
 
-    @mobx.action setPageName(pageName : string) {
+    @mobx.action setPageName(pageName : string) : void {
         this.PageName.set(pageName);
     }
 
@@ -1071,8 +1075,8 @@ class HibikiState {
         let htmlContext = sprintf("<page %s>", this.PageName.get());
         let opts = {eventBoundary: "hard", htmlContext: htmlContext, libContext: "main", handlers: {}};
         let curPage = this.findCurrentPage();
-        let h1 = NodeUtils.makeHandlers(curPage, "main", ["event", "local"]);
-        let h2 = NodeUtils.makeHandlers(this.HtmlObj.get(), "main", ["event", "local"]);
+        let h1 = NodeUtils.makeHandlers(curPage, null, "main", ["event", "local"]);
+        let h2 = NodeUtils.makeHandlers(this.HtmlObj.get(), null, "main", ["event", "local"]);
         opts.handlers = Object.assign({}, h2, h1);
         env = env.makeChildEnv(null, opts);
         return env;
