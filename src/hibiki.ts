@@ -12,7 +12,8 @@ import {deepTextContent, evalDeepTextContent, isObject, bindLibContext} from "./
 import merge from "lodash/merge";
 import type {HibikiConfig, Hibiki, HibikiExtState, ReactClass, LibraryType} from "./types";
 import type {HibikiNode} from "./html-parser";
-import {LocalModule, HttpModule, LibModule, HibikiModule} from "./modules";
+import {LocalModule, HttpModule, LibModule} from "./modules";
+import {HibikiModule} from "./hibiki-module";
 
 declare var window : any;
 

@@ -2273,7 +2273,7 @@ function RequestFromAction(action : HAction, pure : boolean, dataenv : DataEnvir
     if (action.actiontype !== "callhandler") {
         throw new Error(sprintf("Cannot create HibikiRequest from actiontype: '%s'", action.actiontype));
     }
-    let req = new HibikiRequest(dataenv.dbstate.getExtState());
+    let req = new HibikiRequest(dataenv.dbstate.getExtState(), dataenv);
     let fullData : HibikiValObj = demobx(evalExprAst(action.data, dataenv, "resolve")) as HibikiValObj;
     if (fullData != null && !isObject(fullData)) {
         throw new Error(sprintf("HibikiAction 'callhandler' data must be null or an object, cannot be '%s'", hibikiTypeOf(fullData)));

@@ -3,6 +3,7 @@
 import {v4 as uuidv4} from 'uuid';
 import type {RtContext} from "./error";
 import type {HibikiAction, HibikiExtState, HandlerPathType, HibikiValObj} from "./types";
+import type {DataEnvironment} from "./state";
 
 class HibikiRequest {
     reqid : string;
@@ -10,13 +11,15 @@ class HibikiRequest {
     data : HibikiValObj;
     rtContext : RtContext;
     state : HibikiExtState;
+    dataenv : DataEnvironment;
     pure : boolean;
     actions : HibikiAction[];
     libContext : string;
 
-    constructor(state : HibikiExtState) {
+    constructor(state : HibikiExtState, dataenv : DataEnvironment) {
         this.reqid = uuidv4();
         this.state = state;
+        this.dataenv = dataenv;
         this.actions = [];
     }
 

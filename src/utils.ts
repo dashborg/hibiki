@@ -773,5 +773,19 @@ function nsAttrName(attrName : string, ns : string) : string {
     return ns + ":" + attrName;
 }
 
-export {jsonRespHandler, parseUrlParams, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy, valInArray, rawAttrFromNode, STYLE_UNITLESS_NUMBER, subMapKey, subArrayIndex, unbox, splitTrim, bindLibContext, unpackPositionalArgArray, cnArrToClassAttr, classStringToCnArr, isClassStringLocked, joinClassStrs, attrBaseName, cnArrToLosslessStr, parseAttrName, nsAttrName};
+function urlSameOrigin(urlStr : string) {
+    let url = new URL(urlStr, window.location.href);
+    return url.origin == window.location.origin;
+}
+
+function validateModulePath(modName : string, hpath : HandlerPathType) {
+    if (hpath.url.startsWith("http://") || hpath.url.startsWith("https://") || hpath.url.startsWith("//") || !urlSameOrigin(hpath.url)) {
+        throw new Error(sprintf("Invalid %s module URL, must not specify a protocol or host: %s", modName, fullPath(hpath)));
+    }
+    if (!hpath.url.startsWith("/")) {
+        throw new Error(sprintf("Invalid %s module URL, must not specify a relative url: %s", modName, fullPath(hpath)));
+    }
+}
+
+export {jsonRespHandler, parseUrlParams, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy, valInArray, rawAttrFromNode, STYLE_UNITLESS_NUMBER, subMapKey, subArrayIndex, unbox, splitTrim, bindLibContext, unpackPositionalArgArray, cnArrToClassAttr, classStringToCnArr, isClassStringLocked, joinClassStrs, attrBaseName, cnArrToLosslessStr, parseAttrName, nsAttrName, validateModulePath};
 
