@@ -23,6 +23,7 @@ Breaking changes are marked with "(breaking)" below.
 * explicitly allow (or disallow) getters on special Hibiki objects using allowedGetters() - HibikiNode, ChildrenVar, and HibikiError
 * new special format 'json-noresolve' that shows internal Hibiki data structures (LValues, special objects, etc.)
 * explicit type for HibikiNode
+* wording updates to license to make it more clear
 * (breaking) removed 'h-dateformat' from core (removes dayjs dependency).  will re-add in separate library
 * (breaking) removed 'debug' statement, can use @debug on log statement (log statement now accepts named parameters)
 * (breaking) only allow references to $ and $c.  this affects some components that made explicit references to the $args root

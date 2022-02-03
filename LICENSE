@@ -13,21 +13,25 @@ included in all copies or substantial portions of the Software.
 
 2. You may not use this Software to make any product (commercial,
 free, or open-source), software-as-a-service (SaaS),
-platform-as-a-service (PaaS), or infrastructure-as-a-service (IaaS),
+platform-as-a-service (PaaS), infrastructure-as-a-service (IaaS),
 cloud marketplace offering, or similar product or service which allows
-a 3rd-party user or customer to build UI, customize UI, build
-functionality, or customize functionality within your offered product
-or service using the Hibiki HTML language or tags.
+a 3rd-party user or customer to use the Hibiki HTML language or tags
+to build UI, customize UI, build functionality, or customize
+functionality within your offered product or service ("Restricted Use").
 
-2a. This restriction does not apply for a product that is used
-internally and only customized by your own employees or contractors.
+2a. This restriction does not apply to a product that is only used for
+personal use or for the internal business operations of you and your
+company.
 
 2b. This restriction does not, and cannot apply to generic hosting
-services that do not integrate the Software or use the Hibiki HTML
-name directly.
+services, CDNs, editors, or playgrounds, unless they explicitly
+integrate the Software or use the Hibiki HTML name for marketing
+purposes.
 
-2c. As licensee of this software you are free to deploy, publish, and
-host your product anywhere without restriction.
+2c. When using this Software for a non-Restricted Use, you are
+always free to upload, publish, deploy, and host the Software
+(including source code, binaries, minified files, and any
+derived product) anywhere without restriction.
 
 For more information see: https://www.dashborg.net/static/hibiki-license.html
 
