@@ -11,7 +11,7 @@
   </define-component>
   <define-component name="bulma-emailinput">
     <div class="control has-icons-left has-icons-right">
-      <input class="input is-medium" type="email" placeholder="Email" value.bindpath="$.email" change.handler="fire->change(value=@value)">
+      <input class="input is-medium" type="email" placeholder="Email" value="*$args.value" change.handler="fire->change(value=@value)">
       <span class="icon is-left">
         <i class="fa fa-envelope"></i>
       </span>
@@ -138,7 +138,7 @@
 <pre class="codeblock">
 &lt;define-component name="bulma-emailinput">
   &lt;div class="control has-icons-left has-icons-right">
-    &lt;input class="input is-medium" type="email" placeholder="Email" value.bindpath="$args.value" change.handler="fire->change(value=@value)">
+    &lt;input class="input is-medium" type="email" placeholder="Email" value="*$args.value" change.handler="fire->change(value=@value)">
     &lt;span class="icon is-left">
       &lt;i class="fa fa-envelope">&lt;/i>
     &lt;/span>
