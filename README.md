@@ -19,7 +19,7 @@ For an interactive walkthrough please check out the
 * **Issue Tracker** https://github.com/dashborg/hibiki/issues
 * **Homepage** - https://hibikihtml.com
 * **Reference Documentation** - https://docs.hibikihtml.com
-* **Join Slack for Questions** - [Invite Link](https://join.slack.com/t/hibikihtml/shared_invite/zt-12chjq2j5-lBQ114i06ZQX0rV5hDsUBQ)
+* **Join Discord for Questions** - https://discord.gg/zbWV6ueED7
 
 ## Getting Started
 
@@ -244,7 +244,9 @@ Want to learn more?  Check out the [Interactive Tutorial](https://playground.hib
 
 The source code for Hibiki HTML is available on GitHub at at: https://github.com/dashborg/hibiki .  It is licensed under a modified form of the MIT license (similar in spirit to the Confluent open source license) which allows you to use Hibiki HTML without restrictions for almost all personal or commercial projects.
 
-You just can't create a SaaS service offering a hosted version of Hibiki HTML or one that uses the Hibiki HTML language to offer *3rd party* customizability for an existing product or service (see [LICENSE](https://github.com/dashborg/hibiki/blob/main/LICENSE)).
+You just can't create a SaaS service offering a hosted version of Hibiki HTML or one that allows 3rd party users or customers to use the Hibiki HTML language or tags to offer customizability for an existing product or service (see [LICENSE](https://github.com/dashborg/hibiki/blob/main/LICENSE)).
+
+Note that you are always free to copy the Hibiki source and minified builds to your own server, CDN, or hosting service.
 
 The Hibiki HTML license is *not* OSI approved.
 I know this is an ideological deal-breaker for some, but if you have a purely practical concern, I'm happy
@@ -261,12 +263,12 @@ The Hibiki HTML playground is built in Hibiki HTML, also using
 ## Support and Help
 
 Hibiki HTML is under active development.  Please contact me by email [mike (at) hibikihtml.com] 
-or on Slack if you have a question, to report a bug, need help, or would like to contribute.
+or on Discord if you have a question, to report a bug, need help, or would like to contribute.
 
 I'm excited to see Hibiki HTML working in the real world.  If you have an application that you're
 thinking about using Hibiki HTML for, please reach out.  I'm happy to help, build out additional
 functionality/components, or do team training.
 
-[Join the Hibiki HTML Slack Channel](https://join.slack.com/t/hibikihtml/shared_invite/zt-12chjq2j5-lBQ114i06ZQX0rV5hDsUBQ
-)
+[Join the Hibiki HTML Discord Server](https://discord.gg/zbWV6ueED7)
+
 
