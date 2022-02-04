@@ -573,8 +573,7 @@ class ComponentLibrary {
                 throw new Error(sprintf("Bad fetch response for library url '%s', non-text mime-type: '%s'", srcUrl, ctype));
             }
             return resp.text();
-        })
-        .then((rtext) => {
+        }).then((rtext) => {
             let defNode = parseHtml(rtext, null, {});
             libNode = firstSubNodeByTag(defNode, "define-library");
             if (libNode == null) {
@@ -586,9 +585,11 @@ class ComponentLibrary {
             libName = DataCtx.rawAttrStr(libNode.attrs.name);
             bindLibContext(libNode, libName);
             return null;
-        })
-        .then(() => {
+        }).then(() => {
             return this.buildLibrary(libName, libNode, srcUrl, false);
+        }).catch((e) => {
+            e.message = sprintf("Error importing Hibiki Library \"%s\": %s", srcUrl, e.message);
+            throw e;
         });
         return p;
     }
