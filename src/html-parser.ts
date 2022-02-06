@@ -71,6 +71,7 @@ class HibikiNode {
 const PARSED_ATTRS = {
     "bind": true,
     "if": true,
+    "unwrap": true,
     "foreach": true,
     "condition": true,
     "automerge": true,
@@ -79,6 +80,7 @@ const PARSED_ATTRS = {
 const NON_BINDABLE_ATTRS = {
     "bind": true,
     "if": true,
+    "unwrap": true,
     "foreach": true,
     "condition": true,
     "automerge": true,

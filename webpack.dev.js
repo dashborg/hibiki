@@ -3,6 +3,7 @@ const merge = require('webpack-merge');
 const common = require('./webpack.common.js');
 const path = require('path');
 const CopyPlugin = require("copy-webpack-plugin");
+const VERSION = "v0.2.1";
 
 var merged = merge.merge(common, {
     mode: "development",
@@ -22,7 +23,7 @@ var merged = merge.merge(common, {
 });
 
 var definePlugin = new webpack.DefinePlugin({
-    __HIBIKIVERSION__: JSON.stringify("v0"),
+    __HIBIKIVERSION__: JSON.stringify(VERSION),
     __HIBIKIBUILD__: JSON.stringify("devbuild"),
 });
 merged.plugins.push(definePlugin);

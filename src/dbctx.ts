@@ -591,6 +591,17 @@ class DBCtx {
         return this.handleEvent("mount", context);
     }
 
+    @boundMethod handleInitEvent() : Promise<any> {
+        if (!this.hasHandler("init")) {
+            return null;
+        }
+        let context = {
+            innerhtml: this.node.innerhtml,
+            outerhtml: this.node.outerhtml,
+        };
+        return this.handleEvent("init", context);
+    }
+
     @boundMethod handleEvent(event : string, datacontext? : Record<string, any>) : Promise<any> {
         if (this.isEditMode()) {
             return null;

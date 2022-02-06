@@ -6,7 +6,7 @@ const LodashModuleReplacementPlugin = require('lodash-webpack-plugin');
 const TerserPlugin = require("terser-webpack-plugin");
 const moment = require("dayjs");
 const fs = require("fs");
-const VERSION = "v0.2.0";
+const VERSION = "v0.2.1";
 
 function makeBuildStr() {
     let buildStr = moment().format("YYYYMMDD-HHmmss");

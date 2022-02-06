@@ -1,5 +1,14 @@
 # Change Log
 
+## v0.2.1
+
+* 'unwrap' attribute to remove an enclosing tag and just render its children as a fragment
+* allow &lt;define-vars&gt; to receive context as a text node
+* dev builds report a version number
+* custom nodes fire an internal 'init' event when first created (before rendering)
+* do not throw an error when setting a read-only value (silently ignore) -- e.g. setting value in args root
+* h-text will show '[noattr]' when printing noattr value instead of null
+
 ## v0.2.0
 
 Large updates behind the scenes to make the Hibiki HTML data model more consistent.

@@ -787,5 +787,34 @@ function validateModulePath(modName : string, hpath : HandlerPathType) {
     }
 }
 
+function compareVersions(v1 : string, v2 : string) : number {
+    if (v1 === v2) {
+        return 0;
+    }
+    if (v1 === "devbuild") {
+        return 1;
+    }
+    if (v2 === "devbuild") {
+        return -1;
+    }
+    let match1 = v1.match(/^v(\d+)\.(\d+)\.(\d+)$/);
+    if (match1 == null) {
+        throw new Error("Invalid Version: " + v1);
+    }
+    let match2 = v2.match(/^v(\d+)\.(\d+)\.(\d+)$/);
+    if (match2 == null) {
+        throw new Error("Invalid Version: " + v2);
+    }
+    let m1num = parseInt(match1[1])*10000 + parseInt(match1[2])*100 + parseInt(match1[3]);
+    let m2num = parseInt(match2[1])*10000 + parseInt(match2[2])*100 + parseInt(match2[3]);
+    if (m1num > m2num) {
+        return 1;
+    }
+    if (m1num < m2num) {
+        return -1;
+    }
+    return 0;
+}
+
 export {jsonRespHandler, parseUrlParams, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy, valInArray, rawAttrFromNode, STYLE_UNITLESS_NUMBER, subMapKey, subArrayIndex, unbox, splitTrim, bindLibContext, unpackPositionalArgArray, cnArrToClassAttr, classStringToCnArr, isClassStringLocked, joinClassStrs, attrBaseName, cnArrToLosslessStr, parseAttrName, nsAttrName, validateModulePath};
 

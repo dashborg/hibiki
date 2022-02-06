@@ -171,7 +171,10 @@ function renderTextSpan(text : string, style : any, className : string) : any {
 function renderTextData(ctx : DBCtx, onlyText? : boolean) : any {
     let style = ctx.resolveStyleMap();
     let cnArr = ctx.resolveCnArray();
-    let bindVal = ctx.resolveAttrVal("bind");
+    let [bindVal, exists] = ctx.resolveAttrValPair("bind");
+    if (!exists) {
+        bindVal = DataCtx.SYM_NOATTR;
+    }
     let rtn : string = null;
     let nullTextAttr : string = null;
     if (bindVal == null) {

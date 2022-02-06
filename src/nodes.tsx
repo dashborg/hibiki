@@ -52,14 +52,14 @@ class HibikiRootNode extends React.Component<{hibikiState : HibikiExtState}, {}>
         let flowerEmoji = String.fromCodePoint(0x1F338);
         if (dbstate.allowUsageImg() && !usageFired) {
             usageFired = true;
-            let versionStr = (getHibiki().BUILD === "devbuild" ? "devbuild" : getHibiki().VERSION + "|" + getHibiki().BUILD);
+            let versionStr = getHibiki().VERSION + "|" + getHibiki().BUILD;
             let usageImg = new Image();
             usageImg.src = sprintf("https://hibikihtml.com/hibiki-usage.gif?version=%s&build=%s", getHibiki().VERSION, getHibiki().BUILD);
             usageImg.onload = function() {};
         }
         if (dbstate.allowWelcomeMessage() && !welcomeMessage) {
             welcomeMessage = true;
-            let versionStr = (getHibiki().BUILD === "devbuild" ? "devbuild" : getHibiki().VERSION + " " + getHibiki().BUILD);
+            let versionStr = getHibiki().VERSION + " " + getHibiki().BUILD;
             console.log(flowerEmoji + sprintf(" Hibiki HTML https://github.com/dashborg/hibiki [%s] | Developed by Dashborg Inc https://dashborg.net", versionStr));
         }
     }
@@ -126,6 +126,12 @@ function baseRenderOneNode(node : HibikiNode, dataenv : DataEnvironment, injecte
     else if (node.tag == "define-vars") {
         let setCtx = makeCustomDBCtx(node, dataenv, null);
         let contextAttr = setCtx.resolveAttrStr("context");
+        if (contextAttr == null) {
+            contextAttr = textContent(node).trim();
+            if (contextAttr === "") {
+                contextAttr = null;
+            }
+        }
         if (contextAttr == null) {
             return [<ErrorMsg message="<define-vars> no context attribute"/>, false, null];
         }
@@ -233,6 +239,10 @@ class AnyNode extends React.Component<HibikiReactProps, {}> {
         if (tagName.startsWith("hibiki-")) {
             return null;
         }
+        let dataenv = ctx.dataenv;
+        let dbstate = dataenv.dbstate;
+        let compName = ctx.resolveAttrStr("component") ?? tagName;
+        let component = dbstate.ComponentLibrary.findComponent(compName, node.libContext);
         if (!ctx.isEditMode()) {
             if (!iterating && node.foreachAttr != null) {
                 return this.renderForeach(ctx);
@@ -244,11 +254,14 @@ class AnyNode extends React.Component<HibikiReactProps, {}> {
                     return null;
                 }
             }
+            let unwrapExists = ctx.hasRawAttr("unwrap");
+            if (unwrapExists) {
+                let unwrapAttrVal = DataCtx.resolveLValue(ctx.resolveAttrVal("unwrap"));
+                if (unwrapAttrVal) {
+                    return <FragmentNode component={component} node={node} dataenv={dataenv} injectedAttrs={ctx.injectedAttrs}/>;
+                }
+            }
         }
-        let dataenv = ctx.dataenv;
-        let dbstate = dataenv.dbstate;
-        let compName = ctx.resolveAttrStr("component") ?? tagName;
-        let component = dbstate.ComponentLibrary.findComponent(compName, node.libContext);
         if (component != null) {
             if (component.componentType == "react-custom") {
                 this.nodeType = "react-component";
@@ -697,6 +710,8 @@ class CustomNode extends React.Component<HibikiReactProps & {component : Compone
             catch (e) {
                 console.log(sprintf("ERROR parsing/executing 'defaults' in <define-component %s>", componentName), e);
             }
+            let implCtx = makeCustomDBCtx(implNode, childEnv, null);
+            implCtx.handleInitEvent();
         }
         return childEnv;
     }

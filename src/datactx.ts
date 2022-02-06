@@ -273,6 +273,7 @@ function rawAttrStr(attr : NodeAttrType) : string {
 
 const NON_MERGED_ATTRS = {
     "if": true,
+    "unwrap": true,
     "foreach": true,
     "component": true,
     "eid": true,
@@ -450,6 +451,9 @@ function formatVal(val : HibikiVal, format : string) : string {
         }
 
         // format is set (sprintf like string)
+        if (val === SYM_NOATTR) {
+            val = "[noattr]";
+        }
         val = DeepCopy(val, {resolve: true, json: true});
         let [arrVal, isArr] = asArray(val, false);
         if (isArr) {
@@ -1160,7 +1164,7 @@ function runSetOp(path : PathType, localRoot : HibikiVal, op : string, origSetDa
             return localRoot;
         }
         if (readOnly) {
-            throw new Error(sprintf("Cannot set read-only path: %s", StringPath(path)));
+            return localRoot;
         }
         if (op === "setraw") {
             return setData;
@@ -1168,7 +1172,7 @@ function runSetOp(path : PathType, localRoot : HibikiVal, op : string, origSetDa
         throw new Error(sprintf("Invalid setPath op=%s for LValue bindpath", op));
     }
     if (readOnly) {
-        throw new Error(sprintf("Cannot set read-only path: %s", StringPath(path)));
+        return localRoot;
     }
     if (op === "append") {
         return appendData(path, localRoot, setData);
@@ -2096,7 +2100,7 @@ function evalExprAstInternal(exprAst : HExpr, dataenv : DataEnvironment, rtype :
         }
         else if (exprAst.op === "??") {
             let e1 = evalExprAst(exprAst.exprs[0], dataenv, "natural");
-            if (e1 != null) {
+            if (e1 != null && e1 !== SYM_NOATTR) {
                 return e1;
             }
             return evalExprAst(exprAst.exprs[1], dataenv, "natural");
