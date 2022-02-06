@@ -8,7 +8,7 @@ import {v4 as uuidv4} from 'uuid';
 import type {ComponentType, LibraryType, HibikiConfig, HibikiHandlerModule, HibikiAction, EventType, HandlerValType, JSFuncType, Hibiki, ErrorCallbackFn, HtmlParserOpts, HandlerBlock, HibikiVal, HibikiValObj} from "./types";
 import type {HibikiNode, NodeAttrType} from "./html-parser";
 import * as DataCtx from "./datactx";
-import {isObject, textContent, SYM_PROXY, SYM_FLATTEN, nodeStr, callHook, getHibiki, parseHandler, fullPath, parseUrlParams, smartDecodeParams, unbox, bindLibContext} from "./utils";
+import {isObject, textContent, SYM_PROXY, SYM_FLATTEN, nodeStr, callHook, getHibiki, parseHandler, fullPath, parseUrlParams, smartDecodeParams, unbox, bindLibContext, compareVersions} from "./utils";
 import {subNodesByTag, firstSubNodeByTag} from "./nodeutils";
 import {RtContext, HibikiError} from "./error";
 import {HibikiRequest} from "./request";
@@ -562,6 +562,7 @@ class ComponentLibrary {
         if (libName != null) {
             return Promise.resolve(this.libs[libName]);
         }
+        let libReqVersion : string = null;
         let libNode : HibikiNode = null;
         let fetchInit : any = {};
         let p = fetch(srcUrl).then((resp) => {
@@ -583,6 +584,12 @@ class ComponentLibrary {
                 throw new Error(sprintf("<define-library> must have 'name' attribute for library url '%s'", srcUrl));
             }
             libName = DataCtx.rawAttrStr(libNode.attrs.name);
+            libReqVersion = DataCtx.rawAttrStr(libNode.attrs.hibikiversion);
+            if (libReqVersion != null) {
+                if (compareVersions(libReqVersion, getHibiki().VERSION) > 0) {
+                    throw new Error(sprintf("Requires Hibiki HTML version %s (current Hibiki HTML version is %s)", libReqVersion, getHibiki().VERSION));
+                }
+            }
             bindLibContext(libNode, libName);
             return null;
         }).then(() => {
