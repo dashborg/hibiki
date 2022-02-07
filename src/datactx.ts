@@ -97,7 +97,7 @@ const CHILDRENVAR_ALLOWED_GETTERS : Record<string, boolean> = {
     "byindex": true,
     "list": true,
     "filter": true,
-    "empty": true,
+    "size": true,
 };
 
 class ChildrenVar {
@@ -117,8 +117,8 @@ class ChildrenVar {
         return this;
     }
 
-    get empty() : boolean {
-        return (this.list.length === 0);
+    get size() : number {
+        return this.list.length;
     }
 
     get noslot() : ChildrenVar {

@@ -9,7 +9,7 @@
 * do not throw an error when setting a read-only value (silently ignore) -- e.g. setting value in args root
 * h-text will show '[noattr]' when printing noattr value instead of null
 * added ChildrenVar.filter to allow filtering of children by LambdaValue expression
-* added ChildrenVar.empty to check if ChildrenVar contains zero children
+* added ChildrenVar.size -- returns number of children in ChildrenVar
 * bugfix: class.[class] was not being properly set to false when set to the Hibiki value false
 * bugfix: and/or operators were not correctly evaluating 'noattr' as false
 
