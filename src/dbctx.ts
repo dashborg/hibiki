@@ -62,10 +62,6 @@ function createInjectObj(ctx : DBCtx, child : HibikiNode, nodeDataenv : DataEnvi
         let shortName = k.substr(7);
         toInject.attrs[shortName] = injectAttrs[k];
     }
-    let styleMap = evalInjectCtx.resolveNsStyleMap("inject:style", null);
-    if (styleMap != null && Object.keys(styleMap).length > 0) {
-        toInject.styleMap = styleMap;
-    }
     if (ctx.node.handlers != null) {
         for (let hname in ctx.node.handlers) {
             if (!hname.startsWith("inject:")) {
@@ -144,12 +140,10 @@ function resolveArgsRoot(ctx : DBCtx) : HibikiValObj {
 // 'class' and 'style' are pre-merged
 class InjectedAttrsObj {
     attrs : HibikiValObj;
-    styleMap : StyleMapType;
     handlers : Record<string, EHandlerType>;
     
     constructor() {
         this.attrs = {};
-        this.styleMap = null;
         this.handlers = {};
     }
 
@@ -179,6 +173,15 @@ class InjectedAttrsObj {
 
     getHandler(name : string) : EHandlerType {
         return this.handlers[name];
+    }
+
+    mergeInjectedAttrs(injected : InjectedAttrsObj) : void {
+        for (let key in injected.attrs) {
+            this.attrs[key] = injected.attrs[key];
+        }
+        for (let key in injected.handlers) {
+            this.handlers[key] = injected.handlers[key];
+        }
     }
 }
 
