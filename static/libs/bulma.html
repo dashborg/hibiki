@@ -1,0 +1,152 @@
+<define-library name="@hibiki/bulma" hibikiversion="v0.2.1">
+  <define-component name="button">
+    <div class="control" unwrap="!$args.control" automerge="control">
+      <button component="*$args.buttoncomponent" class="button" automerge click.handler="fire->click()">
+        <span if="$args.icon" class="icon" automerge="icon"><i class="*$args.icon"></i></span>
+        <h-fragment if="!!$args.icon && fn:len(@children.list) > 0">
+          <span><h-children bind="@children"></h-children></span>
+        </h-fragment>
+        <h-fragment if="!$args.icon">
+          <h-children bind="@children"></h-children>
+        </h-fragment>
+      </button>
+    </div>
+  </define-component>
+
+  <define-component name="box">
+    <div class="box" automerge>
+      <h-children bind="@children"></h-children>
+    </div>
+  </define-component>
+
+  <define-component name="block">
+    <div class="block" automerge>
+      <h-children bind="@children"></h-children>
+    </div>
+  </define-component>
+
+  <define-component name="content">
+    <div class="content" automerge>
+      <h-children bind="@children"></h-children>
+    </div>
+  </define-component>
+
+  <define-component name="icon">
+    <span class="icon" automerge><i class="*$args.icon"></i></span>
+  </define-component>
+
+  <define-component name="image">
+    <figure class="image" automerge="@all|-src">
+      <img src="*$args.src">
+    </figure>
+  </define-component>
+
+  <define-component name="ratio">
+    <figure class="image" automerge>
+      <h-children inject:class.has-ratio bind="@children"></h-children>
+    </figure>
+  </define-component>
+
+  <define-component name="notification" defaults="show = true;">
+    <define-vars>
+      @show = raw($args.show) ?? ref($c.show);
+    </define-vars>
+    <div if="@show" class="notification" automerge>
+      <button if="$args.hasdelete" click.handler="@show = false; fire->delete()" class="delete"></button>
+      <h-children bind="@children"></h-children>
+    </div>
+  </define-component>
+
+  <define-component name="delete">
+    <button class="delete" automerge click.handler="fire->click()"><h-children bind="@children"></h-children></button>
+  </define-component>
+
+  <define-component name="progress">
+    <progress class="progress" automerge><h-children bind="@children"></h-children></progress>
+  </define-component>
+
+  <define-component name="tag">
+    <span component="*$args.tagcomponent" class="tag" automerge click.handler="fire->click()">
+      <h-children bind="@children"></h-children>
+    </span>
+  </define-component>
+
+  <define-component name="tags">
+    <div class="control" unwrap="!$args.control" automerge="control">
+      <div class="tags has-addons" automerge="@all|-control|-hasdelete">
+        <h-children bind="@children"></h-children>
+        <local-tag if="$args.hasdelete" tagcomponent="a" class="is-delete" automerge="delete" click.handler="fire->delete()"></local-tag>
+      </div>
+    </div>
+  </define-component>
+
+  <define-component name="title">
+    <div component="*$args.titlecomponent" class="title" automerge="@all|-titlecomponent"><h-children bind="@children"></h-children></div>
+  </define-component>
+
+  <define-component name="breadcrumb">
+    <nav class="breadcrumb" automerge>
+      <ul>
+        <li component="h-children" bind="@children.bycomp['@hibiki/bulma:crumb']"></li>
+      </ul>
+    </nav>
+  </define-component>
+
+  <define-component name="crumb">
+    <div component="li" class.is-active="*$args.active">
+      <a automerge="@all|-active" click.handler="fire->click()"><h-children bind="@children"></h-children></a>
+    </div>
+  </define-component>
+
+  <define-component name="card">
+    <div class="card" automerge>
+      <div class="card-header" if="fn:len(@children.byslot['header']) > 0 || $args.title">
+        <p if="$args.title" class="card-header-title">
+          {{ $args.title }}
+        </p>
+        <h-children bind="@children.byslot['header']"></h-children>
+      </div>
+      <div class="card-image" if="fn:len(@children.byslot['image']) > 0">
+        <h-children bind="@children.byslot['image']"></h-children>
+      </div>
+      <div class="card-content" if="fn:len(@children.noslot) > 0">
+        <h-children bind="@children.noslot"></h-children>
+      </div>
+      <div class="card-footer" if="fn:len(@children.byslot['footer']) > 0 || fn:len(@children.byslot['footer-item']) > 0">
+        <h-children bind="@children.byslot['footer']"></h-children>
+        <h-fragment foreach="@elem in @children.byslot['footer-item'].byindex">
+          <h-children inject:class="card-footer-item" bind="@elem"></h-children>
+        </h-fragment>
+      </div>
+    </div>
+  </define-component>
+
+  <define-component name="dropdown">
+    <define-vars>
+      @active = raw($args.active) ?? ref($c.active);
+      @curvalue = raw($args.value) ?? ref($c.curvalue);
+    </define-vars>
+    <div class="dropdown" automerge class.is-active="* @active" active="*@active" hibiki-mark>
+      <div class="dropdown-trigger">
+        <button class="button" aria-haspopup="true" aria-controls="dropdown-menu" click.handler="log('menu-click'); @active = !@active">
+          <span if="$args.label">{{ $args.label }}</span>
+          <h-children bind="@children.byslot['label']"></h-children>
+          <span if="!$args.noicon" class="icon is-small">
+            <i class="* $args.icon ?? 'fa fa-angle-down'" aria-hidden="true"></i>
+          </span>
+        </button>
+      </div>
+      <div class="dropdown-menu">
+        <div class="dropdown-content">
+          <h-children bind="@children.noslot" inject:click.handler="@active = false; if (@node.attrs.value != null) { @curvalue = @node.attrs.value; }" datacontext="@dropdown=true;"></h-children>
+        </div>
+      </div>
+    </div>
+  </define-component>
+
+  <define-component name="option">
+    <a if="@dropdown" href="#" class="dropdown-item" click.handler="fire->click()">
+      <h-children bind="@children"></h-children>
+    </a>
+  </define-component>
+</define-library>
