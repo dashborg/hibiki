@@ -258,7 +258,7 @@ class AnyNode extends React.Component<HibikiReactProps, {}> {
             if (unwrapExists) {
                 let unwrapAttrVal = DataCtx.resolveLValue(ctx.resolveAttrVal("unwrap"));
                 if (unwrapAttrVal) {
-                    return <FragmentNode component={component} node={node} dataenv={dataenv} injectedAttrs={ctx.injectedAttrs}/>;
+                    return <FragmentNode node={node} dataenv={dataenv} injectedAttrs={ctx.injectedAttrs}/>;
                 }
             }
         }
@@ -326,7 +326,7 @@ class CustomReactNode extends React.Component<HibikiReactProps & {component : Co
         }
         let reactProps : Record<string, any> = DataCtx.DeepCopy(ctx.resolveAttrVals(), {resolve: true}) as HibikiValObj;
         reactProps["hibikicontext"] = ctx;
-        let nodeVar = NodeUtils.makeNodeVar(ctx, false);
+        let nodeVar = ctx.makeNodeVar(false);
         let htmlContext = sprintf("react:%s", nodeStr(ctx.node));
         let childEnv = ctx.dataenv.makeChildEnv({node: nodeVar}, {htmlContext: htmlContext, libContext: component.libName});
         let rtnElems = baseRenderHtmlChildren(ctx.node.list, childEnv, false)
@@ -683,7 +683,7 @@ class CustomNode extends React.Component<HibikiReactProps & {component : Compone
         let component = this.props.component;
         let implNode = component.node;
         let rawImplAttrs : Record<string, NodeAttrType> = implNode.attrs || {};
-        let nodeVar = NodeUtils.makeNodeVar(ctx, false);
+        let nodeVar = ctx.makeNodeVar(false);
         let componentName = DataCtx.rawAttrStr(rawImplAttrs.name);
         let ctxHandlers = NodeUtils.makeHandlers(ctx.node, ctx.injectedAttrs, null, null);
         let eventCtx = sprintf("%s", nodeStr(ctx.node));

@@ -125,12 +125,20 @@
     <define-vars>
       @active = raw($args.active) ?? ref($c.active);
       @curvalue = raw($args.value) ?? ref($c.curvalue);
+      @haslabel = $args.label || fn:len(@children.byslot['label']) > 0;
+      @numactive = 0;
+      @activechildren = invoke(@children.bycomp["@hibiki/bulma:option"].filter, lambda(@node.attrs.value == @curvalue));
     </define-vars>
     <div class="dropdown" automerge class.is-active="* @active" active="*@active" hibiki-mark>
       <div class="dropdown-trigger">
         <button class="button" aria-haspopup="true" aria-controls="dropdown-menu" click.handler="log('menu-click'); @active = !@active">
-          <span if="$args.label">{{ $args.label }}</span>
-          <h-children bind="@children.byslot['label']"></h-children>
+          <h-if condition="fn:len(@activechildren.list) > 0">
+            <h-children bind="@activechildren.first" datacontext="@label=true"></h-children>
+          </h-if>
+          <h-if condition="fn:len(@activechildren.list) == 0">
+            <span if="$args.label">{{ $args.label }}</span>
+            <h-children bind="@children.byslot['label']"></h-children>
+          </h-if>
           <span if="!$args.noicon" class="icon is-small">
             <i class="* $args.icon ?? 'fa fa-angle-down'" aria-hidden="true"></i>
           </span>
@@ -138,7 +146,7 @@
       </div>
       <div class="dropdown-menu">
         <div class="dropdown-content">
-          <h-children bind="@children.noslot" inject:click.handler="@active = false; if (@node.attrs.value != null) { @curvalue = @node.attrs.value; }" datacontext="@dropdown=true;"></h-children>
+          <h-children bind="@children.noslot" inject:click.handler="@active = false; @curvalue = @node.attrs.value;" datacontext="@dropdown=true;"></h-children>
         </div>
       </div>
     </div>
@@ -148,5 +156,9 @@
     <a if="@dropdown" href="#" class="dropdown-item" click.handler="fire->click()">
       <h-children bind="@children"></h-children>
     </a>
+    <span if="@label">
+      <h-children bind="@children"></h-children>
+    </span>
   </define-component>
+
 </define-library>

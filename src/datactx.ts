@@ -6,14 +6,14 @@ import {DataEnvironment, HibikiState, HibikiExtState} from "./state";
 import {sprintf} from "sprintf-js";
 import {parseHtml, HibikiNode} from "./html-parser";
 import {RtContext, getShortEMsg, HibikiError} from "./error";
-import {SYM_PROXY, SYM_FLATTEN, isObject, stripAtKeys, unpackPositionalArgs, unpackAtArgs, nodeStr, parseHandler, fullPath, STYLE_UNITLESS_NUMBER, splitTrim, bindLibContext, unpackPositionalArgArray, classStringToCnArr, cnArrToClassAttr, cnArrToLosslessStr, attrBaseName, parseAttrName, nsAttrName} from "./utils";
+import {SYM_PROXY, SYM_FLATTEN, isObject, stripAtKeys, unpackPositionalArgs, unpackAtArgs, nodeStr, parseHandler, fullPath, STYLE_UNITLESS_NUMBER, splitTrim, bindLibContext, unpackPositionalArgArray, classStringToCnArr, cnArrToClassAttr, cnArrToLosslessStr, attrBaseName, parseAttrName, nsAttrName, getHibiki} from "./utils";
 import {PathPart, PathType, PathUnionType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue, HandlerBlock, HibikiVal, HibikiValObj, JSFuncType, HibikiSpecialVal, HibikiPrimitiveVal, StyleMapType} from "./types";
 import type {NodeAttrType} from "./html-parser";
 import {HibikiRequest} from "./request";
 import type {EHandlerType} from "./state";
 import {doParse} from "./hibiki-parser";
 import {DefaultJSFuncs} from "./jsfuncs";
-import type {InjectedAttrsObj} from "./dbctx";
+import type {InjectedAttrsObj, DBCtx} from "./dbctx";
 
 declare var window : any;
 
@@ -96,6 +96,7 @@ const CHILDRENVAR_ALLOWED_GETTERS : Record<string, boolean> = {
     "first": true,
     "byindex": true,
     "list": true,
+    "filter": true,
 };
 
 class ChildrenVar {
@@ -209,6 +210,31 @@ class ChildrenVar {
             rtn.push(new ChildrenVar([child], this.dataenv));
         }
         return rtn;
+    }
+
+    get filter() : LambdaValue {
+        let fn : (dataenv : DataEnvironment, params : HibikiValObj) => HibikiVal = (dataenv : DataEnvironment, params : HibikiValObj) => {
+            let {filterexpr: filterExpr} = unpackPositionalArgs(params, ["filterexpr"]);
+            if (filterExpr == null) {
+                return null;
+            }
+            if (!(filterExpr instanceof LambdaValue)) {
+                throw new Error(sprintf("ChildrenVar filterexpr must be a LambdaValue, got '%s'", hibikiTypeOf(filterExpr)));
+            }
+            let rtn = [];
+            let hibiki = getHibiki();
+            for (let child of this.list) {
+                let childCtx : DBCtx = hibiki.DBCtxModule.makeCustomDBCtx(child, this.dataenv, null);
+                let nodeVar = childCtx.makeNodeVar(true);
+                let lambdaEnv = dataenv.makeChildEnv({node: nodeVar}, null);
+                let isActive = filterExpr.invoke(lambdaEnv, null);
+                if (isActive && isActive !== SYM_NOATTR) {
+                    rtn.push(child);
+                }
+            }
+            return new ChildrenVar(rtn, this.dataenv);
+        };
+        return new LambdaValue(null, fn);
     }
 
     asString() : string {
@@ -587,7 +613,7 @@ class LambdaValue {
     expr : HExpr;
     invokeFn : (dataenv : DataEnvironment, params : HibikiValObj) => HibikiVal;
     
-    constructor(expr : HExpr, invokeFn : (dataenv : DataEnvironment) => HibikiVal) {
+    constructor(expr : HExpr, invokeFn : (dataenv : DataEnvironment, params : HibikiValObj) => HibikiVal) {
         this.expr = expr;
         this.invokeFn = invokeFn;
     }
@@ -600,7 +626,8 @@ class LambdaValue {
             return evalExprAst(this.expr, dataenv, "natural");
         }
         if (this.invokeFn) {
-            return this.invokeFn(dataenv, params);
+            let invokeRtn = this.invokeFn(dataenv, params);
+            return invokeRtn;
         }
         return null;
     }
@@ -2086,24 +2113,30 @@ function evalExprAstInternal(exprAst : HExpr, dataenv : DataEnvironment, rtype :
     else if (exprAst.etype === "op") {
         if (exprAst.op === "&&") {
             let e1 = evalExprAst(exprAst.exprs[0], dataenv, "natural");
-            if (!e1) {
-                return e1;
+            if (!e1 || e1 === SYM_NOATTR) {
+                return false;
             }
-            return evalExprAst(exprAst.exprs[1], dataenv, "natural");
+            let e2 = evalExprAst(exprAst.exprs[1], dataenv, "natural");
+            if (e2 === SYM_NOATTR) {
+                return false;
+            }
+            return e2;
         }
         else if (exprAst.op === "||") {
             let e1 = evalExprAst(exprAst.exprs[0], dataenv, "natural");
-            if (e1) {
+            if (e1 && e1 !== SYM_NOATTR) {
                 return e1;
             }
-            return evalExprAst(exprAst.exprs[1], dataenv, "natural");
+            let e2 = evalExprAst(exprAst.exprs[1], dataenv, "natural");
+            return e2;
         }
         else if (exprAst.op === "??") {
             let e1 = evalExprAst(exprAst.exprs[0], dataenv, "natural");
             if (e1 != null && e1 !== SYM_NOATTR) {
                 return e1;
             }
-            return evalExprAst(exprAst.exprs[1], dataenv, "natural");
+            let e2 = evalExprAst(exprAst.exprs[1], dataenv, "natural");
+            return e2;
         }
         else if (exprAst.op === "*") {
             let e1 : any = evalExprAst(exprAst.exprs[0], dataenv, "resolve");

@@ -193,6 +193,10 @@ interface Hibiki {
     registerLocalNativeComponentImpl(name : string, reactImpl : ReactClass) : void;
     addLibraryCallback(libName : string, fn : Function) : void;
     HibikiReact : new(props : any) => React.Component<{hibikiState : HibikiExtState}, {}>;
+    VERSION : string;
+    BUILD : string;
+
+    // subject to change, use with caution (not part of public API)
     ModuleRegistry : Record<string, (new(state : HibikiState, config : ModuleConfig) => HibikiHandlerModule)>;
     JSFuncs : Record<string, JSFuncType>;
     LocalHandlers : Record<string, (req : HibikiRequest) => any>;
@@ -201,9 +205,8 @@ interface Hibiki {
     ImportLibs : Record<string, any>;
     LibraryCallbacks : Record<string, any[]>;
     States : Record<string, HibikiExtState>;
-    VERSION : string;
-    BUILD : string;
     DataCtx : any;
+    DBCtxModule : any;
 };
 
 interface HibikiExtState {

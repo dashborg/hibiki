@@ -50,7 +50,7 @@ async function convertFormData(formData : FormData) : Promise<Record<string, any
 
 function createInjectObj(ctx : DBCtx, child : HibikiNode, nodeDataenv : DataEnvironment) : InjectedAttrsObj {
     let childCtx = makeCustomDBCtx(child, nodeDataenv, null);
-    let nodeVar = NodeUtils.makeNodeVar(childCtx, true);
+    let nodeVar = childCtx.makeNodeVar(true);
     let evalInjectAttrsEnv = ctx.dataenv.makeChildEnv({node: nodeVar}, null);
     let evalInjectCtx = makeCustomDBCtx(ctx.node, evalInjectAttrsEnv, null);
     let injectAttrs = evalInjectCtx.resolveUnmergedAttrVals();
@@ -677,6 +677,22 @@ class DBCtx {
             this.dataenv.dbstate.NodeDataMap.set(this.uuid, box);
         }
         return new DataCtx.ObjectLValue(null, box);
+    }
+
+    makeNodeVar(withAttrs : boolean) {
+        let node = this.node;
+        if (node == null) {
+            return null;
+        }
+        let rtn : any = {};
+        rtn.tag = this.getHtmlTagName();
+        rtn.rawtag = this.node.tag;
+        rtn.uuid = this.uuid;
+        if (withAttrs) {
+            rtn.attrs = this.resolveAttrVals();
+        }
+        rtn.children = new DataCtx.ChildrenVar(this.node.list, this.dataenv);
+        return rtn;
     }
 }
 

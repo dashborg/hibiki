@@ -192,22 +192,6 @@ function renderTextData(ctx : DBCtx, onlyText? : boolean) : any {
     return renderTextSpan(rtn, style, cnArrToClassAttr(cnArr));
 }
 
-function makeNodeVar(ctx : DBCtx, withAttrs : boolean) : any {
-    let node = ctx.node;
-    if (node == null) {
-        return null;
-    }
-    let rtn : any = {};
-    rtn.tag = ctx.getHtmlTagName();
-    rtn.rawtag = ctx.node.tag;
-    rtn.uuid = ctx.uuid;
-    if (withAttrs) {
-        rtn.attrs = ctx.resolveAttrVals();
-    }
-    rtn.children = new DataCtx.ChildrenVar(ctx.node.list, ctx.dataenv);
-    return rtn;
-}
-
 function parseArgsDecl(datatypes : string) : {[e : string] : boolean} {
     let rtn : {[e : string] : boolean} = {};
     if (datatypes == null || datatypes.trim() === "") {
@@ -385,4 +369,4 @@ function getRawAttrs(node : HibikiNode) : Record<string, string> {
     return rtn;
 }
 
-export {BLOCKED_ELEMS, INLINE_ELEMS, SPECIAL_ATTRS, BLOB_ATTRS, SUBMIT_ELEMS, MANAGED_ATTRS, NON_INJECTABLE, renderTextSpan, renderTextData, makeNodeVar, parseArgsDecl, handleConvertType, makeHandlers, subNodesByTag, firstSubNodeByTag, getManagedType, getRawAttrs};
+export {BLOCKED_ELEMS, INLINE_ELEMS, SPECIAL_ATTRS, BLOB_ATTRS, SUBMIT_ELEMS, MANAGED_ATTRS, NON_INJECTABLE, renderTextSpan, renderTextData, parseArgsDecl, handleConvertType, makeHandlers, subNodesByTag, firstSubNodeByTag, getManagedType, getRawAttrs};

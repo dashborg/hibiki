@@ -14,6 +14,7 @@ import type {HibikiConfig, Hibiki, HibikiExtState, ReactClass, LibraryType} from
 import type {HibikiNode} from "./html-parser";
 import {LocalModule, HttpModule, LibModule} from "./modules";
 import {HibikiModule} from "./hibiki-module";
+import * as DBCtxModule from "./dbctx";
 
 declare var window : any;
 
@@ -226,6 +227,7 @@ let hibiki : Hibiki = {
     VERSION: VERSION,
     BUILD: BUILD,
     DataCtx: DataCtx,
+    DBCtxModule: DBCtxModule,
 };
 
 window.Hibiki = hibiki;
