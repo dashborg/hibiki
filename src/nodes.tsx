@@ -114,7 +114,7 @@ function baseRenderOneNode(node : HibikiNode, dataenv : DataEnvironment, injecte
     }
     else if (node.tag == "if-break") {
         let ifBreakCtx = makeCustomDBCtx(node, dataenv, null);
-        let [ifAttr, exists] = ifBreakCtx.resolveAttrValPair("condition");
+        let [ifAttr, exists] = ifBreakCtx.resolveConditionAttr("condition");
         if (!exists) {
             return [<ErrorMsg message="<if-break> requires 'condition' attribute"/>, false, null];
         }
@@ -198,12 +198,9 @@ function staticEvalTextNode(node : HibikiNode, dataenv : DataEnvironment) : stri
         return nodeStr(node);
     }
     if (!ctx.isEditMode()) {
-        let [ifAttr, exists] = ctx.resolveAttrValPair("if");
-        if (exists) {
-            ifAttr = DataCtx.resolveLValue(ifAttr);
-            if (!ifAttr) {
-                return null;
-            }
+        let [ifVal, exists] = ctx.resolveConditionAttr("if");
+        if (exists && !ifVal) {
+            return null;
         }
     }
     // TODO foreach
@@ -247,19 +244,13 @@ class AnyNode extends React.Component<HibikiReactProps, {}> {
             if (!iterating && node.foreachAttr != null) {
                 return this.renderForeach(ctx);
             }
-            let ifExists = ctx.hasRawAttr("if");
-            if (ifExists) {
-                let ifAttrVal = DataCtx.resolveLValue(ctx.resolveAttrVal("if"));
-                if (!ifAttrVal) {
-                    return null;
-                }
+            let [ifVal, ifExists] = ctx.resolveConditionAttr("if");
+            if (ifExists && !ifVal) {
+                return null;
             }
-            let unwrapExists = ctx.hasRawAttr("unwrap");
-            if (unwrapExists) {
-                let unwrapAttrVal = DataCtx.resolveLValue(ctx.resolveAttrVal("unwrap"));
-                if (unwrapAttrVal) {
-                    return <FragmentNode node={node} dataenv={dataenv} injectedAttrs={ctx.injectedAttrs}/>;
-                }
+            let [unwrapVal, unwrapExists] = ctx.resolveConditionAttr("unwrap");
+            if (unwrapExists && unwrapVal) {
+                return <FragmentNode node={node} dataenv={dataenv} injectedAttrs={ctx.injectedAttrs}/>;
             }
         }
         if (component != null) {
@@ -755,11 +746,11 @@ class TextNode extends React.Component<HibikiReactProps, {}> {
 class IfNode extends React.Component<HibikiReactProps, {}> {
     render() : React.ReactNode {
         let ctx = makeDBCtx(this);
-        let [condAttr, exists] = ctx.resolveAttrValPair("condition");
+        let [condVal, exists] = ctx.resolveConditionAttr("condition");
         if (!exists) {
             return <ErrorMsg message={sprintf("<%s> node requires 'condition' attribute", ctx.node.tag)}/>
         }
-        if (!condAttr) {
+        if (!condVal) {
             return null;
         }
         return <NodeList list={ctx.node.list} ctx={ctx}/>;

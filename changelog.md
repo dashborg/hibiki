@@ -8,6 +8,10 @@
 * custom nodes fire an internal 'init' event when first created (before rendering)
 * do not throw an error when setting a read-only value (silently ignore) -- e.g. setting value in args root
 * h-text will show '[noattr]' when printing noattr value instead of null
+* added ChildrenVar.filter to allow filtering of children by LambdaValue expression
+* added ChildrenVar.empty to check if ChildrenVar contains zero children
+* bugfix: class.[class] was not being properly set to false when set to the Hibiki value false
+* bugfix: and/or operators were not correctly evaluating 'noattr' as false
 
 ## v0.2.0
 

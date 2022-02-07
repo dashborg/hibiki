@@ -694,6 +694,16 @@ class DBCtx {
         rtn.children = new DataCtx.ChildrenVar(this.node.list, this.dataenv);
         return rtn;
     }
+
+    // returns [val, exists]
+    resolveConditionAttr(attrName : string) : [boolean, boolean] {
+        let exists = this.hasRawAttr(attrName);
+        if (!exists) {
+            return [false, false];
+        }
+        let val = DataCtx.valToBool(this.resolveAttrVal(attrName));
+        return [val, true];
+    }
 }
 
 export {DBCtx, makeDBCtx, makeCustomDBCtx, InjectedAttrsObj, createInjectObj, resolveArgsRoot};
