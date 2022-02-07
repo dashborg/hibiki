@@ -310,7 +310,7 @@ function resolveUnmergedCnArray(node : HibikiNode, ns : string, dataenv : DataEn
             continue;
         }
         let rval = getUnmergedAttributeStr(node, k, dataenv);
-        if (rval && rval !== "0" && kval !== "hibiki-cloak") {
+        if (rval && rval !== "0" && rval !== "false" && kval !== "hibiki-cloak") {
             cnArr.push({[kval]: true});
         }
         else {
