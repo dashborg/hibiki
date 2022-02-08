@@ -10,6 +10,12 @@
 * h-text will show '[noattr]' when printing noattr value instead of null
 * added ChildrenVar.filter to allow filtering of children by LambdaValue expression
 * added ChildrenVar.size -- returns number of children in ChildrenVar
+* fixes and improved consistency for using and filtering multiple levels of children nodes
+* consistent behavior of "if-break" and "define-vars" when embedded as children of custom component
+* breaking: removed ChildrenVar.list (inconsisten behavior, not resolved)
+* added ChildrenVar.node (first node of ChildrenVar)
+* added ChilcrenVar.nodes (array of node objects)
+* added innerhtml and outerhtml to node var
 * bugfix: class.[class] was not being properly set to false when set to the Hibiki value false
 * bugfix: and/or operators were not correctly evaluating 'noattr' as false
 

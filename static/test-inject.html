@@ -32,17 +32,24 @@
         <div class="box" style="width: 100%;">
           Selected Menu Item: {{ $.selected }}
           <div>
-            <h-children inject:href="/test-basic.html" inject:style="color: red" inject:class="has-text-weight-bold">
+            <local-inject-redbold>
               <a href="#">Test Inject Link</a>
-            </h-children>
+            </local-inject-redbold>
             (Should be <span style="color: red; font-weight: bold">red/bold</span> and link to /test-basic.html)
           </div>
           <div>
-            <h-children inject:click.handler="$.selected = 'accounts'">
+            <local-inject-handler>
               <a href="#">Test Inject Handler</a>
-            </h-children>
+            </local-inject-handler>
             (Should set menu to 'accounts' when clicked)
           </div>
+        </div>
+        <div class="box">
+          <local-level1>
+            <p>hello</p>
+            <define-vars context="@foo=true;"></define-vars>
+            <div>hello {{ @foo }} {{ @bar }}</div>
+          </local-level1>
         </div>
         <div class="box">
           selected-row: {{ $.selectedrow }}
@@ -75,4 +82,35 @@
       <h-children bind="@children.tags" inject:selected="*$args.selected"></h-children>
     </html-ul>
   </define-component>
+
+  <define-component name="inject-redbold">
+    <h-children hibiki-mark inject:href="/test-basic.html" inject:style="color: red" inject:class="has-text-weight-bold" bind="@children"></h-children>
+  </define-component>
+
+  <define-component name="inject-handler">
+    <h-children inject:click.handler="$.selected = 'accounts'" bind="@children"></h-children>
+  </define-component>
+
+  <define-component name="level1">
+    <div>
+      <p>children-level1={{ @children.tags }}</p>
+      <p>(bold blue, bold blue true null)</p>
+      <h-children bind="@children" inject:style="color: blue;" inject:class="has-text-weight-bold"></h-children>
+    </div>
+    <hr>
+    <local-level2>
+      <h-children bind="@children" inject:style="color: blue;" inject:class="has-text-weight-bold"></h-children>
+      <h-children bind="@children"></h-children>
+    </local-level2>
+  </define-component>
+  
+  <define-component name="level2">
+    <div>
+      <p>children-level2={{ @children.tags }}</p>
+      <p>(bold red, red, bold green 55, green 55)</p>
+      <h-children bind="@children.bytag['p']" inject:style="color: red;"></h-children>
+      <h-children bind="@children.bytag['div']" inject:style="color: green;" datacontext="@bar=55"></h-children>
+    </div>
+  </define-component>
+  
 </body>

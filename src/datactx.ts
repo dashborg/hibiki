@@ -95,18 +95,17 @@ const CHILDRENVAR_ALLOWED_GETTERS : Record<string, boolean> = {
     "bytag": true,
     "first": true,
     "byindex": true,
-    "list": true,
     "filter": true,
     "size": true,
+    "node": true,
+    "nodes": true,
 };
 
 class ChildrenVar {
-    list : HibikiNode[];
-    dataenv : DataEnvironment;
+    boundNodes : DBCtx[];
     
-    constructor(list : HibikiNode[], dataenv : DataEnvironment) {
-        this.list = list ?? [];
-        this.dataenv = dataenv;
+    constructor(boundNodes : DBCtx[]) {
+        this.boundNodes = boundNodes ?? [];
     }
 
     allowedGetters(key : string) : boolean {
@@ -118,101 +117,118 @@ class ChildrenVar {
     }
 
     get size() : number {
-        return this.list.length;
+        return this.boundNodes.length;
     }
 
     get noslot() : ChildrenVar {
-        let rtn = [];
-        for (let child of this.list) {
-            let childSlot = getUnmergedAttributeStr(child, "slot", this.dataenv);
+        let rtn : DBCtx[] = [];
+        for (let child of this.boundNodes) {
+            let childSlot = child.resolveAttrStr("slot");
             if (childSlot == null) {
                 rtn.push(child);
             }
         }
-        return new ChildrenVar(rtn, this.dataenv);
+        return new ChildrenVar(rtn);
+    }
+
+    get node() : HibikiValObj {
+        if (this.boundNodes.length == 0) {
+            return null;
+        }
+        let ctx = this.boundNodes[0];
+        return ctx.makeNodeVar(true);
+    }
+
+    get nodes() : HibikiVal[] {
+        let rtn : HibikiVal[] = [];
+        for (let child of this.boundNodes) {
+            rtn.push(child.makeNodeVar(true));
+        }
+        return rtn;
     }
 
     get tags() : ChildrenVar {
-        let rtn = [];
-        for (let child of this.list) {
-            if (child.tag.startsWith("#")) {
+        let rtn : DBCtx[] = [];
+        for (let child of this.boundNodes) {
+            if (child.node.tag.startsWith("#")) {
                 continue;
             }
             rtn.push(child);
         }
-        return new ChildrenVar(rtn, this.dataenv);
+        return new ChildrenVar(rtn);
     }
 
     get bycomp() : Record<string, ChildrenVar> {
         let rtn : Record<string, ChildrenVar> = {};
-        for (let child of this.list) {
-            if (child.tag.startsWith("hibiki-")) {
+        for (let child of this.boundNodes) {
+            if (child.node.tag.startsWith("hibiki-")) {
                 continue;
             }
-            let compName = getUnmergedAttributeStr(child, "component", this.dataenv) ?? child.tag;
-            let component = this.dataenv.dbstate.ComponentLibrary.findComponent(compName, child.libContext);
+            let tagName = child.node.tag;
+            let compName = child.resolveAttrStr("component") ?? tagName;
+            let component = child.dataenv.dbstate.ComponentLibrary.findComponent(compName, child.node.libContext);
             let cname = null;
             if (component == null) {
-                if (child.tag.startsWith("#")) {
-                    cname = child.tag;
+                if (tagName.startsWith("#")) {
+                    cname = tagName;
                 }
-                else if (child.tag.startsWith("html-")) {
-                    cname = "@html:" + child.tag.substr(5);
+                else if (tagName.startsWith("html-")) {
+                    cname = "@html:" + tagName.substr(5);
                 }
-                else if (child.tag.indexOf("-") == -1) {
-                    cname = "@html:" + child.tag;
+                else if (tagName.indexOf("-") == -1) {
+                    cname = "@html:" + tagName;
                 }
                 else {
-                    cname = "@unknown:" + child.tag;
+                    cname = "@unknown:" + tagName;
                 }
             }
             else {
                 cname = component.libName + ":" + component.name;
             }
             if (rtn[cname] == null) {
-                rtn[cname] = new ChildrenVar([], this.dataenv);
+                rtn[cname] = new ChildrenVar([]);
             }
-            rtn[cname].list.push(child);
+            rtn[cname].pushChild(child);
         }
         return rtn;
     }
 
     get byslot() : Record<string, ChildrenVar> {
-        let rtn = {};
-        for (let child of this.list) {
-            let childSlot = getUnmergedAttributeStr(child, "slot", this.dataenv);
+        let rtn : Record<string, ChildrenVar> = {};
+        for (let child of this.boundNodes) {
+            let childSlot = child.resolveAttrStr("slot");
             if (childSlot == null) {
                 continue;
             }
             if (!(childSlot in rtn)) {
-                rtn[childSlot] = new ChildrenVar([], this.dataenv);
+                rtn[childSlot] = new ChildrenVar([]);
             }
-            rtn[childSlot].list.push(child);
+            rtn[childSlot].pushChild(child);
         }
         return rtn;
     }
 
     get bytag() : Record<string, ChildrenVar> {
-        let rtn = {};
-        for (let child of this.list) {
-            let tagName = child.tag;
+        let rtn : Record<string, ChildrenVar> = {};
+        for (let child of this.boundNodes) {
+            let tagName = child.node.tag;
             if (!(tagName in rtn)) {
-                rtn[tagName] = new ChildrenVar([], this.dataenv);
+                rtn[tagName] = new ChildrenVar([]);
             }
-            rtn[tagName].list.push(child);
+            rtn[tagName].pushChild(child);
         }
         return rtn;
     }
 
     get first() : ChildrenVar {
-        let rtn = (this.list.length > 0 ? [this.list[0]] : []);
-        return new ChildrenVar(rtn, this.dataenv);
+        let rtn : DBCtx[] = (this.boundNodes.length > 0 ? [this.boundNodes[0]] : []);
+        return new ChildrenVar(rtn);
     }
 
     get byindex() : ChildrenVar[] {
-        let rtn = [];
-        for (let child of this.list) {
-            rtn.push(new ChildrenVar([child], this.dataenv));
+        let rtn : ChildrenVar[] = [];
+        for (let child of this.boundNodes) {
+            rtn.push(new ChildrenVar([child]));
         }
         return rtn;
     }
@@ -226,30 +242,33 @@ class ChildrenVar {
             if (!(filterExpr instanceof LambdaValue)) {
                 throw new Error(sprintf("ChildrenVar filterexpr must be a LambdaValue, got '%s'", hibikiTypeOf(filterExpr)));
             }
-            let rtn = [];
+            let rtn : DBCtx[] = [];
             let hibiki = getHibiki();
-            for (let child of this.list) {
-                let childCtx : DBCtx = hibiki.DBCtxModule.makeCustomDBCtx(child, this.dataenv, null);
+            for (let childCtx of this.boundNodes) {
                 let nodeVar = childCtx.makeNodeVar(true);
                 let lambdaEnv = dataenv.makeChildEnv({node: nodeVar}, null);
                 let isActive = filterExpr.invoke(lambdaEnv, null);
                 if (isActive && isActive !== SYM_NOATTR) {
-                    rtn.push(child);
+                    rtn.push(childCtx);
                 }
             }
-            return new ChildrenVar(rtn, this.dataenv);
+            return new ChildrenVar(rtn);
         };
         return new LambdaValue(null, fn);
     }
 
+    pushChild(child : DBCtx) {
+        this.boundNodes.push(child);
+    }
+
     asString() : string {
         let arr = [];
-        for (let child of this.list) {
-            if (child.tag.startsWith("#")) {
-                arr.push(child.tag);
+        for (let child of this.boundNodes) {
+            if (child.node.tag.startsWith("#")) {
+                arr.push(child.node.tag);
             }
             else {
-                arr.push("<" + child.tag + ">");
+                arr.push("<" + child.node.tag + ">");
             }
         }
         if (arr.length === 0) {

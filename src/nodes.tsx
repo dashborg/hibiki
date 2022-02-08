@@ -9,7 +9,7 @@ import {If, For, When, Otherwise, Choose} from "tsx-control-statements/component
 import {v4 as uuidv4} from 'uuid';
 
 import type {ComponentType, LibraryType, HibikiExtState, LibComponentType, HibikiVal, HibikiValObj, HibikiReactProps} from "./types";
-import {DBCtx, makeDBCtx, makeCustomDBCtx, InjectedAttrsObj, createInjectObj, resolveArgsRoot} from "./dbctx";
+import {DBCtx, makeDBCtx, makeCustomDBCtx, InjectedAttrsObj, createInjectObj, resolveArgsRoot, bindNodeList, bindSingleNode, expandChildrenNode} from "./dbctx";
 import * as DataCtx from "./datactx";
 import {HibikiState, DataEnvironment} from "./state";
 import {resolveNumber, isObject, textContent, SYM_PROXY, SYM_FLATTEN, jseval, nodeStr, getHibiki, addToArrayDupCheck, removeFromArray, valInArray, subMapKey, unbox, bindLibContext, cnArrToClassAttr} from "./utils";
@@ -73,6 +73,7 @@ class HibikiRootNode extends React.Component<{hibikiState : HibikiExtState}, {}>
         let node = this.getHibikiNode();
         let dataenv = this.getDataenv();
         let ctx = makeCustomDBCtx(node, dataenv, null);
+        ctx.isRoot = true;
         return <NodeList list={ctx.node.list} ctx={ctx} isRoot={true}/>;
     }
 }
@@ -91,7 +92,7 @@ function evalOptionChildren(node : HibikiNode, dataenv : DataEnvironment) : stri
     return textRtn;
 }
 
-function ctxRenderHtmlChildren(ctx : DBCtx, dataenv? : DataEnvironment) : (Element | string)[] {
+function ctxRenderHtmlChildren(ctx : DBCtx, dataenv? : DataEnvironment) : React.ReactNode[] {
     if (dataenv == null) {
         dataenv = ctx.dataenv;
     }
@@ -102,78 +103,9 @@ function ctxRenderHtmlChildren(ctx : DBCtx, dataenv? : DataEnvironment) : (Eleme
     return rtn;
 }
 
-function baseRenderOneNode(node : HibikiNode, dataenv : DataEnvironment, injectedAttrs : InjectedAttrsObj, isRoot : boolean) : [any, boolean, DataEnvironment] {
-    if (node.tag == "#text") {
-        return [node.text, false, dataenv];
-    }
-    else if (node.tag == "#comment") {
-        return [null, false, null];
-    }
-    else if (NodeUtils.BLOCKED_ELEMS[node.tag]) {
-        return [null, false, null];
-    }
-    else if (node.tag == "if-break") {
-        let ifBreakCtx = makeCustomDBCtx(node, dataenv, null);
-        let [ifAttr, exists] = ifBreakCtx.resolveConditionAttr("condition");
-        if (!exists) {
-            return [<ErrorMsg message="<if-break> requires 'condition' attribute"/>, false, null];
-        }
-        if (!ifAttr) {
-            return [null, false, null];
-        }
-        return [<AnyNode node={node} dataenv={dataenv} injectedAttrs={injectedAttrs}/>, true, null];
-    }
-    else if (node.tag == "define-vars") {
-        let setCtx = makeCustomDBCtx(node, dataenv, null);
-        let contextAttr = setCtx.resolveAttrStr("context");
-        if (contextAttr == null) {
-            contextAttr = textContent(node).trim();
-            if (contextAttr === "") {
-                contextAttr = null;
-            }
-        }
-        if (contextAttr == null) {
-            return [<ErrorMsg message="<define-vars> no context attribute"/>, false, null];
-        }
-        try {
-            let ctxDataenv = DataCtx.ParseAndCreateContextThrow(contextAttr, "context", dataenv, "<define-vars>");
-            return [null, false, ctxDataenv];
-        }
-        catch (e) {
-            return [<ErrorMsg message={"<define-vars> Error parsing/executing context block: " + e}/>, false, null];
-        }
-        return [null, false, null];
-    }
-    else if (node.tag == "define-handler") {
-        let attrs = node.attrs || {};
-        if (!isRoot) {
-            return [<ErrorMsg message={"<define-handler> is only allowed at root of <hibiki>, <page>, or <define-component> nodes"}/>, false, null];
-        }
-        return [null, false, null];
-    }
-    else {
-        return [<AnyNode node={node} dataenv={dataenv} injectedAttrs={injectedAttrs}/>, false, null];
-    }
-}
-
-function baseRenderHtmlChildren(list : HibikiNode[], dataenv : DataEnvironment, isRoot : boolean) : Element[] {
-    let rtn : any[] = [];
-    if (list == null || list.length == 0) {
-        return null;
-    }
-    for (let child of list) {
-        let [elem, stopLoop, newDataenv] = baseRenderOneNode(child, dataenv, null, isRoot);
-        if (elem != null) {
-            rtn.push(elem);
-        }
-        if (stopLoop) {
-            break;
-        }
-        if (newDataenv != null) {
-            dataenv = newDataenv;
-        }
-    }
-    return rtn;
+function baseRenderHtmlChildren(list : HibikiNode[], dataenv : DataEnvironment, isRoot : boolean) : React.ReactNode[] {
+    let ctxList = bindNodeList(list, dataenv, isRoot);
+    return renderCtxList(ctxList);
 }
 
 @mobxReact.observer
@@ -208,6 +140,21 @@ function staticEvalTextNode(node : HibikiNode, dataenv : DataEnvironment) : stri
     return rtn;
 }
 
+function renderCtx(ctx : DBCtx) : React.ReactNode {
+    return <AnyNode node={ctx.node} dataenv={ctx.dataenv} injectedAttrs={ctx.injectedAttrs}/>;
+}
+
+function renderCtxList(ctxList : DBCtx[]) : React.ReactNode[] {
+    if (ctxList == null || ctxList.length == 0) {
+        return null;
+    }
+    let rtn : React.ReactNode[] = [];
+    for (let ctx of ctxList) {
+        rtn.push(renderCtx(ctx));
+    }
+    return rtn;
+}
+
 @mobxReact.observer
 class AnyNode extends React.Component<HibikiReactProps, {}> {
     nodeType : string = "unknown";
@@ -235,6 +182,9 @@ class AnyNode extends React.Component<HibikiReactProps, {}> {
         let tagName = ctx.node.tag;
         if (tagName.startsWith("hibiki-")) {
             return null;
+        }
+        if (tagName === "#text") {
+            return node.text;
         }
         let dataenv = ctx.dataenv;
         let dbstate = dataenv.dbstate;
@@ -681,7 +631,7 @@ class CustomNode extends React.Component<HibikiReactProps & {component : Compone
         let eventDE = ctx.dataenv.makeChildEnv(null, {eventBoundary: "hard", handlers: ctxHandlers, htmlContext: eventCtx});
         let nodeDataLV = ctx.getNodeDataLV(componentName);
         let specials : Record<string, any> = {};
-        specials.children = new DataCtx.ChildrenVar(ctx.node.list, ctx.dataenv);
+        specials.children = ctx.makeChildrenVar();
         specials.node = nodeVar;
         let argsRoot = resolveArgsRoot(ctx);
         let handlers = NodeUtils.makeHandlers(implNode, null, component.libName, ["event"]);
@@ -818,57 +768,11 @@ class WithContextNode extends React.Component<HibikiReactProps, {}> {
 class ChildrenNode extends React.Component<HibikiReactProps, {}> {
     render() : React.ReactNode {
         let ctx = makeDBCtx(this);
-        let textStr = ctx.resolveAttrStr("text");
-        if (textStr != null) {
-            return textStr;
-        }
-        let nodeDataenv : DataEnvironment = null;
-        let nodeList : HibikiNode[] = null;
-        let bindVal = ctx.resolveAttrVal("bind");
-        if (bindVal != null) {
-            if (!(bindVal instanceof DataCtx.ChildrenVar)) {
-                return <ErrorMsg message={sprintf("%s bind expression is not valid, must be [children] type", nodeStr(ctx.node))}/>;
-            }
-            nodeList = bindVal.list;
-            nodeDataenv = bindVal.dataenv;
-        }
-        else if (ctx.node.list != null) {
-            nodeList = ctx.node.list;
-            nodeDataenv = ctx.dataenv;
-        }
-        if (nodeList == null || nodeList.length == 0) {
+        let ctxList = expandChildrenNode(ctx);
+        if (ctxList == null || ctxList.length === 0) {
             return null;
         }
-        let contextattr = ctx.resolveAttrStr("datacontext");
-        if (contextattr != null) {
-            try {
-                let ctxEnv = DataCtx.ParseAndCreateContextThrow(contextattr, "context", ctx.dataenv, nodeStr(ctx.node));
-                nodeDataenv = nodeDataenv.makeChildEnv(ctxEnv.specials, null);
-            }
-            catch (e) {
-                return <ErrorMsg message={nodeStr(ctx.node) + " Error parsing/executing context block: " + e}/>;
-            }
-        }
-        let rtnElems = [];
-        for (let child of nodeList) {
-            let toInject : InjectedAttrsObj = null;
-            if (!NodeUtils.NON_INJECTABLE[child.tag] && !child.tag.startsWith("#")) {
-                toInject = createInjectObj(ctx, child, nodeDataenv);
-            }
-            let [elem, shouldBreak, newEnv] = baseRenderOneNode(child, nodeDataenv, toInject, false);
-            if (elem != null) {
-                rtnElems.push(elem);
-            }
-            if (shouldBreak) {
-                break;
-            }
-            if (newEnv) {
-                nodeDataenv = newEnv;
-            }
-        }
-        if (rtnElems.length == 0) {
-            return null;
-        }
+        let rtnElems = renderCtxList(ctxList);
         return <React.Fragment>{rtnElems}</React.Fragment>;
     }
 }

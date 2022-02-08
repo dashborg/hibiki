@@ -24,6 +24,7 @@ let BLOCKED_ELEMS : Record<string, boolean> = {
 let NON_INJECTABLE : Record<string, boolean> = {
     "define-vars": true,
     "if-break": true,
+    "#text": true,
 };
 
 let INLINE_ELEMS : Record<string, boolean> = {

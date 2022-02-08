@@ -98,21 +98,23 @@
     </div>
   </define-component>
 
+  <!-- inside of a modal, bulma uses different class names for cards -->
   <define-component name="card">
-    <div class="card" automerge>
-      <div class="card-header" if="fn:len(@children.byslot['header']) > 0 || $args.title">
-        <p if="$args.title" class="card-header-title">
+    <div class="* (@modal ? 'modal-card' : 'card')" automerge>
+      <div class="* (@modal ? 'modal-card-head' : 'card-header')" if="@children.byslot['header'].size || $args.title" automerge="header">
+        <p if="$args.title" class="* (@modal ? 'modal-card-title' : 'card-header-title')">
           {{ $args.title }}
         </p>
         <h-children bind="@children.byslot['header']"></h-children>
+        <button if="$args.hasclose" class="delete" click.handler="fire->close()"></button>
       </div>
-      <div class="card-image" if="fn:len(@children.byslot['image']) > 0">
+      <div class="card-image" if="@children.byslot['image'].size" automerge="image">
         <h-children bind="@children.byslot['image']"></h-children>
       </div>
-      <div class="card-content" if="fn:len(@children.noslot) > 0">
+      <div class="* (@modal ? 'modal-card-body' : 'card-content')" if="@children.noslot.size" automerge="content">
         <h-children bind="@children.noslot"></h-children>
       </div>
-      <div class="card-footer" if="fn:len(@children.byslot['footer']) > 0 || fn:len(@children.byslot['footer-item']) > 0">
+      <div class="* (@modal ? 'modal-card-foot' : 'card-footer')" if="@children.byslot['footer'].size || @children.byslot['footer-item'].size" automerge="footer">
         <h-children bind="@children.byslot['footer']"></h-children>
         <h-fragment foreach="@elem in @children.byslot['footer-item'].byindex">
           <h-children inject:class="card-footer-item" bind="@elem"></h-children>
@@ -125,8 +127,6 @@
     <define-vars>
       @active = raw($args.active) ?? ref($c.active);
       @curvalue = raw($args.value) ?? ref($c.curvalue);
-      @haslabel = $args.label || fn:len(@children.byslot['label']) > 0;
-      @numactive = 0;
       @activechildren = invoke(@children.bycomp["@hibiki/bulma:option"].filter, lambda(@node.attrs.value == @curvalue));
     </define-vars>
     <div class="dropdown" automerge class.is-active="* @active" active="*@active" hibiki-mark>
@@ -159,6 +159,49 @@
     <span if="@label">
       <h-children bind="@children"></h-children>
     </span>
+  </define-component>
+
+  <define-component name="menu">
+    
+  </define-component>
+
+  <define-component name="message" defaults="show=true;">
+    <define-vars>
+      @show = raw($args.show) ?? ref($c.show);
+    </define-vars>
+    <div if="@show" class="message" automerge>
+      <div hibiki-mark class="message-header" if="@children.byslot.header.size || $args.title" automerge="header">
+        <h-children text="*$args.title" bind="@children.byslot['header']"></h-children>
+        <button if="$args.hasdelete" click.handler="@show = false; fire->delete()" class="delete"></button>
+      </div>
+      <div class="message-body" automerge="body">
+        <h-children bind="@children.noslot"></h-children>
+      </div>
+    </div>
+  </define-component>
+
+  <define-component name="modal" defaults="show=true;">
+    <define-vars>
+      @show = raw($args.show) ?? ref($c.show);
+      @cardchildren = @children.bycomp['@hibiki/bulma:card'];
+    </define-vars>
+    <div class="modal" class.is-active="*@show">
+      <div class="modal-background"></div>
+      <div if="!@cardchildren.size" class="modal-content" automerge="content">
+        <h-children bind="@children.noslot"></h-children>
+      </div>
+      <h-children if="@cardchildren.size" bind="@cardchildren.first" inject:close.handler="@show = false; fire->close();" datacontext="@modal = true;"></h-children>
+      <button if="!$args.noclose" click.handler="@show = false; fire->close();" class="modal-close is-large"></button>
+    </div>
+  </define-component>
+
+  <define-component name="modalbutton" defaults="show=false;">
+    <local-modal show="*ref($c.show)">
+      <h-children bind="@children.noslot"></h-children>
+    </local-modal>
+    <button if="!$.show_modal" class="button" automerge="button" click.handler="$c.show = true;">
+      <h-children text="*$args.label" bind="@children.byslot['label']"></h-children>
+    </button>
   </define-component>
 
 </define-library>
