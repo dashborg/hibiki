@@ -16,6 +16,8 @@
 * added ChildrenVar.node (first node of ChildrenVar)
 * added ChilcrenVar.nodes (array of node objects)
 * added innerhtml and outerhtml to node var
+* updated when welcome message and usage ping to fire on library load.  can be suppressed using HibikiGlobalConfig
+* updated click and submit handlers to only automatically call event.preventDefault() when the href or action attributes are not present or set to "#".
 * bugfix: class.[class] was not being properly set to false when set to the Hibiki value false
 * bugfix: and/or operators were not correctly evaluating 'noattr' as false
 * bugfix: fix component defaults, define-vars, and h-withcontext, to never update mobx state

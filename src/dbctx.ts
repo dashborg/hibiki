@@ -631,7 +631,12 @@ class DBCtx {
     }
 
     @boundMethod handleOnSubmit(e : any) : boolean {
-        e.preventDefault();
+        if (e != null) {
+            let actionAttr = this.resolveAttrStr("action");
+            if (actionAttr == null || actionAttr === "#") {
+                e.preventDefault();
+            }
+        }
         let formData = new FormData(e.target);
         let paramsPromise = convertFormData(formData);
         paramsPromise.then((params) => {
@@ -642,7 +647,10 @@ class DBCtx {
 
     @boundMethod handleOnClick(e : any) : boolean {
         if (e != null) {
-            e.preventDefault();
+            let hrefAttr = this.resolveAttrStr("href");
+            if (hrefAttr == null || hrefAttr === "#") {
+                e.preventDefault();
+            }
         }
         this.handleEvent("click");
         return true;
