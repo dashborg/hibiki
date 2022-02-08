@@ -1058,14 +1058,6 @@ class HibikiState {
         this.HtmlObj.set(htmlobj);
     }
 
-    allowUsageImg() : boolean {
-        return !this.Config.noUsageImg;
-    }
-
-    allowWelcomeMessage() : boolean {
-        return !this.Config.noWelcomeMessage;
-    }
-
     unhandledEvent(event : EventType, rtctx : RtContext) {
         if (event.event === "init" || event.event === "unhandlederror") {
             return;

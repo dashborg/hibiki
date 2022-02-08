@@ -21,9 +21,6 @@ import type {EHandlerType, DataEnvironmentOpts} from "./state";
 
 declare var window : any;
 
-let welcomeMessage = false;
-let usageFired = false;
-
 @mobxReact.observer
 class ErrorMsg extends React.Component<{message: string}, {}> {
     render() : React.ReactNode {
@@ -47,23 +44,6 @@ class HibikiRootNode extends React.Component<{hibikiState : HibikiExtState}, {}>
         return this.getHibikiState().pageDataenv();
     }
     
-    componentDidMount() {
-        let dbstate = this.getHibikiState();
-        let flowerEmoji = String.fromCodePoint(0x1F338);
-        if (dbstate.allowUsageImg() && !usageFired) {
-            usageFired = true;
-            let versionStr = getHibiki().VERSION + "|" + getHibiki().BUILD;
-            let usageImg = new Image();
-            usageImg.src = sprintf("https://hibikihtml.com/hibiki-usage.gif?version=%s&build=%s", getHibiki().VERSION, getHibiki().BUILD);
-            usageImg.onload = function() {};
-        }
-        if (dbstate.allowWelcomeMessage() && !welcomeMessage) {
-            welcomeMessage = true;
-            let versionStr = getHibiki().VERSION + " " + getHibiki().BUILD;
-            console.log(flowerEmoji + sprintf(" Hibiki HTML https://github.com/dashborg/hibiki [%s] | Developed by Dashborg Inc https://dashborg.net", versionStr));
-        }
-    }
-
     getHibikiNode() : HibikiNode {
         return this.getHibikiState().findCurrentPage();
     }

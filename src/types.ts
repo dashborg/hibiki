@@ -129,11 +129,14 @@ type HttpConfig = {
     compiledCsrfToken? : string | JSFuncStr | (() => string) | HExpr, // internal use
 };
 
+type HibikiGlobalConfig = {
+    noUsagePing : boolean,
+    noWelcomeMessage : boolean,
+};
+
 type HibikiConfig = {
     noConfigMergeFromHtml? : boolean,
     noDataMergeFromHtml?   : boolean,
-    noUsageImg? : boolean,
-    noWelcomeMessage? : boolean,
     modules? : Record<string, ModuleConfig>,
     httpConfig? : HttpConfig;
     unhandledErrorHook? : ErrorCallbackFn;
@@ -207,6 +210,8 @@ interface Hibiki {
     States : Record<string, HibikiExtState>;
     DataCtx : any;
     DBCtxModule : any;
+    WelcomeMessageFired : boolean;
+    UsageFired: boolean;
 };
 
 interface HibikiExtState {
@@ -221,5 +226,5 @@ interface HibikiExtState {
     makeWatcher(exprStr : string, callback : (v : HibikiVal) => void) : (() => void);
 };
 
-export type {HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, ComponentType, LibraryType, HibikiRequest, Hibiki, HibikiAction, HibikiActionString, HibikiActionValue, HibikiExtState, EventType, HandlerValType, JSFuncType, FetchHookFn, CsrfHookFn, ReactClass, HandlerPathType, ErrorCallbackFn, EventCallbackFn, HtmlParserOpts, LibComponentType, HandlerBlock, HibikiVal, HibikiValObj, AutoMergeExpr, AutoFireExpr, HibikiReactProps, HttpConfig, JSFuncStr, HibikiSpecialVal, HibikiPrimitiveVal, StyleMapType};
+export type {HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, ComponentType, LibraryType, HibikiRequest, Hibiki, HibikiAction, HibikiActionString, HibikiActionValue, HibikiExtState, EventType, HandlerValType, JSFuncType, FetchHookFn, CsrfHookFn, ReactClass, HandlerPathType, ErrorCallbackFn, EventCallbackFn, HtmlParserOpts, LibComponentType, HandlerBlock, HibikiVal, HibikiValObj, AutoMergeExpr, AutoFireExpr, HibikiReactProps, HttpConfig, JSFuncStr, HibikiSpecialVal, HibikiPrimitiveVal, StyleMapType, HibikiGlobalConfig};
 
