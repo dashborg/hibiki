@@ -2,6 +2,12 @@
 
 ## v0.2.1
 
+Hibiki HTML is now licensed under the OSI approved MPL v2 (Mozilla Public License)!
+More information here: https://www.mozilla.org/en-US/MPL/2.0/FAQ/
+
+Lots of under the hood changes to make writing UI component libraries
+easier and more straight-forward.
+
 * 'unwrap' attribute to remove an enclosing tag and just render its children as a fragment
 * allow &lt;define-vars&gt; to receive context as a text node
 * dev builds report a version number
