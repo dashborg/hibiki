@@ -675,24 +675,15 @@ class DBCtx {
         this.dataenv.dbstate.NodeDataMap.delete(this.uuid);
     }
 
-    getNodeData(compName : string) : mobx.IObservableValue<HibikiVal> {
+    getNodeData(compName : string, defaultsObj? : HibikiValObj) : mobx.IObservableValue<HibikiValObj> {
         let box = this.dataenv.dbstate.NodeDataMap.get(this.uuid);
         if (box == null) {
             let uuidName = "id_" + this.uuid.replace(/-/g, "_");
-            box = mobx.observable.box({_hibiki: {"customtag": compName, uuid: this.uuid}}, {name: uuidName});
+            let nodeData = Object.assign({}, defaultsObj, {_hibiki: {"customtag": compName, uuid: this.uuid}});
+            box = mobx.observable.box(nodeData, {name: uuidName});
             this.dataenv.dbstate.NodeDataMap.set(this.uuid, box);
         }
         return box;
-    }
-
-    getNodeDataLV(compName : string) : DataCtx.ObjectLValue {
-        let box = this.dataenv.dbstate.NodeDataMap.get(this.uuid);
-        if (box == null) {
-            let uuidName = "id_" + this.uuid.replace(/-/g, "_");
-            box = mobx.observable.box({_hibiki: {"customtag": compName, uuid: this.uuid}}, {name: uuidName});
-            this.dataenv.dbstate.NodeDataMap.set(this.uuid, box);
-        }
-        return new DataCtx.ObjectLValue(null, box);
     }
 
     makeNodeVar(withAttrs : boolean) : HibikiValObj {
@@ -770,13 +761,12 @@ function bindSingleNode(node : HibikiNode, dataenv : DataEnvironment, injectedAt
             return [makeErrorDBCtx("<define-vars> no context attribute", dataenv), false, null];
         }
         try {
-            let ctxDataenv = DataCtx.ParseAndCreateContextThrow(contextAttr, "context", dataenv, "<define-vars>");
-            return [null, false, ctxDataenv];
+            let specials = DataCtx.ParseAndCreateSpecialsThrow(contextAttr, dataenv, "<define-vars>");
+            return [null, false, dataenv.makeChildEnv(specials, {htmlContext: "<define-vars>"})];
         }
         catch (e) {
             return [makeErrorDBCtx("<define-vars> Error parsing/executing context block: " + e, dataenv), false, null];
         }
-        return [null, false, null];
     }
     if (node.tag === "define-handler") {
         if (!isRoot) {
@@ -837,8 +827,7 @@ function expandChildrenNode(ctx : DBCtx) : DBCtx[] {
     let contextattr = ctx.resolveAttrStr("datacontext");
     if (contextattr != null) {
         try {
-            let ctxEnv = DataCtx.ParseAndCreateContextThrow(contextattr, "context", ctx.dataenv, nodeStr(ctx.node));
-            ctxSpecials = ctxEnv.specials;
+            ctxSpecials = DataCtx.ParseAndCreateSpecialsThrow(contextattr, ctx.dataenv, nodeStr(ctx.node));
         }
         catch (e) {
             let msg = nodeStr(ctx.node) + " Error parsing/executing context block: " + e;

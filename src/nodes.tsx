@@ -17,7 +17,7 @@ import {parseHtml, HibikiNode, NodeAttrType} from "./html-parser";
 import * as NodeUtils from "./nodeutils";
 import {RtContext, HibikiError} from "./error";
 import type {HAction} from "./datactx";
-import type {EHandlerType} from "./state";
+import type {EHandlerType, DataEnvironmentOpts} from "./state";
 
 declare var window : any;
 
@@ -629,14 +629,13 @@ class CustomNode extends React.Component<HibikiReactProps & {component : Compone
         let ctxHandlers = NodeUtils.makeHandlers(ctx.node, ctx.injectedAttrs, null, null);
         let eventCtx = sprintf("%s", nodeStr(ctx.node));
         let eventDE = ctx.dataenv.makeChildEnv(null, {eventBoundary: "hard", handlers: ctxHandlers, htmlContext: eventCtx});
-        let nodeDataLV = ctx.getNodeDataLV(componentName);
         let specials : Record<string, any> = {};
         specials.children = ctx.makeChildrenVar();
         specials.node = nodeVar;
         let argsRoot = resolveArgsRoot(ctx);
         let handlers = NodeUtils.makeHandlers(implNode, null, component.libName, ["event"]);
-        let envOpts = {
-            componentRoot: unbox(ctx.getNodeData(componentName)),
+        let envOpts : DataEnvironmentOpts = {
+            componentRoot: {},
             argsRoot: argsRoot,
             handlers: handlers,
             htmlContext: sprintf("<define-component %s>", componentName),
@@ -645,14 +644,21 @@ class CustomNode extends React.Component<HibikiReactProps & {component : Compone
         };
         let childEnv = eventDE.makeChildEnv(specials, envOpts);
         if (initialize && rawImplAttrs.defaults != null) {
+            let htmlContext = sprintf("<define-component %s>:defaults", componentName);
+            let defaultsObj = {};
             try {
-                DataCtx.ParseAndCreateContextThrow(DataCtx.rawAttrStr(rawImplAttrs.defaults), "c", childEnv, sprintf("<define-component %s>:defaults", componentName));
+                let defaultsStr = DataCtx.rawAttrStr(rawImplAttrs.defaults);
+                defaultsObj = DataCtx.ParseAndCreateSpecialsThrow(defaultsStr, childEnv, htmlContext);
             }
             catch (e) {
                 console.log(sprintf("ERROR parsing/executing 'defaults' in <define-component %s>", componentName), e);
             }
+            childEnv.componentRoot = unbox(ctx.getNodeData(componentName, defaultsObj));
             let implCtx = makeCustomDBCtx(implNode, childEnv, null);
             implCtx.handleInitEvent();
+        }
+        else {
+            childEnv.componentRoot = unbox(ctx.getNodeData(componentName));
         }
         return childEnv;
     }
@@ -755,7 +761,8 @@ class WithContextNode extends React.Component<HibikiReactProps, {}> {
             return <ErrorMsg message={sprintf("%s no context attribute", nodeStr(ctx.node))}/>;
         }
         try {
-            let ctxDataenv = DataCtx.ParseAndCreateContextThrow(contextattr, "context", ctx.dataenv, nodeStr(ctx.node));
+            let specials = DataCtx.ParseAndCreateSpecialsThrow(contextattr, ctx.dataenv, nodeStr(ctx.node));
+            let ctxDataenv = ctx.dataenv.makeChildEnv(specials, {htmlContext: nodeStr(ctx.node)});
             return ctxRenderHtmlChildren(ctx, ctxDataenv);
         }
         catch (e) {

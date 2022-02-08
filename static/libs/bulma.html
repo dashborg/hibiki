@@ -3,7 +3,7 @@
     <div class="control" unwrap="!$args.control" automerge="control">
       <button component="*$args.buttoncomponent" class="button" automerge click.handler="fire->click()">
         <span if="$args.icon" class="icon" automerge="icon"><i class="*$args.icon"></i></span>
-        <h-fragment if="!!$args.icon && fn:len(@children.list) > 0">
+        <h-fragment if="!!$args.icon && @children.size">
           <span><h-children bind="@children"></h-children></span>
         </h-fragment>
         <h-fragment if="!$args.icon">
@@ -132,10 +132,10 @@
     <div class="dropdown" automerge class.is-active="* @active" active="*@active" hibiki-mark>
       <div class="dropdown-trigger">
         <button class="button" aria-haspopup="true" aria-controls="dropdown-menu" click.handler="log('menu-click'); @active = !@active">
-          <h-if condition="fn:len(@activechildren.list) > 0">
+          <h-if condition="@activechildren.size">
             <h-children bind="@activechildren.first" datacontext="@label=true"></h-children>
           </h-if>
-          <h-if condition="fn:len(@activechildren.list) == 0">
+          <h-if condition="!@activechildren.size">
             <span if="$args.label">{{ $args.label }}</span>
             <h-children bind="@children.byslot['label']"></h-children>
           </h-if>
@@ -196,10 +196,13 @@
   </define-component>
 
   <define-component name="modalbutton" defaults="show=false;">
-    <local-modal show="*ref($c.show)">
+    <define-vars>
+      @show = raw($args.show) ?? ref($c.show);
+    </define-vars>
+    <local-modal show="*@show">
       <h-children bind="@children.noslot"></h-children>
     </local-modal>
-    <button if="!$.show_modal" class="button" automerge="button" click.handler="$c.show = true;">
+    <button if="!$.show_modal" class="button" automerge="button" click.handler="@show = true;">
       <h-children text="*$args.label" bind="@children.byslot['label']"></h-children>
     </button>
   </define-component>

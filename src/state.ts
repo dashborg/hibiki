@@ -883,7 +883,7 @@ class HibikiState {
     DataNodeStates : Record<string, {query : string, dnstate : any}> = {};
     ResourceCache : Record<string, boolean> = {};
     HasRendered = false;
-    NodeDataMap : Map<string, mobx.IObservableValue<HibikiVal>> = new Map();  // TODO clear on unmount
+    NodeDataMap : Map<string, mobx.IObservableValue<HibikiValObj>> = new Map();
     ExtHtmlObj : mobx.ObservableMap<string,any> = mobx.observable.map({}, {name: "ExtHtmlObj", deep: false});
     Config : HibikiConfig = {};
     PageName : mobx.IObservableValue<string> = mobx.observable.box("default", {name: "PageName"});
@@ -1337,4 +1337,4 @@ function hasHtmlRR(rra : any[]) : boolean {
 
 
 export {HibikiState, DataEnvironment, HibikiExtState};
-export type {EHandlerType};
+export type {EHandlerType, DataEnvironmentOpts};

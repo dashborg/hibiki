@@ -18,6 +18,7 @@
 * added innerhtml and outerhtml to node var
 * bugfix: class.[class] was not being properly set to false when set to the Hibiki value false
 * bugfix: and/or operators were not correctly evaluating 'noattr' as false
+* bugfix: fix component defaults, define-vars, and h-withcontext, to never update mobx state
 
 ## v0.2.0
 
