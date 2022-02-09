@@ -310,28 +310,38 @@ function makeHandlers(node : HibikiNode, injectedAttrs : InjectedAttrsObj, libCo
         }
     }
     if (handlerPrefixes != null && node.list != null) {
-        for (let i=0; i<node.list.length; i++) {
-            let subNode = node.list[i];
-            if (subNode.tag !== "define-handler") {
-                continue;
-            }
-            let attrs = getRawAttrs(subNode);
-            if (attrs.name == null) {
-                continue;
-            }
-            if (subNode.handlers == null || subNode.handlers["handler"] == null) {
-                continue;
-            }
-            let hname = attrs.name;
-            let prefixOk = false;
-            for (let j=0; j<handlerPrefixes.length; j++) {
-                if (hname.startsWith(sprintf("//@%s/", handlerPrefixes[j]))) {
-                    prefixOk = true;
-                    break;
+        let contextVars : DataCtx.ContextVarType[] = [];
+        for (let subNode of node.list) {
+            if (subNode.tag === "define-vars") {
+                if (subNode.contextVars) {
+                    contextVars.push(...subNode.contextVars);
                 }
+                continue;
             }
-            if (prefixOk) {
-                handlers[hname] = {block: new DataCtx.HActionBlock("handler", subNode.handlers["handler"], libContext), node: subNode};
+            if (subNode.tag === "define-handler") {
+                let attrs = getRawAttrs(subNode);
+                if (attrs.name == null) {
+                    continue;
+                }
+                if (subNode.handlers == null || subNode.handlers["handler"] == null) {
+                    continue;
+                }
+                let hname = attrs.name;
+                let prefixOk = false;
+                for (let j=0; j<handlerPrefixes.length; j++) {
+                    if (hname.startsWith(sprintf("//@%s/", handlerPrefixes[j]))) {
+                        prefixOk = true;
+                        break;
+                    }
+                }
+                if (prefixOk) {
+                    let actionBlock = new DataCtx.HActionBlock("handler", subNode.handlers["handler"], libContext);
+                    let htype : HandlerValType = {block: actionBlock, node: subNode};
+                    if (contextVars.length > 0) {
+                        htype.contextVars = contextVars;
+                    }
+                    handlers[hname] = htype;
+                }
             }
         }
     }

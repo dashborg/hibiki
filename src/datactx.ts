@@ -2696,7 +2696,18 @@ async function FireEvent(event : EventType, dataenv : DataEnvironment, rtctx : R
         return null;
     }
     let htmlContext = sprintf("event%s(%s)", (event.bubble ? "-bubble" : ""), event.event);
-    let eventEnv = ehandler.dataenv.makeChildEnv(event.datacontext, {htmlContext: htmlContext});
+    let eventEnv = ehandler.dataenv;
+    if (ehandler.contextVars != null) {
+        try {
+            let evalCtxContextStr = htmlContext + " <define-vars>";
+            let specials = EvalContextVarsThrow(ehandler.contextVars, eventEnv, evalCtxContextStr);
+            eventEnv = eventEnv.makeChildEnv(specials, {htmlContext: "<define-vars>"});
+        }
+        catch (e) {
+            console.log(sprintf("ERROR evaluating <define-vars> before running %s", htmlContext), e);
+        }
+    }
+    eventEnv = eventEnv.makeChildEnv(event.datacontext, {htmlContext: htmlContext});
     let ctxStr = sprintf("Running %s:%s.handler (in [[%s]])", nodeStr(ehandler.node), event.event, ehandler.dataenv.getFullHtmlContext());
     rtctx.pushContext(ctxStr, {handlerEnv: ehandler.dataenv, handlerName: event.event, handlerNode: ehandler.node});
     try {
@@ -2790,7 +2801,7 @@ function makeErrorObj(e : any, rtctx : RtContext) : HibikiError {
     return rtnErr;
 }
 
-function EvalContextVars(ctxVars : ContextVarType[], dataenv : DataEnvironment, htmlContext : string) : HibikiValObj {
+function EvalContextVarsThrow(ctxVars : ContextVarType[], dataenv : DataEnvironment, htmlContext : string) : HibikiValObj {
     let rtctx = new RtContext();
     rtctx.pushContext(htmlContext, null);
     let specials : HibikiValObj = {};
@@ -2988,7 +2999,7 @@ function setLValue(lv : LValue, setVal : HibikiVal) : void {
     rlv.set(setVal);
 }
 
-export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, JsonStringify, EvalSimpleExpr, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, DeepCopy, CheckCycle, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, makeIteratorFromExpr, rawAttrStr, getUnmergedAttributeStr, getUnmergedAttributeValPair, SYM_NOATTR, HActionBlock, valToString, valToBool, compileActionStr, FireEvent, makeErrorObj, OpaqueValue, ChildrenVar, Watcher, LambdaValue, blobPrintStr, asNumber, hibikiTypeOf, JsonReplacerFn, valToAttrStr, resolveLValue, resolveUnmergedCnArray, isUnmerged, resolveUnmergedStyleMap, asStyleMap, asStyleMapFromPair, EvalContextVars};
+export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, JsonStringify, EvalSimpleExpr, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, DeepCopy, CheckCycle, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, makeIteratorFromExpr, rawAttrStr, getUnmergedAttributeStr, getUnmergedAttributeValPair, SYM_NOATTR, HActionBlock, valToString, valToBool, compileActionStr, FireEvent, makeErrorObj, OpaqueValue, ChildrenVar, Watcher, LambdaValue, blobPrintStr, asNumber, hibikiTypeOf, JsonReplacerFn, valToAttrStr, resolveLValue, resolveUnmergedCnArray, isUnmerged, resolveUnmergedStyleMap, asStyleMap, asStyleMapFromPair, EvalContextVarsThrow};
 
 export type {PathType, HAction, HExpr, HIteratorExpr, ContextVarType};
 

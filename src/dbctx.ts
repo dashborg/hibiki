@@ -763,7 +763,7 @@ function bindSingleNode(node : HibikiNode, dataenv : DataEnvironment, injectedAt
     if (node.tag === "define-vars") {
         let setCtx = makeCustomDBCtx(node, dataenv, null);
         try {
-            let specials = DataCtx.EvalContextVars(node.contextVars, dataenv, "<define-vars>");
+            let specials = DataCtx.EvalContextVarsThrow(node.contextVars, dataenv, "<define-vars>");
             return [null, false, dataenv.makeChildEnv(specials, {htmlContext: "<define-vars>"})];
         }
         catch (e) {
@@ -831,7 +831,7 @@ function expandChildrenNode(ctx : DBCtx) : DBCtx[] {
     let ctxSpecials = {};
     if (ctx.node.contextVars != null) {
         try {
-            ctxSpecials = DataCtx.EvalContextVars(ctx.node.contextVars, ctx.dataenv, nodeStr(ctx.node));
+            ctxSpecials = DataCtx.EvalContextVarsThrow(ctx.node.contextVars, ctx.dataenv, nodeStr(ctx.node));
         }
         catch (e) {
             let msg = nodeStr(ctx.node) + " Error evaluating datacontext block: " + e;

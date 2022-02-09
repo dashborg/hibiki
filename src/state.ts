@@ -27,7 +27,12 @@ type CallHandlerOptsType = {
     rtContext? : RtContext,
 };
 
-type EHandlerType = {handler : HandlerBlock, node : HibikiNode, dataenv : DataEnvironment};
+type EHandlerType = {
+    handler : HandlerBlock,
+    node : HibikiNode,
+    dataenv : DataEnvironment,
+    contextVars? : DataCtx.ContextVarType[],
+};
 
 let RESTRICTED_MODS = {
     "": true,
@@ -296,9 +301,9 @@ class DataEnvironment {
         if ((evHandlerName in env.handlers) && !rtctx.isHandlerInStack(env, event.event)) {
             let hval = env.handlers[evHandlerName];
             if (hval.boundDataenv != null) {
-                return {handler: hval.block, node: hval.node, dataenv: hval.boundDataenv};
+                return {handler: hval.block, node: hval.node, dataenv: hval.boundDataenv, contextVars: hval.contextVars};
             }
-            return {handler: hval.block, node: hval.node, dataenv: env};
+            return {handler: hval.block, node: hval.node, dataenv: env, contextVars: hval.contextVars};
         }
         if (env.parent == null) {
             return null;

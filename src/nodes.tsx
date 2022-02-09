@@ -629,9 +629,9 @@ class CustomNode extends React.Component<HibikiReactProps & {component : Compone
         let childEnv = eventDE.makeChildEnv(specials, envOpts);
         if (initialize && implNode.contextVars != null) {
             let htmlContext = sprintf("<define-component %s>:componentdata", componentName);
-            let componentDataObj = {};
+            let componentDataObj : HibikiValObj = {};
             try {
-                componentDataObj = DataCtx.EvalContextVars(implNode.contextVars, childEnv, htmlContext);
+                componentDataObj = DataCtx.EvalContextVarsThrow(implNode.contextVars, childEnv, htmlContext);
             }
             catch (e) {
                 console.log(sprintf("ERROR evaluating 'componentdata' in %s", nodeStr(implNode)), e);
