@@ -337,48 +337,53 @@ function jsDeepEqual(val1 : HibikiVal, val2 : HibikiVal) : boolean {
     return DataCtx.DeepEqual(val1, val2);
 }
 
-reg("len", jsLen, true);
-reg("indexof", jsIndexOf, true);
-reg("min", jsMin, false);
-reg("max", jsMax, false);
-reg("floor", jsFloor, false);
-reg("ceil", jsCeil, false);
-reg("splice", jsSplice, true);
-reg("slice", jsSlice, true);
-reg("push", jsPush, true);
-reg("pop", jsPop, true);
-reg("setadd", jsSetAdd, true);
-reg("setremove", jsSetRemove, true);
-reg("sethas", jsSetHas, true);
-reg("int", jsInt, true);
-reg("float", jsFloat, true);
-reg("str", jsStr, true);
-reg("bool", jsBool, true);
-reg("jsonparse", jsJsonParse, true);
-reg("json", jsJson, true);
-reg("split", jsSplit, true);
-reg("now", jsNow, true);
-reg("ts",  jsNow, true);
-reg("merge", jsMerge, true);
-reg("jseval", jsEval, true);
-reg("js", jsJs, false);
-reg("substr", jsSubstr, true);
-reg("sprintf", jsSprintf, true);
-reg("trim", jsTrim, true);
-reg("startswith", jsStartsWith, true);
-reg("endswith", jsEndsWith, true);
-reg("match", jsMatch, true);
-reg("blobastext", jsBlobAsText, true);
-reg("blobasbase64", jsBlobAsBase64, true);
-reg("blobmimetype", jsBlobMimeType, true);
-reg("bloblen", jsBlobLen, true);
-reg("blobname", jsBlobName, true);
-reg("uuid", jsUuid, true);
-reg("typeof", jsTypeOf, true);
-reg("deepequal", jsDeepEqual, true);
-
-function reg(name : string, fn : any, native : boolean) {
-    DefaultJSFuncs[name] = {fn, native};
+function jsDeepCopy(val : HibikiVal) : HibikiVal {
+    return DataCtx.DeepCopy(val, {resolve: true});
 }
+
+function reg(name : string, fn : any, native : boolean, positionalArgs : boolean) {
+    DefaultJSFuncs[name] = {fn, native, positionalArgs};
+}
+
+reg("len", jsLen, true, true);
+reg("indexof", jsIndexOf, true, true);
+reg("min", jsMin, false, true);
+reg("max", jsMax, false, true);
+reg("floor", jsFloor, false, true);
+reg("ceil", jsCeil, false, true);
+reg("splice", jsSplice, true, true);
+reg("slice", jsSlice, true, true);
+reg("push", jsPush, true, true);
+reg("pop", jsPop, true, true);
+reg("setadd", jsSetAdd, true, true);
+reg("setremove", jsSetRemove, true, true);
+reg("sethas", jsSetHas, true, true);
+reg("int", jsInt, true, true);
+reg("float", jsFloat, true, true);
+reg("str", jsStr, true, true);
+reg("bool", jsBool, true, true);
+reg("jsonparse", jsJsonParse, true, true);
+reg("json", jsJson, true, true);
+reg("split", jsSplit, true, true);
+reg("now", jsNow, true, true);
+reg("ts",  jsNow, true, true);
+reg("merge", jsMerge, true, true);
+reg("jseval", jsEval, true, true);
+reg("js", jsJs, false, true);
+reg("substr", jsSubstr, true, true);
+reg("sprintf", jsSprintf, true, true);
+reg("trim", jsTrim, true, true);
+reg("startswith", jsStartsWith, true, true);
+reg("endswith", jsEndsWith, true, true);
+reg("match", jsMatch, true, true);
+reg("blobastext", jsBlobAsText, true, true);
+reg("blobasbase64", jsBlobAsBase64, true, true);
+reg("blobmimetype", jsBlobMimeType, true, true);
+reg("bloblen", jsBlobLen, true, true);
+reg("blobname", jsBlobName, true, true);
+reg("uuid", jsUuid, true, true);
+reg("typeof", jsTypeOf, true, true);
+reg("deepequal", jsDeepEqual, true, true);
+reg("deepcopy", jsDeepCopy, true, true);
 
 export {DefaultJSFuncs};

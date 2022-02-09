@@ -379,8 +379,8 @@ var grammar = {
     {"name": "primaryExpr", "symbols": ["refExpr"], "postprocess": id},
     {"name": "primaryExpr", "symbols": [(lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "fullExpr", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => data[1]},
     {"name": "primaryExpr", "symbols": ["pathExprNonTerm"], "postprocess": id},
-    {"name": "fnExpr", "symbols": [(lexer.has("FN") ? {type: "FN"} : FN), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "optionalLiteralArrayElements", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess":  (data) => {
-            return {etype: "fn", fn: data[0].value, exprs: data[2]};
+    {"name": "fnExpr", "symbols": [(lexer.has("FN") ? {type: "FN"} : FN), "namedCallParams"], "postprocess":  (data) => {
+            return {etype: "fn", fn: data[0].value, params: data[1]};
         } },
     {"name": "refExpr", "symbols": [(lexer.has("KW_REF") ? {type: "KW_REF"} : KW_REF), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "fullPathExpr", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => ({etype: "ref", pathexpr: data[2]})},
     {"name": "refExpr", "symbols": [(lexer.has("KW_ISREF") ? {type: "KW_ISREF"} : KW_ISREF), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "fullExpr", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => ({etype: "isref", exprs: [data[2]]})},
@@ -390,9 +390,9 @@ var grammar = {
     {"name": "invokeExpr$ebnf$1", "symbols": ["invokeExpr$ebnf$1$subexpression$1"], "postprocess": id},
     {"name": "invokeExpr$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
     {"name": "invokeExpr", "symbols": [(lexer.has("KW_INVOKE") ? {type: "KW_INVOKE"} : KW_INVOKE), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "fullExpr", "invokeExpr$ebnf$1", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess":  (data) => {
-            let rtn = {etype: "invoke", exprs: [data[2]]};
+            let rtn = {etype: "invoke", exprs: [data[2]], params: null};
             if (data[3] != null) {
-                rtn.exprs.push(data[3][1]);
+                rtn.params = data[3][1];
             }
             return rtn;
         } },

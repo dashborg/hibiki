@@ -27,9 +27,10 @@ easier and more straight-forward.
 * removed h-withcontext node (define-vars is more powerful)
 * define-vars, inline context attribute renamed from 'context' to 'datacontext' (to match h-children)
 * define-component, initial component data attribute renamed from 'defaults' to 'componentdata'
-* added new fn:floor and fn:ceil math functions
+* added new fn:floor and fn:ceil math functions, and fn:deepcopy
 * define-vars, datacontext, and componentdata blocks are now parsed once when HTML is loaded (not on demand)
 * components now fire 'mount' event internally (as well as externally)
+* change to grammar to allow functions (fn) to receive named parameters
 * bugfix: class.[class] was not being properly set to false when set to the Hibiki value false
 * bugfix: and/or operators were not correctly evaluating 'noattr' as false
 * bugfix: fix component defaults, define-vars, and h-withcontext, to never update mobx state

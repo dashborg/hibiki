@@ -428,8 +428,8 @@ primaryExpr ->
 
 
 fnExpr -> 
-      %FN %LPAREN optionalLiteralArrayElements %RPAREN {% (data) => {
-          return {etype: "fn", fn: data[0].value, exprs: data[2]};
+      %FN namedCallParams {% (data) => {
+          return {etype: "fn", fn: data[0].value, params: data[1]};
       } %}
 
 refExpr -> 
@@ -439,9 +439,9 @@ refExpr ->
     | %KW_RAW %LPAREN fullPathExpr %RPAREN {% (data) => ({etype: "raw", exprs: [data[2]]}) %}
 
 invokeExpr -> %KW_INVOKE %LPAREN fullExpr (%COMMA innerNamedCallParams):? %RPAREN {% (data) => {
-          let rtn = {etype: "invoke", exprs: [data[2]]};
+          let rtn = {etype: "invoke", exprs: [data[2]], params: null};
           if (data[3] != null) {
-              rtn.exprs.push(data[3][1]);
+              rtn.params = data[3][1];
           }
           return rtn;
       } %}

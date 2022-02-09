@@ -48,6 +48,7 @@ type HExpr = {
     valexpr?   : HExpr,
     pathexpr?  : HExpr,
     sourcestr? : string,
+    params?    : HExpr,   // namedCallParams
 };
 
 type ContextVarType = {key : string, expr : HExpr};
@@ -1940,11 +1941,17 @@ function evalFnAst(fnAst : any, dataenv : DataEnvironment) : HibikiVal {
         stateFn = state.JSFuncs[fnName];
     }
     if (stateFn != null) {
-        let elist : HibikiVal[] = evalExprArray(fnAst.exprs, dataenv, "natural");
+        let params : HibikiValObj = evalExprAst(fnAst.params, dataenv, "natural") as HibikiValObj;
         if (!stateFn.native) {
-            elist = (DeepCopy(elist, {resolve: true}) as HibikiVal[]);
+            params = (DeepCopy(params, {resolve: true}) as HibikiValObj);
         }
-        return stateFn.fn(...elist);
+        if (stateFn.positionalArgs) {
+            let posArgs = unpackPositionalArgArray(params);
+            return stateFn.fn(...posArgs);
+        }
+        else {
+            return stateFn.fn(params, dataenv);
+        }
     }
     else {
         throw new Error(sprintf("Invalid function: '%s'", fnAst.fn));
@@ -2301,10 +2308,7 @@ function evalExprAstInternal(exprAst : HExpr, dataenv : DataEnvironment, rtype :
         if (!(val instanceof LambdaValue)) {
             return val;
         }
-        let invokeData = null;
-        if (exprAst.exprs.length > 1) {
-            invokeData = evalExprAst(exprAst.exprs[1], dataenv, "natural");
-        }
+        let invokeData : HibikiValObj = evalExprAst(exprAst.params, dataenv, "natural") as HibikiValObj;
         return val.invoke(dataenv, invokeData);
     }
     else if (exprAst.etype === "lambda") {
@@ -2966,6 +2970,9 @@ function blobPrintStr(blob : Blob | HibikiBlob) : string {
 }
 
 function resolveLValue(val : HibikiVal) : HibikiVal {
+    if (val == null) {
+        return null;
+    }
     let level = 0;
     while (val instanceof LValue) {
         val = val.getEx();

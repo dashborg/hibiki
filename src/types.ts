@@ -42,6 +42,7 @@ type AutoFireExpr = {
 type JSFuncType = {
     fn : (...args : any[]) => any,
     native : boolean,
+    positionalArgs : boolean,
 };
 
 type HandlerPathType = {
