@@ -113,11 +113,9 @@ function staticEvalTextNode(node : HibikiNode, dataenv : DataEnvironment) : stri
     if (tagName != "h-text") {
         return nodeStr(node);
     }
-    if (!ctx.isEditMode()) {
-        let [ifVal, exists] = ctx.resolveConditionAttr("if");
-        if (exists && !ifVal) {
-            return null;
-        }
+    let [ifVal, exists] = ctx.resolveConditionAttr("if");
+    if (exists && !ifVal) {
+        return null;
     }
     // TODO foreach
     let rtn = NodeUtils.renderTextData(ctx, true);
@@ -174,18 +172,16 @@ class AnyNode extends React.Component<HibikiReactProps, {}> {
         let dbstate = dataenv.dbstate;
         let compName = ctx.resolveAttrStr("component") ?? tagName;
         let component = dbstate.ComponentLibrary.findComponent(compName, node.libContext);
-        if (!ctx.isEditMode()) {
-            if (!iterating && node.foreachAttr != null) {
-                return this.renderForeach(ctx);
-            }
-            let [ifVal, ifExists] = ctx.resolveConditionAttr("if");
-            if (ifExists && !ifVal) {
-                return null;
-            }
-            let [unwrapVal, unwrapExists] = ctx.resolveConditionAttr("unwrap");
-            if (unwrapExists && unwrapVal) {
-                return <FragmentNode node={node} dataenv={dataenv} injectedAttrs={ctx.injectedAttrs}/>;
-            }
+        if (!iterating && node.foreachAttr != null) {
+            return this.renderForeach(ctx);
+        }
+        let [ifVal, ifExists] = ctx.resolveConditionAttr("if");
+        if (ifExists && !ifVal) {
+            return null;
+        }
+        let [unwrapVal, unwrapExists] = ctx.resolveConditionAttr("unwrap");
+        if (unwrapExists && unwrapVal) {
+            return <FragmentNode node={node} dataenv={dataenv} injectedAttrs={ctx.injectedAttrs}/>;
         }
         if (component != null) {
             if (component.componentType == "react-custom") {
@@ -231,9 +227,6 @@ class AnyNode extends React.Component<HibikiReactProps, {}> {
 class CustomReactNode extends React.Component<HibikiReactProps & {component : ComponentType}, {}> {
     componentDidMount() {
         let ctx = makeDBCtx(this);
-        if (ctx.isEditMode()) {
-            return;
-        }
         ctx.handleMountEvent();
     }
     
@@ -277,9 +270,6 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
 
     componentDidMount() {
         let ctx = makeDBCtx(this);
-        if (ctx.isEditMode()) {
-            return;
-        }
         ctx.handleMountEvent();
     }
 
@@ -544,42 +534,40 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
             elemProps["value"] = "";
         }
         
-        if (!ctx.isEditMode()) {
-            // forms are managed if submit.handler
-            if (tagName == "form" && ctx.hasHandler("submit")) {
-                elemProps.onSubmit = ctx.handleOnSubmit;
+        // forms are managed if submit.handler
+        if (tagName == "form" && ctx.hasHandler("submit")) {
+            elemProps.onSubmit = ctx.handleOnSubmit;
+        }
+        
+        if (ctx.hasHandler("click")) {
+            elemProps.onClick = ctx.handleOnClick;
+            // anchors with click.handler work like links (not locations)
+            if (tagName == "a" && elemProps["href"] == null) {
+                elemProps["href"] = "#";
             }
-
-            if (ctx.hasHandler("click")) {
-                elemProps.onClick = ctx.handleOnClick;
-                // anchors with click.handler work like links (not locations)
-                if (tagName == "a" && elemProps["href"] == null) {
-                    elemProps["href"] = "#";
-                }
-            }
+        }
             
-            if (managedType != null) {
-                if (managedType == "value") {
-                    this.setupManagedValue(ctx, elemProps);
-                }
-                else if (managedType == "radio") {
-                    this.setupManagedRadio(ctx, elemProps);
-                }
-                else if (managedType == "checkbox") {
-                    this.setupManagedCheckbox(ctx, elemProps);
-                }
-                else if (managedType == "file") {
-                    this.setupManagedFile(ctx, elemProps);
-                }
-                else if (managedType == "select") {
-                    this.setupManagedSelect(ctx, elemProps);
-                }
-                else if (managedType == "hidden") {
-                    this.setupManagedHidden(ctx, elemProps);
-                }
-                else {
-                    console.log("Invalid managedType", managedType);
-                }
+        if (managedType != null) {
+            if (managedType == "value") {
+                this.setupManagedValue(ctx, elemProps);
+            }
+            else if (managedType == "radio") {
+                this.setupManagedRadio(ctx, elemProps);
+            }
+            else if (managedType == "checkbox") {
+                this.setupManagedCheckbox(ctx, elemProps);
+            }
+            else if (managedType == "file") {
+                this.setupManagedFile(ctx, elemProps);
+            }
+            else if (managedType == "select") {
+                this.setupManagedSelect(ctx, elemProps);
+            }
+            else if (managedType == "hidden") {
+                this.setupManagedHidden(ctx, elemProps);
+            }
+            else {
+                console.log("Invalid managedType", managedType);
             }
         }
 
@@ -598,8 +586,11 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
 
 @mobxReact.observer
 class CustomNode extends React.Component<HibikiReactProps & {component : ComponentType}, {}> {
+    hasImplMount : boolean;
+    
     constructor(props : any) {
         super(props);
+        this.hasImplMount = false;
         this.makeCustomChildEnv(true);
     }
     
@@ -618,6 +609,9 @@ class CustomNode extends React.Component<HibikiReactProps & {component : Compone
         specials.node = nodeVar;
         let argsRoot = resolveArgsRoot(ctx);
         let handlers = NodeUtils.makeHandlers(implNode, null, component.libName, ["event"]);
+        if (handlers != null && handlers["//@event/mount"] != null) {
+            this.hasImplMount = true;
+        }
         let envOpts : DataEnvironmentOpts = {
             componentRoot: {},
             argsRoot: argsRoot,
@@ -637,8 +631,6 @@ class CustomNode extends React.Component<HibikiReactProps & {component : Compone
                 console.log(sprintf("ERROR evaluating 'componentdata' in %s", nodeStr(implNode)), e);
             }
             childEnv.componentRoot = unbox(ctx.getNodeData(componentName, componentDataObj));
-            let implCtx = makeCustomDBCtx(implNode, childEnv, null);
-            implCtx.handleInitEvent();
         }
         else {
             childEnv.componentRoot = unbox(ctx.getNodeData(componentName));
@@ -647,11 +639,20 @@ class CustomNode extends React.Component<HibikiReactProps & {component : Compone
     }
 
     componentDidMount() {
-        let ctx = makeDBCtx(this);
-        if (ctx.isEditMode()) {
-            return;
+        let prtn : Promise<any> = null;
+        if (this.hasImplMount) {
+            let childEnv = this.makeCustomChildEnv(false);
+            let implNode = this.props.component.node;
+            let implCtx = makeCustomDBCtx(implNode, childEnv, null);
+            prtn = implCtx.handleEvent("mount", null);
         }
-        ctx.handleMountEvent();
+        if (prtn == null) {
+            prtn = Promise.resolve(true);
+        }
+        prtn.then(() => {
+            let ctx = makeDBCtx(this);
+            ctx.handleMountEvent();
+        });
     }
 
     componentWillUnmount() {

@@ -521,10 +521,6 @@ class DBCtx {
         return DataCtx.rawAttrStr(this.node.attrs[attrName]);
     }
 
-    isEditMode() : boolean {
-        return false;
-    }
-
     resolveNsStyleMap(styleAttr : string, initStyles? : StyleMapType) : StyleMapType {
         let [injectedStyleMap, iexists] = DataCtx.asStyleMapFromPair(this.injectedAttrs.getInjectedValPair(styleAttr));
         if (iexists) {
@@ -611,21 +607,7 @@ class DBCtx {
         return this.handleEvent("mount", context);
     }
 
-    @boundMethod handleInitEvent() : Promise<any> {
-        if (!this.hasHandler("init")) {
-            return null;
-        }
-        let context = {
-            innerhtml: this.node.innerhtml,
-            outerhtml: this.node.outerhtml,
-        };
-        return this.handleEvent("init", context);
-    }
-
     @boundMethod handleEvent(event : string, datacontext? : Record<string, any>) : Promise<any> {
-        if (this.isEditMode()) {
-            return null;
-        }
         let eventDataenv = this.getEventDataenv();
         let rtctx = new RtContext();
         rtctx.pushContext(sprintf("Firing native '%s' event on %s (in %s)", event, nodeStr(this.node), this.dataenv.getHtmlContext()), null);
