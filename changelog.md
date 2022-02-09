@@ -1,6 +1,6 @@
 # Change Log
 
-## v0.2.1
+## v0.3.0
 
 Hibiki HTML is now licensed under the OSI approved MPL v2 (Mozilla Public License)!
 More information here: https://www.mozilla.org/en-US/MPL/2.0/FAQ/
