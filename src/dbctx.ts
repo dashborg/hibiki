@@ -762,22 +762,12 @@ function bindSingleNode(node : HibikiNode, dataenv : DataEnvironment, injectedAt
     }
     if (node.tag === "define-vars") {
         let setCtx = makeCustomDBCtx(node, dataenv, null);
-        let contextAttr = setCtx.resolveAttrStr("context");
-        if (contextAttr == null) {
-            contextAttr = textContent(node).trim();
-            if (contextAttr === "") {
-                contextAttr = null;
-            }
-        }
-        if (contextAttr == null) {
-            return [makeErrorDBCtx("<define-vars> no context attribute", dataenv), false, null];
-        }
         try {
-            let specials = DataCtx.ParseAndCreateSpecialsThrow(contextAttr, dataenv, "<define-vars>");
+            let specials = DataCtx.EvalContextVars(node.contextVars, dataenv, "<define-vars>");
             return [null, false, dataenv.makeChildEnv(specials, {htmlContext: "<define-vars>"})];
         }
         catch (e) {
-            return [makeErrorDBCtx("<define-vars> Error parsing/executing context block: " + e, dataenv), false, null];
+            return [makeErrorDBCtx("<define-vars> Error evaluating datacontext block: " + e, dataenv), false, null];
         }
     }
     if (node.tag === "define-handler") {
@@ -824,25 +814,27 @@ function expandChildrenNode(ctx : DBCtx) : DBCtx[] {
         return [makeTextDBCtx(textStr, ctx.dataenv)];
     }
     let bindVal = ctx.resolveAttrVal("bind");
+    let ctxList : DBCtx[] = null;
     if (bindVal == null) {
-        return bindNodeList(ctx.node.list, ctx.dataenv, false);
+        ctxList = bindNodeList(ctx.node.list, ctx.dataenv, false);
     }
-    if (!(bindVal instanceof DataCtx.ChildrenVar)) {
-        let msg = sprintf("%s bind expression is not valid, must be [children] type", nodeStr(ctx.node));
-        return [makeErrorDBCtx(msg, ctx.dataenv)];
+    else {
+        if (!(bindVal instanceof DataCtx.ChildrenVar)) {
+            let msg = sprintf("%s bind expression is not valid, must be [children] type", nodeStr(ctx.node));
+            return [makeErrorDBCtx(msg, ctx.dataenv)];
+        }
+        ctxList = bindVal.boundNodes;
     }
-    let ctxList = bindVal.boundNodes;
     if (ctxList == null || ctxList.length == 0) {
         return null;
     }
     let ctxSpecials = {};
-    let contextattr = ctx.resolveAttrStr("datacontext");
-    if (contextattr != null) {
+    if (ctx.node.contextVars != null) {
         try {
-            ctxSpecials = DataCtx.ParseAndCreateSpecialsThrow(contextattr, ctx.dataenv, nodeStr(ctx.node));
+            ctxSpecials = DataCtx.EvalContextVars(ctx.node.contextVars, ctx.dataenv, nodeStr(ctx.node));
         }
         catch (e) {
-            let msg = nodeStr(ctx.node) + " Error parsing/executing context block: " + e;
+            let msg = nodeStr(ctx.node) + " Error evaluating datacontext block: " + e;
             return [makeErrorDBCtx(msg, ctx.dataenv)];
         }
     }

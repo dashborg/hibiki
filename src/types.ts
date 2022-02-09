@@ -8,7 +8,7 @@ import type {HibikiState} from "./state";
 import type {RtContext, HibikiError} from "./error";
 import type {HibikiRequest} from "./request";
 import * as mobx from "mobx";
-import type {HExpr, HibikiBlob, LValue, HIteratorExpr, HAction, HActionBlock, OpaqueValue, ChildrenVar, LambdaValue} from "./datactx";
+import type {HExpr, HibikiBlob, LValue, HIteratorExpr, HAction, HActionBlock, OpaqueValue, ChildrenVar, LambdaValue, ContextVarType} from "./datactx";
 import type {DataEnvironment, EHandlerType} from "./state";
 import type {HibikiNode} from "./html-parser";
 import type {InjectedAttrsObj} from "./dbctx";
@@ -62,6 +62,7 @@ type HandlerValType = {
     block : HandlerBlock,
     node : HibikiNode,
     boundDataenv? : DataEnvironment,
+    contextVars? : ContextVarType[],
 };
 
 type HandlerBlock =

@@ -24,6 +24,11 @@ easier and more straight-forward.
 * added innerhtml and outerhtml to node var
 * updated when welcome message and usage ping to fire on library load.  can be suppressed using HibikiGlobalConfig
 * updated click and submit handlers to only automatically call event.preventDefault() when the href or action attributes are not present or set to "#".
+* removed h-withcontext node (define-vars is more powerful)
+* define-vars, inline context attribute renamed from 'context' to 'datacontext' (to match h-children)
+* define-component, initial component data attribute renamed from 'defaults' to 'componentdata'
+* added new fn:floor and fn:ceil math functions
+* define-vars, datacontext, and componentdata blocks are now parsed once when HTML is loaded (not on demand)
 * bugfix: class.[class] was not being properly set to false when set to the Hibiki value false
 * bugfix: and/or operators were not correctly evaluating 'noattr' as false
 * bugfix: fix component defaults, define-vars, and h-withcontext, to never update mobx state

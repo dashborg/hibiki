@@ -31,13 +31,17 @@
       <div class="container">
         <div class="box" style="width: 100%;">
           Selected Menu Item: {{ $.selected }}
-          <div>
+          <div class="mt-2">
             <local-inject-redbold>
-              <a href="#">Test Inject Link</a>
+              <a href="#">Test Inject Link (component)</a>
             </local-inject-redbold>
-            (Should be <span style="color: red; font-weight: bold">red/bold</span> and link to /test-basic.html)
+            |
+            <h-children inject:href="/test-basic.html" inject:style="color: red" inject:class="has-text-weight-bold">
+              <a href="#">Test Inject Link (direct child of h-children)</a>
+            </h-children>
+            <p>(both should be <span style="color: red; font-weight: bold">red/bold</span> and link to /test-basic.html)</p>
           </div>
-          <div>
+          <div class="mt-2">
             <local-inject-handler>
               <a href="#">Test Inject Handler</a>
             </local-inject-handler>
@@ -47,7 +51,7 @@
         <div class="box">
           <local-level1>
             <p>hello</p>
-            <define-vars context="@foo=true;"></define-vars>
+            <define-vars datacontext="@foo=true;"></define-vars>
             <div>hello {{ @foo }} {{ @bar }}</div>
           </local-level1>
         </div>
@@ -84,7 +88,7 @@
   </define-component>
 
   <define-component name="inject-redbold">
-    <h-children hibiki-mark inject:href="/test-basic.html" inject:style="color: red" inject:class="has-text-weight-bold" bind="@children"></h-children>
+    <h-children inject:href="/test-basic.html" inject:style="color: red" inject:class="has-text-weight-bold" bind="@children"></h-children>
   </define-component>
 
   <define-component name="inject-handler">
@@ -109,7 +113,7 @@
       <p>children-level2={{ @children.tags }}</p>
       <p>(bold red, red, bold green 55, green 55)</p>
       <h-children bind="@children.bytag['p']" inject:style="color: red;"></h-children>
-      <h-children bind="@children.bytag['div']" inject:style="color: green;" datacontext="@bar=55"></h-children>
+      <h-children bind="@children.bytag['div']" inject:style="color: green;" datacontext="@bar=55;"></h-children>
     </div>
   </define-component>
   

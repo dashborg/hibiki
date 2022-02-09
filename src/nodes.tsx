@@ -627,17 +627,16 @@ class CustomNode extends React.Component<HibikiReactProps & {component : Compone
             eventBoundary: "soft",
         };
         let childEnv = eventDE.makeChildEnv(specials, envOpts);
-        if (initialize && rawImplAttrs.defaults != null) {
-            let htmlContext = sprintf("<define-component %s>:defaults", componentName);
-            let defaultsObj = {};
+        if (initialize && implNode.contextVars != null) {
+            let htmlContext = sprintf("<define-component %s>:componentdata", componentName);
+            let componentDataObj = {};
             try {
-                let defaultsStr = DataCtx.rawAttrStr(rawImplAttrs.defaults);
-                defaultsObj = DataCtx.ParseAndCreateSpecialsThrow(defaultsStr, childEnv, htmlContext);
+                componentDataObj = DataCtx.EvalContextVars(implNode.contextVars, childEnv, htmlContext);
             }
             catch (e) {
-                console.log(sprintf("ERROR parsing/executing 'defaults' in <define-component %s>", componentName), e);
+                console.log(sprintf("ERROR evaluating 'componentdata' in %s", nodeStr(implNode)), e);
             }
-            childEnv.componentRoot = unbox(ctx.getNodeData(componentName, defaultsObj));
+            childEnv.componentRoot = unbox(ctx.getNodeData(componentName, componentDataObj));
             let implCtx = makeCustomDBCtx(implNode, childEnv, null);
             implCtx.handleInitEvent();
         }
@@ -733,25 +732,6 @@ class ScriptNode extends React.Component<HibikiReactProps, {}> {
 class NopNode extends React.Component<HibikiReactProps, {}> {
     render() : React.ReactNode {
         return null;
-    }
-}
-
-@mobxReact.observer
-class WithContextNode extends React.Component<HibikiReactProps, {}> {
-    render() : React.ReactNode {
-        let ctx = makeDBCtx(this);
-        let contextattr = ctx.resolveAttrStr("context");
-        if (contextattr == null) {
-            return <ErrorMsg message={sprintf("%s no context attribute", nodeStr(ctx.node))}/>;
-        }
-        try {
-            let specials = DataCtx.ParseAndCreateSpecialsThrow(contextattr, ctx.dataenv, nodeStr(ctx.node));
-            let ctxDataenv = ctx.dataenv.makeChildEnv(specials, {htmlContext: nodeStr(ctx.node)});
-            return ctxRenderHtmlChildren(ctx, ctxDataenv);
-        }
-        catch (e) {
-            return <ErrorMsg message={nodeStr(ctx.node) + " Error parsing/executing context block: " + e}/>;
-        }
     }
 }
 
@@ -957,7 +937,6 @@ addCoreComponent("h-if-break", IfNode);
 addCoreComponent("h-foreach", FragmentNode);
 addCoreComponent("h-text", TextNode);
 addCoreComponent("h-dyn", DynNode);
-addCoreComponent("h-withcontext", WithContextNode);
 addCoreComponent("h-children", ChildrenNode);
 addCoreComponent("h-data", SimpleQueryNode);
 addCoreComponent("h-fragment", FragmentNode);

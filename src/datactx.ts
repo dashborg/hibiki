@@ -50,6 +50,8 @@ type HExpr = {
     sourcestr? : string,
 };
 
+type ContextVarType = {key : string, expr : HExpr};
+
 type HIteratorExpr = {
     data       : HExpr,
     itemvar?   : string,
@@ -2788,21 +2790,14 @@ function makeErrorObj(e : any, rtctx : RtContext) : HibikiError {
     return rtnErr;
 }
 
-function ParseContextAssignListThrow(ctxStr : string) : {key : string, expr : HExpr, setop? : string}[] {
-    let actions = doParse(ctxStr, "ext_contextAssignList");
-    return actions;
-}
-
-function ParseAndCreateSpecialsThrow(ctxStr : string, dataenv : DataEnvironment, htmlContext : string) : HibikiValObj {
-    let caList = ParseContextAssignListThrow(ctxStr);
+function EvalContextVars(ctxVars : ContextVarType[], dataenv : DataEnvironment, htmlContext : string) : HibikiValObj {
     let rtctx = new RtContext();
     rtctx.pushContext(htmlContext, null);
     let specials : HibikiValObj = {};
-    for (let i=0; i<caList.length; i++) {
-        let caVal = caList[i];
+    for (let ctxVar of ctxVars) {
         let evalDataenv = dataenv.makeChildEnv(specials, {htmlContext: htmlContext});
-        let expr = evalExprAst(caVal.expr, evalDataenv, "natural");
-        let specialKey = caVal.key;
+        let expr = evalExprAst(ctxVar.expr, evalDataenv, "natural");
+        let specialKey = ctxVar.key;
         specials[specialKey] = expr;
     }
     return specials;
@@ -2993,7 +2988,7 @@ function setLValue(lv : LValue, setVal : HibikiVal) : void {
     rlv.set(setVal);
 }
 
-export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, JsonStringify, EvalSimpleExpr, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, DeepCopy, CheckCycle, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, makeIteratorFromExpr, rawAttrStr, getUnmergedAttributeStr, getUnmergedAttributeValPair, SYM_NOATTR, HActionBlock, valToString, valToBool, compileActionStr, FireEvent, makeErrorObj, OpaqueValue, ChildrenVar, Watcher, LambdaValue, blobPrintStr, asNumber, hibikiTypeOf, JsonReplacerFn, valToAttrStr, resolveLValue, resolveUnmergedCnArray, isUnmerged, resolveUnmergedStyleMap, asStyleMap, asStyleMapFromPair, ParseAndCreateSpecialsThrow};
+export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, JsonStringify, EvalSimpleExpr, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, DeepCopy, CheckCycle, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, makeIteratorFromExpr, rawAttrStr, getUnmergedAttributeStr, getUnmergedAttributeValPair, SYM_NOATTR, HActionBlock, valToString, valToBool, compileActionStr, FireEvent, makeErrorObj, OpaqueValue, ChildrenVar, Watcher, LambdaValue, blobPrintStr, asNumber, hibikiTypeOf, JsonReplacerFn, valToAttrStr, resolveLValue, resolveUnmergedCnArray, isUnmerged, resolveUnmergedStyleMap, asStyleMap, asStyleMapFromPair, EvalContextVars};
 
-export type {PathType, HAction, HExpr, HIteratorExpr};
+export type {PathType, HAction, HExpr, HIteratorExpr, ContextVarType};
 

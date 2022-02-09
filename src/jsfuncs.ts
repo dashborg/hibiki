@@ -62,6 +62,14 @@ function jsMax(...rest : any[]) {
     return rtn;
 }
 
+function jsFloor(v : number) : number {
+    return Math.floor(v);
+}
+
+function jsCeil(v : number) : number {
+    return Math.ceil(v);
+}
+
 function jsSplice(arr : any[], ...rest : any[]) {
     if (arr == null || !mobx.isArrayLike(arr)) {
         return null;
@@ -333,6 +341,8 @@ reg("len", jsLen, true);
 reg("indexof", jsIndexOf, true);
 reg("min", jsMin, false);
 reg("max", jsMax, false);
+reg("floor", jsFloor, false);
+reg("ceil", jsCeil, false);
 reg("splice", jsSplice, true);
 reg("slice", jsSlice, true);
 reg("push", jsPush, true);
