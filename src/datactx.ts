@@ -81,6 +81,15 @@ type HAction = {
     blockctx?  : string,
 };
 
+type CompareOpts = {
+    locale? : string,
+    nocase? : boolean,
+    sortType? : ("string" | "numeric"),
+    sensitivity? : string,
+    field? : string,
+    index? : number,
+};
+
 class HActionBlock {
     blockType : "block" | "handler";  // handlers are top-level, blocks are like in "then"/"else" clauses.  affects the "setreturn" action
     actions : HAction[];
@@ -3009,35 +3018,61 @@ function setLValue(lv : LValue, setVal : HibikiVal) : void {
     rlv.set(setVal);
 }
 
-function compareVals(v1 : HibikiVal, v2 : HibikiVal, opts? : {locale? : string, nocase? : boolean, sortType? : ("string" | "numeric"), sensitivity? : string}) : number {
+// returns [val, wasNumber]
+function prepareCompareVal(v : HibikiVal, opts : {field? : string, index? : number}) : [string, boolean] {
+    if (v instanceof LValue) {
+        v = resolveLValue(v);
+    }
+    if (v == null) {
+        return [null, false];
+    }
+    if (opts.field != null && typeof(v) === "object") {
+        let [objVal, isObj] = asPlainObject(v, false);
+        if (!isObj) {
+            return [null, false];
+        }
+        v = objVal[opts.field];
+    }
+    if (opts.index != null) {
+        let [arrVal, isArr] = asArray(v, false);
+        if (!isArr) {
+            return [null, false];
+        }
+        if (opts.index < 0 || opts.index >= arrVal.length) {
+            return [null, false];
+        }
+        v = arrVal[opts.index];
+    }
+    let isNumber = (typeof(v) === "number");
+    if (typeof(v) === "number" && isNaN(v)) {
+        return [null, false];
+    }
+    return [valToString(v), isNumber];
+}
+
+function compareVals(v1 : HibikiVal, v2 : HibikiVal, opts? : CompareOpts) : number {
     opts = opts ?? {};
     if (v1 === v2) {
         return 0;
     }
-    if (typeof(v1) === "number" && isNaN(v1)) {
-        v1 = null;
-    }
-    if (typeof(v2) === "number" && isNaN(v2)) {
-        v2 = null;
-    }
-    if (v1 == null && v2 == null) {
+    let [sv1, v1num] = prepareCompareVal(v1, opts);
+    let [sv2, v2num] = prepareCompareVal(v2, opts);
+    if (sv1 == null && sv2 == null) {
         return 0;
     }
-    if (v1 == null) {
+    if (sv1 == null) {
         return -1;
     }
-    if (v2 == null) {
+    if (sv2 == null) {
         return 1;
     }
-    let numeric = (typeof(v1) === "number" && typeof(v2) === "number");
+    let numeric = v1num && v2num;
     if (opts.sortType === "numeric") {
         numeric = true;
     }
     if (opts.sortType === "string") {
         numeric = false;
     }
-    let sv1 = valToString(v1);
-    let sv2 = valToString(v2);
     let locale : string = undefined;
     if (opts.locale != null) {
         locale = opts.locale;
@@ -3052,7 +3087,7 @@ function compareVals(v1 : HibikiVal, v2 : HibikiVal, opts? : {locale? : string, 
     return sv1.localeCompare(sv2, locale, {numeric: numeric, sensitivity: sensitivity});
 }
 
-export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, JsonStringify, EvalSimpleExpr, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, DeepCopy, CheckCycle, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, makeIteratorFromExpr, rawAttrStr, getUnmergedAttributeStr, getUnmergedAttributeValPair, SYM_NOATTR, HActionBlock, valToString, valToBool, compileActionStr, FireEvent, makeErrorObj, OpaqueValue, ChildrenVar, Watcher, LambdaValue, blobPrintStr, valToNumber, hibikiTypeOf, JsonReplacerFn, valToAttrStr, resolveLValue, resolveUnmergedCnArray, isUnmerged, resolveUnmergedStyleMap, asStyleMap, asStyleMapFromPair, EvalContextVarsThrow, compareVals};
+export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, JsonStringify, EvalSimpleExpr, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, DeepCopy, CheckCycle, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, makeIteratorFromExpr, rawAttrStr, getUnmergedAttributeStr, getUnmergedAttributeValPair, SYM_NOATTR, HActionBlock, valToString, valToBool, compileActionStr, FireEvent, makeErrorObj, OpaqueValue, ChildrenVar, Watcher, LambdaValue, blobPrintStr, valToNumber, hibikiTypeOf, JsonReplacerFn, valToAttrStr, resolveLValue, resolveUnmergedCnArray, isUnmerged, resolveUnmergedStyleMap, asStyleMap, asStyleMapFromPair, EvalContextVarsThrow, compareVals, asPrimitive, asArray, asPlainObject};
 
-export type {PathType, HAction, HExpr, HIteratorExpr, ContextVarType};
+export type {PathType, HAction, HExpr, HIteratorExpr, ContextVarType, CompareOpts};
 

@@ -59,9 +59,12 @@ class HibikiModule {
     }
 
     sleep(req : HibikiRequest) : Promise<any> {
-        let sleepMs = unpackArg(req.data, "ms", 0);
+        let sleepMs = DataCtx.valToNumber(unpackArg(req.data, "ms", 0));
         if (sleepMs == null || typeof(sleepMs) !== "number") {
             throw new Error("sleep requires 'ms' parameter (must be number)");
+        }
+        if (isNaN(sleepMs)) {
+            throw new Error("sleep 'ms' parameter is NaN");
         }
         return new Promise((resolve, reject) => {
             setTimeout(() => resolve(true), sleepMs);
@@ -69,7 +72,7 @@ class HibikiModule {
     }
 
     getSS(req : HibikiRequest) : Promise<any> {
-        let key = unpackArg(req.data, "key", 0);
+        let key = DataCtx.valToString(unpackArg(req.data, "key", 0));
         if (key == null) {
             throw new Error("get-session-storage requires 'key' parameter");
         }
@@ -77,7 +80,7 @@ class HibikiModule {
     }
 
     setSS(req : HibikiRequest) : Promise<any> {
-        let key = unpackArg(req.data, "key", 0);
+        let key = DataCtx.valToString(unpackArg(req.data, "key", 0));
         if (key == null) {
             throw new Error("set-session-storage requires 'key' parameter");
         }
@@ -98,7 +101,10 @@ class HibikiModule {
 
     updateUrl(req : HibikiRequest) : Promise<any> {
         let data = stripAtKeys(req.data);
-        let {path: urlStr, raw: isRaw, replace, title} = unpackAtArgs(req.data);
+        let {path: urlStrArg, raw: isRaw, replace, title} = unpackAtArgs(req.data);
+        let titleStr = DataCtx.valToString(title);
+        let isRawBool = DataCtx.valToBool(isRaw);
+        let urlStr = DataCtx.valToString(urlStrArg);
         let url = new URL((urlStr ?? ""), window.location.href);
         for (let key in data) {
             let val = data[key];
@@ -106,10 +112,10 @@ class HibikiModule {
                 url.searchParams.delete(key);
                 continue;
             }
-            url.searchParams.set(key, smartEncodeParam(val, isRaw));
+            url.searchParams.set(key, smartEncodeParam(val, isRawBool));
         }
-        if (title != null) {
-            document.title = title;
+        if (titleStr != null) {
+            document.title = titleStr;
         }
         if (replace) {
             window.history.replaceState(null, document.title, url.toString());
@@ -123,7 +129,9 @@ class HibikiModule {
 
     navigate(req : HibikiRequest) : Promise<any> {
         let data = stripAtKeys(req.data);
-        let {path: urlStr, raw: isRaw} = unpackAtArgs(req.data);
+        let {path: urlStrArg, raw: isRawArg} = unpackAtArgs(req.data);
+        let urlStr = DataCtx.valToString(urlStrArg);
+        let isRaw = DataCtx.valToBool(isRawArg);
         let url = new URL((urlStr ?? ""), window.location.href);
         for (let key in data) {
             let val = data[key];

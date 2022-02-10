@@ -390,7 +390,7 @@ function nodeStr(node : HibikiNode) : string {
     return "<" + node.tag + extraStr + ">";
 }
 
-function unpackArg(data : Record<string, any>, argName : string, pos? : number) : any {
+function unpackArg(data : HibikiValObj, argName : string, pos? : number) : HibikiVal {
     if (data == null) {
         return null;
     }
@@ -402,14 +402,14 @@ function unpackArg(data : Record<string, any>, argName : string, pos? : number) 
     if (pos == null) {
         return null;
     }
-    let posArgs = data["*args"];
+    let posArgs = data["*args"] as HibikiVal[];
     if (posArgs == null || posArgs.length <= pos) {
         return null;
     }
     return posArgs[pos];
 }
 
-function unpackAtArgs(data : Record<string, any>) : Record<string, any> {
+function unpackAtArgs(data : HibikiValObj) : HibikiValObj {
     if (data == null) {
         return {};
     }

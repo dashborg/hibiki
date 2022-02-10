@@ -7,21 +7,23 @@
 import * as mobx from "mobx";
 import type {JSFuncType, HibikiVal, HibikiValObj} from "./types";
 import {sprintf} from "sprintf-js";
-import {isObject, addToArrayDupCheck, removeFromArray, unpackPositionalArgArray} from "./utils";
+import {isObject, addToArrayDupCheck, removeFromArray, unpackArg, unpackPositionalArgArray} from "./utils";
 import {v4 as uuidv4} from 'uuid';
 import * as DataCtx from "./datactx";
+import type {DataEnvironment} from "./state";
 
 let DefaultJSFuncs : Record<string, JSFuncType> = {};
 
-function jsLen(v : any) : number {
-    if (v == null) {
+function jsLen(v : HibikiVal) : number {
+    if (v == null || v === DataCtx.SYM_NOATTR) {
         return 0;
     }
     if (typeof(v) === "string" || mobx.isArrayLike(v)) {
         return v.length;
     }
-    if (typeof(v) === "object") {
-        return Object.keys(v).length;
+    let [objVal, isObj] = DataCtx.asPlainObject(v, false);
+    if (isObj) {
+        return Object.keys(objVal).length;
     }
     return 1;
 }
@@ -34,13 +36,13 @@ function jsIndexOf(str : string, ...rest : any[]) {
     return str.indexOf(...rest);
 }
 
-function jsMin(...rest : any[]) {
+function jsMin(...rest : HibikiVal[]) : number {
     if (rest == null || rest.length == 0) {
         return 0;
     }
-    let rtn = rest[0] ?? 0;
+    let rtn : number = DataCtx.valToNumber(rest[0]) ?? 0;
     for (let i=1; i<rest.length; i++) {
-        let v = rest[i] ?? 0;
+        let v = DataCtx.valToNumber(rest[i]) ?? 0;
         if (v < rtn) {
             rtn = v;
         }
@@ -48,13 +50,13 @@ function jsMin(...rest : any[]) {
     return rtn;
 }
 
-function jsMax(...rest : any[]) {
+function jsMax(...rest : HibikiVal[]) : number {
     if (rest == null || rest.length == 0) {
         return 0;
     }
-    let rtn = rest[0] ?? 0;
+    let rtn : number = DataCtx.valToNumber(rest[0]) ?? 0;
     for (let i=1; i<rest.length; i++) {
-        let v = rest[i] ?? 0;
+        let v = DataCtx.valToNumber(rest[i]) ?? 0;
         if (v > rtn) {
             rtn = v;
         }
@@ -62,19 +64,20 @@ function jsMax(...rest : any[]) {
     return rtn;
 }
 
-function jsFloor(v : number) : number {
-    return Math.floor(v);
+function jsFloor(v : HibikiVal) : number {
+    return Math.floor(DataCtx.valToNumber(v));
 }
 
-function jsCeil(v : number) : number {
-    return Math.ceil(v);
+function jsCeil(v : HibikiVal) : number {
+    return Math.ceil(DataCtx.valToNumber(v));
 }
 
-function jsSplice(arr : any[], ...rest : any[]) {
-    if (arr == null || !mobx.isArrayLike(arr)) {
+function jsSplice(val : HibikiVal, ...rest : any[]) {
+    let [arrObj, isArr] = DataCtx.asArray(val, false);
+    if (!isArr) {
         return null;
     }
-    let newArr = [...arr];
+    let newArr = [...arrObj];
     // @ts-ignore
     newArr.splice(...rest);
     return newArr;
@@ -141,39 +144,42 @@ function jsSetHas(arr : any[], item : any) : boolean {
     return false;
 }
 
-function jsInt(v : any) : number {
-    return parseInt(v);
+function jsInt(v : HibikiVal) : number {
+    let rtn = DataCtx.valToNumber(v);
+    // @ts-ignore - javascript allows an number to be passed to parseInt
+    return parseInt(rtn);
 }
 
-function jsFloat(v : any) : number {
-    return parseFloat(v);
+function jsFloat(v : HibikiVal) : number {
+    return DataCtx.valToNumber(v);
 }
 
-function jsStr(v : any) : string {
-    return String(v);
+function jsStr(v : HibikiVal) : string {
+    return DataCtx.valToString(v);
 }
 
-function jsBool(v : any) : boolean {
-    return !!v;
+function jsBool(v : HibikiVal) : boolean {
+    return DataCtx.valToBool(v);
 }
 
 function jsJsonParse(v : string) : any {
-    if (v == null || v === "") {
+    if (v == null || v === "" || typeof(v) !== "string") {
         return null;
     }
     return JSON.parse(v);
 }
 
-function jsJson(v : any, ...rest : any[]) : string {
+function jsJson(v : HibikiVal, ...rest : any[]) : string {
     return JSON.stringify(v, ...rest);
 }
 
-function jsSplit(str : string, ...rest : any[]) : string[] {
+function jsSplit(str : HibikiVal, ...rest : any[]) : string[] {
     if (str == null) {
         return null;
     }
+    let strVal = DataCtx.valToString(str);
     // @ts-ignore
-    return String(str).split(...rest);
+    return strVal.split(...rest);
 }
 
 function jsNow() : number {
@@ -198,7 +204,7 @@ function jsMerge(...vals : any[]) : any {
 }
 
 function jsEval(jsexpr : string) : any {
-    if (jsexpr == null) {
+    if (jsexpr == null || typeof(jsexpr) !== "string") {
         return null;
     }
     let evalVal = eval("(" + jsexpr + ")");
@@ -219,40 +225,32 @@ function jsJs(fnName : string, ...rest : any[]) : any {
     return val;
 }
 
-function jsSubstr(str : string, ...rest : any[]) : string {
+function jsSubstr(v : HibikiVal, ...rest : any[]) : string {
+    let str = DataCtx.valToString(v);
     if (str == null) {
         return null;
-    }
-    if (typeof(str) !== "string") {
-        str = String(str);
     }
     // @ts-ignore
     return str.substr(...rest);
 }
 
-function jsUpperCase(str : string) : string {
+function jsUpperCase(val : HibikiVal) : string {
+    let str = DataCtx.valToString(val);
     if (str == null) {
         return null;
     }
-    if (typeof(str) !== "string") {
-        str = String(str);
-    }
-    // @ts-ignore
     return str.toUpperCase();
 }
 
-function jsLowerCase(str : string) : string {
+function jsLowerCase(val : HibikiVal) : string {
+    let str = DataCtx.valToString(val);
     if (str == null) {
         return null;
     }
-    if (typeof(str) !== "string") {
-        str = String(str);
-    }
-    // @ts-ignore
     return str.toLowerCase();
 }
 
-function jsSprintf(format : string, ...rest : any[]) : string {
+function jsSprintf(format : HibikiVal, ...rest : any[]) : string {
     if (format == null) {
         return null;
     }
@@ -262,14 +260,14 @@ function jsSprintf(format : string, ...rest : any[]) : string {
     return sprintf(format, ...rest);
 }
 
-function jsTrim(str : string) : string {
+function jsTrim(str : HibikiVal) : string {
     if (typeof(str) !== "string") {
         return null;
     }
     return str.trim();
 }
 
-function jsStartsWith(str : string, ...rest : any[]) : boolean {
+function jsStartsWith(str : HibikiVal, ...rest : any[]) : boolean {
     if (str == null || typeof(str) !== "string") {
         return false;
     }
@@ -277,7 +275,7 @@ function jsStartsWith(str : string, ...rest : any[]) : boolean {
     return str.startsWith(...rest);
 }
 
-function jsEndsWith(str : string, ...rest : any[]) : boolean {
+function jsEndsWith(str : HibikiVal, ...rest : any[]) : boolean {
     if (str == null || typeof(str) !== "string") {
         return false;
     }
@@ -285,9 +283,12 @@ function jsEndsWith(str : string, ...rest : any[]) : boolean {
     return str.endsWith(...rest);
 }
 
-function jsMatch(str : string, regex : string | RegExp, ...rest : any[]) : any {
+function jsMatch(str : HibikiVal, regex : string | RegExp, ...rest : any[]) : any {
     if (str == null || regex == null) {
         return null;
+    }
+    if (typeof(str) !== "string") {
+        throw new Error("fn:match 1st argument must be a string");
     }
     if (typeof(regex) !== "string" && !(regex instanceof RegExp)) {
         throw new Error("fn:match 2nd argument must be a regexp");
@@ -363,25 +364,68 @@ function jsDeepCopy(val : HibikiVal) : HibikiVal {
     return DataCtx.DeepCopy(val, {resolve: true});
 }
 
-function jsCompare(params : HibikiValObj) : number {
-    let args = unpackPositionalArgArray(params);
-    let {locale, "type": sortType, sensitivity, nocase} = (params ?? {});
-    let sortTypeStr : ("numeric" | "string") = null;
+function extractCompareOpts(params : HibikiValObj) : DataCtx.CompareOpts {
+    if (params == null) {
+        return {};
+    }
+    let {locale, "type": sortType, sensitivity, nocase, field, index} = params;
+    let opts : DataCtx.CompareOpts = {};
+    if (locale != null) {
+        opts.locale = DataCtx.valToString(locale);
+    }
+    if (field != null) {
+        opts.field = DataCtx.valToString(field);
+    }
+    if (sensitivity != null) {
+        opts.sensitivity = DataCtx.valToString(sensitivity);
+    }
+    if (index != null) {
+        opts.index = DataCtx.valToNumber(index);
+    }
+    if (nocase != null) {
+        opts.nocase = DataCtx.valToBool(nocase);
+    }
     if (sortType != null) {
         let sortStr = DataCtx.valToString(sortType);
         if (sortStr === "numeric" || sortStr === "string") {
-            sortTypeStr = sortStr;
+            opts.sortType = sortStr;
         }
     }
-    let opts = {
-        locale: DataCtx.valToString(locale),
-        sortType: sortTypeStr,
-        sensitivity: DataCtx.valToString(sensitivity),
-        nocase: DataCtx.valToBool(nocase),
-    };
+    return opts;
+}
+
+function jsCompare(params : HibikiValObj) : number {
+    let args = unpackPositionalArgArray(params);
+    let compareOpts = extractCompareOpts(params);
     let v1 = (args.length >= 1 ? args[0] : null);
     let v2 = (args.length >= 2 ? args[1] : null);
-    return DataCtx.compareVals(v1, v2, opts);
+    return DataCtx.compareVals(v1, v2, compareOpts);
+}
+
+function jsSort(params : HibikiValObj, dataenv : DataEnvironment) : HibikiVal[] {
+    let rawData = unpackArg(params, "data", 0);
+    let data = DataCtx.resolveLValue(rawData);
+    if (data == null) {
+        return null;
+    }
+    let [arrData, isArr] = DataCtx.asArray(data, false);
+    if (!isArr) {
+        return null;
+    }
+    let compareOpts = extractCompareOpts(params);
+    let sortRefs = DataCtx.valToBool(unpackArg(params, "sortrefs"));
+    console.log("sort", rawData);
+    let indexArr = arrData.map((_, idx) => idx);
+    indexArr.sort((idx1, idx2) => {
+        return DataCtx.compareVals(arrData[idx1], arrData[idx2], compareOpts)
+    });
+    if (sortRefs && (rawData instanceof DataCtx.LValue)) {
+        let dataLv = rawData as DataCtx.LValue;
+        return indexArr.map((idx) => dataLv.subArrayIndex(idx));
+    }
+    else {
+        return indexArr.map((idx) => arrData[idx]);
+    }
 }
 
 function reg(name : string, fn : any, native : boolean, positionalArgs : boolean) {
@@ -389,7 +433,7 @@ function reg(name : string, fn : any, native : boolean, positionalArgs : boolean
 }
 
 reg("len", jsLen, true, true);
-reg("indexof", jsIndexOf, true, true);
+reg("indexof", jsIndexOf, false, true);
 reg("min", jsMin, false, true);
 reg("max", jsMax, false, true);
 reg("floor", jsFloor, false, true);
@@ -431,5 +475,6 @@ reg("typeof", jsTypeOf, true, true);
 reg("deepequal", jsDeepEqual, true, true);
 reg("deepcopy", jsDeepCopy, true, true);
 reg("compare", jsCompare, true, false);
+reg("sort", jsSort, true, false);
 
 export {DefaultJSFuncs};

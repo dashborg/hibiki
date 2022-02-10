@@ -360,6 +360,19 @@
           </td>
           <td slot="result">5 | 6</td>
         </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{ fn:sort([5, 8, 1, 2, 25, 20]) }}<br>
+{{ fn:sort([5, 8, 1, 2, 25, 20], type="string") }}
+          </td>
+          <td slot="result">1,2,5,8,20,25<br>1,2,20,25,5,8</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{ fn:sort([{x: 5}, {x: 2}, {x: -5}], field="x") | format("json-compact") }}
+          </td>
+          <td slot="result">[{"x":-5},{"x":2},{"x":5}]</td>
+        </tr>
       </table>
     </div>
 

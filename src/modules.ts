@@ -180,7 +180,7 @@ function setParams(method : string, url : URL, fetchInit : Record<string, any>, 
         throw new Error("Invalid @data, must be an object: type=" + DataCtx.hibikiTypeOf(atData));
     }
     let params = Object.assign({}, fetchInit["csrfParams"], (atData ?? {}), stripAtKeys(data));
-    let encoding = unpackArg(data, "@encoding");
+    let encoding = DataCtx.valToString(unpackArg(data, "@encoding"));
     if (method == "GET" || method == "DELETE") {
         if (encoding != null && encoding != "url") {
             console.log(sprintf("WARNING, @encoding=%s is ignored for GET/DELETE requests, only 'url' is supported", encoding));
@@ -263,7 +263,8 @@ function setCsrf(req : HibikiRequest, url : URL, fetchInit : Record<string, any>
 }
 
 function makeFetchInit(req : HibikiRequest, url : URL, opts : HttpConfig) : Record<string, any> {
-    let {mode: dataMode, init: dataInit, headers: dataHeaders, credentials: dataCredentials} = unpackAtArgs(req.data);
+    let {mode: dataMode, init: dataInitArg, headers: dataHeaders, credentials: dataCredentials} = unpackAtArgs(req.data);
+    let [dataInit, _] = DataCtx.asPlainObject(dataInitArg, false);
     let method = getMethod(req);
     if (!VALID_METHODS[method]) {
         throw new Error(sprintf("Invalid method '%s' passed to http handler %s", method, fullPath(req.callpath)));
@@ -382,7 +383,7 @@ function getMethod(req : HibikiRequest) : string {
         return method.toUpperCase();
     }
     if (req.data != null) {
-        let dataMethod = unpackArg(req.data, "@method");
+        let dataMethod = DataCtx.valToString(unpackArg(req.data, "@method"));
         if (dataMethod != null) {
             return dataMethod.toUpperCase();
         }
