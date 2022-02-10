@@ -435,6 +435,26 @@ function valToBool(val : HibikiVal) : boolean {
     return !!val;
 }
 
+function valToNumber(data : HibikiVal) : number {
+    if (data == null || data === SYM_NOATTR) {
+        return 0;
+    }
+    data = resolveLValue(data);
+    if (typeof(data) === "string") {
+        return Number(data);
+    }
+    if (typeof(data) === "number") {
+        return data;
+    }
+    if (typeof(data) === "boolean") {
+        return (data ? 1 : 0);
+    }
+    if (typeof(data) === "symbol") {
+        return NaN;
+    }
+    return NaN;
+}
+
 // returns [value, exists]
 function resolveNodeAttrPair(val : NodeAttrType, dataenv : DataEnvironment, rtContextStr : string) : [HibikiVal, boolean] {
     if (val == null) {
@@ -1769,28 +1789,6 @@ function asStyleMapFromPair([val, exists] : [HibikiVal, boolean]) : [StyleMapTyp
     return asStyleMap(val, false);
 }
 
-function asNumber(data : HibikiVal) : number {
-    if (data == null || data === SYM_NOATTR) {
-        return 0;
-    }
-    if (typeof(data) === "string") {
-        return Number(data);
-    }
-    if (typeof(data) === "number") {
-        return data;
-    }
-    if (typeof(data) === "boolean") {
-        return (data ? 1 : 0);
-    }
-    if (typeof(data) === "symbol") {
-        return NaN;
-    }
-    if (data instanceof LValue) {
-        return asNumber(data.get());
-    }
-    return NaN;
-}
-
 function asArray(data : HibikiVal, nullOk : boolean) : [HibikiVal[], boolean] {
     if (data == null) {
         return [null, nullOk];
@@ -2094,8 +2092,8 @@ function evalExprAstInternal(exprAst : HExpr, dataenv : DataEnvironment, rtype :
         return rtn;
     }
     else if (exprAst.etype === "array-range") {
-        let e1 = asNumber(evalExprAst(exprAst.exprs[0], dataenv, "resolve"));
-        let e2 = asNumber(evalExprAst(exprAst.exprs[1], dataenv, "resolve"));
+        let e1 = valToNumber(evalExprAst(exprAst.exprs[0], dataenv, "resolve"));
+        let e2 = valToNumber(evalExprAst(exprAst.exprs[1], dataenv, "resolve"));
         if (isNaN(e1) || isNaN(e2) || e1 > e2) {
             return [];
         }
@@ -2184,9 +2182,9 @@ function evalExprAstInternal(exprAst : HExpr, dataenv : DataEnvironment, rtype :
             return e2;
         }
         else if (exprAst.op === "*") {
-            let e1 : any = evalExprAst(exprAst.exprs[0], dataenv, "resolve");
-            let e2 : any = evalExprAst(exprAst.exprs[1], dataenv, "resolve");
-            return asNumber(e1) * asNumber(e2);
+            let e1 : HibikiVal = evalExprAst(exprAst.exprs[0], dataenv, "resolve");
+            let e2 : HibikiVal = evalExprAst(exprAst.exprs[1], dataenv, "resolve");
+            return valToNumber(e1) * valToNumber(e2);
         }
         else if (exprAst.op === "+") {
             // special, will evaluate entire array.
@@ -2195,12 +2193,12 @@ function evalExprAstInternal(exprAst : HExpr, dataenv : DataEnvironment, rtype :
             }
             let rtnVal : any = evalExprAst(exprAst.exprs[0], dataenv, "resolve") ?? null;
             if (typeof(rtnVal) === "symbol") {
-                rtnVal = asNumber(rtnVal);
+                rtnVal = valToString(rtnVal);
             }
             for (let i=1; i<exprAst.exprs.length; i++) {
                 let ev : any = evalExprAst(exprAst.exprs[i], dataenv, "resolve") ?? null;
                 if (typeof(ev) === "symbol") {
-                    ev = asNumber(ev);
+                    ev = valToString(ev);
                 }
                 rtnVal = rtnVal + ev;
             }
@@ -2209,12 +2207,12 @@ function evalExprAstInternal(exprAst : HExpr, dataenv : DataEnvironment, rtype :
         else if (exprAst.op === "/") {
             let e1 = evalExprAst(exprAst.exprs[0], dataenv, "resolve");
             let e2 = evalExprAst(exprAst.exprs[1], dataenv, "resolve");
-            return asNumber(e1) / asNumber(e2);
+            return valToNumber(e1) / valToNumber(e2);
         }
         else if (exprAst.op === "%") {
             let e1 = evalExprAst(exprAst.exprs[0], dataenv, "resolve");
             let e2 = evalExprAst(exprAst.exprs[1], dataenv, "resolve");
-            return asNumber(e1) % asNumber(e2);
+            return valToNumber(e1) % valToNumber(e2);
         }
         else if (exprAst.op === ">=") {
             let e1 = evalExprAst(exprAst.exprs[0], dataenv, "resolve");
@@ -2222,7 +2220,7 @@ function evalExprAstInternal(exprAst : HExpr, dataenv : DataEnvironment, rtype :
             if (typeof(e1) === "string" && typeof(e2) === "string") {
                 return e1 >= e2;
             }
-            return asNumber(e1) >= asNumber(e2);
+            return valToNumber(e1) >= valToNumber(e2);
         }
         else if (exprAst.op === "<=") {
             let e1 = evalExprAst(exprAst.exprs[0], dataenv, "resolve");
@@ -2230,7 +2228,7 @@ function evalExprAstInternal(exprAst : HExpr, dataenv : DataEnvironment, rtype :
             if (typeof(e1) === "string" && typeof(e2) === "string") {
                 return e1 <= e2;
             }
-            return asNumber(e1) <= asNumber(e2);
+            return valToNumber(e1) <= valToNumber(e2);
         }
         else if (exprAst.op === ">") {
             let e1 = evalExprAst(exprAst.exprs[0], dataenv, "resolve");
@@ -2238,7 +2236,7 @@ function evalExprAstInternal(exprAst : HExpr, dataenv : DataEnvironment, rtype :
             if (typeof(e1) === "string" && typeof(e2) === "string") {
                 return e1 > e2;
             }
-            return asNumber(e1) > asNumber(e2);
+            return valToNumber(e1) > valToNumber(e2);
         }
         else if (exprAst.op === "<") {
             let e1 = evalExprAst(exprAst.exprs[0], dataenv, "resolve");
@@ -2246,39 +2244,12 @@ function evalExprAstInternal(exprAst : HExpr, dataenv : DataEnvironment, rtype :
             if (typeof(e1) === "string" && typeof(e2) === "string") {
                 return e1 < e2;
             }
-            return asNumber(e1) < asNumber(e2);
+            return valToNumber(e1) < valToNumber(e2);
         }
         else if (exprAst.op === "<=>") {
             let e1 = evalExprAst(exprAst.exprs[0], dataenv, "resolve");
             let e2 = evalExprAst(exprAst.exprs[1], dataenv, "resolve");
-            if (e1 === e2 || (e1 == null && e2 == null)) {
-                return 0;
-            }
-            if (e1 == null) {
-                return -1;
-            }
-            if (e2 == null) {
-                return 1;
-            }
-            let [pval1, isPrim1] = asPrimitive(e1);
-            if (!isPrim1) {
-                pval1 = valToString(e1);
-            }
-            let [pval2, isPrim2] = asPrimitive(e2);
-            if (!isPrim2) {
-                pval2 = valToString(e2);
-            }
-            console.log("<=>", pval1, pval2, pval1 < pval2, pval1 > pval2);
-            if (pval1 < pval2) {
-                console.log(" ** rtn -1");
-                return -1;
-            }
-            if (pval1 > pval2) {
-                console.log(" ** rtn 1");
-                return 1;
-            }
-            console.log(" ** rtn 0");
-            return 0;
+            return compareVals(e1, e2);
         }
         else if (exprAst.op === "==") {
             // TODO: fix == bug (toString())
@@ -2305,15 +2276,15 @@ function evalExprAstInternal(exprAst : HExpr, dataenv : DataEnvironment, rtype :
         else if (exprAst.op === "-") {
             let e1 = evalExprAst(exprAst.exprs[0], dataenv, "resolve");
             let e2 = evalExprAst(exprAst.exprs[1], dataenv, "resolve");
-            return asNumber(e1) - asNumber(e2);
+            return valToNumber(e1) - valToNumber(e2);
         }
         else if (exprAst.op === "u-") {
             let e1 = evalExprAst(exprAst.exprs[0], dataenv, "resolve") ?? null;
-            return -asNumber(e1);
+            return -valToNumber(e1);
         }
         else if (exprAst.op === "u+") {
             let e1 = evalExprAst(exprAst.exprs[0], dataenv, "resolve") ?? null;
-            return +asNumber(e1);
+            return +valToNumber(e1);
         }
         else if (exprAst.op === "?:") {
             let econd = evalExprAst(exprAst.exprs[0], dataenv, "resolve");
@@ -3038,7 +3009,50 @@ function setLValue(lv : LValue, setVal : HibikiVal) : void {
     rlv.set(setVal);
 }
 
-export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, JsonStringify, EvalSimpleExpr, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, DeepCopy, CheckCycle, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, makeIteratorFromExpr, rawAttrStr, getUnmergedAttributeStr, getUnmergedAttributeValPair, SYM_NOATTR, HActionBlock, valToString, valToBool, compileActionStr, FireEvent, makeErrorObj, OpaqueValue, ChildrenVar, Watcher, LambdaValue, blobPrintStr, asNumber, hibikiTypeOf, JsonReplacerFn, valToAttrStr, resolveLValue, resolveUnmergedCnArray, isUnmerged, resolveUnmergedStyleMap, asStyleMap, asStyleMapFromPair, EvalContextVarsThrow};
+function compareVals(v1 : HibikiVal, v2 : HibikiVal, opts? : {locale? : string, nocase? : boolean, sortType? : ("string" | "numeric"), sensitivity? : string}) : number {
+    opts = opts ?? {};
+    if (v1 === v2) {
+        return 0;
+    }
+    if (typeof(v1) === "number" && isNaN(v1)) {
+        v1 = null;
+    }
+    if (typeof(v2) === "number" && isNaN(v2)) {
+        v2 = null;
+    }
+    if (v1 == null && v2 == null) {
+        return 0;
+    }
+    if (v1 == null) {
+        return -1;
+    }
+    if (v2 == null) {
+        return 1;
+    }
+    let numeric = (typeof(v1) === "number" && typeof(v2) === "number");
+    if (opts.sortType === "numeric") {
+        numeric = true;
+    }
+    if (opts.sortType === "string") {
+        numeric = false;
+    }
+    let sv1 = valToString(v1);
+    let sv2 = valToString(v2);
+    let locale : string = undefined;
+    if (opts.locale != null) {
+        locale = opts.locale;
+    }
+    let sensitivity = "variant";
+    if (opts.nocase) {
+        sensitivity = "accent";
+    }
+    if (opts.sensitivity != null) {
+        sensitivity = opts.sensitivity;
+    }
+    return sv1.localeCompare(sv2, locale, {numeric: numeric, sensitivity: sensitivity});
+}
+
+export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, JsonStringify, EvalSimpleExpr, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, DeepCopy, CheckCycle, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, makeIteratorFromExpr, rawAttrStr, getUnmergedAttributeStr, getUnmergedAttributeValPair, SYM_NOATTR, HActionBlock, valToString, valToBool, compileActionStr, FireEvent, makeErrorObj, OpaqueValue, ChildrenVar, Watcher, LambdaValue, blobPrintStr, valToNumber, hibikiTypeOf, JsonReplacerFn, valToAttrStr, resolveLValue, resolveUnmergedCnArray, isUnmerged, resolveUnmergedStyleMap, asStyleMap, asStyleMapFromPair, EvalContextVarsThrow, compareVals};
 
 export type {PathType, HAction, HExpr, HIteratorExpr, ContextVarType};
 

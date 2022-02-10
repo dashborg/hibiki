@@ -5,9 +5,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 import * as mobx from "mobx";
-import type {JSFuncType, HibikiVal} from "./types";
+import type {JSFuncType, HibikiVal, HibikiValObj} from "./types";
 import {sprintf} from "sprintf-js";
-import {isObject, addToArrayDupCheck, removeFromArray} from "./utils";
+import {isObject, addToArrayDupCheck, removeFromArray, unpackPositionalArgArray} from "./utils";
 import {v4 as uuidv4} from 'uuid';
 import * as DataCtx from "./datactx";
 
@@ -363,6 +363,27 @@ function jsDeepCopy(val : HibikiVal) : HibikiVal {
     return DataCtx.DeepCopy(val, {resolve: true});
 }
 
+function jsCompare(params : HibikiValObj) : number {
+    let args = unpackPositionalArgArray(params);
+    let {locale, "type": sortType, sensitivity, nocase} = (params ?? {});
+    let sortTypeStr : ("numeric" | "string") = null;
+    if (sortType != null) {
+        let sortStr = DataCtx.valToString(sortType);
+        if (sortStr === "numeric" || sortStr === "string") {
+            sortTypeStr = sortStr;
+        }
+    }
+    let opts = {
+        locale: DataCtx.valToString(locale),
+        sortType: sortTypeStr,
+        sensitivity: DataCtx.valToString(sensitivity),
+        nocase: DataCtx.valToBool(nocase),
+    };
+    let v1 = (args.length >= 1 ? args[0] : null);
+    let v2 = (args.length >= 2 ? args[1] : null);
+    return DataCtx.compareVals(v1, v2, opts);
+}
+
 function reg(name : string, fn : any, native : boolean, positionalArgs : boolean) {
     DefaultJSFuncs[name] = {fn, native, positionalArgs};
 }
@@ -409,5 +430,6 @@ reg("uuid", jsUuid, true, true);
 reg("typeof", jsTypeOf, true, true);
 reg("deepequal", jsDeepEqual, true, true);
 reg("deepcopy", jsDeepCopy, true, true);
+reg("compare", jsCompare, true, false);
 
 export {DefaultJSFuncs};

@@ -33,6 +33,7 @@ easier and more straight-forward.
 * change to grammar to allow functions (fn) to receive named parameters
 * added spaceship '<=>' operator for comparison
 * added new fn:uppercase and fn:lowercase string functions
+* added new fn:compare function (supports locales, sensitivity, and numeric/string comparisons)
 * bugfix: class.[class] was not being properly set to false when set to the Hibiki value false
 * bugfix: and/or operators were not correctly evaluating 'noattr' as false
 * bugfix: fix component defaults, define-vars, and h-withcontext, to never update mobx state

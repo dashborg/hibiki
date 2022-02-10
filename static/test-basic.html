@@ -171,9 +171,12 @@
         </tr>
         <tr component="local-test-tr">
           <td slot="test" innerhtml>{{ 5 <=> 2 }} | {{ "7" <=> 2 }} | {{ "mike" <=> "xavier" }}<br>
-{{ null <=> 5 }} | {{ 5 <=> null }} | {{ null <=> noattr }}
+{{ null <=> 5 }} | {{ 5 <=> null }} | {{ null <=> noattr }}<br>
+{{ fn:compare("TeSt", "test") }} | {{ fn:compare("TeSt", "test", nocase=true) }}<br>
+{{ fn:compare("5", 10) }} | {{ fn:compare("5", 10, type="numeric") }}<br>
+{{ fn:compare('ä', "a") }} | {{ fn:compare('ä', "a", locale="de", sensitivity="base") }}
 </td>
-          <td slot="result">1 | 1 | -1<br>-1 | 1 | 0</td>
+          <td slot="result">1 | 1 | -1<br>-1 | 1 | 0<br>1 | 0<br>1 | -1<br>1 | 0</td>
         </tr>
         <tr component="local-test-tr">
           <td slot="test" innerhtml>{{ noattr }}</td>
@@ -295,13 +298,6 @@
             {{fn:json({x: 22})}}
           </td>
           <td slot="result">{"x":22}</td>
-        </tr>
-        <tr component="local-test-tr">
-          <td slot="test" innerhtml>
-            {{fn:ts()}}<br>
-<h-dateformat bind="fn:ts()"></h-dateformat>
-          </td>
-          <td slot="result">(dynamic)</td>
         </tr>
         <tr component="local-test-tr">
           <td slot="test" innerhtml>
