@@ -37,6 +37,7 @@ function strEscValue(val) {
 let lexer = moo.states({
     main: {
         URLPATH: { match: /(?:(?:GET|POST|PUT|PATCH|DELETE|DYN)\s+)[^(); \t\r\n]+|(?:http:|https:|\/\/)[^(); \t\r\n]+/ },
+        SPACESHIP:   "<=>",
         LOGICAL_OR:  "||",
         LOGICAL_AND: "&&",
         GEQ:         ">=",
@@ -389,11 +390,15 @@ equalityExpr ->
     | equalityExpr %BANGEQ relationalExpr {% (data) => ({etype: "op", op: "!=", exprs: [data[0], data[2]]}) %}
 
 relationalExpr ->
+      compareExpr {% id %}
+    | relationalExpr %GEQ compareExpr {% (data) => ({etype: "op", op: ">=", exprs: [data[0], data[2]]}) %}
+    | relationalExpr %LEQ compareExpr {% (data) => ({etype: "op", op: "<=", exprs: [data[0], data[2]]}) %}
+    | relationalExpr %GT compareExpr  {% (data) => ({etype: "op", op: ">", exprs: [data[0], data[2]]}) %}
+    | relationalExpr %LT compareExpr  {% (data) => ({etype: "op", op: "<", exprs: [data[0], data[2]]}) %}
+
+compareExpr ->
       addExpr {% id %}
-    | relationalExpr %GEQ addExpr {% (data) => ({etype: "op", op: ">=", exprs: [data[0], data[2]]}) %}
-    | relationalExpr %LEQ addExpr {% (data) => ({etype: "op", op: "<=", exprs: [data[0], data[2]]}) %}
-    | relationalExpr %GT addExpr  {% (data) => ({etype: "op", op: ">", exprs: [data[0], data[2]]}) %}
-    | relationalExpr %LT addExpr  {% (data) => ({etype: "op", op: "<", exprs: [data[0], data[2]]}) %}
+    | compareExpr %SPACESHIP addExpr {% (data) => ({etype: "op", op: "<=>", exprs: [data[0], data[2]]}) %}
 
 addExpr ->
       mulExpr {% id %}

@@ -170,6 +170,12 @@
           <td slot="result">-5.2 | -5.2 | 10</td>
         </tr>
         <tr component="local-test-tr">
+          <td slot="test" innerhtml>{{ 5 <=> 2 }} | {{ "7" <=> 2 }} | {{ "mike" <=> "xavier" }}<br>
+{{ null <=> 5 }} | {{ 5 <=> null }} | {{ null <=> noattr }}
+</td>
+          <td slot="result">1 | 1 | -1<br>-1 | 1 | 0</td>
+        </tr>
+        <tr component="local-test-tr">
           <td slot="test" innerhtml>{{ noattr }}</td>
           <td slot="result">null</td>
         </tr>
@@ -345,6 +351,18 @@
             {{fn:split("red,blue", ",") | format("json-compact")}}
           </td>
           <td slot="result">["red","blue"]</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{ fn:uppercase("Test") }} | {{ fn:lowercase("Test") }}
+          </td>
+          <td slot="result">TEST | test</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{ fn:floor(5.5) }} | {{ fn:ceil(5.5) }}
+          </td>
+          <td slot="result">5 | 6</td>
         </tr>
       </table>
     </div>

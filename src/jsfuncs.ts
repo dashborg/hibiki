@@ -17,10 +17,10 @@ function jsLen(v : any) : number {
     if (v == null) {
         return 0;
     }
-    if (typeof(v) == "string" || mobx.isArrayLike(v)) {
+    if (typeof(v) === "string" || mobx.isArrayLike(v)) {
         return v.length;
     }
-    if (typeof(v) == "object") {
+    if (typeof(v) === "object") {
         return Object.keys(v).length;
     }
     return 1;
@@ -158,7 +158,7 @@ function jsBool(v : any) : boolean {
 }
 
 function jsJsonParse(v : string) : any {
-    if (v == null || v == "") {
+    if (v == null || v === "") {
         return null;
     }
     return JSON.parse(v);
@@ -202,18 +202,18 @@ function jsEval(jsexpr : string) : any {
         return null;
     }
     let evalVal = eval("(" + jsexpr + ")");
-    if (typeof(evalVal) == "function") {
+    if (typeof(evalVal) === "function") {
         evalVal = evalVal();
     }
     return evalVal;
 }
 
 function jsJs(fnName : string, ...rest : any[]) : any {
-    if (typeof(fnName) != "string") {
+    if (typeof(fnName) !== "string") {
         throw new Error("fn:js first argument must be a string (the function to call)");
     }
     let val = window[fnName];
-    if (typeof(val) == "function") {
+    if (typeof(val) === "function") {
         return val(...rest);
     }
     return val;
@@ -223,18 +223,40 @@ function jsSubstr(str : string, ...rest : any[]) : string {
     if (str == null) {
         return null;
     }
-    if (typeof(str) != "string") {
+    if (typeof(str) !== "string") {
         str = String(str);
     }
     // @ts-ignore
     return str.substr(...rest);
 }
 
+function jsUpperCase(str : string) : string {
+    if (str == null) {
+        return null;
+    }
+    if (typeof(str) !== "string") {
+        str = String(str);
+    }
+    // @ts-ignore
+    return str.toUpperCase();
+}
+
+function jsLowerCase(str : string) : string {
+    if (str == null) {
+        return null;
+    }
+    if (typeof(str) !== "string") {
+        str = String(str);
+    }
+    // @ts-ignore
+    return str.toLowerCase();
+}
+
 function jsSprintf(format : string, ...rest : any[]) : string {
     if (format == null) {
         return null;
     }
-    if (typeof(format) != "string") {
+    if (typeof(format) !== "string") {
         throw new Error("fn:sprintf first argument must be a string");
     }
     return sprintf(format, ...rest);
@@ -248,7 +270,7 @@ function jsTrim(str : string) : string {
 }
 
 function jsStartsWith(str : string, ...rest : any[]) : boolean {
-    if (str == null || typeof(str) != "string") {
+    if (str == null || typeof(str) !== "string") {
         return false;
     }
     // @ts-ignore
@@ -256,7 +278,7 @@ function jsStartsWith(str : string, ...rest : any[]) : boolean {
 }
 
 function jsEndsWith(str : string, ...rest : any[]) : boolean {
-    if (str == null || typeof(str) != "string") {
+    if (str == null || typeof(str) !== "string") {
         return false;
     }
     // @ts-ignore
@@ -267,11 +289,11 @@ function jsMatch(str : string, regex : string | RegExp, ...rest : any[]) : any {
     if (str == null || regex == null) {
         return null;
     }
-    if (typeof(regex) != "string" && !(regex instanceof RegExp)) {
+    if (typeof(regex) !== "string" && !(regex instanceof RegExp)) {
         throw new Error("fn:match 2nd argument must be a regexp");
     }
     let re : RegExp = null;
-    if (typeof(regex) == "string") {
+    if (typeof(regex) === "string") {
         re = new RegExp(regex, ...rest);
     }
     else {
@@ -281,7 +303,7 @@ function jsMatch(str : string, regex : string | RegExp, ...rest : any[]) : any {
 }
 
 function jsBlobAsText(blob : any) : string {
-    if (blob == null || !isObject(blob) || blob._type != "HibikiBlob") {
+    if (blob == null || !isObject(blob) || blob._type !== "HibikiBlob") {
         return null;
     }
     if (!blob.mimetype.startsWith("text/")) {
@@ -291,21 +313,21 @@ function jsBlobAsText(blob : any) : string {
 }
 
 function jsBlobAsBase64(blob : any) : string {
-    if (blob == null || !isObject(blob) || blob._type != "HibikiBlob") {
+    if (blob == null || !isObject(blob) || blob._type !== "HibikiBlob") {
         return null;
     }
     return blob.data;
 }
 
 function jsBlobMimeType(blob : any) : string {
-    if (blob == null || !isObject(blob) || blob._type != "HibikiBlob") {
+    if (blob == null || !isObject(blob) || blob._type !== "HibikiBlob") {
         return null;
     }
     return blob.mimetype;
 }
 
 function jsBlobLen(blob : any) : number {
-    if (blob == null || !isObject(blob) || blob._type != "HibikiBlob") {
+    if (blob == null || !isObject(blob) || blob._type !== "HibikiBlob") {
         return null;
     }
     let bloblen = 0;
@@ -319,7 +341,7 @@ function jsBlobName(blob : any) : string {
     if (blob == null) {
         return null;
     }
-    if (isObject(blob) && blob._type == "HibikiBlob") {
+    if (isObject(blob) && blob._type === "HibikiBlob") {
         return blob.name;
     }
     return null;
@@ -371,6 +393,8 @@ reg("merge", jsMerge, true, true);
 reg("jseval", jsEval, true, true);
 reg("js", jsJs, false, true);
 reg("substr", jsSubstr, true, true);
+reg("uppercase", jsUpperCase, true, true);
+reg("lowercase", jsLowerCase, true, true);
 reg("sprintf", jsSprintf, true, true);
 reg("trim", jsTrim, true, true);
 reg("startswith", jsStartsWith, true, true);

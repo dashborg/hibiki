@@ -2248,6 +2248,38 @@ function evalExprAstInternal(exprAst : HExpr, dataenv : DataEnvironment, rtype :
             }
             return asNumber(e1) < asNumber(e2);
         }
+        else if (exprAst.op === "<=>") {
+            let e1 = evalExprAst(exprAst.exprs[0], dataenv, "resolve");
+            let e2 = evalExprAst(exprAst.exprs[1], dataenv, "resolve");
+            if (e1 === e2 || (e1 == null && e2 == null)) {
+                return 0;
+            }
+            if (e1 == null) {
+                return -1;
+            }
+            if (e2 == null) {
+                return 1;
+            }
+            let [pval1, isPrim1] = asPrimitive(e1);
+            if (!isPrim1) {
+                pval1 = valToString(e1);
+            }
+            let [pval2, isPrim2] = asPrimitive(e2);
+            if (!isPrim2) {
+                pval2 = valToString(e2);
+            }
+            console.log("<=>", pval1, pval2, pval1 < pval2, pval1 > pval2);
+            if (pval1 < pval2) {
+                console.log(" ** rtn -1");
+                return -1;
+            }
+            if (pval1 > pval2) {
+                console.log(" ** rtn 1");
+                return 1;
+            }
+            console.log(" ** rtn 0");
+            return 0;
+        }
         else if (exprAst.op === "==") {
             // TODO: fix == bug (toString())
             let e1 = evalExprAst(exprAst.exprs[0], dataenv, "natural") ?? null;
