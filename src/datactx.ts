@@ -1001,7 +1001,7 @@ function ParseSetPathThrow(setpath : string) : { op : string, path : PathType } 
     return {op: found[1], path: rtnPath};
 }
 
-function internalResolvePath(path : PathType, irData : HibikiVal, dataenv : DataEnvironment, level : number) : HibikiVal {
+function internalResolvePath(path : PathType, irData : HibikiVal, dataenv : DataEnvironment, resolveType : "resolve" | "lvalue", level : number) : HibikiVal {
     // note that irData starts as null when resolving a root path
     if (level >= path.length || irData === SYM_NOATTR) {
         return irData ?? null;   // remove 'undefined'
@@ -1013,7 +1013,7 @@ function internalResolvePath(path : PathType, irData : HibikiVal, dataenv : Data
         }
         if (pp.pathkey === "expr") {
             let newIrData : HibikiVal = pp.value;
-            return internalResolvePath(path, newIrData, dataenv, level+1);
+            return internalResolvePath(path, newIrData, dataenv, resolveType, level+1);
         }
         let newIrData : HibikiVal = null;
         try {
@@ -1022,10 +1022,13 @@ function internalResolvePath(path : PathType, irData : HibikiVal, dataenv : Data
         catch (e) {
             throw new Error(sprintf("Invalid root path, path=%s, pathkey=%s, level=%d", StringPath(path), pp.pathkey, level));
         }
-        return internalResolvePath(path, newIrData, dataenv, level+1);
+        return internalResolvePath(path, newIrData, dataenv, resolveType, level+1);
     }
     else if (pp.pathtype === "array") {
         if (irData instanceof LValue) {
+            if (resolveType === "lvalue") {
+                return irData.subArrayIndex(pp.pathindex);
+            }
             irData = resolveLValue(irData);
         }
         if (irData == null || irData === SYM_NOATTR) {
@@ -1044,10 +1047,13 @@ function internalResolvePath(path : PathType, irData : HibikiVal, dataenv : Data
         if (pp.pathindex >= arrObj.length) {
             return null;
         }
-        return internalResolvePath(path, arrObj[pp.pathindex], dataenv, level+1);
+        return internalResolvePath(path, arrObj[pp.pathindex], dataenv, resolveType, level+1);
     }
     else if (pp.pathtype === "map") {
         if (irData instanceof LValue) {
+            if (resolveType === "lvalue") {
+                return irData.subMapKey(pp.pathkey);
+            }
             irData = resolveLValue(irData);
         }
         if (irData == null || irData === SYM_NOATTR) {
@@ -1057,13 +1063,13 @@ function internalResolvePath(path : PathType, irData : HibikiVal, dataenv : Data
             if (!irData.allowedGetters(pp.pathkey)) {
                 return null;
             }
-            return internalResolvePath(path, irData[pp.pathkey], dataenv, level+1);
+            return internalResolvePath(path, irData[pp.pathkey], dataenv, resolveType, level+1);
         }
         if (isOpaqueType(irData, false)) {
             return null;
         }
         if ((irData instanceof Map) || mobx.isObservableMap(irData)) {
-            return internalResolvePath(path, irData.get(pp.pathkey), dataenv, level+1);
+            return internalResolvePath(path, irData.get(pp.pathkey), dataenv, resolveType, level+1);
         }
         let [dataObj, isObj] = asPlainObject(irData, false);
         if (!isObj) {
@@ -1073,7 +1079,7 @@ function internalResolvePath(path : PathType, irData : HibikiVal, dataenv : Data
             // special case, NOATTR for undefined values off $args root
             return SYM_NOATTR;
         }
-        return internalResolvePath(path, dataObj[pp.pathkey], dataenv, level+1);
+        return internalResolvePath(path, dataObj[pp.pathkey], dataenv, resolveType, level+1);
     }
     else {
         throw new Error(sprintf("Bad PathPart in ResolvePath, path=%s, pathtype=%s, level=%d", StringPath(path), pp.pathtype, level));
@@ -1106,7 +1112,7 @@ function ResolvePathThrow(pathUnion : PathUnionType, dataenv : DataEnvironment) 
     if (path == null) {
         return null;
     }
-    return internalResolvePath(path, null, dataenv, 0);
+    return internalResolvePath(path, null, dataenv, "resolve", 0);
 }
 
 function appendData(path : PathType, curData : HibikiVal, newData : HibikiVal) : HibikiVal {
@@ -1226,7 +1232,7 @@ function quickObjectResolvePath(path : PathType, localRoot : any) : any {
         return;
     }
     try {
-        return internalResolvePath(path, localRoot, null, 1);
+        return internalResolvePath(path, localRoot, null, "resolve", 1);
     }
     catch (e) {
         console.log("Error getting object path", e);
@@ -2086,7 +2092,8 @@ function evalExprAstInternal(exprAst : HExpr, dataenv : DataEnvironment, rtype :
     }
     if (exprAst.etype === "path") {
         let staticPath = evalPath(exprAst.path, dataenv);
-        let val = internalResolvePath(staticPath, null, dataenv, 0);
+        let pathResolveType = (rtype === "raw" ? "lvalue" : "resolve");
+        let val = internalResolvePath(staticPath, null, dataenv, pathResolveType, 0);
         if (rtype === "natural") {
             return resolveLValue(val);
         }

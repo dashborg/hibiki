@@ -96,6 +96,9 @@ function jsSlice(params : HibikiValObj) : HibikiVal[] {
         throw new Error("Invalid start/end arguments to fn:slice, must be numeric (not NaN)");
     }
     let makeRefs = DataCtx.valToBool(unpackArg(params, "makerefs"));
+    if (makeRefs && !(rawVal instanceof DataCtx.LValue)) {
+        console.log("WARNING fn:slice makerefs=true, but data is not a reference");
+    }
     if (!makeRefs || !(rawVal instanceof DataCtx.LValue)) {
         return arrVal.slice(startIdx, endIdx);
     }
@@ -429,10 +432,15 @@ function jsSort(params : HibikiValObj, dataenv : DataEnvironment) : HibikiVal[] 
     }
     let compareOpts = extractCompareOpts(params);
     let makeRefs = DataCtx.valToBool(unpackArg(params, "makerefs"));
+    let sortDesc = DataCtx.valToBool(unpackArg(params, "desc"));
+    let sortMult = (sortDesc ? -1 : 1);
     let indexArr = arrData.map((_, idx) => idx);
     indexArr.sort((idx1, idx2) => {
-        return DataCtx.compareVals(arrData[idx1], arrData[idx2], compareOpts)
+        return sortMult*DataCtx.compareVals(arrData[idx1], arrData[idx2], compareOpts)
     });
+    if (makeRefs && !(rawData instanceof DataCtx.LValue)) {
+        console.log("WARNING fn:sort makerefs=true, but data is not a reference");
+    }
     if (makeRefs && (rawData instanceof DataCtx.LValue)) {
         let dataLv = rawData as DataCtx.LValue;
         return indexArr.map((idx) => dataLv.subArrayIndex(idx));
