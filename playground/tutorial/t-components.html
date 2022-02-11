@@ -114,13 +114,12 @@
 <p>
   A special local variable <code>@children</code> is available inside of your component that holds
   the child elements passed to your component.  The <code>@children</code> variable allows for simple
-  filtering by tag name or <i>slot</i>, but the most common usage is to just include <i>all</i> of the
-  in your defined component.  That is done by using the &lt;h-children&gt; tag with <code>@children.all</code>:
+  filtering by tag name or <i>slot</i>.  You include children by using the &lt;h-children&gt; tag.
 </p>
 <pre>
 &lt;define-component name="bulma-box">
   &lt;div class="box">
-    &lt;h-children bind="@children.all">&lt;/h-children>
+    &lt;h-children bind="@children">&lt;/h-children>
   &lt;/div>
 &lt;/define-component>
 

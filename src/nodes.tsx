@@ -122,8 +122,9 @@ function staticEvalTextNode(node : HibikiNode, dataenv : DataEnvironment) : stri
     return rtn;
 }
 
-function renderCtx(ctx : DBCtx) : React.ReactNode {
-    return <AnyNode node={ctx.node} dataenv={ctx.dataenv} injectedAttrs={ctx.injectedAttrs}/>;
+function renderCtx(ctx : DBCtx, index : number) : React.ReactNode {
+    let nodeKey = ctx.resolveAttrStr("key") ?? index;
+    return <AnyNode key={nodeKey} node={ctx.node} dataenv={ctx.dataenv} injectedAttrs={ctx.injectedAttrs}/>;
 }
 
 function renderCtxList(ctxList : DBCtx[]) : React.ReactNode[] {
@@ -131,8 +132,9 @@ function renderCtxList(ctxList : DBCtx[]) : React.ReactNode[] {
         return null;
     }
     let rtn : React.ReactNode[] = [];
-    for (let ctx of ctxList) {
-        rtn.push(renderCtx(ctx));
+    for (let i=0; i<ctxList.length; i++) {
+        let rnode = renderCtx(ctxList[i], i);
+        rtn.push(rnode);
     }
     return rtn;
 }
