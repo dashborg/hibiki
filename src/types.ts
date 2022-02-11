@@ -23,6 +23,7 @@ type HibikiReactProps = {
     node : HibikiNode,
     dataenv : DataEnvironment,
     injectedAttrs : InjectedAttrsObj,
+    parentHtmlTag : string,
 };
 
 type AutoMergeExpr = {

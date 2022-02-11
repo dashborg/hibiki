@@ -35,7 +35,7 @@ class ErrorMsg extends React.Component<{message: string}, {}> {
 }
 
 @mobxReact.observer
-class HibikiRootNode extends React.Component<{hibikiState : HibikiExtState}, {}> {
+class HibikiRootNode extends React.Component<{hibikiState : HibikiExtState, parentHtmlTag : string}, {}> {
     constructor(props : any) {
         super(props);
     }
@@ -58,7 +58,8 @@ class HibikiRootNode extends React.Component<{hibikiState : HibikiExtState}, {}>
         let dataenv = this.getDataenv();
         let ctx = makeCustomDBCtx(node, dataenv, null);
         ctx.isRoot = true;
-        return <NodeList list={ctx.node.list} ctx={ctx} isRoot={true}/>;
+        let parentHtmlTag = this.props.parentHtmlTag ?? "div";
+        return <NodeList list={ctx.node.list} ctx={ctx} isRoot={true} parentHtmlTag={parentHtmlTag}/>;
     }
 }
 
@@ -76,27 +77,24 @@ function evalOptionChildren(node : HibikiNode, dataenv : DataEnvironment) : stri
     return textRtn;
 }
 
-function ctxRenderHtmlChildren(ctx : DBCtx, dataenv? : DataEnvironment) : React.ReactNode[] {
-    if (dataenv == null) {
-        dataenv = ctx.dataenv;
-    }
+function ctxRenderHtmlChildren(ctx : DBCtx, htmlTag? : string) : React.ReactNode[] {
     if (ctx.node.tag == "option") {
-        return [evalOptionChildren(ctx.node, dataenv)];
+        return [evalOptionChildren(ctx.node, ctx.dataenv)];
     }
-    let rtn = baseRenderHtmlChildren(ctx.node.list, dataenv, false);
+    let rtn = baseRenderHtmlChildren(ctx.node.list, ctx.dataenv, false, htmlTag);
     return rtn;
 }
 
-function baseRenderHtmlChildren(list : HibikiNode[], dataenv : DataEnvironment, isRoot : boolean) : React.ReactNode[] {
+function baseRenderHtmlChildren(list : HibikiNode[], dataenv : DataEnvironment, isRoot : boolean, parentHtmlTag : string) : React.ReactNode[] {
     let ctxList = bindNodeList(list, dataenv, isRoot);
-    return renderCtxList(ctxList);
+    return renderCtxList(ctxList, parentHtmlTag);
 }
 
 @mobxReact.observer
-class NodeList extends React.Component<{list : HibikiNode[], ctx : DBCtx, isRoot? : boolean}> {
+class NodeList extends React.Component<{list : HibikiNode[], ctx : DBCtx, isRoot? : boolean, parentHtmlTag : string}> {
     render() : React.ReactNode {
         let {list, ctx} = this.props;
-        let rtn = baseRenderHtmlChildren(list, ctx.dataenv, this.props.isRoot);
+        let rtn = baseRenderHtmlChildren(list, ctx.dataenv, this.props.isRoot, this.props.parentHtmlTag);
         if (rtn == null) {
             return null;
         }
@@ -122,19 +120,34 @@ function staticEvalTextNode(node : HibikiNode, dataenv : DataEnvironment) : stri
     return rtn;
 }
 
-function renderCtx(ctx : DBCtx, index : number) : React.ReactNode {
+const NO_WHITESPACE_TAGS = {
+    "thead": true,
+    "tbody": true,
+    "tfoot": true,
+    "tr": true,
+    "table": true,
+    "colgroup": true,
+    "frameset": true,
+};
+
+function renderCtx(ctx : DBCtx, index : number, parentHtmlTag : string) : React.ReactNode {
     let nodeKey = ctx.resolveAttrStr("key") ?? index;
-    return <AnyNode key={nodeKey} node={ctx.node} dataenv={ctx.dataenv} injectedAttrs={ctx.injectedAttrs}/>;
+    if (NO_WHITESPACE_TAGS[parentHtmlTag] && ctx.isWhiteSpaceNode()) {
+        return null;
+    }
+    return <AnyNode key={nodeKey} node={ctx.node} dataenv={ctx.dataenv} injectedAttrs={ctx.injectedAttrs} parentHtmlTag={parentHtmlTag}/>;
 }
 
-function renderCtxList(ctxList : DBCtx[]) : React.ReactNode[] {
+function renderCtxList(ctxList : DBCtx[], parentHtmlTag : string) : React.ReactNode[] {
     if (ctxList == null || ctxList.length == 0) {
         return null;
     }
     let rtn : React.ReactNode[] = [];
     for (let i=0; i<ctxList.length; i++) {
-        let rnode = renderCtx(ctxList[i], i);
-        rtn.push(rnode);
+        let rnode = renderCtx(ctxList[i], i, parentHtmlTag);
+        if (rnode != null) {
+            rtn.push(rnode);
+        }
     }
     return rtn;
 }
@@ -152,7 +165,7 @@ class AnyNode extends React.Component<HibikiReactProps, {}> {
             let htmlContext = sprintf("%s:%d", nodeStr(ctx.node), index);
             let childEnv = ctx.dataenv.makeChildEnv(ctxVars, {htmlContext: htmlContext});
             let childCtx = makeCustomDBCtx(node, childEnv, this.props.injectedAttrs);
-            let content = this.renderInner(childCtx, true);
+            let content = this.renderInner(childCtx, true, index);
             if (content != null) {
                 rtnContent.push(content);
             }
@@ -161,7 +174,7 @@ class AnyNode extends React.Component<HibikiReactProps, {}> {
         return rtnContent
     }
     
-    renderInner(ctx : DBCtx, iterating : boolean) : any {
+    renderInner(ctx : DBCtx, iterating : boolean, keyIndex? : number) : any {
         let node = ctx.node;
         let tagName = ctx.node.tag;
         if (tagName.startsWith("hibiki-")) {
@@ -181,14 +194,15 @@ class AnyNode extends React.Component<HibikiReactProps, {}> {
         if (ifExists && !ifVal) {
             return null;
         }
+        let nodeKey = ctx.resolveAttrStr("key") ?? keyIndex;
         let [unwrapVal, unwrapExists] = ctx.resolveConditionAttr("unwrap");
         if (unwrapExists && unwrapVal) {
-            return <FragmentNode node={node} dataenv={dataenv} injectedAttrs={ctx.injectedAttrs}/>;
+            return <FragmentNode key={nodeKey} node={node} dataenv={dataenv} injectedAttrs={ctx.injectedAttrs} parentHtmlTag={this.props.parentHtmlTag}/>;
         }
         if (component != null) {
             if (component.componentType == "react-custom") {
                 this.nodeType = "react-component";
-                return <CustomReactNode component={component} node={node} dataenv={dataenv} injectedAttrs={ctx.injectedAttrs}/>;
+                return <CustomReactNode key={nodeKey} component={component} node={node} dataenv={dataenv} injectedAttrs={ctx.injectedAttrs} parentHtmlTag={this.props.parentHtmlTag}/>;
             }
             else if (component.componentType == "hibiki-native") {
                 this.nodeType = "component";
@@ -199,23 +213,23 @@ class AnyNode extends React.Component<HibikiReactProps, {}> {
                 if (ImplNode == null) {
                     return null;
                 }
-                return <ImplNode node={node} dataenv={dataenv}/>;
+                return <ImplNode key={nodeKey} node={node} dataenv={dataenv} parentHtmlTag={this.props.parentHtmlTag}/>;
             }
             else if (component.componentType == "hibiki-html") {
                 this.nodeType = "hibiki-html-component";
-                return <CustomNode component={component} node={node} dataenv={dataenv} injectedAttrs={ctx.injectedAttrs}/>;
+                return <CustomNode key={nodeKey} component={component} node={node} dataenv={dataenv} injectedAttrs={ctx.injectedAttrs} parentHtmlTag={this.props.parentHtmlTag}/>;
             }
             else {
                 this.nodeType = "unknown";
-                return <div>&lt;{compName}&gt;</div>;
+                return <div key={nodeKey}>&lt;{compName}&gt;</div>;
             }
         }
         if (compName.startsWith("html-") || compName.indexOf("-") == -1) {
             this.nodeType = "rawhtml";
-            return <RawHtmlNode node={node} dataenv={dataenv} injectedAttrs={ctx.injectedAttrs}/>
+            return <RawHtmlNode key={nodeKey} node={node} dataenv={dataenv} injectedAttrs={ctx.injectedAttrs} parentHtmlTag={this.props.parentHtmlTag}/>
         }
         this.nodeType = "unknown";
-        return <div>&lt;{compName}&gt;</div>;
+        return <div key={nodeKey}>&lt;{compName}&gt;</div>;
     }
 
     render() : React.ReactNode {
@@ -249,7 +263,7 @@ class CustomReactNode extends React.Component<HibikiReactProps & {component : Co
         let nodeVar = ctx.makeNodeVar(false);
         let htmlContext = sprintf("react:%s", nodeStr(ctx.node));
         let childEnv = ctx.dataenv.makeChildEnv({node: nodeVar}, {htmlContext: htmlContext, libContext: component.libName});
-        let rtnElems = baseRenderHtmlChildren(ctx.node.list, childEnv, false)
+        let rtnElems = baseRenderHtmlChildren(ctx.node.list, childEnv, false, this.props.parentHtmlTag)
         let reactElem = React.createElement(reactImpl, reactProps, rtnElems);
         return reactElem;
     }
@@ -581,7 +595,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
         if (Object.keys(cnArr).length > 0) {
             elemProps["className"] = cnArrToClassAttr(cnArr);
         }
-        let elemChildren = ctxRenderHtmlChildren(ctx);
+        let elemChildren = ctxRenderHtmlChildren(ctx, tagName);
         return React.createElement(tagName, elemProps, elemChildren);
     }
 }
@@ -668,7 +682,7 @@ class CustomNode extends React.Component<HibikiReactProps & {component : Compone
         let component = this.props.component;
         let implNode = component.node;
         let childEnv = this.makeCustomChildEnv(false);
-        let rtnElems = baseRenderHtmlChildren(implNode.list, childEnv, true)
+        let rtnElems = baseRenderHtmlChildren(implNode.list, childEnv, true, this.props.parentHtmlTag)
         if (rtnElems == null) {
             return null;
         }
@@ -695,7 +709,7 @@ class IfNode extends React.Component<HibikiReactProps, {}> {
         if (!condVal) {
             return null;
         }
-        return <NodeList list={ctx.node.list} ctx={ctx}/>;
+        return <NodeList list={ctx.node.list} ctx={ctx} parentHtmlTag={this.props.parentHtmlTag}/>;
     }
 }
 
@@ -703,7 +717,7 @@ class IfNode extends React.Component<HibikiReactProps, {}> {
 class FragmentNode extends React.Component<HibikiReactProps, {}> {
     render() : React.ReactNode {
         let ctx = makeDBCtx(this);
-        return <NodeList list={ctx.node.list} ctx={ctx}/>;
+        return <NodeList list={ctx.node.list} ctx={ctx} parentHtmlTag={this.props.parentHtmlTag}/>;
     }
 }
 
@@ -746,7 +760,7 @@ class ChildrenNode extends React.Component<HibikiReactProps, {}> {
         if (ctxList == null || ctxList.length === 0) {
             return null;
         }
-        let rtnElems = renderCtxList(ctxList);
+        let rtnElems = renderCtxList(ctxList, this.props.parentHtmlTag);
         return <React.Fragment>{rtnElems}</React.Fragment>;
     }
 }
@@ -777,11 +791,7 @@ class DynNode extends React.Component<HibikiReactProps, {}> {
         if (this.curHtmlObj == null) {
             return null;
         }
-        return (
-            <React.Fragment>
-                <NodeList list={this.curHtmlObj.list} ctx={ctx}/>
-            </React.Fragment>
-        );
+        return <NodeList list={this.curHtmlObj.list} ctx={ctx} parentHtmlTag={this.props.parentHtmlTag}/>;
     }
 }
 

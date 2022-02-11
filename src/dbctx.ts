@@ -393,6 +393,10 @@ class DBCtx {
         return tagName;
     }
 
+    isWhiteSpaceNode() : boolean {
+        return this.node.tag === "#text" && (this.node.text == null || this.node.text.trim() === "");
+    }
+
     resolvePath(path : string, opts? : {rtContext? : string}) : HibikiVal {
         opts = opts ?? {};
         let rtContext = opts.rtContext ?? "DBCtx.resolvePath";
