@@ -759,7 +759,12 @@ function bindSingleNode(node : HibikiNode, dataenv : DataEnvironment, injectedAt
         }
         return [null, false, null];
     }
-    return [makeCustomDBCtx(node, dataenv, injectedAttrs), false, null];
+    let rtnCtx = makeCustomDBCtx(node, dataenv, injectedAttrs);
+    let [ifVal, exists] = rtnCtx.resolveConditionAttr("if");
+    if (exists && !ifVal) {
+        return [null, false, null];
+    }
+    return [rtnCtx, false, null];
 }
 
 function bindNodeList(list : HibikiNode[], dataenv : DataEnvironment, isRoot : boolean) : DBCtx[] {
@@ -791,6 +796,10 @@ function bindNodeList(list : HibikiNode[], dataenv : DataEnvironment, isRoot : b
 }
 
 function expandChildrenNode(ctx : DBCtx) : DBCtx[] {
+    if (ctx.node.foreachAttr) {
+        let msg = sprintf("<h-children> does not support 'foreach' attribute");
+        return [makeErrorDBCtx(msg, ctx.dataenv)];
+    }
     let textStr = ctx.resolveAttrStr("text");
     if (textStr != null) {
         return [makeTextDBCtx(textStr, ctx.dataenv)];

@@ -32,6 +32,7 @@ easier and more straight-forward.
 * components now fire 'mount' event internally (as well as externally)
 * change to grammar to allow functions (fn) to receive named parameters
 * added spaceship '<=>' operator for comparison
+* 'noattr == null' is now true, added 'isnoattr(expr)' to distinguish the noattr case
 * added new fn:uppercase and fn:lowercase string functions
 * added new fn:compare function (supports locales, sensitivity, and numeric/string comparisons)
 * added new fn:sort function (uses fn:compare options) with makerefs parameter which can sort an array as references to link sorted values with originals

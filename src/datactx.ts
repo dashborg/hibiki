@@ -2137,6 +2137,10 @@ function evalExprAstInternal(exprAst : HExpr, dataenv : DataEnvironment, rtype :
         let val = evalExprAst(exprAst.exprs[0], dataenv, "raw");
         return val;
     }
+    else if (exprAst.etype === "isnoattr") {
+        let val = evalExprAst(exprAst.exprs[0], dataenv, "raw");
+        return val === SYM_NOATTR;
+    }
     else if (exprAst.etype === "ref") {
         let [lv, exists] = evalPathExprAst(exprAst.pathexpr, dataenv, null);
         if (!exists) {
@@ -2271,6 +2275,12 @@ function evalExprAstInternal(exprAst : HExpr, dataenv : DataEnvironment, rtype :
             // TODO: fix == bug (toString())
             let e1 = evalExprAst(exprAst.exprs[0], dataenv, "natural") ?? null;
             let e2 = evalExprAst(exprAst.exprs[1], dataenv, "natural") ?? null;
+            if (e1 === SYM_NOATTR) {
+                e1 = null;
+            }
+            if (e2 === SYM_NOATTR) {
+                e2 = null;
+            }
             if (e1 === e2) {
                 return true;
             }
@@ -2280,6 +2290,12 @@ function evalExprAstInternal(exprAst : HExpr, dataenv : DataEnvironment, rtype :
             // TODO: fix == bug (toString())
             let e1 = evalExprAst(exprAst.exprs[0], dataenv, "natural") ?? null;
             let e2 = evalExprAst(exprAst.exprs[1], dataenv, "natural") ?? null;
+            if (e1 === SYM_NOATTR) {
+                e1 = null;
+            }
+            if (e2 === SYM_NOATTR) {
+                e2 = null;
+            }
             if (e1 === e2) {
                 return false;
             }

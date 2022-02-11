@@ -58,6 +58,7 @@ let lexer = moo.states({
                         KW_FALSE: "false",
                         KW_NULL: "null",
                         KW_NOATTR: "noattr",
+                        KW_ISNOATTR: "isnoattr",
                         KW_CALLHANDLER: "callhandler",
                         KW_SETRETURN: "setreturn",
                         KW_RETURN: "return",
@@ -380,11 +381,13 @@ var grammar = {
     {"name": "primaryExpr", "symbols": ["invokeExpr"], "postprocess": id},
     {"name": "primaryExpr", "symbols": ["lambdaExpr"], "postprocess": id},
     {"name": "primaryExpr", "symbols": ["refExpr"], "postprocess": id},
+    {"name": "primaryExpr", "symbols": ["isNoAttrExpr"], "postprocess": id},
     {"name": "primaryExpr", "symbols": [(lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "fullExpr", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => data[1]},
     {"name": "primaryExpr", "symbols": ["pathExprNonTerm"], "postprocess": id},
     {"name": "fnExpr", "symbols": [(lexer.has("FN") ? {type: "FN"} : FN), "namedCallParams"], "postprocess":  (data) => {
             return {etype: "fn", fn: data[0].value, params: data[1]};
         } },
+    {"name": "isNoAttrExpr", "symbols": [(lexer.has("KW_ISNOATTR") ? {type: "KW_ISNOATTR"} : KW_ISNOATTR), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "fullExpr", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => ({etype: "isnoattr", exprs: [data[2]]})},
     {"name": "refExpr", "symbols": [(lexer.has("KW_REF") ? {type: "KW_REF"} : KW_REF), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "fullPathExpr", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => ({etype: "ref", pathexpr: data[2]})},
     {"name": "refExpr", "symbols": [(lexer.has("KW_ISREF") ? {type: "KW_ISREF"} : KW_ISREF), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "fullExpr", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => ({etype: "isref", exprs: [data[2]]})},
     {"name": "refExpr", "symbols": [(lexer.has("KW_REFINFO") ? {type: "KW_REFINFO"} : KW_REFINFO), (lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "fullExpr", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => ({etype: "refinfo", exprs: [data[2]]})},
@@ -539,6 +542,7 @@ var grammar = {
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_IN") ? {type: "KW_IN"} : KW_IN)], "postprocess": id},
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_INVOKE") ? {type: "KW_INVOKE"} : KW_INVOKE)], "postprocess": id},
     {"name": "idOrKeyword", "symbols": [(lexer.has("KW_LAMBDA") ? {type: "KW_LAMBDA"} : KW_LAMBDA)], "postprocess": id},
+    {"name": "idOrKeyword", "symbols": [(lexer.has("KW_ISNOATTR") ? {type: "KW_ISNOATTR"} : KW_ISNOATTR)], "postprocess": id},
     {"name": "_$ebnf$1", "symbols": []},
     {"name": "_$ebnf$1", "symbols": ["_$ebnf$1", (lexer.has("WS") ? {type: "WS"} : WS)], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
     {"name": "_", "symbols": ["_$ebnf$1"]}

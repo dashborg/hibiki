@@ -60,6 +60,7 @@ let lexer = moo.states({
                         KW_FALSE: "false",
                         KW_NULL: "null",
                         KW_NOATTR: "noattr",
+                        KW_ISNOATTR: "isnoattr",
                         KW_CALLHANDLER: "callhandler",
                         KW_SETRETURN: "setreturn",
                         KW_RETURN: "return",
@@ -428,6 +429,7 @@ primaryExpr ->
     | invokeExpr      {% id %}
     | lambdaExpr      {% id %}
     | refExpr         {% id %}
+    | isNoAttrExpr    {% id %}
     | %LPAREN fullExpr %RPAREN {% (data) => data[1] %}
     | pathExprNonTerm {% id %}
 
@@ -436,6 +438,8 @@ fnExpr ->
       %FN namedCallParams {% (data) => {
           return {etype: "fn", fn: data[0].value, params: data[1]};
       } %}
+
+isNoAttrExpr -> %KW_ISNOATTR %LPAREN fullExpr %RPAREN {% (data) => ({etype: "isnoattr", exprs: [data[2]]}) %}
 
 refExpr -> 
       %KW_REF %LPAREN fullPathExpr %RPAREN {% (data) => ({etype: "ref", pathexpr: data[2]}) %}
@@ -597,6 +601,7 @@ idOrKeyword ->
     | %KW_IN          {% id %}
     | %KW_INVOKE      {% id %}
     | %KW_LAMBDA      {% id %}
+    | %KW_ISNOATTR    {% id %}
 
 _ -> %WS:*
 

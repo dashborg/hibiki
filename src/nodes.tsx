@@ -13,7 +13,7 @@ import {If, For, When, Otherwise, Choose} from "tsx-control-statements/component
 import {v4 as uuidv4} from 'uuid';
 
 import type {ComponentType, LibraryType, HibikiExtState, LibComponentType, HibikiVal, HibikiValObj, HibikiReactProps} from "./types";
-import {DBCtx, makeDBCtx, makeCustomDBCtx, InjectedAttrsObj, createInjectObj, resolveArgsRoot, bindNodeList, bindSingleNode, expandChildrenNode} from "./dbctx";
+import {DBCtx, makeDBCtx, makeCustomDBCtx, InjectedAttrsObj, createInjectObj, resolveArgsRoot, bindNodeList, expandChildrenNode} from "./dbctx";
 import * as DataCtx from "./datactx";
 import {HibikiState, DataEnvironment} from "./state";
 import {resolveNumber, isObject, textContent, SYM_PROXY, SYM_FLATTEN, jseval, nodeStr, getHibiki, addToArrayDupCheck, removeFromArray, valInArray, subMapKey, unbox, bindLibContext, cnArrToClassAttr} from "./utils";
