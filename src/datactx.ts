@@ -2092,7 +2092,7 @@ function evalExprAstInternal(exprAst : HExpr, dataenv : DataEnvironment, rtype :
     }
     if (exprAst.etype === "path") {
         let staticPath = evalPath(exprAst.path, dataenv);
-        let pathResolveType = (rtype === "raw" ? "lvalue" : "resolve");
+        let pathResolveType : ("lvalue" | "resolve") = (rtype === "raw" ? "lvalue" : "resolve");
         let val = internalResolvePath(staticPath, null, dataenv, pathResolveType, 0);
         if (rtype === "natural") {
             return resolveLValue(val);

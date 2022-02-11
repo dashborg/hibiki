@@ -83,6 +83,24 @@ function jsSplice(val : HibikiVal, ...rest : any[]) {
     return newArr;
 }
 
+function processSliceArgs(arg : HibikiVal, fnName : string) : [number, number] {
+    if (arg == null) {
+        return null;
+    }
+    let [argArr, isArr] = DataCtx.asArray(arg, false);
+    if (!isArr) {
+        throw new Error(sprintf("Invalid slice arguments to %s, not an array", fnName));
+    }
+    let startVal = (argArr.length >= 1 ? argArr[0] : null);
+    let endVal = (argArr.length >= 2 ? argArr[1] : null);
+    let startIdx = ((startVal == null || startVal === DataCtx.SYM_NOATTR) ? undefined : DataCtx.valToNumber(startVal));
+    let endIdx = ((endVal == null || endVal === DataCtx.SYM_NOATTR)  ? undefined : DataCtx.valToNumber(endVal));
+    if ((startIdx != null && isNaN(startIdx)) || (endIdx != null && isNaN(endIdx))) {
+        throw new Error(sprintf("Invalid start/end arguments to %s, must be numeric (not NaN)", fnName));
+    }
+    return [startIdx, endIdx];
+}
+
 function jsSlice(params : HibikiValObj) : HibikiVal[] {
     let [rawVal, startVal, endVal] = unpackPositionalArgArray(params);
     let val = DataCtx.resolveLValue(rawVal);
@@ -90,11 +108,7 @@ function jsSlice(params : HibikiValObj) : HibikiVal[] {
     if (!isArr) {
         return null;
     }
-    let startIdx = ((startVal == null || startVal === DataCtx.SYM_NOATTR) ? undefined : DataCtx.valToNumber(startVal));
-    let endIdx = ((endVal == null || endVal === DataCtx.SYM_NOATTR)  ? undefined : DataCtx.valToNumber(endVal));
-    if ((startIdx != null && isNaN(startIdx)) || (endIdx != null && isNaN(endIdx))) {
-        throw new Error("Invalid start/end arguments to fn:slice, must be numeric (not NaN)");
-    }
+    let [startIdx, endIdx] = processSliceArgs([startVal, endVal], "fn:slice");
     let makeRefs = DataCtx.valToBool(unpackArg(params, "makerefs"));
     if (makeRefs && !(rawVal instanceof DataCtx.LValue)) {
         console.log("WARNING fn:slice makerefs=true, but data is not a reference");
@@ -433,21 +447,43 @@ function jsSort(params : HibikiValObj, dataenv : DataEnvironment) : HibikiVal[] 
     let compareOpts = extractCompareOpts(params);
     let makeRefs = DataCtx.valToBool(unpackArg(params, "makerefs"));
     let sortDesc = DataCtx.valToBool(unpackArg(params, "desc"));
+    let sliceOpt = processSliceArgs(unpackArg(params, "slice"), "fn:sort#slice");
+    let sortExprArg = unpackArg(params, "sortexpr");
+    let sortExpr : DataCtx.LambdaValue = null;
+    if (sortExprArg != null) {
+        if (!(sortExprArg instanceof DataCtx.LambdaValue)) {
+            throw new Error(sprintf("fn:sort#sortexpr was set, but is not type lambda, type=%s", DataCtx.hibikiTypeOf(sortExprArg)));
+        }
+        sortExpr = sortExprArg;
+    }
+    
     let sortMult = (sortDesc ? -1 : 1);
     let indexArr = arrData.map((_, idx) => idx);
     indexArr.sort((idx1, idx2) => {
-        return sortMult*DataCtx.compareVals(arrData[idx1], arrData[idx2], compareOpts)
+        let cmpVal : number = 0;
+        if (sortExpr != null) {
+            cmpVal = DataCtx.valToNumber(sortExpr.invoke(dataenv, {"a": arrData[idx1], "b": arrData[idx2], "aidx": idx1, "bidx": idx2}));
+        }
+        else {
+            cmpVal = DataCtx.compareVals(arrData[idx1], arrData[idx2], compareOpts);
+        }
+        return sortMult*cmpVal;
     });
     if (makeRefs && !(rawData instanceof DataCtx.LValue)) {
         console.log("WARNING fn:sort makerefs=true, but data is not a reference");
     }
+    let rtn : HibikiVal[] = null;
     if (makeRefs && (rawData instanceof DataCtx.LValue)) {
         let dataLv = rawData as DataCtx.LValue;
-        return indexArr.map((idx) => dataLv.subArrayIndex(idx));
+        rtn = indexArr.map((idx) => dataLv.subArrayIndex(idx));
     }
     else {
-        return indexArr.map((idx) => arrData[idx]);
+        rtn = indexArr.map((idx) => arrData[idx]);
     }
+    if (sliceOpt != null) {
+        rtn = rtn.slice(sliceOpt[0], sliceOpt[1]);
+    }
+    return rtn;
 }
 
 function reg(name : string, fn : any, native : boolean, positionalArgs : boolean) {
