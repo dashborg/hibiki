@@ -33,7 +33,6 @@ let merged = merge.merge(common, {
     },
 });
 
-merged.externals = {};
 merged.plugins.push(new LodashModuleReplacementPlugin());
 merged.plugins.push(new MiniCssExtractPlugin({filename: "dist/[name].css", ignoreOrder: true}));
 if (BundleAnalyzerPlugin != null) {
