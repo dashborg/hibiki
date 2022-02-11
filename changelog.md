@@ -34,7 +34,8 @@ easier and more straight-forward.
 * added spaceship '<=>' operator for comparison
 * added new fn:uppercase and fn:lowercase string functions
 * added new fn:compare function (supports locales, sensitivity, and numeric/string comparisons)
-* added new fn:sort function (uses fn:compare options, and can sort an array as references to link sorted values with originals)
+* added new fn:sort function (uses fn:compare options) with makerefs parameter which can sort an array as references to link sorted values with originals
+* add makerefs parameter to fn:slice, allowing the returned array to link to the original
 * bugfix: class.[class] was not being properly set to false when set to the Hibiki value false
 * bugfix: and/or operators were not correctly evaluating 'noattr' as false
 * bugfix: fix component defaults, define-vars, and h-withcontext, to never update mobx state

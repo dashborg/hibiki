@@ -83,11 +83,26 @@ function jsSplice(val : HibikiVal, ...rest : any[]) {
     return newArr;
 }
 
-function jsSlice(arr : any[], ...rest : any[]) {
-    if (arr == null || !mobx.isArrayLike(arr)) {
+function jsSlice(params : HibikiValObj) : HibikiVal[] {
+    let [rawVal, startVal, endVal] = unpackPositionalArgArray(params);
+    let val = DataCtx.resolveLValue(rawVal);
+    let [arrVal, isArr] = DataCtx.asArray(val, false);
+    if (!isArr) {
         return null;
     }
-    return arr.slice(...rest);
+    let startIdx = ((startVal == null || startVal === DataCtx.SYM_NOATTR) ? undefined : DataCtx.valToNumber(startVal));
+    let endIdx = ((endVal == null || endVal === DataCtx.SYM_NOATTR)  ? undefined : DataCtx.valToNumber(endVal));
+    if ((startIdx != null && isNaN(startIdx)) || (endIdx != null && isNaN(endIdx))) {
+        throw new Error("Invalid start/end arguments to fn:slice, must be numeric (not NaN)");
+    }
+    let makeRefs = DataCtx.valToBool(unpackArg(params, "makerefs"));
+    if (!makeRefs || !(rawVal instanceof DataCtx.LValue)) {
+        return arrVal.slice(startIdx, endIdx);
+    }
+    let rawLv = rawVal as DataCtx.LValue;
+    let indexArr = arrVal.map((_, idx) => idx);
+    let slicedIndexArr = indexArr.slice(startIdx, endIdx);
+    return slicedIndexArr.map((idx) => rawLv.subArrayIndex(idx));
 }
 
 function jsPush(arr : any[], ...rest : any[]) {
@@ -413,13 +428,12 @@ function jsSort(params : HibikiValObj, dataenv : DataEnvironment) : HibikiVal[] 
         return null;
     }
     let compareOpts = extractCompareOpts(params);
-    let sortRefs = DataCtx.valToBool(unpackArg(params, "sortrefs"));
-    console.log("sort", rawData);
+    let makeRefs = DataCtx.valToBool(unpackArg(params, "makerefs"));
     let indexArr = arrData.map((_, idx) => idx);
     indexArr.sort((idx1, idx2) => {
         return DataCtx.compareVals(arrData[idx1], arrData[idx2], compareOpts)
     });
-    if (sortRefs && (rawData instanceof DataCtx.LValue)) {
+    if (makeRefs && (rawData instanceof DataCtx.LValue)) {
         let dataLv = rawData as DataCtx.LValue;
         return indexArr.map((idx) => dataLv.subArrayIndex(idx));
     }
@@ -439,7 +453,7 @@ reg("max", jsMax, false, true);
 reg("floor", jsFloor, false, true);
 reg("ceil", jsCeil, false, true);
 reg("splice", jsSplice, true, true);
-reg("slice", jsSlice, true, true);
+reg("slice", jsSlice, true, false);
 reg("push", jsPush, true, true);
 reg("pop", jsPop, true, true);
 reg("setadd", jsSetAdd, true, true);

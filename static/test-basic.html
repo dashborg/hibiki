@@ -258,9 +258,9 @@
         </tr>
         <tr component="local-test-tr">
           <td slot="test" innerhtml>
-            {{ fn:slice($.arr, 3, 5) }}
+            {{ fn:slice($.arr, 3) }}<br>{{ fn:slice($.arr) }}
           </td>
-          <td slot="result">3,5</td>
+          <td slot="result">3,5,8<br>1,1,2,3,5,8</td>
         </tr>
         <tr component="local-test-tr">
           <td slot="test" innerhtml>
