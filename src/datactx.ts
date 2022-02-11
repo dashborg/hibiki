@@ -691,7 +691,8 @@ class LambdaValue {
             if (params != null) {
                 dataenv = dataenv.makeChildEnv(params, null);
             }
-            return evalExprAst(this.expr, dataenv, "natural");
+            let rtn = evalExprAst(this.expr, dataenv, "natural");
+            return rtn;
         }
         if (this.invokeFn) {
             let invokeRtn = this.invokeFn(dataenv, params);

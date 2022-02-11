@@ -450,7 +450,7 @@ function jsSort(params : HibikiValObj, dataenv : DataEnvironment) : HibikiVal[] 
     let sliceOpt = processSliceArgs(unpackArg(params, "slice"), "fn:sort#slice");
     let sortExprArg = unpackArg(params, "sortexpr");
     let sortExpr : DataCtx.LambdaValue = null;
-    if (sortExprArg != null) {
+    if (sortExprArg != null && sortExprArg !== DataCtx.SYM_NOATTR) {
         if (!(sortExprArg instanceof DataCtx.LambdaValue)) {
             throw new Error(sprintf("fn:sort#sortexpr was set, but is not type lambda, type=%s", DataCtx.hibikiTypeOf(sortExprArg)));
         }
