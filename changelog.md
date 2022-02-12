@@ -6,7 +6,9 @@ Hibiki HTML is now licensed under the OSI approved MPL v2 (Mozilla Public Licens
 More information here: https://www.mozilla.org/en-US/MPL/2.0/FAQ/
 
 Lots of under the hood changes to make writing UI component libraries
-easier and more straight-forward.
+easier and more straight-forward.  Tightened up the core tag library
+by removing 'h-if', 'h-withcontext', 'h-foreach', and 'h-if-break' (all of that
+functionality is available via attributes or other constructs).
 
 * 'unwrap' attribute to remove an enclosing tag and just render its children as a fragment
 * allow &lt;define-vars&gt; to receive context as a text node
@@ -25,6 +27,7 @@ easier and more straight-forward.
 * updated when welcome message and usage ping to fire on library load.  can be suppressed using HibikiGlobalConfig
 * updated click and submit handlers to only automatically call event.preventDefault() when the href or action attributes are not present or set to "#".
 * removed h-withcontext node (define-vars is more powerful)
+* removed h-if, h-foreach, h-if-break.  can all be accessed by adding attributes to existing nodes (or to h-fragment nodes)
 * define-vars, inline context attribute renamed from 'context' to 'datacontext' (to match h-children)
 * define-component, initial component data attribute renamed from 'defaults' to 'componentdata'
 * added new fn:floor and fn:ceil math functions, and fn:deepcopy

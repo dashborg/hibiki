@@ -699,21 +699,6 @@ class TextNode extends React.Component<HibikiReactProps, {}> {
 }
 
 @mobxReact.observer
-class IfNode extends React.Component<HibikiReactProps, {}> {
-    render() : React.ReactNode {
-        let ctx = makeDBCtx(this);
-        let [condVal, exists] = ctx.resolveConditionAttr("condition");
-        if (!exists) {
-            return <ErrorMsg message={sprintf("<%s> node requires 'condition' attribute", ctx.node.tag)}/>
-        }
-        if (!condVal) {
-            return null;
-        }
-        return <NodeList list={ctx.node.list} ctx={ctx} parentHtmlTag={this.props.parentHtmlTag}/>;
-    }
-}
-
-@mobxReact.observer
 class FragmentNode extends React.Component<HibikiReactProps, {}> {
     render() : React.ReactNode {
         let ctx = makeDBCtx(this);
@@ -937,22 +922,16 @@ let CORE_LIBRARY : LibraryType = {
     handlers: {},
 };
 
-addCoreComponent("if", IfNode);
-addCoreComponent("if-break", IfNode);
-addCoreComponent("foreach", FragmentNode);
 addCoreComponent("script", ScriptNode);
 addCoreComponent("define-vars", NopNode);
 addCoreComponent("define-handler", NopNode);
 addCoreComponent("define-component", NopNode);
 addCoreComponent("import-library", NopNode);
-addCoreComponent("h-if", IfNode);
-addCoreComponent("h-if-break", IfNode);
-addCoreComponent("h-foreach", FragmentNode);
 addCoreComponent("h-text", TextNode);
+addCoreComponent("h-fragment", FragmentNode);
 addCoreComponent("h-dyn", DynNode);
 addCoreComponent("h-children", ChildrenNode);
 addCoreComponent("h-data", SimpleQueryNode);
-addCoreComponent("h-fragment", FragmentNode);
 addCoreComponent("h-watcher", WatcherNode);
 
 export {HibikiRootNode, CORE_LIBRARY};

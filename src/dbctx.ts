@@ -735,7 +735,7 @@ function bindSingleNode(node : HibikiNode, dataenv : DataEnvironment, injectedAt
     if (NodeUtils.BLOCKED_ELEMS[node.tag]) {
         return [null, false, null];
     }
-    if (node.tag === "if-break") {
+    if (node.tag === "h-ifbreak") {
         let ifBreakCtx = makeCustomDBCtx(node, dataenv, null);
         let [ifAttr, exists] = ifBreakCtx.resolveConditionAttr("condition");
         if (!exists) {
@@ -810,15 +810,15 @@ function expandChildrenNode(ctx : DBCtx) : DBCtx[] {
     }
     let bindVal = ctx.resolveAttrVal("bind");
     let ctxList : DBCtx[] = null;
-    if (bindVal == null) {
-        ctxList = bindNodeList(ctx.node.list, ctx.dataenv, false);
-    }
-    else {
+    if (bindVal != null) {
         if (!(bindVal instanceof DataCtx.ChildrenVar)) {
             let msg = sprintf("%s bind expression is not valid, must be [children] type", nodeStr(ctx.node));
             return [makeErrorDBCtx(msg, ctx.dataenv)];
         }
         ctxList = bindVal.boundNodes;
+    }
+    if (ctxList == null || ctxList.length == 0) {
+        ctxList = bindNodeList(ctx.node.list, ctx.dataenv, false);
     }
     if (ctxList == null || ctxList.length == 0) {
         return null;
