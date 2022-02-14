@@ -1,12 +1,16 @@
 // Copyright 2021-2022 Dashborg Inc
+//
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 import camelCase from "camelcase";
 import type {HtmlParserOpts, PathType, AutoMergeExpr, AutoFireExpr} from "./types";
 import merge from "lodash/merge";
 import {sprintf} from "sprintf-js";
 import {doParse} from "./hibiki-parser";
-import type {HAction, HExpr, HIteratorExpr} from "./datactx";
-import {textContent, rawAttrFromNode, attrBaseName} from "./utils";
+import type {HAction, HExpr, HIteratorExpr, ContextVarType} from "./datactx";
+import {textContent, rawAttrFromNode, attrBaseName, nodeStr} from "./utils";
 
 const styleAttrPartRe = new RegExp("^(style(?:-[a-z][a-z0-9-])?)\\.(.*)");
 
@@ -26,7 +30,6 @@ class HibikiNode {
     attrs? : Record<string, NodeAttrType>;
     foreachAttr? : HIteratorExpr;
     handlers? : Record<string, HAction[]>;
-    exprs? : Record<string, HExpr>;
     list?  : HibikiNode[];
     style? : Record<string, NodeAttrType>;
     morestyles? : Record<string, Record<string, NodeAttrType>>;
@@ -35,6 +38,7 @@ class HibikiNode {
     innerhtml? : string;
     outerhtml? : string;
     libContext? : string;
+    contextVars? : ContextVarType[];
     mark? : boolean;
 
     constructor(tag : string, opts? : {text? : string, list? : HibikiNode[], attrs? : Record<string, NodeAttrType>}) {
@@ -71,6 +75,7 @@ class HibikiNode {
 const PARSED_ATTRS = {
     "bind": true,
     "if": true,
+    "unwrap": true,
     "foreach": true,
     "condition": true,
     "automerge": true,
@@ -79,6 +84,7 @@ const PARSED_ATTRS = {
 const NON_BINDABLE_ATTRS = {
     "bind": true,
     "if": true,
+    "unwrap": true,
     "foreach": true,
     "condition": true,
     "automerge": true,
@@ -472,6 +478,20 @@ class HtmlParser {
         node.attrs[name] = attrExpr;
     }
 
+    parseContextVars(ctxStr : string, htmlContext : string) : ContextVarType[] {
+        if (ctxStr == null || ctxStr.trim() === "") {
+            return null;
+        }
+        try {
+            let actions : ContextVarType[] = doParse(ctxStr, "ext_contextAssignList");
+            return actions;
+        }
+        catch (e) {
+            console.log(sprintf("ERROR parsing %s (only simple assignments allowed)\n<<<\n%s\n>>>\n", htmlContext, ctxStr), e.toString());
+            return null;
+        }
+    }
+
     parseHandlerText(node : HibikiNode) {
         let nameAttr = rawAttrFromNode(node, "name");
         let handlerText = textContent(node);
@@ -553,6 +573,27 @@ class HtmlParser {
         }
         if (node.tag === "define-handler") {
             this.parseHandlerText(node);
+        }
+
+        // contextVars
+        if (node.tag === "define-vars") {
+            let textFrom = "<define-vars datacontext>";
+            let ctxStr = rawAttrFromNode(node, "datacontext");
+            if (ctxStr == null) {
+                textFrom = "<define-vars>:text";
+                ctxStr = textContent(node);
+            }
+            node.contextVars = this.parseContextVars(ctxStr, textFrom);
+        }
+        else if (node.tag === "define-component") {
+            let ctxStr = rawAttrFromNode(node, "componentdata");
+            if (ctxStr != null) {
+                node.contextVars = this.parseContextVars(ctxStr, nodeStr(node) + ":componentdata");
+            }
+        }
+        else if (rawAttrFromNode(node, "datacontext") != null) {
+            let ctxStr = rawAttrFromNode(node, "datacontext");
+            node.contextVars = this.parseContextVars(ctxStr, nodeStr(node) + ":datacontext");
         }
         pctx.tagStack.pop();
         return node;

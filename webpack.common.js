@@ -9,11 +9,6 @@ module.exports = {
         path: __dirname,
         filename: "dist/[name]-dev.js"
     },
-    externals: {
-        "react": "React",
-        "react-dom": "ReactDOM",
-        "mobx": "mobx",
-    },
     module: {
         rules: [
             {

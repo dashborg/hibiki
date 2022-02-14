@@ -8,6 +8,7 @@
     <h1 class="title">Test NoAttr</h1>
     <div class="box">
       <p class="mb-3">noattr={{ noattr }}</p>
+      <p class="mb-3">true={{ noattr == null }} | false={{ noattr != null }} | true={{ isnoattr(noattr) }} | false={{ isnoattr(null) }}</p>
       <p class="mb-3">{{ ref($.inputbound ? $.name : noattr) | format("json-noresolve") }}</p>
       <input class="input" type="text" value.bindpath="$.inputbound ? $.name : noattr"><br>
       <p>

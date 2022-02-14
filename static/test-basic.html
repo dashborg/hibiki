@@ -170,6 +170,15 @@
           <td slot="result">-5.2 | -5.2 | 10</td>
         </tr>
         <tr component="local-test-tr">
+          <td slot="test" innerhtml>{{ 5 <=> 2 }} | {{ "7" <=> 2 }} | {{ "mike" <=> "xavier" }}<br>
+{{ null <=> 5 }} | {{ 5 <=> null }} | {{ null <=> noattr }}<br>
+{{ fn:compare("TeSt", "test") }} | {{ fn:compare("TeSt", "test", nocase=true) }}<br>
+{{ fn:compare("5", 10) }} | {{ fn:compare("5", 10, type="numeric") }}<br>
+{{ fn:compare('ä', "a") }} | {{ fn:compare('ä', "a", locale="de", sensitivity="base") }}
+</td>
+          <td slot="result">1 | 1 | -1<br>-1 | 1 | 0<br>1 | 0<br>1 | -1<br>1 | 0</td>
+        </tr>
+        <tr component="local-test-tr">
           <td slot="test" innerhtml>{{ noattr }}</td>
           <td slot="result">null</td>
         </tr>
@@ -249,9 +258,9 @@
         </tr>
         <tr component="local-test-tr">
           <td slot="test" innerhtml>
-            {{ fn:slice($.arr, 3, 5) }}
+            {{ fn:slice($.arr, 3) }}<br>{{ fn:slice($.arr) }}
           </td>
-          <td slot="result">3,5</td>
+          <td slot="result">3,5,8<br>1,1,2,3,5,8</td>
         </tr>
         <tr component="local-test-tr">
           <td slot="test" innerhtml>
@@ -289,13 +298,6 @@
             {{fn:json({x: 22})}}
           </td>
           <td slot="result">{"x":22}</td>
-        </tr>
-        <tr component="local-test-tr">
-          <td slot="test" innerhtml>
-            {{fn:ts()}}<br>
-<h-dateformat bind="fn:ts()"></h-dateformat>
-          </td>
-          <td slot="result">(dynamic)</td>
         </tr>
         <tr component="local-test-tr">
           <td slot="test" innerhtml>
@@ -345,6 +347,39 @@
             {{fn:split("red,blue", ",") | format("json-compact")}}
           </td>
           <td slot="result">["red","blue"]</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{ fn:uppercase("Test") }} | {{ fn:lowercase("Test") }}
+          </td>
+          <td slot="result">TEST | test</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{ fn:floor(5.5) }} | {{ fn:ceil(5.5) }}
+          </td>
+          <td slot="result">5 | 6</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{ fn:sort([5, 8, 1, 2, 25, 20]) }}<br>
+{{ fn:sort([5, 8, 1, 2, 25, 20], type="string") }}<br>
+{{ fn:sort([5, 8, 1, 2, 25, 20], slice=[1,3]) }}            
+          </td>
+          <td slot="result">1,2,5,8,20,25<br>1,2,20,25,5,8<br>2,5</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{ fn:sort([{x: 5}, {x: 2}, {x: -5}], field="x") | format("json-compact") }}
+          </td>
+          <td slot="result">[{"x":-5},{"x":2},{"x":5}]</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" innerhtml>
+            {{ fn:sort([{x: 5}, {x: 2}, {x: -5}],
+   sortexpr=lambda(@b.x <=> @a.x)) | format("json-compact") }}
+          </td>
+          <td slot="result">[{"x":5},{"x":2},{"x":-5}]</td>
         </tr>
       </table>
     </div>
@@ -400,7 +435,7 @@
     
   <define-component name="test-tr">
     <html-tr>
-      <html-td><pre>{{fn:trim(@children.byslot.test.list[0].innerhtml)}}</pre></html-td>
+      <html-td><pre>{{fn:trim(@children.byslot.test.node.innerhtml)}}</pre></html-td>
       <h-children bind="@children.byslot.result"></h-children>
       <h-children bind="@children.byslot.test"></h-children>
     </html-tr>

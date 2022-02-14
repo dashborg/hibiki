@@ -1,10 +1,14 @@
 // Copyright 2021-2022 Dashborg Inc
+//
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 import type {HibikiState} from "./state";
 import type {RtContext, HibikiError} from "./error";
 import type {HibikiRequest} from "./request";
 import * as mobx from "mobx";
-import type {HExpr, HibikiBlob, LValue, HIteratorExpr, HAction, HActionBlock, OpaqueValue, ChildrenVar, LambdaValue} from "./datactx";
+import type {HExpr, HibikiBlob, LValue, HIteratorExpr, HAction, HActionBlock, OpaqueValue, ChildrenVar, LambdaValue, ContextVarType} from "./datactx";
 import type {DataEnvironment, EHandlerType} from "./state";
 import type {HibikiNode} from "./html-parser";
 import type {InjectedAttrsObj} from "./dbctx";
@@ -19,6 +23,7 @@ type HibikiReactProps = {
     node : HibikiNode,
     dataenv : DataEnvironment,
     injectedAttrs : InjectedAttrsObj,
+    parentHtmlTag : string,
 };
 
 type AutoMergeExpr = {
@@ -38,6 +43,7 @@ type AutoFireExpr = {
 type JSFuncType = {
     fn : (...args : any[]) => any,
     native : boolean,
+    positionalArgs : boolean,
 };
 
 type HandlerPathType = {
@@ -58,6 +64,7 @@ type HandlerValType = {
     block : HandlerBlock,
     node : HibikiNode,
     boundDataenv? : DataEnvironment,
+    contextVars? : ContextVarType[],
 };
 
 type HandlerBlock =
@@ -129,11 +136,14 @@ type HttpConfig = {
     compiledCsrfToken? : string | JSFuncStr | (() => string) | HExpr, // internal use
 };
 
+type HibikiGlobalConfig = {
+    noUsagePing : boolean,
+    noWelcomeMessage : boolean,
+};
+
 type HibikiConfig = {
     noConfigMergeFromHtml? : boolean,
     noDataMergeFromHtml?   : boolean,
-    noUsageImg? : boolean,
-    noWelcomeMessage? : boolean,
     modules? : Record<string, ModuleConfig>,
     httpConfig? : HttpConfig;
     unhandledErrorHook? : ErrorCallbackFn;
@@ -193,6 +203,10 @@ interface Hibiki {
     registerLocalNativeComponentImpl(name : string, reactImpl : ReactClass) : void;
     addLibraryCallback(libName : string, fn : Function) : void;
     HibikiReact : new(props : any) => React.Component<{hibikiState : HibikiExtState}, {}>;
+    VERSION : string;
+    BUILD : string;
+
+    // subject to change, use with caution (not part of public API)
     ModuleRegistry : Record<string, (new(state : HibikiState, config : ModuleConfig) => HibikiHandlerModule)>;
     JSFuncs : Record<string, JSFuncType>;
     LocalHandlers : Record<string, (req : HibikiRequest) => any>;
@@ -201,9 +215,10 @@ interface Hibiki {
     ImportLibs : Record<string, any>;
     LibraryCallbacks : Record<string, any[]>;
     States : Record<string, HibikiExtState>;
-    VERSION : string;
-    BUILD : string;
     DataCtx : any;
+    DBCtxModule : any;
+    WelcomeMessageFired : boolean;
+    UsageFired: boolean;
 };
 
 interface HibikiExtState {
@@ -218,5 +233,5 @@ interface HibikiExtState {
     makeWatcher(exprStr : string, callback : (v : HibikiVal) => void) : (() => void);
 };
 
-export type {HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, ComponentType, LibraryType, HibikiRequest, Hibiki, HibikiAction, HibikiActionString, HibikiActionValue, HibikiExtState, EventType, HandlerValType, JSFuncType, FetchHookFn, CsrfHookFn, ReactClass, HandlerPathType, ErrorCallbackFn, EventCallbackFn, HtmlParserOpts, LibComponentType, HandlerBlock, HibikiVal, HibikiValObj, AutoMergeExpr, AutoFireExpr, HibikiReactProps, HttpConfig, JSFuncStr, HibikiSpecialVal, HibikiPrimitiveVal, StyleMapType};
+export type {HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, ComponentType, LibraryType, HibikiRequest, Hibiki, HibikiAction, HibikiActionString, HibikiActionValue, HibikiExtState, EventType, HandlerValType, JSFuncType, FetchHookFn, CsrfHookFn, ReactClass, HandlerPathType, ErrorCallbackFn, EventCallbackFn, HtmlParserOpts, LibComponentType, HandlerBlock, HibikiVal, HibikiValObj, AutoMergeExpr, AutoFireExpr, HibikiReactProps, HttpConfig, JSFuncStr, HibikiSpecialVal, HibikiPrimitiveVal, StyleMapType, HibikiGlobalConfig};
 

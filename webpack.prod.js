@@ -6,7 +6,7 @@ const LodashModuleReplacementPlugin = require('lodash-webpack-plugin');
 const TerserPlugin = require("terser-webpack-plugin");
 const moment = require("dayjs");
 const fs = require("fs");
-const VERSION = "v0.2.0";
+const VERSION = "v0.3.0";
 
 function makeBuildStr() {
     let buildStr = moment().format("YYYYMMDD-HHmmss");
@@ -33,7 +33,6 @@ let merged = merge.merge(common, {
     },
 });
 
-merged.externals = {};
 merged.plugins.push(new LodashModuleReplacementPlugin());
 merged.plugins.push(new MiniCssExtractPlugin({filename: "dist/[name].css", ignoreOrder: true}));
 if (BundleAnalyzerPlugin != null) {

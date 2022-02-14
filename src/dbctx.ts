@@ -1,4 +1,8 @@
 // Copyright 2021-2022 Dashborg Inc
+//
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 import * as mobx from "mobx";
 import * as DataCtx from "./datactx";
@@ -7,9 +11,10 @@ import {DataEnvironment} from "./state";
 import {sprintf} from "sprintf-js";
 import {boundMethod} from 'autobind-decorator'
 import type {HibikiVal, HibikiValObj, HibikiReactProps, StyleMapType, AutoMergeExpr} from "./types";
-import type {HibikiNode, NodeAttrType} from "./html-parser";
+import type {NodeAttrType} from "./html-parser";
+import {HibikiNode} from "./html-parser";
 import * as NodeUtils from "./nodeutils";
-import {nodeStr, isObject, attrBaseName, cnArrToClassAttr, classStringToCnArr, nsAttrName, cnArrToLosslessStr, parseAttrName, isClassStringLocked, joinClassStrs} from "./utils";
+import {nodeStr, isObject, attrBaseName, cnArrToClassAttr, classStringToCnArr, nsAttrName, cnArrToLosslessStr, parseAttrName, isClassStringLocked, joinClassStrs, textContent} from "./utils";
 import {RtContext} from "./error";
 import type {EHandlerType} from "./state";
 
@@ -50,7 +55,7 @@ async function convertFormData(formData : FormData) : Promise<Record<string, any
 
 function createInjectObj(ctx : DBCtx, child : HibikiNode, nodeDataenv : DataEnvironment) : InjectedAttrsObj {
     let childCtx = makeCustomDBCtx(child, nodeDataenv, null);
-    let nodeVar = NodeUtils.makeNodeVar(childCtx, true);
+    let nodeVar = childCtx.makeNodeVar(true);
     let evalInjectAttrsEnv = ctx.dataenv.makeChildEnv({node: nodeVar}, null);
     let evalInjectCtx = makeCustomDBCtx(ctx.node, evalInjectAttrsEnv, null);
     let injectAttrs = evalInjectCtx.resolveUnmergedAttrVals();
@@ -61,10 +66,6 @@ function createInjectObj(ctx : DBCtx, child : HibikiNode, nodeDataenv : DataEnvi
         }
         let shortName = k.substr(7);
         toInject.attrs[shortName] = injectAttrs[k];
-    }
-    let styleMap = evalInjectCtx.resolveNsStyleMap("inject:style", null);
-    if (styleMap != null && Object.keys(styleMap).length > 0) {
-        toInject.styleMap = styleMap;
     }
     if (ctx.node.handlers != null) {
         for (let hname in ctx.node.handlers) {
@@ -144,12 +145,10 @@ function resolveArgsRoot(ctx : DBCtx) : HibikiValObj {
 // 'class' and 'style' are pre-merged
 class InjectedAttrsObj {
     attrs : HibikiValObj;
-    styleMap : StyleMapType;
     handlers : Record<string, EHandlerType>;
     
     constructor() {
         this.attrs = {};
-        this.styleMap = null;
         this.handlers = {};
     }
 
@@ -180,6 +179,14 @@ class InjectedAttrsObj {
     getHandler(name : string) : EHandlerType {
         return this.handlers[name];
     }
+}
+
+// inj2 overrides inj1
+function mergeInjectedAttrs(inj1 : InjectedAttrsObj, inj2 : InjectedAttrsObj) : InjectedAttrsObj {
+    let rtn = new InjectedAttrsObj();
+    Object.assign(rtn.attrs, inj1.attrs, inj2.attrs);
+    Object.assign(rtn.handlers, inj1.handlers, inj2.handlers);
+    return rtn;
 }
 
 // the order matters here.  first check for specific attr, then check for all.
@@ -332,14 +339,27 @@ function makeDBCtx(elem : React.Component<HibikiReactProps, {}>) : DBCtx {
     return new DBCtx(elem, null, null, null);
 }
 
+function makeTextDBCtx(text : string, dataenvArg : DataEnvironment) {
+    let textNode = new HibikiNode("#text", {text: text});
+    return new DBCtx(null, textNode, dataenvArg, null);
+}
+
+function makeErrorDBCtx(errText : string, dataenvArg : DataEnvironment) {
+    let textNode = new HibikiNode("#text", {text: errText});
+    let divNode = new HibikiNode("div", {list: [textNode]});
+    return new DBCtx(null, divNode, dataenvArg, null);
+}
+
 class DBCtx {
     dataenv : DataEnvironment;
     node : HibikiNode;
     uuid : string;
     injectedAttrs : InjectedAttrsObj;
     amData : AutoMergeData;
+    isRoot : boolean;
     
     constructor(elem : React.Component<HibikiReactProps, {}>, nodeArg : HibikiNode, dataenvArg : DataEnvironment, injectedAttrs : InjectedAttrsObj) {
+        this.isRoot = false;
         if (elem != null) {
             this.dataenv = elem.props.dataenv;
             this.node = elem.props.node;
@@ -371,6 +391,10 @@ class DBCtx {
             tagName = tagName.substr(5);
         }
         return tagName;
+    }
+
+    isWhiteSpaceNode() : boolean {
+        return this.node.tag === "#text" && (this.node.text == null || this.node.text.trim() === "");
     }
 
     resolvePath(path : string, opts? : {rtContext? : string}) : HibikiVal {
@@ -501,10 +525,6 @@ class DBCtx {
         return DataCtx.rawAttrStr(this.node.attrs[attrName]);
     }
 
-    isEditMode() : boolean {
-        return false;
-    }
-
     resolveNsStyleMap(styleAttr : string, initStyles? : StyleMapType) : StyleMapType {
         let [injectedStyleMap, iexists] = DataCtx.asStyleMapFromPair(this.injectedAttrs.getInjectedValPair(styleAttr));
         if (iexists) {
@@ -592,9 +612,6 @@ class DBCtx {
     }
 
     @boundMethod handleEvent(event : string, datacontext? : Record<string, any>) : Promise<any> {
-        if (this.isEditMode()) {
-            return null;
-        }
         let eventDataenv = this.getEventDataenv();
         let rtctx = new RtContext();
         rtctx.pushContext(sprintf("Firing native '%s' event on %s (in %s)", event, nodeStr(this.node), this.dataenv.getHtmlContext()), null);
@@ -604,7 +621,12 @@ class DBCtx {
     }
 
     @boundMethod handleOnSubmit(e : any) : boolean {
-        e.preventDefault();
+        if (e != null) {
+            let actionAttr = this.resolveAttrStr("action");
+            if (actionAttr == null || actionAttr === "#") {
+                e.preventDefault();
+            }
+        }
         let formData = new FormData(e.target);
         let paramsPromise = convertFormData(formData);
         paramsPromise.then((params) => {
@@ -615,7 +637,10 @@ class DBCtx {
 
     @boundMethod handleOnClick(e : any) : boolean {
         if (e != null) {
-            e.preventDefault();
+            let hrefAttr = this.resolveAttrStr("href");
+            if (hrefAttr == null || hrefAttr === "#") {
+                e.preventDefault();
+            }
         }
         this.handleEvent("click");
         return true;
@@ -648,25 +673,188 @@ class DBCtx {
         this.dataenv.dbstate.NodeDataMap.delete(this.uuid);
     }
 
-    getNodeData(compName : string) : mobx.IObservableValue<HibikiVal> {
+    getNodeData(compName : string, defaultsObj? : HibikiValObj) : mobx.IObservableValue<HibikiValObj> {
         let box = this.dataenv.dbstate.NodeDataMap.get(this.uuid);
         if (box == null) {
             let uuidName = "id_" + this.uuid.replace(/-/g, "_");
-            box = mobx.observable.box({_hibiki: {"customtag": compName, uuid: this.uuid}}, {name: uuidName});
+            let nodeData = Object.assign({}, defaultsObj, {_hibiki: {"customtag": compName, uuid: this.uuid}});
+            box = mobx.observable.box(nodeData, {name: uuidName});
             this.dataenv.dbstate.NodeDataMap.set(this.uuid, box);
         }
         return box;
     }
 
-    getNodeDataLV(compName : string) : DataCtx.ObjectLValue {
-        let box = this.dataenv.dbstate.NodeDataMap.get(this.uuid);
-        if (box == null) {
-            let uuidName = "id_" + this.uuid.replace(/-/g, "_");
-            box = mobx.observable.box({_hibiki: {"customtag": compName, uuid: this.uuid}}, {name: uuidName});
-            this.dataenv.dbstate.NodeDataMap.set(this.uuid, box);
+    makeNodeVar(withAttrs : boolean) : HibikiValObj {
+        let node = this.node;
+        if (node == null) {
+            return null;
         }
-        return new DataCtx.ObjectLValue(null, box);
+        let rtn : HibikiValObj = {};
+        rtn.tag = this.getHtmlTagName();
+        rtn.rawtag = this.node.tag;
+        rtn.uuid = this.uuid;
+        if (node.innerhtml) {
+            rtn.innerhtml = node.innerhtml;
+        }
+        if (node.outerhtml) {
+            rtn.outerhtml = node.outerhtml;
+        }
+        if (withAttrs) {
+            rtn.attrs = this.resolveAttrVals();
+        }
+        rtn.children = this.makeChildrenVar();
+        return rtn;
+    }
+
+    // returns [val, exists]
+    resolveConditionAttr(attrName : string) : [boolean, boolean] {
+        let exists = this.hasRawAttr(attrName);
+        if (!exists) {
+            return [false, false];
+        }
+        let val = DataCtx.valToBool(this.resolveAttrVal(attrName));
+        return [val, true];
+    }
+
+    makeChildrenVar() : DataCtx.ChildrenVar {
+        if (this.node.list == null) {
+            return new DataCtx.ChildrenVar([]);
+        }
+        let boundList = bindNodeList(this.node.list, this.dataenv, this.isRoot);
+        return new DataCtx.ChildrenVar(boundList);
     }
 }
 
-export {DBCtx, makeDBCtx, makeCustomDBCtx, InjectedAttrsObj, createInjectObj, resolveArgsRoot};
+function bindSingleNode(node : HibikiNode, dataenv : DataEnvironment, injectedAttrs : InjectedAttrsObj, isRoot : boolean) : [DBCtx, boolean, DataEnvironment] {
+    if (node.tag === "#text") {
+        return [makeCustomDBCtx(node, dataenv, injectedAttrs), false, null];
+    }
+    if (node.tag === "#comment") {
+        return [null, false, null];
+    }
+    if (NodeUtils.BLOCKED_ELEMS[node.tag]) {
+        return [null, false, null];
+    }
+    if (node.tag === "h-ifbreak") {
+        let ifBreakCtx = makeCustomDBCtx(node, dataenv, null);
+        let [ifAttr, exists] = ifBreakCtx.resolveConditionAttr("condition");
+        if (!exists) {
+            return [makeErrorDBCtx("<if-break> requires 'condition' attribute", dataenv), false, null];
+        }
+        if (!ifAttr) {
+            return [null, false, null];
+        }
+        return [ifBreakCtx, true, null];
+    }
+    if (node.tag === "define-vars") {
+        let setCtx = makeCustomDBCtx(node, dataenv, null);
+        try {
+            let specials = DataCtx.EvalContextVarsThrow(node.contextVars, dataenv, "<define-vars>");
+            return [null, false, dataenv.makeChildEnv(specials, {htmlContext: "<define-vars>"})];
+        }
+        catch (e) {
+            return [makeErrorDBCtx("<define-vars> Error evaluating datacontext block: " + e, dataenv), false, null];
+        }
+    }
+    if (node.tag === "define-handler") {
+        if (!isRoot) {
+            let msg = "<define-handler> is only allowed at root of <hibiki>, <page>, or <define-component> nodes";
+            return [makeErrorDBCtx(msg, dataenv), false, null];
+        }
+        return [null, false, null];
+    }
+    let rtnCtx = makeCustomDBCtx(node, dataenv, injectedAttrs);
+    let [ifVal, exists] = rtnCtx.resolveConditionAttr("if");
+    if (exists && !ifVal) {
+        return [null, false, null];
+    }
+    return [rtnCtx, false, null];
+}
+
+function bindNodeList(list : HibikiNode[], dataenv : DataEnvironment, isRoot : boolean) : DBCtx[] {
+    if (list == null || list.length == 0) {
+        return null;
+    }
+    let rtn : DBCtx[] = [];
+    for (let child of list) {
+        let [ctx, stopLoop, newDataenv] = bindSingleNode(child, dataenv, null, isRoot);
+        if (ctx != null) {
+            if (ctx.node.tag === "h-children") {
+                let boundChildren = expandChildrenNode(ctx);
+                if (boundChildren != null) {
+                    rtn.push(...boundChildren);
+                }
+            }
+            else {
+                rtn.push(ctx);
+            }
+        }
+        if (stopLoop) {
+            break;
+        }
+        if (newDataenv != null) {
+            dataenv = newDataenv;
+        }
+    }
+    return rtn;
+}
+
+function expandChildrenNode(ctx : DBCtx) : DBCtx[] {
+    if (ctx.node.foreachAttr) {
+        let msg = sprintf("<h-children> does not support 'foreach' attribute");
+        return [makeErrorDBCtx(msg, ctx.dataenv)];
+    }
+    let textStr = ctx.resolveAttrStr("text");
+    if (textStr != null) {
+        return [makeTextDBCtx(textStr, ctx.dataenv)];
+    }
+    let bindVal = ctx.resolveAttrVal("bind");
+    let ctxList : DBCtx[] = null;
+    if (bindVal != null) {
+        if (!(bindVal instanceof DataCtx.ChildrenVar)) {
+            let msg = sprintf("%s bind expression is not valid, must be [children] type", nodeStr(ctx.node));
+            return [makeErrorDBCtx(msg, ctx.dataenv)];
+        }
+        ctxList = bindVal.boundNodes;
+    }
+    if (ctxList == null || ctxList.length == 0) {
+        ctxList = bindNodeList(ctx.node.list, ctx.dataenv, false);
+    }
+    if (ctxList == null || ctxList.length == 0) {
+        return null;
+    }
+    let ctxSpecials = {};
+    if (ctx.node.contextVars != null) {
+        try {
+            ctxSpecials = DataCtx.EvalContextVarsThrow(ctx.node.contextVars, ctx.dataenv, nodeStr(ctx.node));
+        }
+        catch (e) {
+            let msg = nodeStr(ctx.node) + " Error evaluating datacontext block: " + e;
+            return [makeErrorDBCtx(msg, ctx.dataenv)];
+        }
+    }
+    let rtnList : DBCtx[] = [];
+    for (let childCtx of ctxList) {
+        let toInject : InjectedAttrsObj = childCtx.injectedAttrs;
+        let nodeDataenv = childCtx.dataenv;
+        if (ctxSpecials != null) {
+            nodeDataenv = childCtx.dataenv.makeChildEnv(ctxSpecials, null);
+        }
+        let tagName = childCtx.node.tag;
+        if (!NodeUtils.NON_INJECTABLE[tagName] && !tagName.startsWith("#")) {
+            let newInjections = createInjectObj(ctx, childCtx.node, nodeDataenv);
+            if (toInject == null) {
+                toInject = newInjections;
+            }
+            else {
+                toInject = mergeInjectedAttrs(toInject, newInjections);
+            }
+        }
+        let newCtx = makeCustomDBCtx(childCtx.node, nodeDataenv, toInject);
+        rtnList.push(newCtx);
+    }
+    return rtnList;
+}
+
+
+export {DBCtx, makeDBCtx, makeCustomDBCtx, InjectedAttrsObj, createInjectObj, resolveArgsRoot, bindSingleNode, bindNodeList, mergeInjectedAttrs, expandChildrenNode};

@@ -1,19 +1,25 @@
 // Copyright 2021-2022 Dashborg Inc
+//
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 import * as React from "react";
 import * as mobx from "mobx";
 import * as mobxReact from "mobx-react";
 import * as DataCtx from "./datactx";
+import {sprintf} from "sprintf-js";
 import {parseHtml} from "./html-parser";
 import {HibikiState, DataEnvironment} from "./state";
 import * as ReactDOM from "react-dom";
 import {HibikiRootNode, CORE_LIBRARY} from "./nodes";
 import {deepTextContent, evalDeepTextContent, isObject, bindLibContext} from "./utils";
 import merge from "lodash/merge";
-import type {HibikiConfig, Hibiki, HibikiExtState, ReactClass, LibraryType} from "./types";
+import type {HibikiConfig, Hibiki, HibikiExtState, ReactClass, LibraryType, HibikiGlobalConfig} from "./types";
 import type {HibikiNode} from "./html-parser";
 import {LocalModule, HttpModule, LibModule} from "./modules";
 import {HibikiModule} from "./hibiki-module";
+import * as DBCtxModule from "./dbctx";
 
 declare var window : any;
 
@@ -23,6 +29,17 @@ let BUILD = __HIBIKIBUILD__; let VERSION = __HIBIKIVERSION__;
 function errorWithCause(message : string, cause : Error) {
     // @ts-ignore
     throw new Error(message, {cause: cause}); // ES6 error with cause
+}
+
+function getGlobalConfig() : HibikiGlobalConfig {
+    let rtn : HibikiGlobalConfig = {
+        noUsagePing: false,
+        noWelcomeMessage: false,
+    };
+    if (window.HibikiGlobalConfig != null && typeof(window.HibikiGlobalConfig) === "object") {
+        rtn = Object.assign(rtn, window.HibikiGlobalConfig);
+    }
+    return rtn;
 }
 
 function readHibikiOptsFromHtml(htmlObj : HibikiNode) : {config : HibikiConfig, initialData : any} {
@@ -60,12 +77,6 @@ function readHibikiConfigFromOuterHtml(htmlElem : string | HTMLElement) : Hibiki
     let rtn : HibikiConfig = {};
     if (typeof(htmlElem) == "string") {
         return rtn;
-    }
-    if (htmlElem.hasAttribute("nousageimg")) {
-        rtn.noUsageImg = true;
-    }
-    if (htmlElem.hasAttribute("nowelcomemessage")) {
-        rtn.noWelcomeMessage = true;
     }
     if (htmlElem.hasAttribute("noconfigmergefromhtml")) {
         rtn.noConfigMergeFromHtml = true;
@@ -105,7 +116,8 @@ let createState = function createState(config : HibikiConfig, html : string | HT
 createState = mobx.action(createState);
 
 function render(elem : HTMLElement, state : HibikiExtState) {
-    let props = {hibikiState: state};
+    let parentHtmlTag = elem.parentElement.tagName.toLowerCase();
+    let props = {hibikiState: state, parentHtmlTag: parentHtmlTag};
     let reactElem = React.createElement(HibikiRootNode, props, null);
     state.setInitCallback(() => {
         ReactDOM.render(reactElem, elem);
@@ -226,9 +238,28 @@ let hibiki : Hibiki = {
     VERSION: VERSION,
     BUILD: BUILD,
     DataCtx: DataCtx,
+    DBCtxModule: DBCtxModule,
+    WelcomeMessageFired: false,
+    UsageFired: false,
 };
 
 window.Hibiki = hibiki;
+
+function fireWelcomeMessage() {
+    let globalConfig = getGlobalConfig();
+    if (!hibiki.WelcomeMessageFired && !globalConfig.noWelcomeMessage) {
+        hibiki.WelcomeMessageFired = true;
+        let versionStr = hibiki.VERSION + " " + hibiki.BUILD;
+        let flowerEmoji = String.fromCodePoint(0x1F338);
+        console.log(flowerEmoji + sprintf(" Hibiki HTML https://github.com/dashborg/hibiki [%s] | Developed by Dashborg Inc https://dashborg.net", versionStr));
+    }
+    if (!hibiki.UsageFired && !globalConfig.noUsagePing) {
+        let versionStr = hibiki.VERSION + "|" + hibiki.BUILD;
+        let usageImg = new Image();
+        usageImg.src = sprintf("https://hibikihtml.com/hibiki-usage.gif?version=%s&build=%s", hibiki.VERSION, hibiki.BUILD);
+        usageImg.onload = function() {};
+    }
+}
 
 let hideStyleSheet = document.createElement("style");
 hideStyleSheet.innerHTML = ".hibiki-cloak { display: none }";
@@ -240,4 +271,6 @@ if (document.readyState == "loading") {
 else {
     autoloadTags();
 }
+
+fireWelcomeMessage();
 

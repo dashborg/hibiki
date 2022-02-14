@@ -22,7 +22,7 @@
 
     <define-component name="box">
       <div automerge class="box">
-        <h-children bind="@children.all"></h-children>
+        <h-children bind="@children"></h-children>
       </div>
     </define-component>
 
@@ -44,7 +44,7 @@
 
     <define-component name="onoff-button">
       <button class="button" class.is-success="*$args.value" class.is-danger="*!$args.value" click.handler="$args.value = !$args.value; fire->change($args.value);">
-        <h-children bind="@children.all"></h-children>
+        <h-children bind="@children"></h-children>
         <span class="icon is-small ml-1">
           <i if="$args.value" class="fa fa-check"></i>
           <i if="!$args.value" class="fa fa-close"></i>

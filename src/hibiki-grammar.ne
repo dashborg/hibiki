@@ -1,4 +1,8 @@
 # Copyright 2021-2022 Dashborg Inc
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 @{%
 
@@ -33,6 +37,7 @@ function strEscValue(val) {
 let lexer = moo.states({
     main: {
         URLPATH: { match: /(?:(?:GET|POST|PUT|PATCH|DELETE|DYN)\s+)[^(); \t\r\n]+|(?:http:|https:|\/\/)[^(); \t\r\n]+/ },
+        SPACESHIP:   "<=>",
         LOGICAL_OR:  "||",
         LOGICAL_AND: "&&",
         GEQ:         ">=",
@@ -55,6 +60,7 @@ let lexer = moo.states({
                         KW_FALSE: "false",
                         KW_NULL: "null",
                         KW_NOATTR: "noattr",
+                        KW_ISNOATTR: "isnoattr",
                         KW_CALLHANDLER: "callhandler",
                         KW_SETRETURN: "setreturn",
                         KW_RETURN: "return",
@@ -385,11 +391,15 @@ equalityExpr ->
     | equalityExpr %BANGEQ relationalExpr {% (data) => ({etype: "op", op: "!=", exprs: [data[0], data[2]]}) %}
 
 relationalExpr ->
+      compareExpr {% id %}
+    | relationalExpr %GEQ compareExpr {% (data) => ({etype: "op", op: ">=", exprs: [data[0], data[2]]}) %}
+    | relationalExpr %LEQ compareExpr {% (data) => ({etype: "op", op: "<=", exprs: [data[0], data[2]]}) %}
+    | relationalExpr %GT compareExpr  {% (data) => ({etype: "op", op: ">", exprs: [data[0], data[2]]}) %}
+    | relationalExpr %LT compareExpr  {% (data) => ({etype: "op", op: "<", exprs: [data[0], data[2]]}) %}
+
+compareExpr ->
       addExpr {% id %}
-    | relationalExpr %GEQ addExpr {% (data) => ({etype: "op", op: ">=", exprs: [data[0], data[2]]}) %}
-    | relationalExpr %LEQ addExpr {% (data) => ({etype: "op", op: "<=", exprs: [data[0], data[2]]}) %}
-    | relationalExpr %GT addExpr  {% (data) => ({etype: "op", op: ">", exprs: [data[0], data[2]]}) %}
-    | relationalExpr %LT addExpr  {% (data) => ({etype: "op", op: "<", exprs: [data[0], data[2]]}) %}
+    | compareExpr %SPACESHIP addExpr {% (data) => ({etype: "op", op: "<=>", exprs: [data[0], data[2]]}) %}
 
 addExpr ->
       mulExpr {% id %}
@@ -419,14 +429,17 @@ primaryExpr ->
     | invokeExpr      {% id %}
     | lambdaExpr      {% id %}
     | refExpr         {% id %}
+    | isNoAttrExpr    {% id %}
     | %LPAREN fullExpr %RPAREN {% (data) => data[1] %}
     | pathExprNonTerm {% id %}
 
 
 fnExpr -> 
-      %FN %LPAREN optionalLiteralArrayElements %RPAREN {% (data) => {
-          return {etype: "fn", fn: data[0].value, exprs: data[2]};
+      %FN namedCallParams {% (data) => {
+          return {etype: "fn", fn: data[0].value, params: data[1]};
       } %}
+
+isNoAttrExpr -> %KW_ISNOATTR %LPAREN fullExpr %RPAREN {% (data) => ({etype: "isnoattr", exprs: [data[2]]}) %}
 
 refExpr -> 
       %KW_REF %LPAREN fullPathExpr %RPAREN {% (data) => ({etype: "ref", pathexpr: data[2]}) %}
@@ -435,9 +448,9 @@ refExpr ->
     | %KW_RAW %LPAREN fullPathExpr %RPAREN {% (data) => ({etype: "raw", exprs: [data[2]]}) %}
 
 invokeExpr -> %KW_INVOKE %LPAREN fullExpr (%COMMA innerNamedCallParams):? %RPAREN {% (data) => {
-          let rtn = {etype: "invoke", exprs: [data[2]]};
+          let rtn = {etype: "invoke", exprs: [data[2]], params: null};
           if (data[3] != null) {
-              rtn.exprs.push(data[3][1]);
+              rtn.params = data[3][1];
           }
           return rtn;
       } %}
@@ -588,6 +601,7 @@ idOrKeyword ->
     | %KW_IN          {% id %}
     | %KW_INVOKE      {% id %}
     | %KW_LAMBDA      {% id %}
+    | %KW_ISNOATTR    {% id %}
 
 _ -> %WS:*
 

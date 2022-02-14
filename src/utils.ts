@@ -1,4 +1,8 @@
 // Copyright 2021-2022 Dashborg Inc
+//
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 import * as mobx from "mobx";
 import {Hibiki, HandlerPathType, HibikiVal, HibikiValObj, JSFuncStr} from "./types";
@@ -386,7 +390,7 @@ function nodeStr(node : HibikiNode) : string {
     return "<" + node.tag + extraStr + ">";
 }
 
-function unpackArg(data : Record<string, any>, argName : string, pos? : number) : any {
+function unpackArg(data : HibikiValObj, argName : string, pos? : number) : HibikiVal {
     if (data == null) {
         return null;
     }
@@ -398,14 +402,14 @@ function unpackArg(data : Record<string, any>, argName : string, pos? : number) 
     if (pos == null) {
         return null;
     }
-    let posArgs = data["*args"];
+    let posArgs = data["*args"] as HibikiVal[];
     if (posArgs == null || posArgs.length <= pos) {
         return null;
     }
     return posArgs[pos];
 }
 
-function unpackAtArgs(data : Record<string, any>) : Record<string, any> {
+function unpackAtArgs(data : HibikiValObj) : HibikiValObj {
     if (data == null) {
         return {};
     }
@@ -417,7 +421,6 @@ function unpackAtArgs(data : Record<string, any>) : Record<string, any> {
     }
     return rtn;
 }
-
 
 function unpackPositionalArgs(data : HibikiValObj, posArgNames : string[]) : HibikiValObj {
     if (data == null) {
@@ -787,5 +790,34 @@ function validateModulePath(modName : string, hpath : HandlerPathType) {
     }
 }
 
-export {jsonRespHandler, parseUrlParams, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy, valInArray, rawAttrFromNode, STYLE_UNITLESS_NUMBER, subMapKey, subArrayIndex, unbox, splitTrim, bindLibContext, unpackPositionalArgArray, cnArrToClassAttr, classStringToCnArr, isClassStringLocked, joinClassStrs, attrBaseName, cnArrToLosslessStr, parseAttrName, nsAttrName, validateModulePath};
+function compareVersions(v1 : string, v2 : string) : number {
+    if (v1 === v2) {
+        return 0;
+    }
+    if (v1 === "devbuild") {
+        return 1;
+    }
+    if (v2 === "devbuild") {
+        return -1;
+    }
+    let match1 = v1.match(/^v(\d+)\.(\d+)\.(\d+)$/);
+    if (match1 == null) {
+        throw new Error("Invalid Version: " + v1);
+    }
+    let match2 = v2.match(/^v(\d+)\.(\d+)\.(\d+)$/);
+    if (match2 == null) {
+        throw new Error("Invalid Version: " + v2);
+    }
+    let m1num = parseInt(match1[1])*10000 + parseInt(match1[2])*100 + parseInt(match1[3]);
+    let m2num = parseInt(match2[1])*10000 + parseInt(match2[2])*100 + parseInt(match2[3]);
+    if (m1num > m2num) {
+        return 1;
+    }
+    if (m1num < m2num) {
+        return -1;
+    }
+    return 0;
+}
+
+export {jsonRespHandler, parseUrlParams, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy, valInArray, rawAttrFromNode, STYLE_UNITLESS_NUMBER, subMapKey, subArrayIndex, unbox, splitTrim, bindLibContext, unpackPositionalArgArray, cnArrToClassAttr, classStringToCnArr, isClassStringLocked, joinClassStrs, attrBaseName, cnArrToLosslessStr, parseAttrName, nsAttrName, validateModulePath, compareVersions};
 

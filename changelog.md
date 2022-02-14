@@ -1,5 +1,50 @@
 # Change Log
 
+## v0.3.0
+
+Hibiki HTML is now licensed under the OSI approved MPL v2 (Mozilla Public License)!
+More information here: https://www.mozilla.org/en-US/MPL/2.0/FAQ/
+
+Lots of under the hood changes to make writing UI component libraries
+easier and more straight-forward.  Tightened up the core tag library
+by removing 'h-if', 'h-withcontext', 'h-foreach', and 'h-if-break' (all of that
+functionality is available via attributes or other constructs).
+
+* 'unwrap' attribute to remove an enclosing tag and just render its children as a fragment
+* allow &lt;define-vars&gt; to receive context as a text node
+* dev builds report a version number
+* custom nodes fire an internal 'init' event when first created (before rendering)
+* do not throw an error when setting a read-only value (silently ignore) -- e.g. setting value in args root
+* h-text will show '[noattr]' when printing noattr value instead of null
+* added ChildrenVar.filter to allow filtering of children by LambdaValue expression
+* added ChildrenVar.size -- returns number of children in ChildrenVar
+* fixes and improved consistency for using and filtering multiple levels of children nodes
+* consistent behavior of "if-break" and "define-vars" when embedded as children of custom component
+* breaking: removed ChildrenVar.list (inconsisten behavior, not resolved)
+* added ChildrenVar.node (first node of ChildrenVar)
+* added ChilcrenVar.nodes (array of node objects)
+* added innerhtml and outerhtml to node var
+* updated when welcome message and usage ping to fire on library load.  can be suppressed using HibikiGlobalConfig
+* updated click and submit handlers to only automatically call event.preventDefault() when the href or action attributes are not present or set to "#".
+* removed h-withcontext node (define-vars is more powerful)
+* removed h-if, h-foreach, h-if-break.  can all be accessed by adding attributes to existing nodes (or to h-fragment nodes)
+* define-vars, inline context attribute renamed from 'context' to 'datacontext' (to match h-children)
+* define-component, initial component data attribute renamed from 'defaults' to 'componentdata'
+* added new fn:floor and fn:ceil math functions, and fn:deepcopy
+* define-vars, datacontext, and componentdata blocks are now parsed once when HTML is loaded (not on demand)
+* components now fire 'mount' event internally (as well as externally)
+* change to grammar to allow functions (fn) to receive named parameters
+* added spaceship '<=>' operator for comparison
+* 'noattr == null' is now true, added 'isnoattr(expr)' to distinguish the noattr case
+* added new fn:uppercase and fn:lowercase string functions
+* added new fn:compare function (supports locales, sensitivity, and numeric/string comparisons)
+* added new fn:sort function (uses fn:compare options) with makerefs parameter which can sort an array as references to link sorted values with originals
+* add makerefs parameter to fn:slice, allowing the returned array to link to the original
+* when evaluating a raw() expression, allow creation of sub-references.  if raw(@v) is a refernce, now raw(@v.subfield) will also evaluate to a reference.
+* bugfix: class.[class] was not being properly set to false when set to the Hibiki value false
+* bugfix: and/or operators were not correctly evaluating 'noattr' as false
+* bugfix: fix component defaults, define-vars, and h-withcontext, to never update mobx state
+
 ## v0.2.0
 
 Large updates behind the scenes to make the Hibiki HTML data model more consistent.

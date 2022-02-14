@@ -240,17 +240,11 @@ Want to learn more?  Check out the [Interactive Tutorial](https://playground.hib
 
 ---
 
-## Open Source-ish
+## Open Source
 
-The source code for Hibiki HTML is available on GitHub at at: https://github.com/dashborg/hibiki .  It is licensed under a modified form of the MIT license (similar in spirit to the Confluent open source license) which allows you to use Hibiki HTML without restrictions for almost all personal or commercial projects.
+The source code for Hibiki HTML is available on GitHub at at: https://github.com/dashborg/hibiki .  It is licensed under the Mozilla Public License v2.0 -- https://mozilla.org/MPL/2.0/ .
 
-You just can't create a SaaS service offering a hosted version of Hibiki HTML or one that allows 3rd party users or customers to use the Hibiki HTML language or tags to offer customizability for an existing product or service (see [LICENSE](https://github.com/dashborg/hibiki/blob/main/LICENSE)).
-
-Note that you are always free to copy the Hibiki source and minified builds to your own server, CDN, or hosting service.
-
-The Hibiki HTML license is *not* OSI approved.
-I know this is an ideological deal-breaker for some, but if you have a purely practical concern, I'm happy
-to offer a proprietary license that satisfies your legal department.
+Mozilla has an excellent [FAQ](https://www.mozilla.org/en-US/MPL/2.0/FAQ/), but basically this license allows you to use Hibiki HTML in any project (personal, commercial, or open-source).  The only restriction is if you modify any of the *Hibiki HTML source files* you must make the source code of those changes available.
 
 ## Credits
 

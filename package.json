@@ -1,11 +1,11 @@
 {
   "name": "hibiki",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Hibiki HTML",
   "main": "dist/hibiki.js",
   "repository": "https://github.com/sawka/hibiki",
   "author": "Michael Sawka <mike@dashborg.net>",
-  "license": "See LICENSE in LICENSE",
+  "license": "MPL-2.0",
   "devDependencies": {
     "@babel/cli": "^7.16.0",
     "@babel/core": "^7.16.0",

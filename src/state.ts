@@ -1,4 +1,8 @@
 // Copyright 2021-2022 Dashborg Inc
+//
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 import * as mobx from "mobx";
 import md5 from "md5";
@@ -8,7 +12,7 @@ import {v4 as uuidv4} from 'uuid';
 import type {ComponentType, LibraryType, HibikiConfig, HibikiHandlerModule, HibikiAction, EventType, HandlerValType, JSFuncType, Hibiki, ErrorCallbackFn, HtmlParserOpts, HandlerBlock, HibikiVal, HibikiValObj} from "./types";
 import type {HibikiNode, NodeAttrType} from "./html-parser";
 import * as DataCtx from "./datactx";
-import {isObject, textContent, SYM_PROXY, SYM_FLATTEN, nodeStr, callHook, getHibiki, parseHandler, fullPath, parseUrlParams, smartDecodeParams, unbox, bindLibContext} from "./utils";
+import {isObject, textContent, SYM_PROXY, SYM_FLATTEN, nodeStr, callHook, getHibiki, parseHandler, fullPath, parseUrlParams, smartDecodeParams, unbox, bindLibContext, compareVersions} from "./utils";
 import {subNodesByTag, firstSubNodeByTag} from "./nodeutils";
 import {RtContext, HibikiError} from "./error";
 import {HibikiRequest} from "./request";
@@ -23,7 +27,12 @@ type CallHandlerOptsType = {
     rtContext? : RtContext,
 };
 
-type EHandlerType = {handler : HandlerBlock, node : HibikiNode, dataenv : DataEnvironment};
+type EHandlerType = {
+    handler : HandlerBlock,
+    node : HibikiNode,
+    dataenv : DataEnvironment,
+    contextVars? : DataCtx.ContextVarType[],
+};
 
 let RESTRICTED_MODS = {
     "": true,
@@ -292,9 +301,9 @@ class DataEnvironment {
         if ((evHandlerName in env.handlers) && !rtctx.isHandlerInStack(env, event.event)) {
             let hval = env.handlers[evHandlerName];
             if (hval.boundDataenv != null) {
-                return {handler: hval.block, node: hval.node, dataenv: hval.boundDataenv};
+                return {handler: hval.block, node: hval.node, dataenv: hval.boundDataenv, contextVars: hval.contextVars};
             }
-            return {handler: hval.block, node: hval.node, dataenv: env};
+            return {handler: hval.block, node: hval.node, dataenv: env, contextVars: hval.contextVars};
         }
         if (env.parent == null) {
             return null;
@@ -562,6 +571,7 @@ class ComponentLibrary {
         if (libName != null) {
             return Promise.resolve(this.libs[libName]);
         }
+        let libReqVersion : string = null;
         let libNode : HibikiNode = null;
         let fetchInit : any = {};
         let p = fetch(srcUrl).then((resp) => {
@@ -583,6 +593,12 @@ class ComponentLibrary {
                 throw new Error(sprintf("<define-library> must have 'name' attribute for library url '%s'", srcUrl));
             }
             libName = DataCtx.rawAttrStr(libNode.attrs.name);
+            libReqVersion = DataCtx.rawAttrStr(libNode.attrs.hibikiversion);
+            if (libReqVersion != null) {
+                if (compareVersions(libReqVersion, getHibiki().VERSION) > 0) {
+                    throw new Error(sprintf("Requires Hibiki HTML version %s (current Hibiki HTML version is %s)", libReqVersion, getHibiki().VERSION));
+                }
+            }
             bindLibContext(libNode, libName);
             return null;
         }).then(() => {
@@ -876,7 +892,7 @@ class HibikiState {
     DataNodeStates : Record<string, {query : string, dnstate : any}> = {};
     ResourceCache : Record<string, boolean> = {};
     HasRendered = false;
-    NodeDataMap : Map<string, mobx.IObservableValue<HibikiVal>> = new Map();  // TODO clear on unmount
+    NodeDataMap : Map<string, mobx.IObservableValue<HibikiValObj>> = new Map();
     ExtHtmlObj : mobx.ObservableMap<string,any> = mobx.observable.map({}, {name: "ExtHtmlObj", deep: false});
     Config : HibikiConfig = {};
     PageName : mobx.IObservableValue<string> = mobx.observable.box("default", {name: "PageName"});
@@ -1049,14 +1065,6 @@ class HibikiState {
 
     @mobx.action setHtml(htmlobj : HibikiNode) {
         this.HtmlObj.set(htmlobj);
-    }
-
-    allowUsageImg() : boolean {
-        return !this.Config.noUsageImg;
-    }
-
-    allowWelcomeMessage() : boolean {
-        return !this.Config.noWelcomeMessage;
     }
 
     unhandledEvent(event : EventType, rtctx : RtContext) {
@@ -1330,4 +1338,4 @@ function hasHtmlRR(rra : any[]) : boolean {
 
 
 export {HibikiState, DataEnvironment, HibikiExtState};
-export type {EHandlerType};
+export type {EHandlerType, DataEnvironmentOpts};

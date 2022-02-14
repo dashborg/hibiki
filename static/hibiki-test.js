@@ -42,9 +42,6 @@ function testMode() {
 }
 
 if (testMode() == "test") {
-    scriptQueue.push("https://cdnjs.cloudflare.com/ajax/libs/react/17.0.2/umd/react.production.min.js");
-    scriptQueue.push("https://cdnjs.cloudflare.com/ajax/libs/react-dom/17.0.2/umd/react-dom.production.min.js");
-    scriptQueue.push("https://cdnjs.cloudflare.com/ajax/libs/mobx/5.15.4/mobx.umd.min.js");
     scriptQueue.push("/dist/hibiki-dev.js");
 }
 else {
