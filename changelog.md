@@ -13,16 +13,15 @@ functionality is available via attributes or other constructs).
 * 'unwrap' attribute to remove an enclosing tag and just render its children as a fragment
 * allow &lt;define-vars&gt; to receive context as a text node
 * dev builds report a version number
-* custom nodes fire an internal 'init' event when first created (before rendering)
 * do not throw an error when setting a read-only value (silently ignore) -- e.g. setting value in args root
 * h-text will show '[noattr]' when printing noattr value instead of null
 * added ChildrenVar.filter to allow filtering of children by LambdaValue expression
 * added ChildrenVar.size -- returns number of children in ChildrenVar
 * fixes and improved consistency for using and filtering multiple levels of children nodes
 * consistent behavior of "if-break" and "define-vars" when embedded as children of custom component
-* breaking: removed ChildrenVar.list (inconsisten behavior, not resolved)
+* breaking: removed ChildrenVar.list (inconsistent behavior, not resolved)
 * added ChildrenVar.node (first node of ChildrenVar)
-* added ChilcrenVar.nodes (array of node objects)
+* added ChildrenVar.nodes (array of node objects)
 * added innerhtml and outerhtml to node var
 * updated when welcome message and usage ping to fire on library load.  can be suppressed using HibikiGlobalConfig
 * updated click and submit handlers to only automatically call event.preventDefault() when the href or action attributes are not present or set to "#".
