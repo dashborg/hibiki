@@ -41,9 +41,12 @@ type AutoFireExpr = {
 };
 
 type JSFuncType = {
-    fn : (...args : any[]) => any,
+    fn : (...args : HibikiVal[]) => HibikiVal,
+    paramFn : (HibikiParamsObj, DataEnvironment) => HibikiVal,
+    
     native : boolean,
-    positionalArgs : boolean,
+    retainNoAttr : boolean,
+    insecure : boolean,
 };
 
 type HandlerPathType = {

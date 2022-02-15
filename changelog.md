@@ -1,5 +1,17 @@
 # Change Log
 
+## v0.3.1
+
+* removed 'alert' statement, use log(..., @alert=true);
+* removed 'bubble' statement, use fire->event(..., @bubble=true);
+* allow 'fire' statement to take nodeuuid as at-arg, fire->event(..., @nodeuuid="expr");
+* new HibikiParamsObj to manage position/named params in a more structured way
+* HibikiParamsObj passed to jsfuncs
+* HibikiParamsObj available in HibikiRequest object
+* HibikiRequest.data is now params stripped of at-args (and positional args)
+* added 'nosort' option to fn:sort()
+* bugfix: more consistent handling of noattr args in jsfuncs (stripped out by HibikiParamsObj)
+
 ## v0.3.0
 
 Hibiki HTML is now licensed under the OSI approved MPL v2 (Mozilla Public License)!

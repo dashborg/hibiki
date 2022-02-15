@@ -8,11 +8,13 @@ import {v4 as uuidv4} from 'uuid';
 import type {RtContext} from "./error";
 import type {HibikiAction, HibikiExtState, HandlerPathType, HibikiValObj} from "./types";
 import type {DataEnvironment} from "./state";
+import type {HibikiParamsObj} from "./datactx";
 
 class HibikiRequest {
     reqid : string;
     callpath : HandlerPathType;
-    data : HibikiValObj;
+    data : HibikiValObj;       // a plain object of regular parameter keys (no at-keys or positional args), not null
+    params : HibikiParamsObj;  // full params object (at-keys, keys, and positional args)
     rtContext : RtContext;
     state : HibikiExtState;
     dataenv : DataEnvironment;

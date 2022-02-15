@@ -10,7 +10,7 @@ import {DataEnvironment, HibikiState, HibikiExtState} from "./state";
 import {sprintf} from "sprintf-js";
 import {parseHtml, HibikiNode} from "./html-parser";
 import {RtContext, getShortEMsg, HibikiError} from "./error";
-import {SYM_PROXY, SYM_FLATTEN, isObject, stripAtKeys, unpackPositionalArgs, unpackAtArgs, nodeStr, parseHandler, fullPath, STYLE_UNITLESS_NUMBER, splitTrim, bindLibContext, unpackPositionalArgArray, classStringToCnArr, cnArrToClassAttr, cnArrToLosslessStr, attrBaseName, parseAttrName, nsAttrName, getHibiki} from "./utils";
+import {SYM_PROXY, SYM_FLATTEN, isObject, nodeStr, parseHandler, fullPath, STYLE_UNITLESS_NUMBER, splitTrim, bindLibContext, classStringToCnArr, cnArrToClassAttr, cnArrToLosslessStr, attrBaseName, parseAttrName, nsAttrName, getHibiki} from "./utils";
 import {PathPart, PathType, PathUnionType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue, HandlerBlock, HibikiVal, HibikiValObj, JSFuncType, HibikiSpecialVal, HibikiPrimitiveVal, StyleMapType} from "./types";
 import type {NodeAttrType} from "./html-parser";
 import {HibikiRequest} from "./request";
@@ -89,6 +89,92 @@ type CompareOpts = {
     field? : string,
     index? : number,
 };
+
+class HibikiParamsObj {
+    params : HibikiValObj;
+    posArgs : HibikiVal[];
+
+    constructor(params : HibikiValObj) {
+        let [paramsObj, isObj] = asPlainObject(params, false);
+        if (!isObj) {
+            this.params = {};
+            this.posArgs = [];
+            return;
+        }
+        let [posArgs, isArr] = asArray(params["*args"], false);
+        this.posArgs = (isArr ? [...posArgs] : []);
+        this.params = {...paramsObj};
+        if (this.params["*args"]) {
+            delete this.params["*args"];
+        }
+    }
+
+    stripNoAttrs() {
+        this.params = stripNoAttrShallow(this.params);
+        this.posArgs = stripNoAttrShallow(this.posArgs);
+    }
+
+    deepCopy(opts? : DeepCopyOptsType) {
+        this.params = DeepCopyTypeSafe(this.params, opts);
+        this.posArgs = DeepCopyTypeSafe(this.posArgs, opts);
+    }
+
+    getAtArgs() : HibikiValObj {
+        let rtn : HibikiValObj = {};
+        for (let key in this.params) {
+            if (key.startsWith("@")) {
+                rtn[key.substr(1)] = this.params[key];
+            }
+        }
+        return rtn;
+    }
+
+    hasArg(argName : string, pos? : number) : boolean {
+        if (argName != null) {
+            if (argName in this.params && this.params[argName] !== SYM_NOATTR) {
+                return true;
+            }
+        }
+        if (pos != null && this.posArgs.length > pos) {
+            if (this.posArgs[pos] !== SYM_NOATTR) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    getArg(argName : string, pos? : number) : HibikiVal {
+        if (argName != null) {
+            if (argName in this.params) {
+                return this.params[argName];
+            }
+        }
+        if (pos == null || this.posArgs.length <= pos) {
+            return null;
+        }
+        return this.posArgs[pos];
+    }
+
+    getNamedPositionalArgs(posArgNames : string[]) : HibikiValObj {
+        let rtn : HibikiValObj = {};
+        for (let idx=0; idx<posArgNames.length; idx++) {
+            let name = posArgNames[idx];
+            rtn[name] = this.getArg(name, idx);
+        }
+        return rtn;
+    }
+
+    getPlainArgs() : HibikiValObj {
+        let rtn : HibikiValObj = {};
+        for (let key in this.params) {
+            if (key.startsWith("@")) {
+                continue;
+            }
+            rtn[key] = this.params[key];
+        }
+        return rtn;
+    }
+}
 
 class HActionBlock {
     blockType : "block" | "handler";  // handlers are top-level, blocks are like in "then"/"else" clauses.  affects the "setreturn" action
@@ -250,8 +336,8 @@ class ChildrenVar {
     }
 
     get filter() : LambdaValue {
-        let fn : (dataenv : DataEnvironment, params : HibikiValObj) => HibikiVal = (dataenv : DataEnvironment, params : HibikiValObj) => {
-            let {filterexpr: filterExpr} = unpackPositionalArgs(params, ["filterexpr"]);
+        let fn : (dataenv : DataEnvironment, params : HibikiParamsObj) => HibikiVal = (dataenv : DataEnvironment, params : HibikiParamsObj) => {
+            let {filterexpr: filterExpr} = params.getNamedPositionalArgs(["filterexpr"]);
             if (filterExpr == null) {
                 return null;
             }
@@ -263,7 +349,7 @@ class ChildrenVar {
             for (let childCtx of this.boundNodes) {
                 let nodeVar = childCtx.makeNodeVar(true);
                 let lambdaEnv = dataenv.makeChildEnv({node: nodeVar}, null);
-                let isActive = filterExpr.invoke(lambdaEnv, null);
+                let isActive = filterExpr.invoke(lambdaEnv, new HibikiParamsObj(null));
                 if (isActive && isActive !== SYM_NOATTR) {
                     rtn.push(childCtx);
                 }
@@ -559,8 +645,8 @@ function formatVal(val : HibikiVal, format : string) : string {
     }
 }
 
-function formatFilter(val : any, args : HibikiValObj) {
-    let {format} = unpackPositionalArgs(args, ["format"]);
+function formatFilter(val : any, params : HibikiParamsObj) {
+    let format = params.getArg("format", 0);
     return formatVal(val, valToString(format));
 }
 
@@ -679,18 +765,16 @@ class Watcher {
 
 class LambdaValue {
     expr : HExpr;
-    invokeFn : (dataenv : DataEnvironment, params : HibikiValObj) => HibikiVal;
+    invokeFn : (dataenv : DataEnvironment, params : HibikiParamsObj) => HibikiVal;
     
-    constructor(expr : HExpr, invokeFn : (dataenv : DataEnvironment, params : HibikiValObj) => HibikiVal) {
+    constructor(expr : HExpr, invokeFn : (dataenv : DataEnvironment, params : HibikiParamsObj) => HibikiVal) {
         this.expr = expr;
         this.invokeFn = invokeFn;
     }
 
-    invoke(dataenv : DataEnvironment, params : HibikiValObj) : HibikiVal {
+    invoke(dataenv : DataEnvironment, params : HibikiParamsObj) : HibikiVal {
         if (this.expr) {
-            if (params != null) {
-                dataenv = dataenv.makeChildEnv(params, null);
-            }
+            dataenv = dataenv.makeChildEnv(params.params, {htmlContext: "invoke-context"});
             let rtn = evalExprAst(this.expr, dataenv, "natural");
             return rtn;
         }
@@ -1598,8 +1682,48 @@ function CheckCycle(data : HibikiVal, detector? : CycleDetector) : [boolean, str
     return [false, null];
 }
 
+function stripNoAttrShallow<T extends HibikiVal>(val : T) : T {
+    if (val == null || val === SYM_NOATTR) {
+        return null;
+    }
+    let [arrObj, isArr] = asArray(val, false);
+    if (isArr) {
+        arrObj = [...arrObj];
+        for (let i=arrObj.length-1; i>=0; i--) {
+            if (arrObj[i] === SYM_NOATTR) {
+                arrObj.pop();
+                continue;
+            }
+            break;
+        }
+        for (let i=0; i<arrObj.length; i++) {
+            if (arrObj[i] === SYM_NOATTR) {
+                arrObj[i] = null;
+            }
+        }
+        return arrObj as T;
+    }
+    let [plainObj, isObj] = asPlainObject(val, false);
+    if (isObj) {
+        plainObj = {...plainObj};
+        for (let key in plainObj) {
+            if (plainObj[key] === SYM_NOATTR) {
+                delete plainObj[key];
+            }
+        }
+        return plainObj as T;
+    }
+    return val;
+}
+
+type DeepCopyOptsType = {resolve? : boolean, json? : boolean, cycleArr? : HibikiVal[], cyclePath? : string[]};
+
+function DeepCopyTypeSafe<T extends (HibikiValObj | HibikiVal[])>(data : T, opts? : DeepCopyOptsType) : T {
+    return DeepCopy(data, opts) as T;
+}
+
 // this also has the effect of demobx
-function DeepCopy(data : HibikiVal, opts? : {resolve? : boolean, json? : boolean, cycleArr? : HibikiVal[], cyclePath? : string[]}) : HibikiVal {
+function DeepCopy(data : HibikiVal, opts? : DeepCopyOptsType) : HibikiVal {
     if (data == null) {
         return null;
     }
@@ -1955,16 +2079,21 @@ function evalFnAst(fnAst : any, dataenv : DataEnvironment) : HibikiVal {
         stateFn = state.JSFuncs[fnName];
     }
     if (stateFn != null) {
-        let params : HibikiValObj = evalExprAst(fnAst.params, dataenv, "natural") as HibikiValObj;
+        let params = evalExprParams(fnAst.params, dataenv);
         if (!stateFn.native) {
-            params = (DeepCopy(params, {resolve: true}) as HibikiValObj);
+            params.deepCopy({resolve: true});
         }
-        if (stateFn.positionalArgs) {
-            let posArgs = unpackPositionalArgArray(params);
-            return stateFn.fn(...posArgs);
+        else if (!stateFn.retainNoAttr) {
+            params.stripNoAttrs();
+        }
+        if (stateFn.paramFn != null) {
+            return stateFn.paramFn(params, dataenv);
+        }
+        else if (stateFn.fn != null) {
+            return stateFn.fn(...params.posArgs);
         }
         else {
-            return stateFn.fn(params, dataenv);
+            throw new Error(sprintf("Invalid function: '%s', no function defined", fnAst.fn));
         }
     }
     else {
@@ -2069,6 +2198,19 @@ function evalPathExprAst(exprAst : HExpr, dataenv : DataEnvironment, ctxStr : st
     throw new Error(sprintf("Invalid path expression etype: '%s'", exprAst.etype));
 }
 
+function evalExprParams(exprAst : HExpr, dataenv : DataEnvironment) : HibikiParamsObj {
+    let val = evalExprAst(exprAst, dataenv, "natural");
+    let [plainObj, isObj] = asPlainObject(val, true);
+    if (isObj) {
+        return new HibikiParamsObj(plainObj);
+    }
+    let [arrObj, isArr] = asArray(val, false);
+    if (isArr) {
+        return new HibikiParamsObj({"*args": arrObj});
+    }
+    return new HibikiParamsObj({"*args": [val]});
+}
+
 // rtype (controls lvalue resolution)
 //   "resolve" - always resolve lvalues, resolve SYM_NOATTR to null
 //   "raw"     - no extra resolution
@@ -2167,8 +2309,8 @@ function evalExprAstInternal(exprAst : HExpr, dataenv : DataEnvironment, rtype :
         let filter = exprAst.filter;
         if (filter === "format") {
             let e1 = evalExprAst(exprAst.exprs[0], dataenv, "natural");
-            let args = evalExprAst(exprAst.exprs[1], dataenv, "resolve");
-            return formatFilter(e1, args as HibikiValObj);
+            let params = evalExprParams(exprAst.params, dataenv);
+            return formatFilter(e1, params);
         }
         else {
             throw new Error(sprintf("Invalid filter '%s' (only format is allowed)", exprAst.filter));
@@ -2344,8 +2486,8 @@ function evalExprAstInternal(exprAst : HExpr, dataenv : DataEnvironment, rtype :
         if (!(val instanceof LambdaValue)) {
             return val;
         }
-        let invokeData : HibikiValObj = evalExprAst(exprAst.params, dataenv, "natural") as HibikiValObj;
-        return val.invoke(dataenv, invokeData);
+        let invokeParams = evalExprParams(exprAst.params, dataenv);
+        return val.invoke(dataenv, invokeParams);
     }
     else if (exprAst.etype === "lambda") {
         let expr = exprAst.exprs[0];
@@ -2389,11 +2531,9 @@ function RequestFromAction(action : HAction, pure : boolean, dataenv : DataEnvir
         throw new Error(sprintf("Cannot create HibikiRequest from actiontype: '%s'", action.actiontype));
     }
     let req = new HibikiRequest(dataenv.dbstate.getExtState(), dataenv);
-    let fullData : HibikiValObj = demobx(evalExprAst(action.data, dataenv, "resolve")) as HibikiValObj;
-    if (fullData != null && !isObject(fullData)) {
-        throw new Error(sprintf("HibikiAction 'callhandler' data must be null or an object, cannot be '%s'", hibikiTypeOf(fullData)));
-    }
-    req.data = fullData as HibikiValObj;
+    req.params = evalExprParams(action.data, dataenv);
+    req.params.stripNoAttrs();
+    req.data = req.params.getPlainArgs();
     req.rtContext = rtctx;
     req.pure = pure || action.pure;
     req.libContext = dataenv.getLibContext() ?? "main";
@@ -2404,17 +2544,12 @@ function RequestFromAction(action : HAction, pure : boolean, dataenv : DataEnvir
             throw new Error("Invalid handler path: " + callPath);
         }
         req.callpath = hpath;
-        if (fullData != null) {
-            if ("@url" in fullData || "@module" in fullData) {
-                throw new Error(sprintf("HibikiAction 'callhandler' cannot specifiy @url or @module params when a callpath is specified"));
-            }
+        if (req.params.getArg("@url") != null || req.params.getArg("@module") != null) {
+            throw new Error(sprintf("HibikiAction 'callhandler' cannot specifiy @url or @module params when a callpath is specified"));
         }
     }
     else {
-        if (fullData == null) {
-            throw new Error(sprintf("HibikiAction 'callhandler' without a callpath must specify an @url param"));
-        }
-        let {"@url": dataUrl, "@method": dataMethod, "@module": dataModule} = fullData;
+        let {"@url": dataUrl, "@method": dataMethod, "@module": dataModule} = req.params.params;
         if (dataUrl == null) {
             throw new Error(sprintf("HibikiAction 'callhandler' without a callpath must specify an @url param"));
         }
@@ -2425,7 +2560,7 @@ function RequestFromAction(action : HAction, pure : boolean, dataenv : DataEnvir
         };
         req.callpath = hpath;
     }
-    if (fullData != null && isObject(fullData) && fullData["@pure"]) {
+    if (req.params.getArg("@pure")) {
         req.pure = true;
     }
     return req;
@@ -2488,14 +2623,14 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
         if (pure) {
             return null;
         }
-        let ivVal = evalExprAst(action.data, dataenv, "resolve");
-        if (ivVal == null) {
+        let ivParams = evalExprParams(action.data, dataenv);
+        ivParams.deepCopy({resolve: true});
+        if (ivParams.posArgs.length === 0) {
             dataenv.dbstate.invalidateAll();
         }
         else {
-            let ivArr = (mobx.isArrayLike(ivVal) ? ivVal : [ivVal]);
-            for (let i=0; i<ivArr.length; i++) {
-                let iv = ivArr[i];
+            for (let i=0; i<ivParams.posArgs.length; i++) {
+                let iv = ivParams.posArgs[i];
                 if (iv != null) {
                     dataenv.dbstate.invalidateRegex(String(iv));
                 }
@@ -2514,33 +2649,38 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
         if (eventStr == null || eventStr === "") {
             return null;
         }
+        let params = evalExprParams(action.data, dataenv);
+        params.stripNoAttrs();
         let bubble = !!action.bubble;
+        if (params.hasArg("@bubble")) {
+            bubble = valToBool(params.getArg("@bubble"));
+        }
+        let nodeuuid = action.nodeuuid;
+        if (params.hasArg("@nodeuuid")) {
+            nodeuuid = valToString(params.getArg("@nodeuuid"));
+        }
         if (!action.native) {
-            if (action.nodeuuid) {
-                rtctx.replaceContext(sprintf("%s '%s' event (node uuid %s)", (bubble ? "Bubbling" : "Firing"), eventStr, action.nodeuuid), null);
+            if (nodeuuid) {
+                rtctx.replaceContext(sprintf("%s '%s' event (node uuid %s)", (bubble ? "Bubbling" : "Firing"), eventStr, nodeuuid), null);
             }
             else {
                 rtctx.replaceContext(sprintf("%s '%s' event", (bubble ? "Bubbling" : "Firing"), eventStr), null);
             }
         }
-        let datacontext = null;
-        let params = evalExprAst(action.data, dataenv, "natural");
-        if (params != null && isObject(params)) {
-            let objParams : HibikiValObj = params as HibikiValObj;
-            let {value} = unpackPositionalArgs(objParams, ["value"]);
-            datacontext = stripAtKeys(objParams);
-            delete datacontext["*args"];
-            if (value != null && !("value" in datacontext)) {
-                datacontext.value = value;
-            }
+        let datacontext = params.getPlainArgs();
+        if (!("value" in datacontext) && params.hasArg(null, 0)) {
+            datacontext["value"] = params.getArg(null, 0);
         }
-        let event = {event: eventStr, native: false, datacontext, bubble, nodeuuid: action.nodeuuid};
+        let event = {event: eventStr, native: action.native, datacontext, bubble, nodeuuid};
         return FireEvent(event, dataenv, rtctx, false);
     }
     else if (action.actiontype === "log") {
-        let exprData : HibikiValObj = DeepCopy(evalExprAst(action.data, dataenv, "natural")) as HibikiValObj;
-        let dataValArr = unpackPositionalArgArray(exprData);
-        let {debug: debugAtArg} = unpackAtArgs(exprData);
+        let params = evalExprParams(action.data, dataenv);
+        params.stripNoAttrs();
+        params.deepCopy();
+        let dataValArr = params.posArgs;
+        let debugAtArg = valToBool(params.getArg("@debug"));
+        let alertAtArg = valToBool(params.getArg("@alert"));
         dataValArr = dataValArr.map((val) => {
             if (val instanceof HibikiError) {
                 return val.toString();
@@ -2554,13 +2694,14 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
             console.log(rtctx.asString("> "));
             console.log("RtContext / DataEnvironment", rtctx, dataenv);
         }
-        if (action.alert) {
+        if (action.alert || alertAtArg) {
             let alertStr = dataValArr.map((v) => String(v)).join(", ");
             alert(alertStr);
         }
         return null;
     }
     else if (action.actiontype === "throw") {
+        // action.data is not a params type
         rtctx.popContext();
         let errVal = evalExprAst(action.data, dataenv, "resolve");
         if (errVal instanceof HibikiError) {
@@ -3111,7 +3252,7 @@ function compareVals(v1 : HibikiVal, v2 : HibikiVal, opts? : CompareOpts) : numb
     return sv1.localeCompare(sv2, locale, {numeric: numeric, sensitivity: sensitivity});
 }
 
-export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, JsonStringify, EvalSimpleExpr, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, DeepCopy, CheckCycle, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, makeIteratorFromExpr, rawAttrStr, getUnmergedAttributeStr, getUnmergedAttributeValPair, SYM_NOATTR, HActionBlock, valToString, valToBool, compileActionStr, FireEvent, makeErrorObj, OpaqueValue, ChildrenVar, Watcher, LambdaValue, blobPrintStr, valToNumber, hibikiTypeOf, JsonReplacerFn, valToAttrStr, resolveLValue, resolveUnmergedCnArray, isUnmerged, resolveUnmergedStyleMap, asStyleMap, asStyleMapFromPair, EvalContextVarsThrow, compareVals, asPrimitive, asArray, asPlainObject};
+export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, JsonStringify, EvalSimpleExpr, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, DeepCopy, DeepCopyTypeSafe, CheckCycle, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, makeIteratorFromExpr, rawAttrStr, getUnmergedAttributeStr, getUnmergedAttributeValPair, SYM_NOATTR, HActionBlock, valToString, valToBool, compileActionStr, FireEvent, makeErrorObj, OpaqueValue, ChildrenVar, Watcher, LambdaValue, blobPrintStr, valToNumber, hibikiTypeOf, JsonReplacerFn, valToAttrStr, resolveLValue, resolveUnmergedCnArray, isUnmerged, resolveUnmergedStyleMap, asStyleMap, asStyleMapFromPair, EvalContextVarsThrow, compareVals, asPrimitive, asArray, asPlainObject, HibikiParamsObj, stripNoAttrShallow};
 
 export type {PathType, HAction, HExpr, HIteratorExpr, ContextVarType, CompareOpts};
 

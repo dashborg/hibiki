@@ -367,7 +367,7 @@ class DataEnvironment {
         return rtn;
     }
 
-    makeChildEnv(specials : any, opts : DataEnvironmentOpts) : DataEnvironment {
+    makeChildEnv(specials : HibikiValObj, opts : DataEnvironmentOpts) : DataEnvironment {
         specials = specials || {};
         let rtn = new DataEnvironment(this.dbstate, opts);
         rtn.parent = this;
@@ -376,7 +376,7 @@ class DataEnvironment {
         return rtn;
     }
 
-    resolvePath(path : string, opts? : {keepMobx? : boolean, rtContext? : string}) : any {
+    resolvePath(path : string, opts? : {keepMobx? : boolean, rtContext? : string}) : HibikiVal {
         opts = opts ?? {};
         let rtContext = opts.rtContext ?? "DataEnvironment.resolvePath";
         let rtn = DataCtx.ResolvePath(path, this, {rtContext: rtContext});
@@ -386,7 +386,7 @@ class DataEnvironment {
         return rtn;
     }
 
-    setDataPath(path : string, data : any, rtContext? : string) {
+    setDataPath(path : string, data : HibikiVal, rtContext? : string) {
         rtContext = rtContext ?? "DataEnvironment.setDataPath";
         DataCtx.SetPath(path, this, data, {rtContext: rtContext});
     }

@@ -7,7 +7,7 @@
 import * as mobx from "mobx";
 import type {JSFuncType, HibikiVal, HibikiValObj} from "./types";
 import {sprintf} from "sprintf-js";
-import {isObject, addToArrayDupCheck, removeFromArray, unpackArg, unpackPositionalArgArray} from "./utils";
+import {isObject, addToArrayDupCheck, removeFromArray} from "./utils";
 import {v4 as uuidv4} from 'uuid';
 import * as DataCtx from "./datactx";
 import type {DataEnvironment} from "./state";
@@ -15,7 +15,7 @@ import type {DataEnvironment} from "./state";
 let DefaultJSFuncs : Record<string, JSFuncType> = {};
 
 function jsLen(v : HibikiVal) : number {
-    if (v == null || v === DataCtx.SYM_NOATTR) {
+    if (v == null) {
         return 0;
     }
     if (typeof(v) === "string" || mobx.isArrayLike(v)) {
@@ -89,27 +89,28 @@ function processSliceArgs(arg : HibikiVal, fnName : string) : [number, number] {
     }
     let [argArr, isArr] = DataCtx.asArray(arg, false);
     if (!isArr) {
-        throw new Error(sprintf("Invalid slice arguments to %s, not an array", fnName));
+        throw new Error(sprintf("Invalid slice arguments to %s, not an array type=%s", fnName, DataCtx.hibikiTypeOf(arg)));
     }
-    let startVal = (argArr.length >= 1 ? argArr[0] : null);
-    let endVal = (argArr.length >= 2 ? argArr[1] : null);
-    let startIdx = ((startVal == null || startVal === DataCtx.SYM_NOATTR) ? undefined : DataCtx.valToNumber(startVal));
-    let endIdx = ((endVal == null || endVal === DataCtx.SYM_NOATTR)  ? undefined : DataCtx.valToNumber(endVal));
+    argArr = DataCtx.stripNoAttrShallow(argArr);
+    let [startVal, endVal] = argArr;
+    let startIdx = (startVal == null ? undefined : DataCtx.valToNumber(startVal));
+    let endIdx = (endVal == null  ? undefined : DataCtx.valToNumber(endVal));
     if ((startIdx != null && isNaN(startIdx)) || (endIdx != null && isNaN(endIdx))) {
         throw new Error(sprintf("Invalid start/end arguments to %s, must be numeric (not NaN)", fnName));
     }
     return [startIdx, endIdx];
 }
 
-function jsSlice(params : HibikiValObj) : HibikiVal[] {
-    let [rawVal, startVal, endVal] = unpackPositionalArgArray(params);
+function jsSlice(params : DataCtx.HibikiParamsObj) : HibikiVal[] {
+    params.stripNoAttrs();
+    let [rawVal, startVal, endVal] = params.posArgs;
     let val = DataCtx.resolveLValue(rawVal);
     let [arrVal, isArr] = DataCtx.asArray(val, false);
     if (!isArr) {
         return null;
     }
     let [startIdx, endIdx] = processSliceArgs([startVal, endVal], "fn:slice");
-    let makeRefs = DataCtx.valToBool(unpackArg(params, "makerefs"));
+    let makeRefs = DataCtx.valToBool(params.getArg("makerefs"));
     if (makeRefs && !(rawVal instanceof DataCtx.LValue)) {
         console.log("WARNING fn:slice makerefs=true, but data is not a reference");
     }
@@ -315,23 +316,17 @@ function jsEndsWith(str : HibikiVal, ...rest : any[]) : boolean {
     return str.endsWith(...rest);
 }
 
-function jsMatch(str : HibikiVal, regex : string | RegExp, ...rest : any[]) : any {
+function jsMatch(str : HibikiVal, regex : HibikiVal, ...rest : any[]) : any {
     if (str == null || regex == null) {
         return null;
     }
     if (typeof(str) !== "string") {
         throw new Error("fn:match 1st argument must be a string");
     }
-    if (typeof(regex) !== "string" && !(regex instanceof RegExp)) {
-        throw new Error("fn:match 2nd argument must be a regexp");
+    if (typeof(regex) !== "string") {
+        throw new Error("fn:match 2nd argument must be a regexp string");
     }
-    let re : RegExp = null;
-    if (typeof(regex) === "string") {
-        re = new RegExp(regex, ...rest);
-    }
-    else {
-        re = regex;
-    }
+    let re = new RegExp(regex, ...rest);
     return str.match(re);
 }
 
@@ -396,11 +391,8 @@ function jsDeepCopy(val : HibikiVal) : HibikiVal {
     return DataCtx.DeepCopy(val, {resolve: true});
 }
 
-function extractCompareOpts(params : HibikiValObj) : DataCtx.CompareOpts {
-    if (params == null) {
-        return {};
-    }
-    let {locale, "type": sortType, sensitivity, nocase, field, index} = params;
+function extractCompareOpts(params : DataCtx.HibikiParamsObj) : DataCtx.CompareOpts {
+    let {locale, "type": sortType, sensitivity, nocase, field, index} = params.params;
     let opts : DataCtx.CompareOpts = {};
     if (locale != null) {
         opts.locale = DataCtx.valToString(locale);
@@ -426,16 +418,16 @@ function extractCompareOpts(params : HibikiValObj) : DataCtx.CompareOpts {
     return opts;
 }
 
-function jsCompare(params : HibikiValObj) : number {
-    let args = unpackPositionalArgArray(params);
+function jsCompare(params : DataCtx.HibikiParamsObj) : number {
+    let args = params.posArgs;
     let compareOpts = extractCompareOpts(params);
     let v1 = (args.length >= 1 ? args[0] : null);
     let v2 = (args.length >= 2 ? args[1] : null);
     return DataCtx.compareVals(v1, v2, compareOpts);
 }
 
-function jsSort(params : HibikiValObj, dataenv : DataEnvironment) : HibikiVal[] {
-    let rawData = unpackArg(params, "data", 0);
+function jsSort(params : DataCtx.HibikiParamsObj, dataenv : DataEnvironment) : HibikiVal[] {
+    let rawData = params.getArg("data", 0);
     let data = DataCtx.resolveLValue(rawData);
     if (data == null) {
         return null;
@@ -445,12 +437,13 @@ function jsSort(params : HibikiValObj, dataenv : DataEnvironment) : HibikiVal[] 
         return null;
     }
     let compareOpts = extractCompareOpts(params);
-    let makeRefs = DataCtx.valToBool(unpackArg(params, "makerefs"));
-    let sortDesc = DataCtx.valToBool(unpackArg(params, "desc"));
-    let sliceOpt = processSliceArgs(unpackArg(params, "slice"), "fn:sort#slice");
-    let sortExprArg = unpackArg(params, "sortexpr");
+    let makeRefs = DataCtx.valToBool(params.getArg("makerefs"));
+    let sortDesc = DataCtx.valToBool(params.getArg("desc"));
+    let sliceOpt = processSliceArgs(params.getArg("slice"), "fn:sort#slice");
+    let noSort = DataCtx.valToBool(params.getArg("nosort"));
+    let sortExprArg = params.getArg("sortexpr");
     let sortExpr : DataCtx.LambdaValue = null;
-    if (sortExprArg != null && sortExprArg !== DataCtx.SYM_NOATTR) {
+    if (sortExprArg != null) {
         if (!(sortExprArg instanceof DataCtx.LambdaValue)) {
             throw new Error(sprintf("fn:sort#sortexpr was set, but is not type lambda, type=%s", DataCtx.hibikiTypeOf(sortExprArg)));
         }
@@ -459,16 +452,19 @@ function jsSort(params : HibikiValObj, dataenv : DataEnvironment) : HibikiVal[] 
     
     let sortMult = (sortDesc ? -1 : 1);
     let indexArr = arrData.map((_, idx) => idx);
-    indexArr.sort((idx1, idx2) => {
-        let cmpVal : number = 0;
-        if (sortExpr != null) {
-            cmpVal = DataCtx.valToNumber(sortExpr.invoke(dataenv, {"a": arrData[idx1], "b": arrData[idx2], "aidx": idx1, "bidx": idx2}));
-        }
-        else {
-            cmpVal = DataCtx.compareVals(arrData[idx1], arrData[idx2], compareOpts);
-        }
-        return sortMult*cmpVal;
-    });
+    if (!noSort) {
+        indexArr.sort((idx1, idx2) => {
+            let cmpVal : number = 0;
+            if (sortExpr != null) {
+                let invokeParams = new DataCtx.HibikiParamsObj({"a": arrData[idx1], "b": arrData[idx2], "aidx": idx1, "bidx": idx2});
+                cmpVal = DataCtx.valToNumber(sortExpr.invoke(dataenv, invokeParams));
+            }
+            else {
+                cmpVal = DataCtx.compareVals(arrData[idx1], arrData[idx2], compareOpts);
+            }
+            return sortMult*cmpVal;
+        });
+    }
     if (makeRefs && !(rawData instanceof DataCtx.LValue)) {
         console.log("WARNING fn:sort makerefs=true, but data is not a reference");
     }
@@ -486,53 +482,74 @@ function jsSort(params : HibikiValObj, dataenv : DataEnvironment) : HibikiVal[] 
     return rtn;
 }
 
-function reg(name : string, fn : any, native : boolean, positionalArgs : boolean) {
-    DefaultJSFuncs[name] = {fn, native, positionalArgs};
+function regParamFn(name : string, fn : (params : DataCtx.HibikiParamsObj, dataenv : DataEnvironment) => HibikiVal, opts? : {retainNoAttr? : boolean, insecure? : boolean}) {
+    opts = opts ?? {};
+    let config : JSFuncType = {
+        fn: null,
+        paramFn: fn,
+        native: true,
+        retainNoAttr: opts.retainNoAttr,
+        insecure: opts.insecure,
+    };
+    DefaultJSFuncs[name] = config;
 }
 
-reg("len", jsLen, true, true);
-reg("indexof", jsIndexOf, false, true);
-reg("min", jsMin, false, true);
-reg("max", jsMax, false, true);
-reg("floor", jsFloor, false, true);
-reg("ceil", jsCeil, false, true);
-reg("splice", jsSplice, true, true);
-reg("slice", jsSlice, true, false);
-reg("push", jsPush, true, true);
-reg("pop", jsPop, true, true);
-reg("setadd", jsSetAdd, true, true);
-reg("setremove", jsSetRemove, true, true);
-reg("sethas", jsSetHas, true, true);
-reg("int", jsInt, true, true);
-reg("float", jsFloat, true, true);
-reg("str", jsStr, true, true);
-reg("bool", jsBool, true, true);
-reg("jsonparse", jsJsonParse, true, true);
-reg("json", jsJson, true, true);
-reg("split", jsSplit, true, true);
-reg("now", jsNow, true, true);
-reg("ts",  jsNow, true, true);
-reg("merge", jsMerge, true, true);
-reg("jseval", jsEval, true, true);
-reg("js", jsJs, false, true);
-reg("substr", jsSubstr, true, true);
-reg("uppercase", jsUpperCase, true, true);
-reg("lowercase", jsLowerCase, true, true);
-reg("sprintf", jsSprintf, true, true);
-reg("trim", jsTrim, true, true);
-reg("startswith", jsStartsWith, true, true);
-reg("endswith", jsEndsWith, true, true);
-reg("match", jsMatch, true, true);
-reg("blobastext", jsBlobAsText, true, true);
-reg("blobasbase64", jsBlobAsBase64, true, true);
-reg("blobmimetype", jsBlobMimeType, true, true);
-reg("bloblen", jsBlobLen, true, true);
-reg("blobname", jsBlobName, true, true);
-reg("uuid", jsUuid, true, true);
-reg("typeof", jsTypeOf, true, true);
-reg("deepequal", jsDeepEqual, true, true);
-reg("deepcopy", jsDeepCopy, true, true);
-reg("compare", jsCompare, true, false);
-reg("sort", jsSort, true, false);
+function reg(name : string, fn : (...args : HibikiVal[]) => HibikiVal, native : boolean, opts? : {retainNoAttr? : boolean, insecure? : boolean}) {
+    opts = opts ?? {};
+    let config : JSFuncType = {
+        fn: fn,
+        paramFn: null,
+        native,
+        retainNoAttr: opts.retainNoAttr,
+        insecure: opts.insecure,
+    };
+    DefaultJSFuncs[name] = config;
+}
+
+// native-funcs
+reg("len", jsLen, true);
+reg("indexof", jsIndexOf, false);
+reg("min", jsMin, false);
+reg("max", jsMax, false);
+reg("floor", jsFloor, false);
+reg("ceil", jsCeil, false);
+reg("splice", jsSplice, true);
+regParamFn("slice", jsSlice);
+reg("push", jsPush, true);
+reg("pop", jsPop, true);
+reg("setadd", jsSetAdd, true);
+reg("setremove", jsSetRemove, true);
+reg("sethas", jsSetHas, true);
+reg("int", jsInt, true);
+reg("float", jsFloat, true);
+reg("str", jsStr, true);
+reg("bool", jsBool, true);
+reg("jsonparse", jsJsonParse, true);
+reg("json", jsJson, true);
+reg("split", jsSplit, true);
+reg("now", jsNow, true);
+reg("ts",  jsNow, true);
+reg("merge", jsMerge, true);
+reg("jseval", jsEval, true, {insecure: true});
+reg("substr", jsSubstr, true);
+reg("uppercase", jsUpperCase, true);
+reg("lowercase", jsLowerCase, true);
+reg("sprintf", jsSprintf, true);
+reg("trim", jsTrim, true);
+reg("startswith", jsStartsWith, true);
+reg("endswith", jsEndsWith, true);
+reg("match", jsMatch, true);
+reg("blobastext", jsBlobAsText, true);
+reg("blobasbase64", jsBlobAsBase64, true);
+reg("blobmimetype", jsBlobMimeType, true);
+reg("bloblen", jsBlobLen, true);
+reg("blobname", jsBlobName, true);
+reg("uuid", jsUuid, true);
+reg("typeof", jsTypeOf, true);
+reg("deepequal", jsDeepEqual, true);
+reg("deepcopy", jsDeepCopy, true);
+regParamFn("compare", jsCompare);
+regParamFn("sort", jsSort);
+reg("js", jsJs, false, {insecure: true});
 
 export {DefaultJSFuncs};

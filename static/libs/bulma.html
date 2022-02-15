@@ -1,4 +1,4 @@
-<define-library name="@hibiki/bulma" hibikiversion="v0.3.0">
+<define-library name="@hibiki/bulma" hibikiversion="v0.3.1">
   <hibiki-content tag="hibiki/bulma"></hibiki-content>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.2/css/bulma.min.css"></link>
   
@@ -275,11 +275,10 @@
     <define-vars>
       @sortfield = raw($args.sortfield) ?? ref($c.sortfield);
       @sortdesc = raw($args.sortdesc) ?? ref($c.sortdesc);
-      @sorticon_expr = lambda(@sortfield == @node.attrs.sortfield ? (@sortdesc ? 'fa fa-angle-up' : 'fa fa-angle-down') : null);
-      @data = (@sortfield != null ? fn:sort(raw($args.bind), makerefs=isref($args.bind), field=@sortfield, desc=@sortdesc, sortexpr=$c.sortexpr) : raw($args.bind));
+      @sorticon = (@sortdesc ? 'fa fa-angle-up' : 'fa fa-angle-down');
+      @data = fn:sort(raw($args.bind), nosort=(@sortfield == null), makerefs=isref($args.bind), field=@sortfield, desc=@sortdesc, sortexpr=$c.sortexpr, slice=$args.slice);
     </define-vars>
     <define-handler name="//@event/sort">
-      log("sort-handler", @sortfield, @value, @col_sortexpr);
       if (@sortfield == @value) {
           @sortdesc = !@sortdesc;
           $c.sortexpr = @col_sortexpr;
@@ -293,12 +292,22 @@
     <table class="table" automerge="@class|style">
       <thead>
         <tr>
-          <th component="h-children" inject:sorticon="* invoke(@sorticon_expr)" bind="@children.bycomp['@hibiki/bulma:col']" inject:mode="header" inject:sort.handler="fire->sort(value=@value, col_sortexpr=@col_sortexpr)"></th>
+          <th component="h-children"
+              inject:sorticon="* (@sortfield == @node.attrs.sortfield) ? @sorticon : noattr"
+              bind="@children.bycomp['@hibiki/bulma:col']"
+              inject:mode="header"
+              inject:sort.handler="fire->sort(value=@value, col_sortexpr=@col_sortexpr)"></th>
         </tr>
       </thead>
       <tbody>
-        <tr foreach="(@v, @idx) in @data" class.is-selected="* $args.selected != null && $args.selected == @idx" click.handler="fire->rowclick(row=@v, rownum=@idx)">
-          <td component="h-children" bind="@children.bycomp['@hibiki/bulma:col']" inject:mode="row" inject:row="*@v" inject:rownum="*@idx">
+        <tr foreach="(@v, @idx) in @data"
+            class.is-selected="* $args.selected != null && $args.selected == @idx"
+            click.handler="fire->rowclick(row=@v, rownum=@idx)">
+          <td component="h-children"
+              bind="@children.bycomp['@hibiki/bulma:col']"
+              inject:mode="row"
+              inject:row="*@v"
+              inject:rownum="*@idx">
           </td>
         </tr>
       </tbody>
