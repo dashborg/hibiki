@@ -31,6 +31,8 @@ type RtContextOpts = {
     rtContext? : string,
 };
 
+type ExprResolveType = "resolve" | "raw" | "natural";
+
 type HActionResult = {
     rtnVal? : HibikiVal,
     execReturn? : boolean,   // return out of handler
@@ -479,7 +481,7 @@ function resolveUnmergedStyleMap(styleMap : Record<string, NodeAttrType>, dataen
     let rtn : StyleMapType = {};
     for (let [styleProp, nodeAttr] of Object.entries(styleMap)) {
         let fullCtxStr = sprintf("Resolving style property '%s' in %s", ctxStr);
-        let [rval, exists] = resolveNodeAttrPair(nodeAttr, dataenv, fullCtxStr);
+        let [rval, exists] = resolveNodeAttrPair(nodeAttr, dataenv, fullCtxStr, "natural");
         if (!exists) {
             continue;
         }
@@ -551,7 +553,7 @@ function valToNumber(data : HibikiVal) : number {
 }
 
 // returns [value, exists]
-function resolveNodeAttrPair(val : NodeAttrType, dataenv : DataEnvironment, rtContextStr : string) : [HibikiVal, boolean] {
+function resolveNodeAttrPair(val : NodeAttrType, dataenv : DataEnvironment, rtContextStr : string, rtype : ExprResolveType) : [HibikiVal, boolean] {
     if (val == null) {
         return [null, false];
     }
@@ -560,7 +562,7 @@ function resolveNodeAttrPair(val : NodeAttrType, dataenv : DataEnvironment, rtCo
     }
     let resolvedVal : HibikiVal = null;
     try {
-        resolvedVal = evalExprAst(val, dataenv, "raw");
+        resolvedVal = evalExprAst(val, dataenv, rtype);
     }
     catch (e) {
         console.log(sprintf("ERROR %s expression\n\"%s\"\n", rtContextStr, val.sourcestr), e.toString());
@@ -607,7 +609,7 @@ function getUnmergedAttributeValPair(node : HibikiNode, attrName : string, datae
     if (node.attrs && node.attrs[attrName] != null) {
         let aval = node.attrs[attrName];
         let ctxStr = sprintf("resolving attribute '%s' in %s", attrName, nodeStr(node));
-        let [rtnVal, exists] = resolveNodeAttrPair(aval, dataenv, ctxStr);
+        let [rtnVal, exists] = resolveNodeAttrPair(aval, dataenv, ctxStr, "raw");
         if (exists) {
             return [rtnVal, true];
         }
@@ -2131,7 +2133,7 @@ function evalPath(path : PathType, dataenv : DataEnvironment, depth? : number) :
     return staticPath;
 }
 
-function evalExprArray(exprArray : HExpr[], dataenv : DataEnvironment, rtype : "resolve" | "natural" | "raw") : HibikiVal[] {
+function evalExprArray(exprArray : HExpr[], dataenv : DataEnvironment, rtype : ExprResolveType) : HibikiVal[] {
     if (exprArray == null || exprArray.length === 0) {
         return [];
     }
@@ -2209,7 +2211,7 @@ function evalExprParams(exprAst : HExpr, dataenv : DataEnvironment) : HibikiPara
 //   "resolve" - always resolve lvalues, resolve SYM_NOATTR to null
 //   "raw"     - no extra resolution
 //   "natural" - resolve "path" exprs lvalues (no extra resolution)
-function evalExprAst(exprAst : HExpr, dataenv : DataEnvironment, rtype : "resolve" | "raw" | "natural") : HibikiVal {
+function evalExprAst(exprAst : HExpr, dataenv : DataEnvironment, rtype : ExprResolveType) : HibikiVal {
     if (rtype === "resolve") {
         let rtn = evalExprAstInternal(exprAst, dataenv, "natural");
         rtn = resolveLValue(rtn);
@@ -2293,6 +2295,13 @@ function evalExprAstInternal(exprAst : HExpr, dataenv : DataEnvironment, rtype :
         let val = evalExprAst(exprAst.exprs[0], dataenv, "raw");
         if (val instanceof LValue) {
             return val.asString();
+        }
+        return null;
+    }
+    else if (exprAst.etype === "deref") {
+        let val = evalExprAst(exprAst.exprs[0], dataenv, "raw");
+        if (val instanceof LValue) {
+            return val.get();
         }
         return null;
     }

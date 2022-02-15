@@ -76,6 +76,7 @@ let lexer = moo.states({
                         KW_REF: "ref",
                         KW_ISREF: "isref",
                         KW_REFINFO: "refinfo",
+                        KW_DEREF: "deref",
                         KW_RAW: "raw",
                         KW_IN: "in",
                         KW_INVOKE: "invoke",
@@ -426,6 +427,7 @@ refExpr ->
     | %KW_ISREF %LPAREN fullExpr %RPAREN {% (data) => ({etype: "isref", exprs: [data[2]]}) %}
     | %KW_REFINFO %LPAREN fullExpr %RPAREN {% (data) => ({etype: "refinfo", exprs: [data[2]]}) %}
     | %KW_RAW %LPAREN fullPathExpr %RPAREN {% (data) => ({etype: "raw", exprs: [data[2]]}) %}
+    | %KW_DEREF %LPAREN fullExpr %RPAREN {% (data) => ({etype: "deref", exprs: [data[2]]}) %}
 
 invokeExpr -> %KW_INVOKE %LPAREN fullExpr (%COMMA innerNamedCallParams):? %RPAREN {% (data) => {
           let rtn = {etype: "invoke", exprs: [data[2]], params: null};
@@ -569,6 +571,7 @@ idOrKeyword ->
     | %KW_THROW  {% id %}
     | %KW_RAW    {% id %}
     | %KW_REF    {% id %}
+    | %KW_DEREF  {% id %}
     | %KW_ISREF  {% id %}
     | %KW_REFINFO     {% id %}
     | %KW_SETRETURN   {% id %}

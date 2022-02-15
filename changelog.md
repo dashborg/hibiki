@@ -10,6 +10,7 @@
 * HibikiParamsObj available in HibikiRequest object
 * HibikiRequest.data is now params stripped of at-args (and positional args)
 * added 'nosort' option to fn:sort()
+* added deref() expression which removes one level of ref()
 * bugfix: more consistent handling of noattr args in jsfuncs (stripped out by HibikiParamsObj)
 
 ## v0.3.0
