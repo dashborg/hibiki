@@ -135,7 +135,7 @@
     </define-vars>
     <div class="dropdown" automerge class.is-active="* @active" active="*@active" hibiki-mark>
       <div class="dropdown-trigger">
-        <button class="button" aria-haspopup="true" aria-controls="dropdown-menu" click.handler="log('menu-click'); @active = !@active">
+        <button class="button" aria-haspopup="true" aria-controls="dropdown-menu" click.handler="@active = !@active">
           <h-children if="@activechildren.size" bind="@activechildren.first" inject:mode="label"></h-children>
           <h-fragment if="!@activechildren.size">
             <span if="$args.label">{{ $args.label }}</span>
@@ -215,11 +215,20 @@
       @end = fn:min(@start + $args.pagesize - 1, $args.totalsize - 1);
       @lastpage = fn:floor(($args.totalsize-1) / $args.pagesize);
     </define-vars>
+    <define-handler name="//@event/update_sliceargs">
+      if (isref($args.sliceargs)) {
+          $args.sliceargs = [@start, @end+1];
+      }
+    </define-handler>
     <define-handler name="//@event/change">
       if (@value >= 0 && @value <= @lastpage) {
           $args.curpage = @value;
+          fire->update_sliceargs();
           fire->change(value=@value);
       }
+    </define-handler>
+    <define-handler name="//@event/mount">
+      fire->update_sliceargs();
     </define-handler>
     <div class="buttons has-addons" automerge>
       <local-button icon="fa fa-angle-double-left" disabled="* @start <= 0" click.handler="fire->change(value=0)">First</local-button>
@@ -271,12 +280,24 @@
     </div>
   </define-component>
 
+  <define-component name="paged-table" componentdata="curpage=fn:int($args.initialpage)">
+    <define-vars>
+      @curpage = raw($args.curpage) ?? ref($c.curpage);
+      @pagesize = $args.pagesize ?? 10;
+    </define-vars>
+    <local-table automerge="@all|-curpage" rowclick.handler="fire->rowclick(row=@row, rownum=@rownum)" slice="*$c.sliceout">
+      <h-children bind="@children"></h-children>
+    </local-table>
+    <local-pager curpage="*raw(@curpage)" sliceargs="*ref($c.sliceout)" pagesize="*@pagesize" totalsize="*fn:len($args.bind)"></local-pager>
+  </define-component>
+
   <define-component name="table">
     <define-vars>
       @sortfield = raw($args.sortfield) ?? ref($c.sortfield);
       @sortdesc = raw($args.sortdesc) ?? ref($c.sortdesc);
       @sorticon = (@sortdesc ? 'fa fa-angle-up' : 'fa fa-angle-down');
       @data = fn:sort(raw($args.bind), nosort=(@sortfield == null), makerefs=isref($args.bind), field=@sortfield, desc=@sortdesc, sortexpr=$c.sortexpr, slice=$args.slice);
+      @selectedkeyexpr = $args.selectedkeyexpr ?? lambda(@rownum);
     </define-vars>
     <define-handler name="//@event/sort">
       if (@sortfield == @value) {
@@ -285,10 +306,20 @@
       }
       else {
           @sortfield = @value;
-          @sortdesc = false;
+          @sortdesc = !!@initialsortdesc;
           $c.sortexpr = @col_sortexpr;
       }
     </define-handler>
+    <define-handler name="//@event/rowclick">
+      if (isref($args.selected)) {
+          $args.selected = invoke(@selectedkeyexpr, row=@row, rownum=@rownum);
+      }
+      if (isref($args.selectedrow)) {
+          $args.selectedrow = raw(@data[@rownum]);
+      }
+      fire->rowclick(10, row=@row, rownum=@rownum, x=5);
+    </define-handler>
+    sortfield={{ @sortfield }} | sortdesc={{ @sortdesc }} | sliceout={{ $args.slice }} | sortexpr={{ $c.sortexpr }} | {{ refinfo($args.bind) }}
     <table class="table" automerge="@class|style">
       <thead>
         <tr>
@@ -296,12 +327,12 @@
               inject:sorticon="* (@sortfield == @node.attrs.sortfield) ? @sorticon : noattr"
               bind="@children.bycomp['@hibiki/bulma:col']"
               inject:mode="header"
-              inject:sort.handler="fire->sort(value=@value, col_sortexpr=@col_sortexpr)"></th>
+              inject:sort.handler="fire->sort(value=@value, col_sortexpr=@col_sortexpr, initialsortdesc=@initialsortdesc)"></th>
         </tr>
       </thead>
       <tbody>
         <tr foreach="(@v, @idx) in @data"
-            class.is-selected="* $args.selected != null && $args.selected == @idx"
+            class.is-selected="* $args.selected != null && $args.selected == invoke(@selectedkeyexpr, row=@v, rownum=@idx)"
             click.handler="fire->rowclick(row=@v, rownum=@idx)">
           <td component="h-children"
               bind="@children.bycomp['@hibiki/bulma:col']"
@@ -317,12 +348,12 @@
   <define-component name="col">
     <html-th if="$args.mode == 'header'" click.handler="fire->headerclick()">
       <h-children if="$args.sortfield == null" text="*$args.label" bind="@children.byslot['header']"></h-children>
-      <a if="$args.sortfield != null" automerge="sortanchor" click.handler="fire->sort(value=$args.sortfield, col_sortexpr=$args.sortexpr)">
+      <a if="$args.sortfield != null" automerge="sortanchor" click.handler="fire->sort(value=$args.sortfield, col_sortexpr=$args.sortexpr, initialsortdesc=$args.initialsortdesc)">
         <h-children text="*$args.label" bind="@children.byslot['header']"></h-children>
         <span if="$args.sorticon != null" class="*$args.sorticon"></span>
       </a>
     </html-th>
-    <html-td if="$args.mode == 'row'" click.handler="fire->click()">
+    <html-td automerge="@style|class" if="$args.mode == 'row'" click.handler="fire->click()">
       <h-children bind="@children.noslot" datacontext="@row=$args.row; @rownum=$args.rownum"></h-children>
     </html-td>
   </define-component>

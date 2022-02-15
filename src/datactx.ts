@@ -788,12 +788,36 @@ class LambdaValue {
 
 abstract class LValue {
     abstract get() : HibikiVal;
-    abstract getEx() : HibikiVal;
-    abstract set(newVal : HibikiVal);
+    abstract set(newVal : HibikiVal) : void;
     abstract subArrayIndex(index : number) : LValue;
     abstract subMapKey(key : string) : LValue;
-    abstract getRtContext() : string;
     abstract asString() : string;
+}
+
+class NullLValue extends LValue {
+    constructor() {
+        super();
+    }
+
+    get() : HibikiVal {
+        return null;
+    }
+
+    set(newVal : HibikiVal) : void {
+        // nothing
+    }
+
+    subMapKey(key : string) : LValue {
+        return new NullLValue();
+    }
+
+    subArrayIndex(index : number) : LValue {
+        return new NullLValue();
+    }
+
+    asString() : string {
+        return "[lvalue:null]";
+    }
 }
 
 class BoundLValue extends LValue {
@@ -809,17 +833,8 @@ class BoundLValue extends LValue {
     }
 
     get() : HibikiVal {
-        // return exValToVal(this.getEx());
-        return this.getEx();
-    }
-    
-    getEx() : HibikiVal {
         let staticPath = evalPath(this.path, this.dataenv);
         return ResolvePath(staticPath, this.dataenv, {rtContext: this.rtContext});
-    }
-
-    getRtContext() : string {
-        return this.rtContext;
     }
 
     set(newVal : HibikiVal) {
@@ -869,15 +884,7 @@ class ReadOnlyLValue extends LValue {
     }
 
     get() : HibikiVal {
-        return exValToVal(this.getEx());
-    }
-
-    getEx() : HibikiVal {
-        return this.wrappedLV.getEx();
-    }
-
-    getRtContext() : string {
-        return this.wrappedLV.getRtContext();
+        return this.wrappedLV.get();
     }
 
     set(newVal : HibikiVal) {
@@ -930,16 +937,7 @@ class ObjectLValue extends LValue {
     }
 
     get() : HibikiVal {
-        return this.getEx();
-        // return exValToVal(this.getEx());
-    }
-
-    getEx() : HibikiVal {
         return quickObjectResolvePath(this.path, this.root.get());
-    }
-
-    getRtContext() : string {
-        return this.rtContext;
     }
 
     set(newVal : HibikiVal) {
@@ -1346,7 +1344,7 @@ function runSetOp(path : PathType, localRoot : HibikiVal, op : string, origSetDa
     let setData = DeepCopy(origSetData);
     if (localRoot instanceof LValue) {
         if (op === "set") {
-            setLValue(localRoot, setData);
+            localRoot.set(setData);
             return localRoot;
         }
         if (readOnly) {
@@ -1401,10 +1399,8 @@ function internalSetPath(dataenv : DataEnvironment, op : string, path : PathType
         }
         let resolvedVal : HibikiVal = null;
         let originalResolvedVal : HibikiVal = null;
-        let rlv : LValue = null;
         if (localRoot instanceof LValue) {
-            rlv = resolveToLValue(localRoot);
-            resolvedVal = rlv.get();
+            resolvedVal = localRoot.get();
             originalResolvedVal = resolvedVal;
         }
         else {
@@ -1427,7 +1423,7 @@ function internalSetPath(dataenv : DataEnvironment, op : string, path : PathType
         arrVal[pp.pathindex] = newVal;
         if (localRoot instanceof LValue) {
             if (arrVal !== originalResolvedVal) {
-                rlv.set(arrVal);
+                localRoot.set(arrVal);
             }
             return localRoot;
         }
@@ -1436,10 +1432,8 @@ function internalSetPath(dataenv : DataEnvironment, op : string, path : PathType
     else if (pp.pathtype === "map") {
         let resolvedVal : HibikiVal = null;
         let originalResolvedVal : HibikiVal = null;
-        let rlv : LValue = null;
         if (localRoot instanceof LValue) {
-            rlv = resolveToLValue(localRoot);
-            resolvedVal = rlv.get();
+            resolvedVal = localRoot.get();
             originalResolvedVal = resolvedVal;
         }
         else {
@@ -1466,7 +1460,7 @@ function internalSetPath(dataenv : DataEnvironment, op : string, path : PathType
         }
         if (localRoot instanceof LValue) {
             if (resolvedVal !== originalResolvedVal) {
-                rlv.set(resolvedVal);
+                localRoot.set(resolvedVal);
             }
             return localRoot;
         }
@@ -2293,11 +2287,11 @@ function evalExprAstInternal(exprAst : HExpr, dataenv : DataEnvironment, rtype :
     }
     else if (exprAst.etype === "isref") {
         let val = evalExprAst(exprAst.exprs[0], dataenv, "raw");
-        return (val instanceof BoundLValue);
+        return (val instanceof LValue);
     }
     else if (exprAst.etype === "refinfo") {
         let val = evalExprAst(exprAst.exprs[0], dataenv, "raw");
-        if (val instanceof BoundLValue) {
+        if (val instanceof LValue) {
             return val.asString();
         }
         return null;
@@ -3152,7 +3146,7 @@ function resolveLValue(val : HibikiVal) : HibikiVal {
     }
     let level = 0;
     while (val instanceof LValue) {
-        val = val.getEx();
+        val = val.get();
         level++;
         if (level > MAX_LVALUE_LEVEL) {
             break;
@@ -3165,7 +3159,7 @@ function resolveToLValue(lv : LValue) : LValue {
     let level = 0;
     let origLv = lv;
     while (true) {
-        let val = lv.getEx();
+        let val = lv.get();
         if (!(val instanceof LValue)) {
             break;
         }
@@ -3176,11 +3170,6 @@ function resolveToLValue(lv : LValue) : LValue {
         }
     }
     return lv;
-}
-
-function setLValue(lv : LValue, setVal : HibikiVal) : void {
-    let rlv = resolveToLValue(lv);
-    rlv.set(setVal);
 }
 
 // returns [val, wasNumber]
