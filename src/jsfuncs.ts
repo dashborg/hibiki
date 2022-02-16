@@ -7,7 +7,7 @@
 import * as mobx from "mobx";
 import type {JSFuncType, HibikiVal, HibikiValObj} from "./types";
 import {sprintf} from "sprintf-js";
-import {isObject, addToArrayDupCheck, removeFromArray} from "./utils";
+import {isObject, addToArrayDupCheck, removeFromArray, valInArray} from "./utils";
 import {v4 as uuidv4} from 'uuid';
 import * as DataCtx from "./datactx";
 import type {DataEnvironment} from "./state";
@@ -123,7 +123,7 @@ function jsSlice(params : DataCtx.HibikiParamsObj) : HibikiVal[] {
     return slicedIndexArr.map((idx) => rawLv.subArrayIndex(idx));
 }
 
-function jsPush(arr : any[], ...rest : any[]) {
+function jsPush(arr : HibikiVal[], ...rest : HibikiVal[]) {
     if (arr == null || !mobx.isArrayLike(arr)) {
         return [...rest];
     }
@@ -131,7 +131,7 @@ function jsPush(arr : any[], ...rest : any[]) {
     return rtn;
 }
 
-function jsPop(arr : any[], ...rest : any[]) {
+function jsPop(arr : HibikiVal[], ...rest : HibikiVal[]) {
     if (arr == null) {
         return [];
     }
@@ -143,7 +143,7 @@ function jsPop(arr : any[], ...rest : any[]) {
     return rtn;
 }
 
-function jsSetAdd(arr : any[], ...rest : any[]) {
+function jsSetAdd(arr : HibikiVal[], ...rest : HibikiVal[]) {
     if (arr == null || !mobx.isArrayLike(arr)) {
         arr = [];
     }
@@ -154,7 +154,7 @@ function jsSetAdd(arr : any[], ...rest : any[]) {
     return rtn;
 }
 
-function jsSetRemove(arr : any[], ...rest : any[]) {
+function jsSetRemove(arr : HibikiVal[], ...rest : HibikiVal[]) {
     if (arr == null || !mobx.isArrayLike(arr)) {
         return [];
     }
@@ -163,18 +163,6 @@ function jsSetRemove(arr : any[], ...rest : any[]) {
         removeFromArray(rtn, rest[i]);
     }
     return rtn;
-}
-
-function jsSetHas(arr : any[], item : any) : boolean {
-    if (arr == null || !mobx.isArrayLike(arr)) {
-        return false;
-    }
-    for (let i=0; i<arr.length; i++) {
-        if (arr[i] == item) {
-            return true;
-        }
-    }
-    return false;
 }
 
 function jsInt(v : HibikiVal) : number {
@@ -236,7 +224,7 @@ function jsMerge(...vals : any[]) : any {
     return rtn;
 }
 
-function jsEval(jsexpr : string) : any {
+function jsEval(jsexpr : string) : HibikiVal {
     if (jsexpr == null || typeof(jsexpr) !== "string") {
         return null;
     }
@@ -244,18 +232,18 @@ function jsEval(jsexpr : string) : any {
     if (typeof(evalVal) === "function") {
         evalVal = evalVal();
     }
-    return evalVal;
+    return DataCtx.CleanVal(evalVal);
 }
 
-function jsJs(fnName : string, ...rest : any[]) : any {
+function jsJs(fnName : string, ...rest : any[]) : HibikiVal {
     if (typeof(fnName) !== "string") {
         throw new Error("fn:js first argument must be a string (the function to call)");
     }
     let val = window[fnName];
     if (typeof(val) === "function") {
-        return val(...rest);
+        return DataCtx.DeepCopy(val(...rest));
     }
-    return val;
+    return DataCtx.CleanVal(val);
 }
 
 function jsSubstr(v : HibikiVal, ...rest : any[]) : string {
@@ -482,6 +470,45 @@ function jsSort(params : DataCtx.HibikiParamsObj, dataenv : DataEnvironment) : H
     return rtn;
 }
 
+function jsSetUpdate(params : DataCtx.HibikiParamsObj) : HibikiVal {
+    params.deepCopy({resolve: true});
+    let setVal = params.getArg(null, 0);
+    let val = params.getArg(null, 1);
+    let onOff = DataCtx.valToBool(params.getArg(null, 2));
+    let isMulti = true;
+    if (params.hasArg("@multi")) {
+        isMulti = DataCtx.valToBool(params.getArg("@multi"));
+    }
+    if (!isMulti) {
+        return (onOff ? val : null);
+    }
+    let [arrVal, isArr] = DataCtx.asArray(setVal, true);
+    if (!isArr || arrVal == null) {
+        arrVal = [];
+    }
+    if (onOff) {
+        arrVal = addToArrayDupCheck(arrVal, val);
+    }
+    else {
+        arrVal = removeFromArray(arrVal, val);
+    }
+    return arrVal;
+}
+
+function jsSetHas(params : DataCtx.HibikiParamsObj) : boolean {
+    params.deepCopy({resolve: true});
+    let setVal = params.getArg(null, 0);
+    let val = params.getArg(null, 1);
+    let isMulti = true;
+    if (params.hasArg("@multi")) {
+        isMulti = DataCtx.valToBool(params.getArg("@multi"));
+    }
+    if (!isMulti) {
+        return setVal == val;
+    }
+    return valInArray(setVal, val);
+}
+
 function regParamFn(name : string, fn : (params : DataCtx.HibikiParamsObj, dataenv : DataEnvironment) => HibikiVal, opts? : {retainNoAttr? : boolean, insecure? : boolean}) {
     opts = opts ?? {};
     let config : JSFuncType = {
@@ -506,32 +533,46 @@ function reg(name : string, fn : (...args : HibikiVal[]) => HibikiVal, native : 
     DefaultJSFuncs[name] = config;
 }
 
-// native-funcs
-reg("len", jsLen, true);
-reg("indexof", jsIndexOf, false);
-reg("min", jsMin, false);
-reg("max", jsMax, false);
-reg("floor", jsFloor, false);
-reg("ceil", jsCeil, false);
-reg("splice", jsSplice, true);
-regParamFn("slice", jsSlice);
-reg("push", jsPush, true);
-reg("pop", jsPop, true);
-reg("setadd", jsSetAdd, true);
-reg("setremove", jsSetRemove, true);
-reg("sethas", jsSetHas, true);
+// misc functions
+reg("len", jsLen, true);  // works with strings or arrays
+reg("typeof", jsTypeOf, true);
+reg("jsonparse", jsJsonParse, true);
+reg("json", jsJson, true);
+reg("now", jsNow, true);
+reg("ts",  jsNow, true);
+reg("merge", jsMerge, true);
+reg("uuid", jsUuid, true);
+reg("deepequal", jsDeepEqual, true);
+reg("deepcopy", jsDeepCopy, true);
+reg("jseval", jsEval, true, {insecure: true});
+reg("js", jsJs, false, {insecure: true});
+
+// type conversion functions
 reg("int", jsInt, true);
 reg("float", jsFloat, true);
 reg("str", jsStr, true);
 reg("bool", jsBool, true);
-reg("jsonparse", jsJsonParse, true);
-reg("json", jsJson, true);
-reg("split", jsSplit, true);
-reg("now", jsNow, true);
-reg("ts",  jsNow, true);
-reg("merge", jsMerge, true);
-reg("jseval", jsEval, true, {insecure: true});
+
+// blob functions
+reg("blobastext", jsBlobAsText, true);
+reg("blobasbase64", jsBlobAsBase64, true);
+reg("blobmimetype", jsBlobMimeType, true);
+reg("bloblen", jsBlobLen, true);
+reg("blobname", jsBlobName, true);
+
+// compare and sort
+regParamFn("compare", jsCompare);
+regParamFn("sort", jsSort);
+
+// array functions
+reg("splice", jsSplice, true);
+regParamFn("slice", jsSlice);
+reg("push", jsPush, true);
+reg("pop", jsPop, true);
+
+// string functions
 reg("substr", jsSubstr, true);
+reg("indexof", jsIndexOf, false);
 reg("uppercase", jsUpperCase, true);
 reg("lowercase", jsLowerCase, true);
 reg("sprintf", jsSprintf, true);
@@ -539,17 +580,18 @@ reg("trim", jsTrim, true);
 reg("startswith", jsStartsWith, true);
 reg("endswith", jsEndsWith, true);
 reg("match", jsMatch, true);
-reg("blobastext", jsBlobAsText, true);
-reg("blobasbase64", jsBlobAsBase64, true);
-reg("blobmimetype", jsBlobMimeType, true);
-reg("bloblen", jsBlobLen, true);
-reg("blobname", jsBlobName, true);
-reg("uuid", jsUuid, true);
-reg("typeof", jsTypeOf, true);
-reg("deepequal", jsDeepEqual, true);
-reg("deepcopy", jsDeepCopy, true);
-regParamFn("compare", jsCompare);
-regParamFn("sort", jsSort);
-reg("js", jsJs, false, {insecure: true});
+reg("split", jsSplit, true);
+
+// math functions
+reg("min", jsMin, false);
+reg("max", jsMax, false);
+reg("floor", jsFloor, false);
+reg("ceil", jsCeil, false);
+
+// string-set functions
+reg("setadd", jsSetAdd, true);
+reg("setremove", jsSetRemove, true);
+regParamFn("setupdate", jsSetUpdate);
+regParamFn("sethas", jsSetHas);
 
 export {DefaultJSFuncs};

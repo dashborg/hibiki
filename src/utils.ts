@@ -26,7 +26,7 @@ function spliceCopy(arr : any[], ...rest : any[]) {
     return newArr;
 }
 
-function addToArrayDupCheck(arr : HibikiVal, val : any) : HibikiVal[] {
+function addToArrayDupCheck(arr : HibikiVal, val : HibikiVal) : HibikiVal[] {
     if (arr == null || !mobx.isArrayLike(arr)) {
         arr = [];
     }
@@ -39,9 +39,9 @@ function addToArrayDupCheck(arr : HibikiVal, val : any) : HibikiVal[] {
     return arr;
 }
 
-function removeFromArray(arr : HibikiVal, val : any) : HibikiVal {
+function removeFromArray(arr : HibikiVal, val : HibikiVal) : HibikiVal[] {
     if (arr == null || !mobx.isArrayLike(arr)) {
-        return arr;
+        return [];
     }
     for (let i=0; i<arr.length; i++) {
         if (arr[i] == val) {
@@ -52,7 +52,7 @@ function removeFromArray(arr : HibikiVal, val : any) : HibikiVal {
     return arr;
 }
 
-function valInArray(arr : HibikiVal, val : any) : boolean {
+function valInArray(arr : HibikiVal, val : HibikiVal) : boolean {
     if (arr == null || !mobx.isArrayLike(arr)) {
         return false;
     }
