@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<script src="/hibiki-test.js"></script>
+<div class="container m-4">
+  <template hibiki>
+    <define-handler name="//@event/init">
+      $.v1 = {x: 55};
+      $.v2 = {z: 100};
+      $.ref1 = ref($.v1);
+      $.ref2 = ref($.v2);
+      $.refref = ref($.ref1);
+    </define-handler>
+    <h1 class="title">Test References</h1>
+    <div class="box">
+      <h4 class="title is-4">Display</h4>
+      <div>v1 = {{ raw($.v1) | format("json-noresolve") }}</div>
+      <div>v2 = {{ raw($.v2) | format("json-noresolve") }}</div>
+      <div>ref1 = {{ raw($.ref1) | format("json-noresolve") }}</div>
+      <div>ref2 = {{ raw($.ref2) | format("json-noresolve") }}</div>
+      <div>refref = {{ raw($.refref) | format("json-noresolve") }}</div>
+    </div>
+    <div class="box">
+      <h4 class="title is-4">Update</h4>
+      <button click.handler="$.ref1 = {y:200}" class="button">$.ref1 = {y:200}</button>
+      <button click.handler="$.ref1.x = 88" class="button">$.ref1.x = 88</button>
+      <button click.handler="$.refref = 20" class="button">$.refref = 20</button>
+      <br>
+      <button click.handler="$.refref = raw($.ref2)" class="button">$.refref = raw($.ref2)</button>
+      <button click.handler="@v = deref($.refref); @v.a = 5;" class="button">@v = deref($.refref); @v.a = 5;</button>
+    </div>
+  </template>
+</div>

@@ -31,6 +31,11 @@ type RtContextOpts = {
     rtContext? : string,
 };
 
+type SetPathOpts = {
+    rtContext? : string,
+    setop? : string,
+}
+
 type ExprResolveType = "resolve" | "raw" | "natural";
 
 type HActionResult = {
@@ -841,7 +846,7 @@ class BoundLValue extends LValue {
 
     set(newVal : HibikiVal) {
         let staticPath = evalPath(this.path, this.dataenv);
-        SetPath(staticPath, this.dataenv, newVal, {rtContext: this.rtContext});
+        SetPath(staticPath, this.dataenv, newVal, {rtContext: this.rtContext, setop: "setraw"});
     }
 
     subArrayIndex(index : number) : LValue {
@@ -1474,10 +1479,9 @@ function internalSetPath(dataenv : DataEnvironment, op : string, path : PathType
     return null;
 }
 
-// function SetPath(path : PathUnionType, localRoot : any, setData : any, globalRoot? : any) : any {
-function SetPath(path : PathUnionType, dataenv : DataEnvironment, setData : HibikiVal, opts? : RtContextOpts) {
+function SetPath(path : PathUnionType, dataenv : DataEnvironment, setData : HibikiVal, opts? : SetPathOpts) {
     try {
-        SetPathThrow(path, dataenv, setData);
+        SetPathThrow(path, dataenv, setData, opts);
     }
     catch (e) {
         let context = "";
@@ -1488,9 +1492,10 @@ function SetPath(path : PathUnionType, dataenv : DataEnvironment, setData : Hibi
     }
 }
 
-function SetPathThrow(pathUnion : PathUnionType, dataenv : DataEnvironment, setData : HibikiVal) {
+function SetPathThrow(pathUnion : PathUnionType, dataenv : DataEnvironment, setData : HibikiVal, opts? : SetPathOpts) {
+    opts = opts ?? {};
     let path : PathType = null;
-    let op : string = "";
+    let op : string = null;
     if (typeof(pathUnion) === "string") {
         let spr = ParseSetPath(pathUnion);
         if (spr == null) {
@@ -1501,7 +1506,7 @@ function SetPathThrow(pathUnion : PathUnionType, dataenv : DataEnvironment, setD
     }
     else {
         path = pathUnion;
-        op = "set";
+        op = opts.setop ?? "set";
     }
     if (path == null) {
         return;
@@ -3250,7 +3255,7 @@ function compareVals(v1 : HibikiVal, v2 : HibikiVal, opts? : CompareOpts) : numb
     return sv1.localeCompare(sv2, locale, {numeric: numeric, sensitivity: sensitivity});
 }
 
-export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, SetPathThrow, StringPath, JsonStringify, EvalSimpleExpr, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, DeepCopy, DeepCopyTypeSafe, CheckCycle, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, makeIteratorFromExpr, rawAttrStr, getUnmergedAttributeStr, getUnmergedAttributeValPair, SYM_NOATTR, HActionBlock, valToString, valToBool, compileActionStr, FireEvent, makeErrorObj, OpaqueValue, ChildrenVar, Watcher, LambdaValue, blobPrintStr, valToNumber, hibikiTypeOf, JsonReplacerFn, valToAttrStr, resolveLValue, resolveUnmergedCnArray, isUnmerged, resolveUnmergedStyleMap, asStyleMap, asStyleMapFromPair, EvalContextVarsThrow, compareVals, asPrimitive, asArray, asPlainObject, HibikiParamsObj, stripNoAttrShallow};
+export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, StringPath, JsonStringify, EvalSimpleExpr, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, DeepCopy, DeepCopyTypeSafe, CheckCycle, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, makeIteratorFromExpr, rawAttrStr, getUnmergedAttributeStr, getUnmergedAttributeValPair, SYM_NOATTR, HActionBlock, valToString, valToBool, compileActionStr, FireEvent, makeErrorObj, OpaqueValue, ChildrenVar, Watcher, LambdaValue, blobPrintStr, valToNumber, hibikiTypeOf, JsonReplacerFn, valToAttrStr, resolveLValue, resolveUnmergedCnArray, isUnmerged, resolveUnmergedStyleMap, asStyleMap, asStyleMapFromPair, EvalContextVarsThrow, compareVals, asPrimitive, asArray, asPlainObject, HibikiParamsObj, stripNoAttrShallow};
 
 export type {PathType, HAction, HExpr, HIteratorExpr, ContextVarType, CompareOpts};
 
