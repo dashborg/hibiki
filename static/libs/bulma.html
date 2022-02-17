@@ -1,19 +1,23 @@
 <define-library name="@hibiki/bulma" hibikiversion="v0.3.1">
-  <hibiki-content tag="hibiki/bulma"></hibiki-content>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.2/css/bulma.min.css"></link>
   
   <define-component name="button">
-    <div class="control" unwrap="!$args.control" automerge="control">
-      <button component="*$args.buttoncomponent" class="button" automerge click.handler="fire->click()">
-        <span if="$args.icon" class="icon" automerge="icon"><i class="*$args.icon"></i></span>
-        <h-fragment if="($args.icon || $args.righticon) && @children.size">
-          <span><h-children bind="@children"></h-children></span>
-        </h-fragment>
-        <h-fragment if="!($args.icon || $args.righticon)">
-          <h-children bind="@children"></h-children>
-        </h-fragment>
-        <span if="$args.righticon" class="icon" automerge="icon"><i class="*$args.righticon"></i></span>
-      </button>
+    <div class="field" unwrap="!$args.field" automerge="field">
+      <div class="control" unwrap="!$args.field && !$args.control" automerge="control">
+        <button component="*$args.buttoncomponent" class="button" automerge click.handler="fire->click()">
+          <span if="$args.icon" class="icon" automerge="icon"><i class="*$args.icon"></i></span>
+          <h-fragment if="($args.icon || $args.righticon) && @children.size">
+            <span><h-children bind="@children"></h-children></span>
+          </h-fragment>
+          <h-fragment if="!($args.icon || $args.righticon)">
+            <h-children bind="@children.noslot"></h-children>
+          </h-fragment>
+          <span if="$args.righticon" class="icon" automerge="icon"><i class="*$args.righticon"></i></span>
+        </button>
+      </div>
+      <p class="help" automerge="help" if="$args.field && ($args.helptext || @children.byslot['help'].size)">
+        <h-children text="*$args.helptext" bind="@children.byslot['help']"></h-children>
+      </p>
     </div>
   </define-component>
 
@@ -161,6 +165,7 @@
     <span if="$args.mode == 'label'">
       <h-children bind="@children"></h-children>
     </span>
+    <html-option if="$args.mode == null"><h-children bind="@children"></h-children></html-option>
   </define-component>
 
   <define-component name="menu">
@@ -297,7 +302,6 @@
       @sortdesc = raw($args.sortdesc) ?? ref($c.sortdesc);
       @sorticon = (@sortdesc ? 'fa fa-angle-up' : 'fa fa-angle-down');
       @data = fn:sort(raw($args.bind), nosort=(@sortfield == null), makerefs=isref($args.bind), field=@sortfield, desc=@sortdesc, sortexpr=$c.sortexpr, slice=$args.slice);
-      @selectedkeyexpr = $args.selectedkeyexpr ?? lambda(@rownum);
     </define-vars>
     <define-handler name="//@event/sort">
       if (@sortfield == @value) {
@@ -310,34 +314,24 @@
           $c.sortexpr = @col_sortexpr;
       }
     </define-handler>
-    <define-handler name="//@event/rowclick">
-      if (isref($args.selected)) {
-          $args.selected = invoke(@selectedkeyexpr, row=@row, rownum=@rownum);
-      }
-      if (isref($args.selectedrow)) {
-          $args.selectedrow = raw(@data[@rownum]);
-      }
-      fire->rowclick(10, row=@row, rownum=@rownum, x=5);
-    </define-handler>
     sortfield={{ @sortfield }} | sortdesc={{ @sortdesc }} | sliceout={{ $args.slice }} | sortexpr={{ $c.sortexpr }} | {{ refinfo($args.bind) }}
     <table class="table" automerge="@class|style">
       <thead>
         <tr>
           <th component="h-children"
               inject:sorticon="* (@sortfield == @node.attrs.sortfield) ? @sorticon : noattr"
-              bind="@children.bycomp['@hibiki/bulma:col']"
+              bind="@children.bycomp['@hibiki/bulma:tablecol']"
               inject:mode="header"
               inject:sort.handler="fire->sort(value=@value, col_sortexpr=@col_sortexpr, initialsortdesc=@initialsortdesc)"></th>
         </tr>
       </thead>
       <tbody>
         <tr foreach="(@v, @idx) in @data"
-            class.is-selected="* $args.selected != null && $args.selected == invoke(@selectedkeyexpr, row=@v, rownum=@idx)"
             click.handler="fire->rowclick(row=@v, rownum=@idx)">
           <td component="h-children"
-              bind="@children.bycomp['@hibiki/bulma:col']"
+              bind="@children.bycomp['@hibiki/bulma:tablecol']"
               inject:mode="row"
-              inject:row="*@v"
+              inject:row="*raw(@v)"
               inject:rownum="*@idx">
           </td>
         </tr>
@@ -345,7 +339,7 @@
     </table>
   </define-component>
 
-  <define-component name="col">
+  <define-component name="tablecol">
     <html-th if="$args.mode == 'header'" click.handler="fire->headerclick()">
       <h-children if="$args.sortfield == null" text="*$args.label" bind="@children.byslot['header']"></h-children>
       <a if="$args.sortfield != null" automerge="sortanchor" click.handler="fire->sort(value=$args.sortfield, col_sortexpr=$args.sortexpr, initialsortdesc=$args.initialsortdesc)">
@@ -354,8 +348,114 @@
       </a>
     </html-th>
     <html-td automerge="@style|class" if="$args.mode == 'row'" click.handler="fire->click()">
-      <h-children bind="@children.noslot" datacontext="@row=$args.row; @rownum=$args.rownum"></h-children>
+      <h-children bind="@children.noslot" datacontext="@row=raw($args.row); @rownum=$args.rownum"></h-children>
     </html-td>
   </define-component>
+
+  <define-component name="panel">
+    <div class="panel" automerge>
+      <p if="$args.label || @children.byslot['heading']" class="panel-heading" automerge="heading">
+        <h-children text="*$args.label" bind="@children.byslot['heading']"></h-children>
+      </p>
+      <h-children bind="@children.noslot"></h-children>
+    </div>
+  </define-component>
+
+  <define-component name="input">
+    <div class="field" unwrap="!$args.field" automerge="field">
+      <label if="$args.label || @children.byslot['label'].size" class="label" automerge="label">
+        <h-children text="*$args.label" bind="@children.byslot['label']"></h-children>
+      </label>
+      <div class="control" unwrap="!$args.field && !$args.control" class.has-icons-left="*$args.lefticon" class.has-icons-right="*$args.righticon" automerge="control">
+        <input automerge="@all|-field|-control|-label|-lefticon|-righticon|-help|!type" class="input" type="text">
+        <span if="$args.lefticon" class="icon is-small is-left" automerge="lefticon">
+          <i class="*$args.lefticon"></i>
+        </span>
+        <span if="$args.righticon" class="icon is-small is-right" automerge="righticon">
+          <i class="*$args.righticon"></i>
+        </span>
+      </div>
+      <p class="help" automerge="help" if="$args.field && ($args.helptext || @children.byslot['help'].size)">
+        <h-children text="*$args.helptext" bind="@children.byslot['help']"></h-children>
+      </p>
+    </div>
+  </define-component>
+
+  <define-component name="textarea">
+    <div class="field" unwrap="!$args.field" automerge="field">
+      <label if="$args.label || @children.byslot['label'].size" class="label" automerge="label">
+        <h-children text="*$args.label" bind="@children.byslot['label']"></h-children>
+      </label>
+      <div class="control" unwrap="!$args.field && !$args.control" automerge="control">
+        <textarea automerge="@all|-field|-control|-label" class="textarea"></textarea>
+      </div>
+      <p class="help" automerge="help" if="$args.field && ($args.helptext || @children.byslot['help'].size)">
+        <h-children text="*$args.helptext" bind="@children.byslot['help']"></h-children>
+      </p>
+    </div>
+  </define-component>
+
+  <define-component name="checkbox">
+    <div class="field" unwrap="!$args.field" automerge="field">
+      <div class="control" unwrap="!$args.field && !$args.control" automerge="control">
+        <label class="checkbox">
+          <input type="checkbox" automerge="@all|-field|-control|-label" class="checkbox">
+          <h-children text="*$args.label" bind="@children.byslot['label']"></h-children>
+        </label>
+      </div>
+      <p class="help" automerge="help" if="$args.field && ($args.helptext || @children.byslot['help'].size)">
+        <h-children text="*$args.helptext" bind="@children.byslot['help']"></h-children>
+      </p>
+    </div>
+  </define-component>
+
+  <define-component name="radio">
+    <div class="field" unwrap="!$args.field" automerge="field">
+      <div class="control" unwrap="!$args.field && !$args.control" automerge="control">
+        <label class="radio">
+          <input type="radio" automerge="@all|-field|-control|-label" class="checkbox">
+          <h-children text="*$args.label" bind="@children.byslot['label']"></h-children>
+        </label>
+      </div>
+      <p class="help" automerge="help" if="$args.field && ($args.helptext || @children.byslot['help'].size)">
+        <h-children text="*$args.helptext" bind="@children.byslot['help']"></h-children>
+      </p>
+    </div>
+  </define-component>
+
+  <define-component name="select">
+    <div class="field" unwrap="!$args.field" automerge="field">
+      <label if="$args.label || @children.byslot['label'].size" class="label" automerge="label">
+        <h-children text="*$args.label" bind="@children.byslot['label']"></h-children>
+      </label>
+      <div class="control" unwrap="!$args.field && !$args.control" automerge="control" class.has-icons-left="*$args.lefticon">
+        <div class="select" automerge="selectdiv">
+          <html-select automerge="@all|-lefticon|-field|-control">
+            <h-children bind="@children.noslot"></h-children>
+          </html-select>
+        </div>
+        <span if="$args.lefticon" class="icon is-small is-left" automerge="lefticon">
+          <i class="*$args.lefticon"></i>
+        </span>
+      </div>
+      <p class="help" automerge="help" if="$args.field && ($args.helptext || @children.byslot['help'].size)">
+        <h-children text="*$args.helptext" bind="@children.byslot['help']"></h-children>
+      </p>
+    </div>
+  </define-component>
+
+  <define-component name="hfield">
+    <div class="field is-horizontal" automerge>
+      <div if="!$args.nolabel" class="field-label" automerge="fieldlabel">
+        <label class="label" automerge="label">
+          <h-children text="*$args.label" bind="@children.byslot['label']"></h-children>
+        </label>
+      </div>
+      <div class="field-body" automerge="body">
+        <h-children bind="@children.noslot"></h-children>
+      </div>
+    </div>
+  </define-component>
+  
 
 </define-library>
