@@ -12,6 +12,7 @@
 * added 'nosort' option to fn:sort()
 * added deref() expression which removes one level of ref()
 * bugfix: more consistent handling of noattr args in jsfuncs (stripped out by HibikiParamsObj)
+* bugfix: rendering of text inside of html option tag
 
 ## v0.3.0
 

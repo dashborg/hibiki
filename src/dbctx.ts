@@ -397,6 +397,16 @@ class DBCtx {
         return this.node.tag === "#text" && (this.node.text == null || this.node.text.trim() === "");
     }
 
+    evalAsText() : string {
+        if (this.node.tag === "#text") {
+            return this.node.text;
+        }
+        if (this.node.tag === "h-text") {
+            return NodeUtils.renderTextData(this, true);
+        }
+        return nodeStr(node);
+    }
+
     resolvePath(path : string, opts? : {rtContext? : string}) : HibikiVal {
         opts = opts ?? {};
         let rtContext = opts.rtContext ?? "DBCtx.resolvePath";

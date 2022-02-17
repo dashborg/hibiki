@@ -68,8 +68,10 @@ function evalOptionChildren(node : HibikiNode, dataenv : DataEnvironment) : stri
         return null;
     }
     let textRtn = null;
-    for (let i=0; i<node.list.length; i++) {
-        let text = staticEvalTextNode(node.list[i], dataenv);
+    let ctxList = bindNodeList(node.list, dataenv, false);
+    for (let i=0; i<ctxList.length; i++) {
+        let ctx = ctxList[i];
+        let text = ctx.evalAsText();
         if (text != null) {
             textRtn = (textRtn ?? "") + text;
         }
@@ -78,7 +80,7 @@ function evalOptionChildren(node : HibikiNode, dataenv : DataEnvironment) : stri
 }
 
 function ctxRenderHtmlChildren(ctx : DBCtx, htmlTag? : string) : React.ReactNode[] {
-    if (ctx.node.tag == "option") {
+    if (ctx.getHtmlTagName() === "option") {
         return [evalOptionChildren(ctx.node, ctx.dataenv)];
     }
     let rtn = baseRenderHtmlChildren(ctx.node.list, ctx.dataenv, false, htmlTag);
@@ -100,24 +102,6 @@ class NodeList extends React.Component<{list : HibikiNode[], ctx : DBCtx, isRoot
         }
         return <React.Fragment>{rtn}</React.Fragment>;
     }
-}
-
-function staticEvalTextNode(node : HibikiNode, dataenv : DataEnvironment) : string {
-    let ctx = makeCustomDBCtx(node, dataenv, null);
-    let tagName = ctx.node.tag;
-    if (tagName == "#text") {
-        return node.text;
-    }
-    if (tagName != "h-text") {
-        return nodeStr(node);
-    }
-    let [ifVal, exists] = ctx.resolveConditionAttr("if");
-    if (exists && !ifVal) {
-        return null;
-    }
-    // TODO foreach
-    let rtn = NodeUtils.renderTextData(ctx, true);
-    return rtn;
 }
 
 const NO_WHITESPACE_TAGS = {
