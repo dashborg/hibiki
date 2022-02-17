@@ -169,7 +169,49 @@
   </define-component>
 
   <define-component name="menu">
-    
+    <define-vars>
+      @selected = raw($args.selected) ?? ref(null);
+    </define-vars>
+    <define-handler name="//@event/click">
+      if (@value != null) {
+          @selected = @value;
+      }
+      fire->click(@value);
+    </define-handler>
+    <div class="menu" automerge>
+      <h-children bind="@children" inject:selected="*@selected" inject:click.handler="fire->click(@value)"></h-children>
+    </div>
+  </define-component>
+
+  <define-component name="menulabel">
+    <p class="menu-label" automerge>
+      <h-children text="*$args.label" bind="@children" click.handler="fire->click()"></h-children>
+    </p>
+  </define-component>
+
+  <define-component name="menulist">
+    <html-ul class="menu-list" automerge>
+      <h-children bind="@children" inject:selected="*$args.selected" inject:click.handler="fire->click(@value)"></h-children>
+    </html-ul>
+  </define-component>
+
+  <define-component name="menusublist">
+    <html-li automerge>
+      <a class.is-active="*$args.active || ($args.value != null && $args.selected == $args.value)" click.handler="fire->click($args.value)" automerge="a">
+        <h-children text="*$args.label" bind="@children.byslot['label']"></h-children>
+      </a>
+      <ul if="@children.noslot.size" automerge="ul">
+        <h-children bind="@children.noslot" inject:selected="*$args.selected" inject:click.handler="fire->click(@value);"></h-children>
+      </ul>
+    </html-li>
+  </define-component>
+
+  <define-component name="menuitem">
+    <html-li>
+      <a class.is-active="*$args.active || ($args.value != null && $args.selected == $args.value)" click.handler="fire->click($args.value)" automerge="a">
+        <h-children text="*$args.label" bind="@children"></h-children>
+      </a>
+    </html-li>
   </define-component>
 
   <define-component name="message" componentdata="show=true;">
@@ -441,6 +483,32 @@
       <p class="help" automerge="help" if="$args.field && ($args.helptext || @children.byslot['help'].size)">
         <h-children text="*$args.helptext" bind="@children.byslot['help']"></h-children>
       </p>
+    </div>
+  </define-component>
+
+  <define-component name="file">
+    <div class="field" unwrap="!$args.field" automerge="field">
+      <div class="control" unwrap="!$args.field && !$args.control" automerge="control">
+        <div class="file" automerge="file" class.has-name="$args.filename != null || @children.byslot['filename'].size">
+          <label class="file-label" automerge="label">
+            <input class="file-input" type="file" automerge="@all|-autoname">
+            <span class="file-cta" automerge="cta">
+              <span if="$args.icon" class="file-icon" automerge="icon">
+                <i class="*$args.icon"></i>
+              </span>
+              <span if="$args.label || @children.byslot['label'].size" class="file-label" automerge="filelabel">
+                <h-children text="*$args.label" bind="@children.byslot['label']"></h-children>
+              </span>
+            </span>
+            <span if="$args.filename != null || @children.byslot['filename'].size" class="file-name">
+              <h-children text="*$args.filename" bind="@children.byslot['filename']"></h-children>
+            </span>
+            <span if="$args.autoname" class="file-name">
+              {{ ($args.value == null ? $args.filenameplaceholder : fn:blobname($args.value)) }}
+            </span>
+          </label>
+        </div>
+      </div>
     </div>
   </define-component>
 
