@@ -632,9 +632,11 @@ class DBCtx {
 
     @boundMethod handleOnSubmit(e : any) : boolean {
         if (e != null) {
-            let actionAttr = this.resolveAttrStr("action");
-            if (actionAttr == null || actionAttr === "#") {
-                e.preventDefault();
+            if (this.getHtmlTagName() === "form") {
+                let actionAttr = this.resolveAttrStr("action");
+                if (actionAttr == null || actionAttr === "#") {
+                    e.preventDefault();
+                }
             }
         }
         let formData = new FormData(e.target);
@@ -647,9 +649,11 @@ class DBCtx {
 
     @boundMethod handleOnClick(e : any) : boolean {
         if (e != null) {
-            let hrefAttr = this.resolveAttrStr("href");
-            if (hrefAttr == null || hrefAttr === "#") {
-                e.preventDefault();
+            if (this.getHtmlTagName === "a") {
+                let hrefAttr = this.resolveAttrStr("href");
+                if (hrefAttr == null || hrefAttr === "#") {
+                    e.preventDefault();
+                }
             }
         }
         this.handleEvent("click");

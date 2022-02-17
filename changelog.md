@@ -13,6 +13,7 @@
 * added deref() expression which removes one level of ref()
 * bugfix: more consistent handling of noattr args in jsfuncs (stripped out by HibikiParamsObj)
 * bugfix: rendering of text inside of html option tag
+* bugfix: don't call preventDefault on bubbled click events (allows anchor tags to work as expected even if a click.handler is defined)
 
 ## v0.3.0
 
