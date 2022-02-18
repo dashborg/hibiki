@@ -630,12 +630,12 @@ class ComponentLibrary {
         for (let i=0; i<scriptTags.length; i++) {
             let stag = scriptTags[i];
             let attrs = NodeUtils.getRawAttrs(stag);
-            if (attrs.type != null && attrs.type !== "text/javascript") {
+            if (attrs.type != null && attrs.type !== "text/javascript" && attrs.type !== "module") {
                 console.log(sprintf("WARNING library %s not processing script node with type=%s", libPrintStr, attrs.type));
                 continue;
             }
             if (attrs.src == null) {
-                let p = this.state.queueScriptText(textContent(stag), !attrs.async);
+                let p = this.state.queueScriptText(textContent(stag), attrs.type, !attrs.async);
                 parr.push(p);
                 continue;
             }
@@ -643,7 +643,7 @@ class ComponentLibrary {
             if (attrs.relative) {
                 scriptSrc = new URL(scriptSrc, srcUrl).toString();
             }
-            let p = this.state.queueScriptSrc(scriptSrc, true);
+            let p = this.state.queueScriptSrc(scriptSrc, attrs.type, true);
             parr.push(p);
             srcs.push("[script]" + scriptSrc);
         }
@@ -1140,7 +1140,7 @@ class HibikiState {
             return null;
         }
         for (let h of htmlobj.list) {
-            if ((h.tag === "script" || h.tag === "h-script") && h.attrs != null && h.attrs["name"] === scriptName) {
+            if (h.tag === "script" && h.attrs != null && h.attrs["name"] === scriptName) {
                 return h;
             }
         }
@@ -1249,7 +1249,7 @@ class HibikiState {
         }
     }
 
-    queueScriptSrc(scriptSrc : string, sync : boolean) : Promise<boolean> {
+    queueScriptSrc(scriptSrc : string, scriptType : string, sync : boolean) : Promise<boolean> {
         // console.log("queue script src", scriptSrc);
         let srcMd5 = md5(scriptSrc);
         if (this.ResourceCache[srcMd5]) {
@@ -1259,6 +1259,9 @@ class HibikiState {
         let scriptElem = document.createElement("script");
         if (sync) {
             scriptElem.async = false;
+        }
+        if (scriptType != null) {
+            scriptElem.type = scriptType;
         }
         let presolve = null;
         let prtn = new Promise((resolve, reject) => {
@@ -1275,7 +1278,7 @@ class HibikiState {
         return prtn.then(() => true);
     }
 
-    queueScriptText(text : string, sync : boolean) : Promise<boolean> {
+    queueScriptText(text : string, scriptType : string, sync : boolean) : Promise<boolean> {
         // console.log("queue script", text);
         let textMd5 = md5(text);
         if (this.ResourceCache[textMd5]) {
@@ -1283,7 +1286,7 @@ class HibikiState {
         }
         this.ResourceCache[textMd5] = true;
         let dataUri = "data:text/javascript;base64," + btoa(text);
-        return this.queueScriptSrc(dataUri, sync);
+        return this.queueScriptSrc(dataUri, scriptType, sync);
     }
 
     loadCssLink(cssUrl : string, sync : boolean) : Promise<boolean> {

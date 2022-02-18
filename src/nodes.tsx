@@ -696,19 +696,20 @@ class ScriptNode extends React.Component<HibikiReactProps, {}> {
         let ctx = makeDBCtx(this);
         let srcAttr = ctx.resolveAttrVal("src");
         let isSync = !ctx.resolveAttrStr("async")
+        let scriptType = ctx.resolveAttrStr("type");
         if (srcAttr == null) {
             let scriptText = textContent(ctx.node);
             if (scriptText == null || scriptText.trim() == "") {
                 return null;
             }
-            ctx.dataenv.dbstate.queueScriptText(scriptText, isSync);
+            ctx.dataenv.dbstate.queueScriptText(scriptText, scriptType, isSync);
             return null;
         }
         if (srcAttr instanceof DataCtx.HibikiBlob) {
-            ctx.dataenv.dbstate.queueScriptSrc(srcAttr.makeDataUrl(), isSync);
+            ctx.dataenv.dbstate.queueScriptSrc(srcAttr.makeDataUrl(), scriptType, isSync);
         }
         else {
-            ctx.dataenv.dbstate.queueScriptSrc(DataCtx.valToAttrStr(srcAttr), isSync);
+            ctx.dataenv.dbstate.queueScriptSrc(DataCtx.valToAttrStr(srcAttr), scriptType, isSync);
         }
         return null;
     }

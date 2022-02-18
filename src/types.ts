@@ -144,6 +144,7 @@ type HttpConfig = {
 type HibikiGlobalConfig = {
     noUsagePing : boolean,
     noWelcomeMessage : boolean,
+    libraryRoot : string,
 };
 
 type HibikiConfig = {
@@ -220,8 +221,6 @@ interface Hibiki {
     ImportLibs : Record<string, any>;
     LibraryCallbacks : Record<string, any[]>;
     States : Record<string, HibikiExtState>;
-    DataCtx : any;
-    DBCtxModule : any;
     WelcomeMessageFired : boolean;
     UsageFired: boolean;
 };

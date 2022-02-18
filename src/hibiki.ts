@@ -26,6 +26,8 @@ declare var window : any;
 // @ts-ignore - from webpack DefinePlugin
 let BUILD = __HIBIKIBUILD__; let VERSION = __HIBIKIVERSION__;
 
+const DEFAULT_LIBRARY_ROOT = "https://cdn.hibikihtml.com/libs/";
+
 function errorWithCause(message : string, cause : Error) {
     // @ts-ignore
     throw new Error(message, {cause: cause}); // ES6 error with cause
@@ -35,6 +37,7 @@ function getGlobalConfig() : HibikiGlobalConfig {
     let rtn : HibikiGlobalConfig = {
         noUsagePing: false,
         noWelcomeMessage: false,
+        libraryRoot: DEFAULT_LIBRARY_ROOT,
     };
     if (window.HibikiGlobalConfig != null && typeof(window.HibikiGlobalConfig) === "object") {
         rtn = Object.assign(rtn, window.HibikiGlobalConfig);
@@ -232,13 +235,13 @@ let hibiki : Hibiki = {
         ReactDOM: ReactDOM,
         mobx: mobx,
         mobxReact: mobxReact,
+        HibikiDataCtx: DataCtx,
+        HibikiDBCtx: DBCtxModule,
     },
     LibraryCallbacks: {},
     States: {},
     VERSION: VERSION,
     BUILD: BUILD,
-    DataCtx: DataCtx,
-    DBCtxModule: DBCtxModule,
     WelcomeMessageFired: false,
     UsageFired: false,
 };
