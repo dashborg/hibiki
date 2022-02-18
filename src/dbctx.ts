@@ -84,7 +84,7 @@ function createInjectObj(ctx : DBCtx, child : HibikiNode, nodeDataenv : DataEnvi
 
 function _assignToArgsRootNs(argsRoot : HibikiValObj, key : string, val : HibikiVal, forced : boolean) {
     let [ns, baseName] = parseAttrName(key);
-    if (baseName === "") {
+    if (baseName === "" || ns === "h" || ns === "hibiki") {
         return;
     }
     if (argsRoot["@ns"][ns] == null) {
@@ -695,7 +695,7 @@ class DBCtx {
         let box = this.dataenv.dbstate.NodeDataMap.get(this.uuid);
         if (box == null) {
             let uuidName = "id_" + this.uuid.replace(/-/g, "_");
-            let nodeData = Object.assign({}, defaultsObj, {_hibiki: {"customtag": compName, uuid: this.uuid}});
+            let nodeData = Object.assign({}, defaultsObj, {"@hibiki": {"customtag": compName, uuid: this.uuid}});
             box = mobx.observable.box(nodeData, {name: uuidName});
             this.dataenv.dbstate.NodeDataMap.set(this.uuid, box);
         }
@@ -726,12 +726,24 @@ class DBCtx {
 
     // returns [val, exists]
     resolveConditionAttr(attrName : string) : [boolean, boolean] {
-        let exists = this.hasRawAttr(attrName);
-        if (!exists) {
+        let rawExists = this.hasRawAttr(attrName);
+        let hattrExists = this.hasRawAttr("h:" + attrName);
+        let hibikiExists = this.hasRawAttr("hibiki:" + attrName);
+        if (!rawExists && !hattrExists && !hibikiExists) {
             return [false, false];
         }
-        let val = DataCtx.valToBool(this.resolveAttrVal(attrName));
-        return [val, true];
+        if (hibikiExists) {
+            let val = DataCtx.valToBool(this.resolveAttrVal("hibiki:" + attrName));
+            return [val, true];
+        }
+        else if (hattrExists) {
+            let val = DataCtx.valToBool(this.resolveAttrVal("h:" + attrName));
+            return [val, true];
+        }
+        else {
+            let val = DataCtx.valToBool(this.resolveAttrVal(attrName));
+            return [val, true];
+        }
     }
 
     makeChildrenVar() : DataCtx.ChildrenVar {

@@ -14,6 +14,12 @@
 * allow getters on HibikiBlob oject (mimetype, bloblen, name, base64), fn:blob funcs are now obsolete
 * new @event context var passed to all native handlers (and propagated if events are re-fired) that wraps react synthetic event
 * HibikiEvent object, 'type' getter, and 2 lambda getters that can be invoked (stopPropagation, and preventDefault)
+* rename $c._hibiki to $c.@hibiki ($c.@hibiki.uuid contains node uuid)
+* new whitespace elimination rules in hibiki html parser.  by default, trims whitespace from beginning and end of node's children (except for 'pre', 'code', and 'script' tags).  removes any whitespace-only nodes from special HTML nodes like 'ul', and table nodes).
+* added 'hibiki:ws' attribute to override whitespace handling for node, modes = "none", "all", "trim", and "trim-nl"
+* new hibiki attribute namespace, 'h:' or 'hibiki:' attributes for hibiki specific functionality
+* moved 'innerhtml' and 'outerhtml' special attributes to hibiki namespace
+* added aliases for 'foreach', 'automerge', 'if', and 'unwrap' attributes in hibiki namespace: e.g. 'hibiki:foreach', 'hibiki:automerge', 'h:unwrap'
 * bugfix: inconsistencies in accessing getters on HibikiNode object
 * bugfix: more consistent handling of noattr args in jsfuncs (stripped out by HibikiParamsObj)
 * bugfix: rendering of text inside of html option tag

@@ -23,6 +23,25 @@ const NODE_ALLOWED_GETTERS : Record<string, boolean> = {
     "outerhtml": true,
 };
 
+type WSMode = "none" | "all" | "trim" | "trim-nl";
+
+const DEFAULT_WS_MODE = "trim";
+
+const HTML_WS_MODES : Record<string, WSMode> = {
+    "pre": "all",
+    "code": "all",
+    "script": "all",
+    "table": "none",
+    "tbody": "none",
+    "thead": "none",
+    "tfoot": "none",
+    "tr": "none",
+    "ul": "none",
+    "select": "none",
+    "colgroup": "none",
+    "frameset": "none",
+};
+
 class HibikiNode extends HibikiWrappedObj {
     _type  : "HibikiNode";
     tag    : string;
@@ -40,6 +59,7 @@ class HibikiNode extends HibikiWrappedObj {
     libContext? : string;
     contextVars? : ContextVarType[];
     mark? : boolean;
+    wsMode? : WSMode;
 
     constructor(tag : string, opts? : {text? : string, list? : HibikiNode[], attrs? : Record<string, NodeAttrType>}) {
         super();
@@ -79,23 +99,45 @@ class HibikiNode extends HibikiWrappedObj {
     hibikiTypeOf() : string {
         return "hibiki:node";
     }
+
+    isWs() : boolean {
+        return this.tag === "#text" && (this.text == null || this.text.trim() === "");
+    }
+
+    isEmptyText() : boolean {
+        return this.tag === "#text" && (this.text == null || this.text === "");
+    }
+
+    getHtmlTagName() : string {
+        if (this.tag.startsWith("#")) {
+            return null;
+        }
+        if (this.tag.startsWith("html-")) {
+            return this.tag.substr(5);
+        }
+        if (this.tag.indexOf("-") !== -1) {
+            return null;
+        }
+        return this.tag;
+    }
 };
 
 const PARSED_ATTRS = {
     "bind": true,
     "if": true,
+    "h:if": true,
+    "hibiki:if": true,
     "unwrap": true,
-    "foreach": true,
-    "condition": true,
-    "automerge": true,
+    "h:unwrap": true,
+    "hibiki:unwrap": true,
 };
 
+// all 'h:' and 'hibiki:' attributes are non-bindable
 const NON_BINDABLE_ATTRS = {
     "bind": true,
     "if": true,
     "unwrap": true,
     "foreach": true,
-    "condition": true,
     "automerge": true,
     "style": true,
     "class": true, // including all class.[class] attrs
@@ -378,7 +420,7 @@ class HtmlParser {
             console.log(sprintf("WARNING Invalid bindpath attribute, cannot end with ':', cannot bind %s, ignoring", name));
             return true;
         }
-        if (NON_BINDABLE_ATTRS[baseName] || name.startsWith("class.")) {
+        if (NON_BINDABLE_ATTRS[baseName] || name.startsWith("class.") || name.startsWith("h:") || name.startsWith("hibiki:")) {
             console.log(sprintf("WARNING Invalid bindpath attribute, cannot bind %s, ignoring", name));
             return true;
         }
@@ -422,18 +464,6 @@ class HtmlParser {
         }
     }
 
-    parseCaptureHtmlAttrs(htmlElem : Element, node : HibikiNode, attrName : string, attrValue : string, pctx : ParseContext) : boolean {
-        if (attrName == "innerhtml") {
-            node.innerhtml = htmlElem.innerHTML;
-            return true;
-        }
-        if (attrName == "outerhtml") {
-            node.outerhtml = htmlElem.outerHTML;
-            return true;
-        }
-        return false;
-    }
-
     parseRawTagAttr(node : HibikiNode, attrName : string, attrValue : string, pctx : ParseContext) : boolean {
         if (node.tag === "define-component" || node.tag === "define-handler" || node.tag === "import-library" || node.tag === "define-vars" || node.tag.startsWith("hibiki-")) {
             if (attrValue === "") {
@@ -445,27 +475,62 @@ class HtmlParser {
         return false;
     }
 
-    parseMarkAttr(node : HibikiNode, attrName : string, attrValue : string) : boolean {
-        if (attrName == "hibiki-mark") {
+    parseHibikiSpecialAttrs(htmlElem : Element, node : HibikiNode, attrName : string, attrValue : string) : boolean {
+        if (attrName === "h:mark" || attrName === "hibiki:mark") {
             node.mark = true;
+            return true;
+        }
+        if (attrName === "h:innerhtml" || attrName === "hibiki:innerhtml") {
+            node.innerhtml = htmlElem.innerHTML;
+            return true;
+        }
+        if (attrName === "h:outerhtml" || attrName == "hibiki:outerhtml") {
+            node.outerhtml = htmlElem.outerHTML;
+            return true;
+        }
+        if (attrName === "h:ws" || attrName == "hibiki:ws") {
+            if (attrValue === "") {
+                attrValue = "1";
+            }
+            if (attrValue === "1" || attrValue === "all") {
+                node.wsMode = "all";
+            }
+            else if (attrValue === "0" || attrValue === "none") {
+                node.wsMode = "none";
+            }
+            else if (attrValue === "trim") {
+                node.wsMode = "trim";
+            }
+            else if (attrValue === "trim-nl") {
+                node.wsMode = "trim-nl";
+            }
+            else {
+                console.log(sprintf("WARNING: invalid hibiki:ws attribute value '%s'", attrValue));
+            }
             return true;
         }
         return false;
     }
 
-    parseAutoAttrs(node : HibikiNode, attrName : string, attrValue : string, pctx : ParseContext) {
+    parseAutoAttrs(node : HibikiNode, attrName : string, attrValue : string, pctx : ParseContext) : boolean {
         if (attrValue === "") {
             attrValue = "1";
         }
-        if (attrName == "automerge") {
+        if (attrName == "automerge" || attrName == "h:automerge" || attrName == "hibiki:automerge") {
             node.automerge = parseAutoMerge(attrValue);
+            return true;
         }
-        if (attrName == "autofire") {
+        if (attrName == "autofire" || attrName == "h:autofire" || attrName == "hibiki:autofire") {
             node.autofire = parseAutoFire(attrValue);
+            return true;
         }
+        return false;
     }
 
-    parseForeachAttr(node : HibikiNode, attrName : string, attrValue : string, pctx : ParseContext) {
+    parseForeachAttr(node : HibikiNode, attrName : string, attrValue : string, pctx : ParseContext) : boolean {
+        if (attrName !== "foreach" && attrName !== "h:foreach" && attrName !== "hibiki:foreach") {
+            return false;
+        }
         try {
             let iterExprAst : HIteratorExpr = doParse(attrValue, "ext_iteratorExpr");
             iterExprAst.sourcestr = attrValue;
@@ -474,6 +539,7 @@ class HtmlParser {
         catch (e) {
             console.log(sprintf("ERROR evaluating foreach attribute <%s>@%s\n\"%s\"\n", node.tag, attrName, attrValue), e.toString());
         }
+        return true;
     }
 
     parseStandardAttr(node : HibikiNode, name : string, value : string, pctx : ParseContext) {
@@ -541,13 +607,10 @@ class HtmlParser {
             let attr = nodeAttrs.item(i);
             let attrName = attr.name.toLowerCase();
             let attrValue = attr.value;
-            if (this.parseCaptureHtmlAttrs(htmlElem, node, attrName, attrValue, pctx)) {
-                continue;
-            }
             if (this.parseRawTagAttr(node, attrName, attrValue, pctx)) {
                 continue;
             }
-            if (this.parseMarkAttr(node, attrName, attrValue)) {
+            if (this.parseHibikiSpecialAttrs(htmlElem, node, attrName, attrValue)) {
                 continue;
             }
             if (this.parseStyleAttr(node, attrName, attrValue, pctx)) {
@@ -562,18 +625,17 @@ class HtmlParser {
             else if (this.parseCCAttr(node, attrName, attrValue, pctx)) {
                 continue;
             }
-            else if (attrName == "automerge" || attrName == "autofire") {
-                this.parseAutoAttrs(node, attrName, attrValue, pctx);
+            else if (this.parseAutoAttrs(node, attrName, attrValue, pctx)) {
                 continue;
             }
-            else if (attrName == "foreach") {
-                this.parseForeachAttr(node, attrName, attrValue, pctx);
+            else if (this.parseForeachAttr(node, attrName, attrValue, pctx)) {
                 continue;
             }
             this.parseStandardAttr(node, attrName, attrValue, pctx);
         }
         let list = this.parseNodeChildren(node.tag, htmlNode, pctx);
         if (list != null) {
+            list = this.trimWs(node, list);
             node.list = list;
         }
         if (node.tag === "script" && node.attrs != null && (node.attrs["type"] === "application/json" || node.attrs["type"] === "text/plain") && node.list != null && node.list.length === 1 && node.list[0].tag === "#text") {
@@ -645,6 +707,55 @@ class HtmlParser {
         rtn.list = this.parseNodeChildren(rtn.tag, rootNode, pctx) ?? [];
         return rtn;
     }
+
+    trimWs(node : HibikiNode, list : HibikiNode[]) : HibikiNode[] {
+        if (list == null || list.length === 0) {
+            return list;
+        }
+        let wsMode : WSMode = node.wsMode ?? HTML_WS_MODES[node.getHtmlTagName()] ?? DEFAULT_WS_MODE;
+        if (wsMode === "all") {
+            return list;
+        }
+        if (wsMode === "trim") {
+            let firstNode = list[0];
+            let shouldTrim = false;
+            if (firstNode.tag === "#text" && firstNode.text != null) {
+                firstNode.text = firstNode.text.trimStart();
+                shouldTrim = shouldTrim || (firstNode.text === "");
+            }
+            let lastNode = list[list.length-1];
+            if (lastNode.tag === "#text" && lastNode.text != null) {
+                lastNode.text = lastNode.text.trimEnd();
+                shouldTrim = shouldTrim || (lastNode.text === "");
+            }
+            if (shouldTrim) {
+                list = list.filter((subNode) => !subNode.isEmptyText());
+            }
+            return list;
+        }
+        if (wsMode === "none") {
+            list = list.filter((subNode) => !subNode.isWs());
+            return list;
+        }
+        if (wsMode === "trim-nl") {
+            let firstNode = list[0];
+            let shouldTrim = false;
+            if (firstNode.tag === "#text") {
+                firstNode.text = trimToNl(firstNode.text);
+                shouldTrim = shouldTrim || (firstNode.text === "");
+            }
+            let lastNode = list[list.length-1];
+            if (lastNode.tag === "#text") {
+                lastNode.text = trimFromNl(lastNode.text);
+                shouldTrim = shouldTrim || (lastNode.text === "");
+            }
+            if (shouldTrim) {
+                list = list.filter((subNode) => !subNode.isEmptyText());
+            }
+            return list;
+        }
+        return list;
+    }
 }
 
 function parseHtml(input : string | HTMLElement, sourceName? : string, opts? : HtmlParserOpts) : HibikiNode {
@@ -688,6 +799,50 @@ function parseDelimitedSections(text : string, openDelim : string, closeDelim : 
         textPos = endPos+closeDelim.length;
     }
     return parts;
+}
+
+function trimToNl(str : string) : string {
+    if (str == null) {
+        return null;
+    }
+    for (let i=0; i<str.length; i++) {
+        let ch = str[i];
+        if (ch === " ") {
+            continue;
+        }
+        if (ch === "\n") {
+            return str.substr(i+1);
+        }
+        if (ch === "\r") {
+            if (str[i+1] === "\n") {
+                return str.substr(i+2);
+            }
+            return str.substr(i+1);
+        }
+    }
+    return str;
+}
+
+function trimFromNl(str : string) : string {
+    if (str == null) {
+        return null;
+    }
+    for (let i=str.length-1; i>=0; i--) {
+        let ch = str[i];
+        if (ch === " ") {
+            continue;
+        }
+        if (ch === "\n") {
+            if (str[i-1] === "\r") {
+                return str.substr(0, i-1);
+            }
+            return str.substr(0, i);
+        }
+        if (ch === "\r") {
+            return str.substr(0, i);
+        }
+    }
+    return str;
 }
 
 export {parseHtml, parseDelimitedSections, HibikiNode};
