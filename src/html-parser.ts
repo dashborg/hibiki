@@ -10,7 +10,7 @@ import merge from "lodash/merge";
 import {sprintf} from "sprintf-js";
 import {doParse} from "./hibiki-parser";
 import type {HAction, HExpr, HIteratorExpr, ContextVarType} from "./datactx";
-import {textContent, rawAttrFromNode, attrBaseName, nodeStr} from "./utils";
+import {textContent, rawAttrFromNode, attrBaseName, nodeStr, HibikiWrappedObj} from "./utils";
 
 const styleAttrPartRe = new RegExp("^(style(?:-[a-z][a-z0-9-])?)\\.(.*)");
 
@@ -23,7 +23,7 @@ const NODE_ALLOWED_GETTERS : Record<string, boolean> = {
     "outerhtml": true,
 };
 
-class HibikiNode {
+class HibikiNode extends HibikiWrappedObj {
     _type  : "HibikiNode";
     tag    : string;
     text?  : string;
@@ -42,6 +42,7 @@ class HibikiNode {
     mark? : boolean;
 
     constructor(tag : string, opts? : {text? : string, list? : HibikiNode[], attrs? : Record<string, NodeAttrType>}) {
+        super();
         this._type = "HibikiNode";
         this.tag = tag;
         if (opts != null) {
@@ -69,6 +70,14 @@ class HibikiNode {
             return null;
         }
         return this.morestyles[attrName];
+    }
+
+    asString() : string {
+        return sprintf("[node:%s]", this.tag);
+    }
+
+    hibikiTypeOf() : string {
+        return "hibiki:node";
     }
 };
 

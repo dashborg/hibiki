@@ -8,6 +8,7 @@ import {v4 as uuidv4} from 'uuid';
 import type {DataEnvironment} from "./state";
 import {sprintf} from "sprintf-js";
 import type {HibikiNode} from "./html-parser";
+import {HibikiWrappedObj} from "./utils";
 
 type RtContextItem = {
     desc : string,
@@ -98,7 +99,7 @@ class RtContext {
 
     pushErrorContext(err : any) {
         let emsg = err.toString();
-        emsg.replaceAll("\n", "\\n");
+        emsg = emsg.replace(/\n/g, "\\n");
         if (emsg.length > 80) {
             emsg = emsg.substr(0, 77) + "...";
         }
@@ -150,13 +151,14 @@ const ERROR_ALLOWED_GETTERS : Record<string, boolean> = {
     "message": true,
 };
 
-class HibikiError {
+class HibikiError extends HibikiWrappedObj {
     _type : "HibikiError";
     message : string;
     rtctx : RtContext;
     err : any;
     
     constructor(msg : string, err? : any, rtctx? : RtContext) {
+        super();
         this._type = "HibikiError";
         this.message = msg;
         this.err = err;
@@ -213,6 +215,19 @@ class HibikiError {
             errStr += "\nJavaScript Error: " + this.err.stack + "\n";
         }
         return errStr;
+    }
+
+    asString() : string {
+        let emsg = this.message;
+        emsg = emsg.replace(/\n/g, "\\n");
+        if (emsg.length > 80) {
+            emsg = emsg.substr(0, 77) + "...";
+        }
+        return sprintf("[error:%s]", emsg);
+    }
+
+    hibikiTypeOf() : string {
+        return "hibiki:error";
     }
 }
 

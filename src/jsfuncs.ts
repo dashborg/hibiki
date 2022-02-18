@@ -318,47 +318,37 @@ function jsMatch(str : HibikiVal, regex : HibikiVal, ...rest : any[]) : any {
     return str.match(re);
 }
 
-function jsBlobAsText(blob : any) : string {
-    if (blob == null || !isObject(blob) || blob._type !== "HibikiBlob") {
-        return null;
+function jsBlobAsText(blob : HibikiVal) : string {
+    if (blob instanceof DataCtx.HibikiBlob) {
+        return blob.text;
     }
-    if (!blob.mimetype.startsWith("text/")) {
-        return null;
-    }
-    return atob(blob.data);
+    return null;
 }
 
-function jsBlobAsBase64(blob : any) : string {
-    if (blob == null || !isObject(blob) || blob._type !== "HibikiBlob") {
-        return null;
+function jsBlobAsBase64(blob : HibikiVal) : string {
+    if (blob instanceof DataCtx.HibikiBlob) {
+        return blob.base64;
     }
-    return blob.data;
+    return null;
 }
 
-function jsBlobMimeType(blob : any) : string {
-    if (blob == null || !isObject(blob) || blob._type !== "HibikiBlob") {
-        return null;
+function jsBlobMimeType(blob : HibikiVal) : string {
+    if (blob instanceof DataCtx.HibikiBlob) {
+        return blob.mimetypeIv;
     }
-    return blob.mimetype;
+    return null;
 }
 
-function jsBlobLen(blob : any) : number {
-    if (blob == null || !isObject(blob) || blob._type !== "HibikiBlob") {
-        return null;
+function jsBlobLen(blob : HibikiVal) : number {
+    if (blob instanceof DataCtx.HibikiBlob) {
+        return blob.bloblen;
     }
-    let bloblen = 0;
-    if (blob.data != null) {
-        bloblen = blob.data.length;
-    }
-    return Math.ceil((bloblen/4)*3);
+    return null;
 }
 
-function jsBlobName(blob : any) : string {
-    if (blob == null) {
-        return null;
-    }
-    if (isObject(blob) && blob._type === "HibikiBlob") {
-        return blob.name;
+function jsBlobName(blob : HibikiVal) : string {
+    if (blob instanceof DataCtx.HibikiBlob) {
+        return blob.nameIv;
     }
     return null;
 }

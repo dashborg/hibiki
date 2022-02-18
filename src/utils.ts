@@ -7,7 +7,6 @@
 import * as mobx from "mobx";
 import {Hibiki, HandlerPathType, HibikiVal, HibikiValObj, JSFuncStr} from "./types";
 import {sprintf} from "sprintf-js";
-import type {HibikiBlob} from "./datactx";
 import type {HibikiNode, NodeAttrType} from "./html-parser";
 
 declare var window : any;
@@ -15,6 +14,12 @@ declare var window : any;
 const ssFeClientIdKey = "hibiki-feclientid";
 const SYM_PROXY = Symbol("proxy");
 const SYM_FLATTEN = Symbol("flatten");
+
+abstract class HibikiWrappedObj {
+    abstract allowedGetters(key : string) : boolean;
+    abstract asString() : string;
+    abstract hibikiTypeOf() : string;
+}
 
 function spliceCopy(arr : any[], ...rest : any[]) {
     if (arr == null || !mobx.isArrayLike(arr)) {
@@ -745,5 +750,5 @@ function compareVersions(v1 : string, v2 : string) : number {
     return 0;
 }
 
-export {jsonRespHandler, parseUrlParams, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, evalDeepTextContent, jseval, nodeStr, callHook, getHibiki, parseHandler, fullPath, smartEncodeParam, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy, valInArray, rawAttrFromNode, STYLE_UNITLESS_NUMBER, subMapKey, subArrayIndex, unbox, splitTrim, bindLibContext, cnArrToClassAttr, classStringToCnArr, isClassStringLocked, joinClassStrs, attrBaseName, cnArrToLosslessStr, parseAttrName, nsAttrName, validateModulePath, compareVersions};
+export {jsonRespHandler, parseUrlParams, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, evalDeepTextContent, jseval, nodeStr, callHook, getHibiki, parseHandler, fullPath, smartEncodeParam, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy, valInArray, rawAttrFromNode, STYLE_UNITLESS_NUMBER, subMapKey, subArrayIndex, unbox, splitTrim, bindLibContext, cnArrToClassAttr, classStringToCnArr, isClassStringLocked, joinClassStrs, attrBaseName, cnArrToLosslessStr, parseAttrName, nsAttrName, validateModulePath, compareVersions, HibikiWrappedObj};
 

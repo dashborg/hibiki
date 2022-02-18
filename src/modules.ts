@@ -4,7 +4,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-import {isObject, getHibiki, fullPath, getSS, setSS, smartEncodeParam, base64ToArray, callHook, validateModulePath} from "./utils";
+import {isObject, getHibiki, fullPath, getSS, setSS, smartEncodeParam, callHook, validateModulePath} from "./utils";
 import {sprintf} from "sprintf-js";
 import type {HibikiState} from "./state";
 import type {FetchHookFn, Hibiki, HibikiAction, HandlerPathType, HibikiExtState, HttpConfig, HibikiActionString, HibikiVal, HibikiValObj} from "./types";
@@ -55,15 +55,7 @@ function formDataConvertVal(val : any, inArray? : boolean) : any {
         return val;
     }
     if (val instanceof DataCtx.HibikiBlob) {
-        let binaryArr = base64ToArray(val.data);
-        if (val.name != null) {
-            let blob = new File([binaryArr], val.name, {type: val.mimetype});
-            return blob;
-        }
-        else {
-            let blob = new Blob([binaryArr], {type: val.mimetype});
-            return blob;
-        }
+        return val.asJsBlob();
     }
     if (!inArray && mobx.isArrayLike(val)) {
         let rtn = [];
@@ -146,14 +138,8 @@ function jsonReplacer(key : string, value : any) : any {
         throw new Error(sprintf("Cannot serialize Blob %s with json encoding (use 'multipart' encoding)", DataCtx.blobPrintStr(this[key])));
     }
     if (this[key] instanceof DataCtx.HibikiBlob) {
-        let val = this[key];
-        let blob : Record<string, any> = {};
-        blob.mimetype = val.mimetype;
-        blob.data = val.data;
-        if (val.name != null) {
-            blob.name = val.name;
-        }
-        return blob;
+        let hblob : DataCtx.HibikiBlob = this[key];
+        return hblob.asJson();
     }
     return DataCtx.JsonReplacerFn.bind(this)(key, value);
 }

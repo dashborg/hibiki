@@ -18,14 +18,15 @@ import {nodeStr, isObject, attrBaseName, cnArrToClassAttr, classStringToCnArr, n
 import {RtContext} from "./error";
 import type {EHandlerType} from "./state";
 
-async function convertFormData(formData : FormData) : Promise<Record<string, any>> {
-    let params = {};
+async function convertFormData(formData : FormData) : Promise<HibikiValObj> {
+    let params : HibikiValObj = {};
     for (let key of (formData as any).keys()) {
         let arrVal = formData.getAll(key);
         if (arrVal.length == 0) {
             continue;
         }
         else if (arrVal.length == 1 && (arrVal[0] instanceof Blob) && arrVal[0].size == 0 && !arrVal[0].name) {
+            // weird FormData quirk, for multi-file we have a 'null' instance of Blob
             continue;
         }
         else if (arrVal.length == 1) {
@@ -404,7 +405,7 @@ class DBCtx {
         if (this.node.tag === "h-text") {
             return NodeUtils.renderTextData(this, true);
         }
-        return nodeStr(node);
+        return nodeStr(this.node);
     }
 
     resolvePath(path : string, opts? : {rtContext? : string}) : HibikiVal {
@@ -649,7 +650,7 @@ class DBCtx {
 
     @boundMethod handleOnClick(e : any) : boolean {
         if (e != null) {
-            if (this.getHtmlTagName === "a") {
+            if (this.getHtmlTagName() === "a") {
                 let hrefAttr = this.resolveAttrStr("href");
                 if (hrefAttr == null || hrefAttr === "#") {
                     e.preventDefault();

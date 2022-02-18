@@ -10,7 +10,7 @@ import {DataEnvironment, HibikiState, HibikiExtState} from "./state";
 import {sprintf} from "sprintf-js";
 import {parseHtml, HibikiNode} from "./html-parser";
 import {RtContext, getShortEMsg, HibikiError} from "./error";
-import {SYM_PROXY, SYM_FLATTEN, isObject, nodeStr, parseHandler, fullPath, STYLE_UNITLESS_NUMBER, splitTrim, bindLibContext, classStringToCnArr, cnArrToClassAttr, cnArrToLosslessStr, attrBaseName, parseAttrName, nsAttrName, getHibiki} from "./utils";
+import {SYM_PROXY, SYM_FLATTEN, isObject, nodeStr, parseHandler, fullPath, STYLE_UNITLESS_NUMBER, splitTrim, bindLibContext, classStringToCnArr, cnArrToClassAttr, cnArrToLosslessStr, attrBaseName, parseAttrName, nsAttrName, getHibiki, HibikiWrappedObj, base64ToArray} from "./utils";
 import {PathPart, PathType, PathUnionType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue, HandlerBlock, HibikiVal, HibikiValObj, JSFuncType, HibikiSpecialVal, HibikiPrimitiveVal, StyleMapType} from "./types";
 import type {NodeAttrType} from "./html-parser";
 import {HibikiRequest} from "./request";
@@ -96,6 +96,35 @@ type CompareOpts = {
     field? : string,
     index? : number,
 };
+
+const EVENT_ALLOWED_GETTERS : Record<string, boolean> = {
+    "type": true,
+};
+
+class HibikiReactEvent extends HibikiWrappedObj {
+    event : any;
+
+    constructor(event : any) {
+        super();
+        this.event = event;
+    }
+
+    get type() : string {
+        return this.event.type;
+    }
+
+    allowedGetters(key : string) : boolean {
+        return EVENT_ALLOWED_GETTERS[key];
+    }
+
+    asString() : string {
+        return sprintf("[event:%s]", this.event.type);
+    }
+
+    hibikiTypeOf() : string {
+        return "hibiki:event";
+    }
+}
 
 class HibikiParamsObj {
     params : HibikiValObj;
@@ -210,10 +239,11 @@ const CHILDRENVAR_ALLOWED_GETTERS : Record<string, boolean> = {
     "nodes": true,
 };
 
-class ChildrenVar {
+class ChildrenVar extends HibikiWrappedObj {
     boundNodes : DBCtx[];
     
     constructor(boundNodes : DBCtx[]) {
+        super();
         this.boundNodes = boundNodes ?? [];
     }
 
@@ -385,38 +415,109 @@ class ChildrenVar {
         }
         return sprintf("[children:%s]", arr.toString());
     }
+
+    hibikiTypeOf() : string {
+        return "hibiki:children";
+    }
 }
 
 class OpaqueValue {
-    _type : "OpaqueValue";
     value : any;
 
     constructor(value : any) {
-        this._type = "OpaqueValue";
         this.value = value;
     }
 }
 
-function isOpaqueType(val : HibikiVal, setter : boolean) : boolean {
-    if (val instanceof ChildrenVar || val instanceof HibikiError) {
-        return setter;
-    }
-    let [_, isSpecial] = asSpecial(val, false);
-    return isSpecial;
-}
+const BLOB_ALLOWED_GETTERS : Record<string, boolean> = {
+    "mimetype": true,
+    "bloblen": true,
+    "name": true,
+    "base64": true,
+};
 
-class HibikiBlob {
-    mimetype : string = null;
-    data : string = null;
-    name : string = null;
-    _type : "HibikiBlob" = "HibikiBlob";
+class HibikiBlob extends HibikiWrappedObj {
+    mimetypeIv : string = null;
+    dataIv : string = null;
+    nameIv : string = null;
+
+    constructor(mimetype : string, data : string, name? : string) {
+        super();
+        this.mimetypeIv = mimetype;
+        this.dataIv = data;
+        this.nameIv = name;
+    }
 
     makeDataUrl() : string {
-        return "data:" + this.mimetype + ";base64," + this.data;
+        return "data:" + this.mimetypeIv + ";base64," + this.dataIv;
+    }
+
+    allowedGetters(key : string) : boolean {
+        return BLOB_ALLOWED_GETTERS[key];
+    }
+
+    appendData(data : string) {
+        this.dataIv += data;
+    }
+
+    get bloblen() : number {
+        let bloblen = 0;
+        if (this.dataIv != null) {
+            bloblen = this.dataIv.length;
+        }
+        return Math.ceil((bloblen/4)*3);
+    }
+
+    get mimetype() : string {
+        return this.mimetypeIv;
+    }
+
+    get name() : string {
+        return this.nameIv;
+    }
+
+    get base64() : string {
+        return this.dataIv;
+    }
+
+    get text() : string {
+        if (this.mimetypeIv == null || !this.mimetypeIv.startsWith("text/")) {
+            return null;
+        }
+        return atob(this.dataIv);
+    }
+
+    asJson() : HibikiValObj {
+        let rtn : HibikiValObj = {};
+        rtn.mimetype = this.mimetypeIv;
+        rtn.data = this.dataIv;
+        if (this.nameIv != null) {
+            rtn.name = this.nameIv;
+        }
+        return rtn;
+    }
+
+    asJsBlob() : Blob {
+        let binaryArr = base64ToArray(this.dataIv);
+        if (this.nameIv != null) {
+            let blob = new File([binaryArr], this.nameIv, {type: this.mimetypeIv});
+            return blob;
+        }
+        else {
+            let blob = new Blob([binaryArr], {type: this.mimetypeIv});
+            return blob;
+        }
     }
 
     asString() : string {
-        return blobPrintStr(this);
+        if (this.nameIv != null) {
+            return sprintf("[hibikiblob type=%s, len=%s, name=%s]", this.mimetypeIv, this.bloblen, this.nameIv);
+        }
+        return sprintf("[hibikiblob type=%s, len=%s]", this.mimetypeIv, this.bloblen)
+    }
+
+    hibikiTypeOf() : string {
+        return "hibiki:blob";
     }
 }
 
@@ -688,26 +789,22 @@ function rtnIfType(v : any, itype : string) : any {
     }
 }
 
-function makeIteratorFromValue(bindVal : any) : [any, boolean] {
+function makeIteratorFromValue(bindVal : HibikiVal) : [any, boolean] {
     let iterator = null;
     let isMap = false;
     if (bindVal == null) {
         return [[], false];
     }
-    if (bindVal instanceof HibikiBlob) {
-        return [[bindVal], false];
-    }
-    if (bindVal instanceof DataEnvironment || bindVal instanceof LValue) {
-        return [[], false];
+    let [arrVal, isArr] = asArray(bindVal, false);
+    if (isArr) {
+        return [arrVal, false];
     }
     if (bindVal instanceof Map || mobx.isObservableMap(bindVal)) {
         return [bindVal, true];
     }
-    if (mobx.isArrayLike(bindVal)) {
-        return [bindVal, false];
-    }
-    if (typeof(bindVal) === "object") {
-        return [Object.entries(bindVal), true];
+    let [plainObj, isObj] = asPlainObject(bindVal, false);
+    if (isObj) {
+        return [Object.entries(plainObj), true];
     }
     else {
         return [[bindVal], false];
@@ -1124,7 +1221,8 @@ function internalResolvePath(path : PathType, irData : HibikiVal, dataenv : Data
         if (irData == null || irData === SYM_NOATTR) {
             return irData ?? null;   // remove 'undefined'
         }
-        if (isOpaqueType(irData, false)) {
+        let [_, isSpecial] = asSpecial(irData, false);
+        if (isSpecial) {
             return null;
         }
         let [arrObj, isArray] = asArray(irData, false);
@@ -1149,13 +1247,14 @@ function internalResolvePath(path : PathType, irData : HibikiVal, dataenv : Data
         if (irData == null || irData === SYM_NOATTR) {
             return null;
         }
-        if (irData instanceof ChildrenVar || irData instanceof HibikiError || irData instanceof HibikiNode) {
+        if (irData instanceof HibikiWrappedObj) {
             if (!irData.allowedGetters(pp.pathkey)) {
                 return null;
             }
             return internalResolvePath(path, irData[pp.pathkey], dataenv, resolveType, level+1);
         }
-        if (isOpaqueType(irData, false)) {
+        let [_, isSpecial] = asSpecial(irData, false);
+        if (isSpecial) {
             return null;
         }
         if ((irData instanceof Map) || mobx.isObservableMap(irData)) {
@@ -1416,7 +1515,8 @@ function internalSetPath(dataenv : DataEnvironment, op : string, path : PathType
         if (resolvedVal == null) {
             resolvedVal = [];
         }
-        if (isOpaqueType(resolvedVal, true)) {
+        let [_, isSpecial] = asSpecial(resolvedVal, false);
+        if (isSpecial) {
             throw new Error(sprintf("SetPath cannot resolve array index through %s, path=%s, level=%d", specialValToString(resolvedVal), StringPath(path), level));
         }
         let [arrVal, isArr] = asArray(resolvedVal, false);
@@ -1449,7 +1549,8 @@ function internalSetPath(dataenv : DataEnvironment, op : string, path : PathType
         if (resolvedVal == null) {
             resolvedVal = {};
         }
-        if (isOpaqueType(resolvedVal, true)) {
+        let [_, isSpecial] = asSpecial(resolvedVal, false);
+        if (isSpecial) {
             throw new Error(sprintf("SetPath cannot resolve map key through %s, path=%s, level=%d", specialValToString(resolvedVal), StringPath(path), level));
         }
         if ((resolvedVal instanceof Map) || mobx.isObservableMap(localRoot)) {
@@ -1527,14 +1628,8 @@ function specialValToString(val : any) : string {
     if (typeof(val) === "bigint") {
         return val.toString();
     }
-    if (val instanceof Blob || val instanceof HibikiBlob) {
-        return blobPrintStr(val);
-    }
     if (val instanceof DataEnvironment) {
         return "[DataEnvironment]";
-    }
-    if (val instanceof HibikiError) {
-        return val.toString();
     }
     if (val instanceof HibikiRequest) {
         return sprintf("[HibikiRequest:%s]", val.reqid);
@@ -1542,10 +1637,7 @@ function specialValToString(val : any) : string {
     if (val instanceof HibikiState || val instanceof HibikiExtState) {
         return "[HibikiState]";
     }
-    if (val instanceof HibikiNode) {
-        return "[HibikiNode:" + val.tag + "]";
-    }
-    if (val instanceof ChildrenVar) {
+    if (val instanceof HibikiWrappedObj) {
         return val.asString();
     }
     if (val instanceof LambdaValue) {
@@ -1811,26 +1903,17 @@ function hibikiTypeOf(val : HibikiVal) : string {
     if (Object.getPrototypeOf(val) === Object.prototype) {
         return "object";
     }
-    if (val instanceof HibikiBlob) {
-        return "hibiki:blob"
-    }
-    if (val instanceof HibikiNode) {
-        return "hibiki:node";
+    if (val instanceof HibikiWrappedObj) {
+        return val.hibikiTypeOf();
     }
     if (val instanceof OpaqueValue) {
         return "hibiki:opaque";
-    }
-    if (val instanceof ChildrenVar) {
-        return "hibiki:children";
     }
     if (val instanceof LambdaValue) {
         return "hibiki:lambda";
     }
     if (val instanceof LValue) {
         return "hibiki:lvalue";
-    }
-    if (val instanceof HibikiError) {
-        return "hibiki:error";
     }
     if (val instanceof DataEnvironment) {
         return "hibiki:dataenvironment";
@@ -1869,7 +1952,7 @@ function asSpecial(data : HibikiVal, nullOk : boolean) : [HibikiSpecialVal, bool
     if (data == null) {
         return [null, false];
     }
-    if (typeof(data) === "symbol" || data instanceof HibikiBlob || data instanceof HibikiNode || data instanceof OpaqueValue || data instanceof ChildrenVar || data instanceof LambdaValue || data instanceof LValue || data instanceof HibikiError) {
+    if (typeof(data) === "symbol" || data instanceof OpaqueValue || data instanceof LambdaValue || data instanceof LValue || data instanceof HibikiWrappedObj) {
         return [data, true];
     };
     if (typeof(data) === "object") {
@@ -2840,9 +2923,7 @@ function convertAction(action : HibikiAction) : HAction {
         if (action.actiontype === "blob") {
             rtn.actiontype = "setdata";
         }
-        let blob = new HibikiBlob();
-        blob.mimetype = action.blobmimetype;
-        blob.data = action.blobbase64;
+        let blob = new HibikiBlob(action.blobmimetype, action.blobbase64);
         rtn.data = {etype: "literal", val: blob};
     }
     let err = validateAction(rtn);
@@ -3055,13 +3136,13 @@ function BlobFromBlob(blob : Blob) : Promise<HibikiBlob> {
                 reject(new Error("Invalid BLOB, could not be readAsDataURL"));
                 return;
             }
-            let hblob = new HibikiBlob();
-            hblob.mimetype = mimetype;
-            // extra 7 bytes for "base64," ... e.g. data:image/jpeg;base64,[base64data]
-            hblob.data = (reader.result as string).substr(commaIdx+1);
+            // e.g. data:image/jpeg;base64,[base64data]
+            let blobdata = (reader.result as string).substr(commaIdx+1);
+            let blobname = null;
             if (blob instanceof File && blob.name != null) {
-                hblob.name = blob.name;
+                blobname = blob.name;
             }
+            let hblob = new HibikiBlob(mimetype, blobdata, blobname);
             resolve(hblob);
         };
         reader.readAsDataURL(blob);
@@ -3072,9 +3153,7 @@ function BlobFromRRA(rra : HibikiAction) : HibikiBlob {
     if (rra.actiontype !== "blob") {
         return null;
     }
-    let blob = new HibikiBlob();
-    blob.mimetype = rra.blobmimetype;
-    blob.data = rra.blobbase64;
+    let blob = new HibikiBlob(rra.blobmimetype, rra.blobbase64);
     return blob;
 }
 
@@ -3082,7 +3161,7 @@ function ExtBlobFromRRA(blob : HibikiBlob, rra : HibikiAction) {
     if (blob == null) {
         throw new Error(sprintf("Cannot extend null HibikiBlob"));
     }
-    blob.data += rra.blobbase64;
+    blob.appendData(rra.blobbase64);
 }
 
 function blobExtDataPath(path : PathType, curData : HibikiVal, newData : HibikiVal) : HibikiVal {
@@ -3092,7 +3171,7 @@ function blobExtDataPath(path : PathType, curData : HibikiVal, newData : HibikiV
     if (typeof(newData) !== "string") {
         throw new Error(sprintf("SetPath cannot blobext with non-string argument, path=%s, typeof=%s", StringPath(path), hibikiTypeOf(newData)));
     }
-    curData.data += newData;
+    curData.appendData(newData);
     return curData;
 }
 
@@ -3139,15 +3218,7 @@ function blobPrintStr(blob : Blob | HibikiBlob) : string {
         return null;
     }
     if (blob instanceof HibikiBlob) {
-        let hblob : HibikiBlob = (blob as any);
-        let bloblen = 0;
-        if (hblob.data != null) {
-            bloblen = hblob.data.length;
-        }
-        if (hblob.name != null) {
-            return sprintf("[hibikiblob type=%s, len=%s, name=%s]", hblob.mimetype, Math.ceil((bloblen/4)*3), hblob.name);
-        }
-        return sprintf("[hibikiblob type=%s, len=%s]", hblob.mimetype, Math.ceil((bloblen/4)*3))
+        return blob.asString();
     }
     if (blob instanceof File && blob.name != null) {
         sprintf("[jsblob type=%s, len=%s, name=%s]", blob.type, blob.size, blob.name);
