@@ -231,8 +231,8 @@ class HibikiError extends HibikiWrappedObj {
     }
 }
 
-function getShortEMsg(e : any) {
-    let emsg = e.toString();
+function getShortEMsg(err : any) {
+    let emsg = err.toString();
     emsg = emsg.replace(/ Instead, I was(.|\n)*/, "");
     return emsg;
 }

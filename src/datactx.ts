@@ -27,6 +27,8 @@ const MAX_ACTIONS = 1000;
 const MAX_STACK = 30;
 const MAX_LVALUE_LEVEL = 5;
 
+type InvokeFnType = (dataenv : DataEnvironment, params : HibikiParamsObj) => HibikiVal;
+
 type RtContextOpts = {
     rtContext? : string,
 };
@@ -99,6 +101,8 @@ type CompareOpts = {
 
 const EVENT_ALLOWED_GETTERS : Record<string, boolean> = {
     "type": true,
+    "preventDefault": true,
+    "stopPropagation": true,
 };
 
 class HibikiReactEvent extends HibikiWrappedObj {
@@ -109,12 +113,28 @@ class HibikiReactEvent extends HibikiWrappedObj {
         this.event = event;
     }
 
+    allowedGetters(key : string) : boolean {
+        return EVENT_ALLOWED_GETTERS[key];
+    }
+
     get type() : string {
         return this.event.type;
     }
 
-    allowedGetters(key : string) : boolean {
-        return EVENT_ALLOWED_GETTERS[key];
+    get preventDefault() : LambdaValue {
+        let fn : InvokeFnType = (dataenv : DataEnvironment, params : HibikiParamsObj) => {
+            this.event.preventDefault();
+            return null;
+        }
+        return new LambdaValue(null, fn);
+    }
+
+    get stopPropagation() : LambdaValue {
+        let fn : InvokeFnType = (dataenv : DataEnvironment, params : HibikiParamsObj) => {
+            this.event.stopPropagation();
+            return null;
+        }
+        return new LambdaValue(null, fn);
     }
 
     asString() : string {
@@ -373,7 +393,7 @@ class ChildrenVar extends HibikiWrappedObj {
     }
 
     get filter() : LambdaValue {
-        let fn : (dataenv : DataEnvironment, params : HibikiParamsObj) => HibikiVal = (dataenv : DataEnvironment, params : HibikiParamsObj) => {
+        let fn : InvokeFnType = (dataenv : DataEnvironment, params : HibikiParamsObj) => {
             let {filterexpr: filterExpr} = params.getNamedPositionalArgs(["filterexpr"]);
             if (filterExpr == null) {
                 return null;
@@ -869,9 +889,9 @@ class Watcher {
 
 class LambdaValue {
     expr : HExpr;
-    invokeFn : (dataenv : DataEnvironment, params : HibikiParamsObj) => HibikiVal;
+    invokeFn : InvokeFnType;
     
-    constructor(expr : HExpr, invokeFn : (dataenv : DataEnvironment, params : HibikiParamsObj) => HibikiVal) {
+    constructor(expr : HExpr, invokeFn : InvokeFnType) {
         this.expr = expr;
         this.invokeFn = invokeFn;
     }
@@ -2766,7 +2786,11 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
         if (!("value" in datacontext) && params.hasArg(null, 0)) {
             datacontext["value"] = params.getArg(null, 0);
         }
-        let event = {event: eventStr, native: action.native, datacontext, bubble, nodeuuid};
+        let hibikiEvent = dataenv.getContextKey("event");
+        let event : EventType = {event: eventStr, native: action.native, datacontext, bubble, nodeuuid};
+        if (hibikiEvent != null && hibikiEvent instanceof HibikiReactEvent) {
+            event.hibikiEvent = hibikiEvent;
+        }
         return FireEvent(event, dataenv, rtctx, false);
     }
     else if (action.actiontype === "log") {
@@ -2981,7 +3005,9 @@ async function FireEvent(event : EventType, dataenv : DataEnvironment, rtctx : R
             console.log(sprintf("ERROR evaluating <define-vars> before running %s", htmlContext), e);
         }
     }
-    eventEnv = eventEnv.makeChildEnv(event.datacontext, {htmlContext: htmlContext});
+    let dcWithEvent : HibikiValObj = Object.assign({}, event.datacontext);
+    dcWithEvent["event"] = event.hibikiEvent;
+    eventEnv = eventEnv.makeChildEnv(dcWithEvent, {htmlContext: htmlContext});
     let ctxStr = sprintf("Running %s:%s.handler (in [[%s]])", nodeStr(ehandler.node), event.event, ehandler.dataenv.getFullHtmlContext());
     rtctx.pushContext(ctxStr, {handlerEnv: ehandler.dataenv, handlerName: event.event, handlerNode: ehandler.node});
     try {
@@ -3065,12 +3091,12 @@ function ExecuteHandlerBlock(block : HandlerBlock, pure : boolean, dataenv : Dat
     return prtn;
 }
 
-function makeErrorObj(e : any, rtctx : RtContext) : HibikiError {
+function makeErrorObj(err : any, rtctx : RtContext) : HibikiError {
     let message = "Error";
-    if (e != null) {
-        message = e.toString();
+    if (err != null) {
+        message = err.toString();
     }
-    let rtnErr = new HibikiError(message, e, rtctx);
+    let rtnErr = new HibikiError(message, err, rtctx);
     window.HibikiLastError = rtnErr;
     return rtnErr;
 }
@@ -3330,7 +3356,7 @@ function compareVals(v1 : HibikiVal, v2 : HibikiVal, opts? : CompareOpts) : numb
     return sv1.localeCompare(sv2, locale, {numeric: numeric, sensitivity: sensitivity});
 }
 
-export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, StringPath, JsonStringify, EvalSimpleExpr, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, DeepCopy, CleanVal, DeepCopyTypeSafe, CheckCycle, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, makeIteratorFromExpr, rawAttrStr, getUnmergedAttributeStr, getUnmergedAttributeValPair, SYM_NOATTR, HActionBlock, valToString, valToBool, compileActionStr, FireEvent, makeErrorObj, OpaqueValue, ChildrenVar, Watcher, LambdaValue, blobPrintStr, valToNumber, hibikiTypeOf, JsonReplacerFn, valToAttrStr, resolveLValue, resolveUnmergedCnArray, isUnmerged, resolveUnmergedStyleMap, asStyleMap, asStyleMapFromPair, EvalContextVarsThrow, compareVals, asPrimitive, asArray, asPlainObject, HibikiParamsObj, stripNoAttrShallow};
+export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, StringPath, JsonStringify, EvalSimpleExpr, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, DeepCopy, CleanVal, DeepCopyTypeSafe, CheckCycle, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, makeIteratorFromExpr, rawAttrStr, getUnmergedAttributeStr, getUnmergedAttributeValPair, SYM_NOATTR, HActionBlock, valToString, valToBool, compileActionStr, FireEvent, makeErrorObj, OpaqueValue, ChildrenVar, Watcher, LambdaValue, blobPrintStr, valToNumber, hibikiTypeOf, JsonReplacerFn, valToAttrStr, resolveLValue, resolveUnmergedCnArray, isUnmerged, resolveUnmergedStyleMap, asStyleMap, asStyleMapFromPair, EvalContextVarsThrow, compareVals, asPrimitive, asArray, asPlainObject, HibikiParamsObj, stripNoAttrShallow, HibikiReactEvent};
 
 export type {PathType, HAction, HExpr, HIteratorExpr, ContextVarType, CompareOpts};
 

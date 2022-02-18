@@ -8,7 +8,7 @@ import type {HibikiState} from "./state";
 import type {RtContext, HibikiError} from "./error";
 import type {HibikiRequest} from "./request";
 import * as mobx from "mobx";
-import type {HExpr, LValue, HIteratorExpr, HAction, HActionBlock, OpaqueValue, LambdaValue, ContextVarType} from "./datactx";
+import type {HExpr, LValue, HIteratorExpr, HAction, HActionBlock, OpaqueValue, LambdaValue, ContextVarType, HibikiReactEvent} from "./datactx";
 import type {DataEnvironment, EHandlerType} from "./state";
 import type {HibikiNode} from "./html-parser";
 import type {InjectedAttrsObj} from "./dbctx";
@@ -58,6 +58,7 @@ type HandlerPathType = {
 
 type EventType = {
     event : string,
+    hibikiEvent? : HibikiReactEvent,
     native : boolean,
     bubble : boolean,
     datacontext : Record<string, any>,

@@ -11,6 +11,10 @@
 * HibikiRequest.data is now params stripped of at-args (and positional args)
 * added 'nosort' option to fn:sort()
 * added deref() expression which removes one level of ref()
+* allow getters on HibikiBlob oject (mimetype, bloblen, name, base64), fn:blob funcs are now obsolete
+* new @event context var passed to all native handlers (and propagated if events are re-fired) that wraps react synthetic event
+* HibikiEvent object, 'type' getter, and 2 lambda getters that can be invoked (stopPropagation, and preventDefault)
+* bugfix: inconsistencies in accessing getters on HibikiNode object
 * bugfix: more consistent handling of noattr args in jsfuncs (stripped out by HibikiParamsObj)
 * bugfix: rendering of text inside of html option tag
 * bugfix: don't call preventDefault on bubbled click events (allows anchor tags to work as expected even if a click.handler is defined)

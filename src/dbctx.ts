@@ -10,7 +10,7 @@ import { v4 as uuidv4 } from 'uuid';
 import {DataEnvironment} from "./state";
 import {sprintf} from "sprintf-js";
 import {boundMethod} from 'autobind-decorator'
-import type {HibikiVal, HibikiValObj, HibikiReactProps, StyleMapType, AutoMergeExpr} from "./types";
+import type {HibikiVal, HibikiValObj, HibikiReactProps, StyleMapType, AutoMergeExpr, EventType} from "./types";
 import type {NodeAttrType} from "./html-parser";
 import {HibikiNode} from "./html-parser";
 import * as NodeUtils from "./nodeutils";
@@ -619,55 +619,58 @@ class DBCtx {
             innerhtml: this.node.innerhtml,
             outerhtml: this.node.outerhtml,
         };
-        return this.handleEvent("mount", context);
+        return this.handleEvent(null, "mount", context);
     }
 
-    @boundMethod handleEvent(event : string, datacontext? : Record<string, any>) : Promise<any> {
+    @boundMethod handleEvent(reactEvent : any, event : string, datacontext? : Record<string, any>) : Promise<any> {
         let eventDataenv = this.getEventDataenv();
         let rtctx = new RtContext();
         rtctx.pushContext(sprintf("Firing native '%s' event on %s (in %s)", event, nodeStr(this.node), this.dataenv.getHtmlContext()), null);
-        let eventObj = {event: event, bubble: false, datacontext: datacontext, native: true};
+        let eventObj : EventType = {event: event, bubble: false, datacontext: datacontext, native: true};
+        if (reactEvent != null) {
+            eventObj.hibikiEvent = new DataCtx.HibikiReactEvent(reactEvent);
+        }
         let prtn = DataCtx.FireEvent(eventObj, eventDataenv, rtctx, false);
         return prtn;
     }
 
-    @boundMethod handleOnSubmit(e : any) : boolean {
-        if (e != null) {
+    @boundMethod handleOnSubmit(reactEvent : any) : boolean {
+        if (reactEvent != null) {
             if (this.getHtmlTagName() === "form") {
                 let actionAttr = this.resolveAttrStr("action");
                 if (actionAttr == null || actionAttr === "#") {
-                    e.preventDefault();
+                    reactEvent.preventDefault();
                 }
             }
         }
-        let formData = new FormData(e.target);
+        let formData = new FormData(reactEvent.target);
         let paramsPromise = convertFormData(formData);
         paramsPromise.then((params) => {
-            this.handleEvent("submit", {formdata: params});
+            this.handleEvent(reactEvent, "submit", {formdata: params});
         });
         return false;
     }
 
-    @boundMethod handleOnClick(e : any) : boolean {
-        if (e != null) {
+    @boundMethod handleOnClick(reactEvent : any) : boolean {
+        if (reactEvent != null) {
             if (this.getHtmlTagName() === "a") {
                 let hrefAttr = this.resolveAttrStr("href");
                 if (hrefAttr == null || hrefAttr === "#") {
-                    e.preventDefault();
+                    reactEvent.preventDefault();
                 }
             }
         }
-        this.handleEvent("click");
+        this.handleEvent(reactEvent, "click");
         return true;
     }
 
-    @boundMethod handleOnChange(newVal : HibikiVal) : boolean {
-        this.handleEvent("change", {value: newVal});
+    @boundMethod handleOnChange(reactEvent : any, newVal : HibikiVal) : boolean {
+        this.handleEvent(reactEvent, "change", {value: newVal});
         return false;
     }
 
-    @boundMethod handleAfterChange(newVal : HibikiVal) : boolean {
-        this.handleEvent("afterchange", {value: newVal});
+    @boundMethod handleAfterChange(reactEvent, newVal : HibikiVal) : boolean {
+        this.handleEvent(reactEvent, "afterchange", {value: newVal});
         return false;
     }
 

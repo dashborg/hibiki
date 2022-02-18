@@ -273,17 +273,17 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
         ctx.handleMountEvent();
     }
 
-    @boundMethod handleFileOnChange(e : any) {
+    @boundMethod handleFileOnChange(reactEvent : any) {
         let ctx = makeDBCtx(this);
         let isMultiple = !!ctx.resolveAttrStr("multiple");
         let valueLV = ctx.resolveLValueAttr("value");
-        let p = convertBlobArray(e.target.files);
+        let p = convertBlobArray(reactEvent.target.files);
         p.then((hblobArr) => {
             if (isMultiple) {
                 if (hblobArr.length == 0) {
                     hblobArr = null;
                 }
-                ctx.handleOnChange(hblobArr);
+                ctx.handleOnChange(reactEvent, hblobArr);
                 if (valueLV != null) {
                     valueLV.set(hblobArr);
                 }
@@ -293,7 +293,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
                 if (hblobArr.length > 0) {
                     blob = hblobArr[0];
                 }
-                ctx.handleOnChange(blob);
+                ctx.handleOnChange(reactEvent, blob);
                 if (valueLV != null) {
                     valueLV.set(blob);
                 }
@@ -301,53 +301,53 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
         });
     }
 
-    @boundMethod handleSelectOnChange(e : any) {
+    @boundMethod handleSelectOnChange(reactEvent : any) {
         let ctx = makeDBCtx(this);
         let valueLV = ctx.resolveLValueAttr("value");
         let isMulti = !!ctx.resolveAttrStr("multiple");
         let newValue : (string | string[]) = null;
         if (isMulti) {
-            newValue = Array.from(e.target.selectedOptions, (option : HTMLOptionElement) => option.value);
+            newValue = Array.from(reactEvent.target.selectedOptions, (option : HTMLOptionElement) => option.value);
         }
         else {
-            newValue = e.target.value;
+            newValue = reactEvent.target.value;
         }
-        ctx.handleOnChange(newValue);
+        ctx.handleOnChange(reactEvent, newValue);
         if (valueLV != null) {
             valueLV.set(newValue);
         }
     }
 
-    @boundMethod handleValueOnChange(e : any) {
+    @boundMethod handleValueOnChange(reactEvent : any) {
         let ctx = makeDBCtx(this);
         let valueLV = ctx.resolveLValueAttr("value");
-        let newValue = e.target.value;
+        let newValue = reactEvent.target.value;
         NodeUtils.handleConvertType(ctx, newValue);
-        ctx.handleOnChange(newValue);
+        ctx.handleOnChange(reactEvent, newValue);
         if (valueLV != null) {
             valueLV.set(newValue);
         }
-        ctx.handleAfterChange(newValue);
+        ctx.handleAfterChange(reactEvent, newValue);
     }
 
-    @boundMethod handleRadioOnChange(e : any) {
+    @boundMethod handleRadioOnChange(reactEvent : any) {
         let ctx = makeDBCtx(this);
         let formValueLV = ctx.resolveLValueAttr("formvalue");
-        let newValue = e.target.checked;
-        ctx.handleOnChange(newValue);
+        let newValue = reactEvent.target.checked;
+        ctx.handleOnChange(reactEvent, newValue);
         if (formValueLV != null) {
             let radioValue = ctx.resolveAttrStr("value") ?? "on";
             formValueLV.set(radioValue);
         }
-        ctx.handleAfterChange(newValue);
+        ctx.handleAfterChange(reactEvent, newValue);
     }
 
-    @boundMethod handleCheckboxOnChange(e : any) {
+    @boundMethod handleCheckboxOnChange(reactEvent : any) {
         let ctx = makeDBCtx(this);
         let checkedLV = ctx.resolveLValueAttr("checked");
         let formValueLV = ctx.resolveLValueAttr("formvalue");
-        let newValue = e.target.checked;
-        ctx.handleOnChange(newValue);
+        let newValue = reactEvent.target.checked;
+        ctx.handleOnChange(reactEvent, newValue);
         if (checkedLV != null) {
             checkedLV.set(newValue);
         }
@@ -362,7 +362,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
                 formValueLV.set(newFormValue);
             }
         }
-        ctx.handleAfterChange(newValue);
+        ctx.handleAfterChange(reactEvent, newValue);
     }
 
     setupManagedValue(ctx : DBCtx, elemProps : Record<string, any>) {
@@ -644,7 +644,7 @@ class CustomNode extends React.Component<HibikiReactProps & {component : Compone
             let childEnv = this.makeCustomChildEnv(false);
             let implNode = this.props.component.node;
             let implCtx = makeCustomDBCtx(implNode, childEnv, null);
-            prtn = implCtx.handleEvent("mount", null);
+            prtn = implCtx.handleEvent(null, "mount", null);
         }
         if (prtn == null) {
             prtn = Promise.resolve(true);
@@ -783,7 +783,7 @@ class WatcherNode extends React.Component<HibikiReactProps, {}> {
         }
         if (updated) {
             setTimeout(() => {
-                ctx.handleEvent("update", {value: bindVal});
+                ctx.handleEvent(null, "update", {value: bindVal});
             }, 0);
         }
         return null;
@@ -835,7 +835,7 @@ class SimpleQueryNode extends React.Component<HibikiReactProps, {}> {
                 if (outputLV != null) {
                     outputLV.set(queryRtn);
                 }
-                setTimeout(() => ctx.handleEvent("load", {value: queryRtn}), 10);
+                setTimeout(() => ctx.handleEvent(null, "load", {value: queryRtn}), 10);
             }).catch((e) => {
                 let errObj = new HibikiError(e.toString(), e, rtctx);
                 dbstate.reportErrorObj(errObj);
