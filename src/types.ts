@@ -145,6 +145,7 @@ type HibikiGlobalConfig = {
     noUsagePing : boolean,
     noWelcomeMessage : boolean,
     libraryRoot : string,
+    useDevLibraryBuilds : boolean,
 };
 
 type HibikiConfig = {
@@ -211,6 +212,7 @@ interface Hibiki {
     HibikiReact : new(props : any) => React.Component<{hibikiState : HibikiExtState}, {}>;
     VERSION : string;
     BUILD : string;
+    GlobalConfig : HibikiGlobalConfig;
 
     // subject to change, use with caution (not part of public API)
     ModuleRegistry : Record<string, (new(state : HibikiState, config : ModuleConfig) => HibikiHandlerModule)>;

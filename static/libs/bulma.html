@@ -172,46 +172,101 @@
     <define-vars>
       @selected = raw($args.selected) ?? ref(null);
     </define-vars>
-    <define-handler name="//@event/click">
+    <define-handler name="//@event/menuclick">
       if (@value != null) {
           @selected = @value;
       }
-      fire->click(@value);
+      fire->menuclick(@value);
     </define-handler>
     <div class="menu" automerge>
-      <h-children bind="@children" inject:selected="*@selected" inject:click.handler="fire->click(@value)"></h-children>
+      <h-children bind="@children" inject:selected="*@selected" inject:menuclick.handler="fire->menuclick(@value)"></h-children>
     </div>
   </define-component>
 
   <define-component name="menulabel">
-    <p class="menu-label" automerge>
-      <h-children text="*$args.label" bind="@children" click.handler="fire->click()"></h-children>
+    <p class="menu-label" automerge click.handler="fire->click()">
+      <h-children text="*$args.label" bind="@children"></h-children>
     </p>
   </define-component>
 
   <define-component name="menulist">
-    <html-ul class="menu-list" automerge>
-      <h-children bind="@children" inject:selected="*$args.selected" inject:click.handler="fire->click(@value)"></h-children>
+    <html-ul class="menu-list" automerge click.handler="fire->click()">
+      <h-children bind="@children" inject:selected="*$args.selected" inject:menuclick.handler="fire->menuclick(@value)"></h-children>
     </html-ul>
   </define-component>
 
   <define-component name="menusublist">
-    <html-li automerge>
-      <a class.is-active="*$args.active || ($args.value != null && $args.selected == $args.value)" click.handler="fire->click($args.value)" automerge="a">
+    <html-li automerge click.handler="fire->click()">
+      <a class.is-active="*$args.active || ($args.value != null && $args.selected == $args.value)" click.handler="fire->click(); fire->menuclick($args.value)" automerge="a">
         <h-children text="*$args.label" bind="@children.byslot['label']"></h-children>
       </a>
       <ul if="@children.noslot.size" automerge="ul">
-        <h-children bind="@children.noslot" inject:selected="*$args.selected" inject:click.handler="fire->click(@value);"></h-children>
+        <h-children bind="@children.noslot" inject:selected="*$args.selected" inject:menuclick.handler="fire->menuclick(@value);"></h-children>
       </ul>
     </html-li>
   </define-component>
 
   <define-component name="menuitem">
     <html-li>
-      <a class.is-active="*$args.active || ($args.value != null && $args.selected == $args.value)" click.handler="fire->click($args.value)" automerge="a">
+      <a class.is-active="*$args.active || ($args.value != null && $args.selected == $args.value)" click.handler="fire->click(); if ($args.value != null) { fire->menuclick($args.value); }" automerge="a">
         <h-children text="*$args.label" bind="@children"></h-children>
       </a>
     </html-li>
+  </define-component>
+
+  <define-component name="navbar">
+    <define-vars>
+      @menuactive = raw($args.menuactive) ?? ref($c.menuactive);
+    </define-vars>
+    <div class="navbar" automerge>
+      <h-children bind="@children" inject:menuactive="*@menuactive" inject:burgerclick.handler="log('burgerclick', @menuactive); @menuactive = !@menuactive" inject:navclick.handler="fire->navclick(@value)"></h-children>
+    </div>
+  </define-component>
+
+  <define-component name="navbarbrand">
+    <div class="navbar-brand" automerge>
+      <h-children bind="@children" inject:navclick.handler="fire->navclick(@value)"></h-children>
+      <a if="$args.withburger" click.handler="fire->burgerclick()" role="button" class="navbar-burger" aria-label="menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </a>
+    </div>
+  </define-component>
+
+  <define-component name="navbarmenu">
+    <div class="navbar-menu" class.is-active="*$args.menuactive" automerge>
+      <div class="navbar-start">
+        <h-children bind="@children.byslot['start']" inject:navclick.handler="fire->navclick(@value)"></h-children>
+        <h-children bind="@children.noslot" inject:navclick.handler="fire->navclick(@value)"></h-children>
+      </div>
+      <div class="navbar-end">
+        <h-children bind="@children.byslot['end']" inject:navclick.handler="fire->navclick(@value)"></h-children>
+      </div>
+    </div>
+  </define-component>
+
+  <define-component name="navbarlink">
+    <a class="navbar-item" automerge click.handler="fire->click(); if ($args.value != null) { fire->navclick($args.value); }">
+      <h-children text="*$args.label" bind="@children"></h-children>
+    </a>
+  </define-component>
+
+  <define-component name="navbaritem">
+    <div class="navbar-item" automerge click.handler="fire->click()">
+      <h-children text="*$args.label" bind="@children" inject:navclick.handler="fire->navclick(@value)"></h-children>
+    </div>
+  </define-component>
+
+  <define-component name="navbardropdown">
+    <div class="navbar-item has-dropdown" automerge class.is-active="*$args.active || ($args.manageactive && $c.active)">
+      <a class="navbar-link" automerge="link" click.handler="if ($args.manageactive) { $c.active = !$c.active; }">
+        <h-children text="*$args.label" bind="@children.byslot['label']"></h-children>
+      </a>
+      <div class="navbar-dropdown" automerge="dropdown">
+        <h-children bind="@children.noslot" inject:navclick.handler="fire->navclick(@value); $c.active = false;"></h-children>
+      </div>
+    </div>
   </define-component>
 
   <define-component name="message" componentdata="show=true;">

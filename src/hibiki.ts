@@ -38,6 +38,7 @@ function getGlobalConfig() : HibikiGlobalConfig {
         noUsagePing: false,
         noWelcomeMessage: false,
         libraryRoot: DEFAULT_LIBRARY_ROOT,
+        useDevLibraryBuilds: false,
     };
     if (window.HibikiGlobalConfig != null && typeof(window.HibikiGlobalConfig) === "object") {
         rtn = Object.assign(rtn, window.HibikiGlobalConfig);
@@ -132,10 +133,14 @@ function render(elem : HTMLElement, state : HibikiExtState) {
 function loadTag(elem : HTMLElement) : HibikiExtState {
     if (elem.hasAttribute("loaded")) {
         console.log("Hibiki tag already loaded", elem);
-        return;
+        return null;
     }
     elem.setAttribute("loaded", "1");
-    if (elem.tagName.toLowerCase() == "template") {
+    if (elem.tagName.toLowerCase() === "body") {
+        console.log("Hibiki cannot render directly into <body> tag, create a tag under <body> to render to");
+        return null;
+    }
+    if (elem.tagName.toLowerCase() === "template") {
         let forElemId = elem.getAttribute("for");
         let renderNode = null;
         if (forElemId != null) {
@@ -169,11 +174,6 @@ function loadTag(elem : HTMLElement) : HibikiExtState {
 
 function autoloadTags() : void {
     let elems = document.querySelectorAll("hibiki, template[hibiki]");
-    let htmlElem = document.querySelector("html");
-    let bodyElem = document.querySelector("body");
-    if (htmlElem.hasAttribute("hibiki") || (bodyElem != null && bodyElem.hasAttribute("hibiki"))) {
-        elems = document.querySelectorAll("body");
-    }
     for (let i=0; i<elems.length; i++) {
         let elem : HTMLElement = elems[i] as HTMLElement;
         if (elem.hasAttribute("noautoload")) {
@@ -226,6 +226,7 @@ let hibiki : Hibiki = {
         "lib": LibModule,
         "hibiki": HibikiModule,
     },
+    GlobalConfig: getGlobalConfig(),
     JSFuncs: {},
     LocalHandlers: LocalHandlers,
     LocalReactComponents: LocalReactComponents,
@@ -246,6 +247,7 @@ let hibiki : Hibiki = {
     UsageFired: false,
 };
 
+hibiki.ImportLibs.Hibiki = hibiki;
 window.Hibiki = hibiki;
 
 function fireWelcomeMessage() {

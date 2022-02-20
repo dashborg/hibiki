@@ -21,6 +21,7 @@
 * moved 'innerhtml' and 'outerhtml' special attributes to hibiki namespace
 * added aliases for 'foreach', 'automerge', 'if', and 'unwrap' attributes in hibiki namespace: e.g. 'hibiki:foreach', 'hibiki:automerge', 'h:unwrap'
 * allow script type="module" for inline hibiki script nodes
+* no longer allow rendering Hibiki HTML directly to 'body' tag (bad interactions with 3rd party libraries)
 * bugfix: inconsistencies in accessing getters on HibikiNode object
 * bugfix: more consistent handling of noattr args in jsfuncs (stripped out by HibikiParamsObj)
 * bugfix: rendering of text inside of html option tag

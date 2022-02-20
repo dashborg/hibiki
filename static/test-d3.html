@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<html hibiki>
+<html>
   <script src="/hibiki-test.js"></script>
-  <body class="hibiki-cloak">
+  <body>
+    <template hibiki>
       <hibiki-data>
         {"mode": "scatter"}
       </hibiki-data>
@@ -53,6 +54,6 @@
           <d3-scatter-plot data="*$.data"></d3-scatter-plot>
         </div>
       </div>
-
+    </template>
   </body>
 </html>

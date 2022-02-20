@@ -3,7 +3,6 @@ const merge = require('webpack-merge');
 const common = require('./webpack.common.js');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const LodashModuleReplacementPlugin = require('lodash-webpack-plugin');
-const TerserPlugin = require("terser-webpack-plugin");
 const moment = require("dayjs");
 const fs = require("fs");
 const VERSION = "v0.3.1";

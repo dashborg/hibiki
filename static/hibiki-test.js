@@ -42,6 +42,10 @@ function testMode() {
 }
 
 if (testMode() == "test") {
+    window.HibikiGlobalConfig = {
+        libraryRoot: "http://localhost:5005/",
+        useDevLibraryBuilds: true,
+    };
     scriptQueue.push("/dist/hibiki-dev.js");
 }
 else {

@@ -5,7 +5,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.64.0/mode/javascript/javascript.min.js" integrity="sha512-DJ/Flq7rxJDDhgkO49H/rmidX44jmxWot/ku3c+XXEF9XFal78KIpu7w6jEaQhK4jli1U3/yOH+Rp3cIIEYFPQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.64.0/mode/css/css.min.js" integrity="sha512-5jz5G7Fn6Xbc3YA/5KYXYwxSkyKEh7oEFNwc7cCnMs48diTBh24gKxcbt7r8Do+xFK6pJgr+BFfcKnUne+XUvA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.64.0/mode/htmlmixed/htmlmixed.min.js" integrity="sha512-IC+qg9ITjo2CLFOTQcO6fBbvisTeJmiT5D5FnXsCptqY8t7/UxWhOorn2X+GHkoD1FNkyfnMJujt5PcB7qutyA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-  <script>
+  <script type="module">
     function handleControlEnter(state, uuid, cm) {
         let actions = [];
         let text = cm.getValue();
@@ -51,7 +51,7 @@
   
   <define-component name="editor">
     <div class="* 'fontsize-' + ($c.fontsize + 3)" class.fontsizer>
-      <textarea mount.handler="//@lib/mountCM(id=$c._hibiki.uuid, text=$args.initialtext)" class="editor" id="*'editor-textarea-' + $c._hibiki.uuid"></textarea>
+      <textarea mount.handler="//@lib/mountCM(id=$c.@hibiki.uuid, text=$args.initialtext)" class="editor" id="*'editor-textarea-' + $c.@hibiki.uuid"></textarea>
     </div>
     <div class="columns mb-0 pb-2">
       <div class="column pb-0" style="margin-left: 29px;">
@@ -68,7 +68,7 @@
       </div>
       <div class="column pb-0"></div>
       <div class="column is-flex-grow-0 pb-0" style="flex-basis: content;">
-        <button click.handler="@text = //@lib/getCMText(id=$c._hibiki.uuid); fire->change(@text)" class="button is-primary pl-5 pr-5 mr-2" style="font-weight: bold;">Submit (Ctrl-Enter)</button>
+        <button click.handler="@text = //@lib/getCMText(id=$c.@hibiki.uuid); fire->change(@text)" class="button is-primary pl-5 pr-5 mr-2" style="font-weight: bold;">Submit (Ctrl-Enter)</button>
         <div style="width:12px;"></div>
       </div>
     </div>

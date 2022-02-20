@@ -645,6 +645,12 @@ class ComponentLibrary {
             }
             let p = this.state.queueScriptSrc(scriptSrc, attrs.type, true);
             parr.push(p);
+            if (scriptSrc.startsWith("data:")) {
+                scriptSrc = "dataurl";
+                if (attrs["data-filepath"] != null) {
+                    scriptSrc = "inline:" + attrs["data-filepath"];
+                }
+            }
             srcs.push("[script]" + scriptSrc);
         }
         let linkTags = subNodesByTag(libNode, "link");
