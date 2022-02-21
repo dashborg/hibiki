@@ -1,4 +1,5 @@
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
+const path = require("path");
 
 module.exports = {
     mode: "development",
@@ -6,8 +7,8 @@ module.exports = {
         hibiki: ["./src/hibiki.ts"],
     },
     output: {
-        path: __dirname,
-        filename: "dist/[name]-dev.js"
+        path: path.resolve(__dirname, "dist"),
+        filename: "[name]-dev.js"
     },
     module: {
         rules: [

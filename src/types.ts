@@ -8,15 +8,16 @@ import type {HibikiState} from "./state";
 import type {RtContext, HibikiError} from "./error";
 import type {HibikiRequest} from "./request";
 import * as mobx from "mobx";
-import type {HExpr, HibikiBlob, LValue, HIteratorExpr, HAction, HActionBlock, OpaqueValue, ChildrenVar, LambdaValue, ContextVarType} from "./datactx";
+import type {HExpr, LValue, HIteratorExpr, HAction, HActionBlock, OpaqueValue, LambdaValue, ContextVarType, HibikiReactEvent} from "./datactx";
 import type {DataEnvironment, EHandlerType} from "./state";
 import type {HibikiNode} from "./html-parser";
 import type {InjectedAttrsObj} from "./dbctx";
+import type {HibikiWrappedObj} from "./utils";
 
 type HibikiValObj = {[k : string] : HibikiVal};
 type HibikiVal = HibikiPrimitiveVal | HibikiSpecialVal | HibikiValObj | HibikiVal[];
 type HibikiPrimitiveVal = null | string | number | boolean
-type HibikiSpecialVal = HibikiBlob | HibikiNode | OpaqueValue | ChildrenVar | LambdaValue | LValue | HibikiError | symbol;
+type HibikiSpecialVal = HibikiWrappedObj | LambdaValue | LValue | OpaqueValue | symbol;
 type StyleMapType = Record<string, number|string>;
 
 type HibikiReactProps = {
@@ -41,9 +42,12 @@ type AutoFireExpr = {
 };
 
 type JSFuncType = {
-    fn : (...args : any[]) => any,
+    fn : (...args : HibikiVal[]) => HibikiVal,
+    paramFn : (HibikiParamsObj, DataEnvironment) => HibikiVal,
+    
     native : boolean,
-    positionalArgs : boolean,
+    retainNoAttr : boolean,
+    insecure : boolean,
 };
 
 type HandlerPathType = {
@@ -54,6 +58,7 @@ type HandlerPathType = {
 
 type EventType = {
     event : string,
+    hibikiEvent? : HibikiReactEvent,
     native : boolean,
     bubble : boolean,
     datacontext : Record<string, any>,
@@ -139,6 +144,8 @@ type HttpConfig = {
 type HibikiGlobalConfig = {
     noUsagePing : boolean,
     noWelcomeMessage : boolean,
+    libraryRoot : string,
+    useDevLibraryBuilds : boolean,
 };
 
 type HibikiConfig = {
@@ -205,6 +212,7 @@ interface Hibiki {
     HibikiReact : new(props : any) => React.Component<{hibikiState : HibikiExtState}, {}>;
     VERSION : string;
     BUILD : string;
+    GlobalConfig : HibikiGlobalConfig;
 
     // subject to change, use with caution (not part of public API)
     ModuleRegistry : Record<string, (new(state : HibikiState, config : ModuleConfig) => HibikiHandlerModule)>;
@@ -215,8 +223,6 @@ interface Hibiki {
     ImportLibs : Record<string, any>;
     LibraryCallbacks : Record<string, any[]>;
     States : Record<string, HibikiExtState>;
-    DataCtx : any;
-    DBCtxModule : any;
     WelcomeMessageFired : boolean;
     UsageFired: boolean;
 };

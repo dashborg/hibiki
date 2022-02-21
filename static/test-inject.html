@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <script src="/hibiki-test.js"></script>
-<body hibiki class="hibiki-cloak">
+<body><template hibiki>
   <hibiki-data>
     {"data": [
       {"x": 1, "y": 1},
@@ -116,5 +116,4 @@
       <h-children bind="@children.bytag['div']" inject:style="color: green;" datacontext="@bar=55;"></h-children>
     </div>
   </define-component>
-  
-</body>
+</template></body>

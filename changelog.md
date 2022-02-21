@@ -1,5 +1,46 @@
 # Change Log
 
+## v0.3.1
+
+More internal changes and features to support complex UI component libraries.
+Start a set of standard versioned Hibiki HTML libraries that can be loaded using a special &lt;import-library lib="..."&gt; syntax.
+Standard library source code is available on GitHub at https://github.com/dashborg/hibiki-libs with 
+templates and instructions on how to build custom libraries that integrate existing JS libraries and React controls.
+
+* import Standard Hibiki HTML libraries using &lt;import-library lib="[LIBRARY-NAME]@[VERSION]"&gt;&lt;/import-library&gt;
+* removed 'alert' statement, use log(..., @alert=true);
+* removed 'bubble' statement, use fire->event(..., @bubble=true);
+* allow 'fire' statement to take nodeuuid as at-arg, fire->event(..., @nodeuuid="expr");
+* added 'nosort' option to fn:sort()
+* HibikiRequest.data is now params stripped of at-args (and positional args)
+* added deref() expression which removes one level of ref()
+* allow getters on HibikiBlob oject (mimetype, bloblen, name, base64), fn:blob funcs are now obsolete
+* new @event context var passed to all native handlers (and propagated if events are re-fired) that wraps react synthetic event
+* HibikiEvent object, 'type' getter, and 2 lambda getters that can be invoked (stopPropagation, and preventDefault)
+* rename $c._hibiki to $c.@hibiki ($c.@hibiki.uuid contains node uuid)
+* new whitespace elimination rules in hibiki html parser.  by default, trims whitespace from beginning and end of node's children (except for 'pre', 'code', and 'script' tags).  removes any whitespace-only nodes from special HTML nodes like 'ul', and table nodes).
+* added 'hibiki:ws' attribute to override whitespace handling for node, modes = "none", "all", "trim", and "trim-nl"
+* new hibiki attribute namespace, 'h:' or 'hibiki:' attributes for hibiki specific functionality
+* moved 'innerhtml' and 'outerhtml' special attributes to hibiki namespace
+* added aliases for 'foreach', 'automerge', 'if', and 'unwrap' attributes in hibiki namespace: e.g. 'hibiki:foreach', 'hibiki:automerge', 'h:unwrap'
+* allow script type="module" for inline hibiki script nodes
+* no longer allow rendering Hibiki HTML directly to 'body' tag (bad interactions with 3rd party libraries)
+* 'foreach' will now skip keys that start with '@' on ojects.  to iterate over them, use fn:objallkeys().
+* added fn:objkeys(), fn:objatkeys() and fn:objallkeys() to return object keys (also work with HibikiWrappedObj).  objkeys omits any keys starting with '@', objallkeys returns all keys (include @), and objatkeys only returns @ keys.
+* added 'type' and 'data' getters to HibikiError object
+* http module errors set error.type to 'http' and error.data to an object with 'status', 'statustext', and 'data' (parsed error response).  can be used to inspect and use error responses (e.g. JSON error bodies with non-200 status codes)
+* if http module encounters unparsable json, it will throw an error, and set error.data.data to a blob with mimetype 'text/json-unparseable'
+* http network errors get error.data.status set to 599, and err.data.statustext to 'Network Error'
+* attributes prefixed with 'html-' will overwrite non-prefixed attributes in HTML nodes.  workaround for chrome/firefox issues where &lt;img&gt; src tags are getting preloaded, even in &lt;template&gt; or AJAX requests.  now you can write &lt;img html-src="*..."&gt; without causing an extra browser request.
+* assignment to a ref will set data one-level deep (will not recursively traverse refs), use deref() manually to set deep refs
+* internal: new HibikiParamsObj to manage position/named params in a more structured way
+* internal: HibikiParamsObj passed to jsfuncs
+* internal: HibikiParamsObj available in HibikiRequest object
+* bugfix: inconsistencies in accessing getters on HibikiNode object
+* bugfix: more consistent handling of noattr args in jsfuncs (stripped out by HibikiParamsObj)
+* bugfix: rendering of text inside of html option tag
+* bugfix: don't call preventDefault on bubbled click events (allows anchor tags to work as expected even if a click.handler is defined)
+
 ## v0.3.0
 
 Hibiki HTML is now licensed under the OSI approved MPL v2 (Mozilla Public License)!

@@ -28,7 +28,7 @@ no build tools to download and run.
 Just add one script tag to the top of your page or template:
 
 ```
-<script src="https://cdn.hibikihtml.com/hibiki/latest/hibiki-prod.min.js"></script>
+<script src="https://cdn.hibikihtml.com/hibiki/v0.3.1/hibiki-prod.min.js"></script>
 ```
 
 Wrap any portion of your content with a &lt;template hibiki&gt; tag and you have your first

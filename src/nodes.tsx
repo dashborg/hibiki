@@ -68,8 +68,10 @@ function evalOptionChildren(node : HibikiNode, dataenv : DataEnvironment) : stri
         return null;
     }
     let textRtn = null;
-    for (let i=0; i<node.list.length; i++) {
-        let text = staticEvalTextNode(node.list[i], dataenv);
+    let ctxList = bindNodeList(node.list, dataenv, false);
+    for (let i=0; i<ctxList.length; i++) {
+        let ctx = ctxList[i];
+        let text = ctx.evalAsText();
         if (text != null) {
             textRtn = (textRtn ?? "") + text;
         }
@@ -78,7 +80,7 @@ function evalOptionChildren(node : HibikiNode, dataenv : DataEnvironment) : stri
 }
 
 function ctxRenderHtmlChildren(ctx : DBCtx, htmlTag? : string) : React.ReactNode[] {
-    if (ctx.node.tag == "option") {
+    if (ctx.getHtmlTagName() === "option") {
         return [evalOptionChildren(ctx.node, ctx.dataenv)];
     }
     let rtn = baseRenderHtmlChildren(ctx.node.list, ctx.dataenv, false, htmlTag);
@@ -100,24 +102,6 @@ class NodeList extends React.Component<{list : HibikiNode[], ctx : DBCtx, isRoot
         }
         return <React.Fragment>{rtn}</React.Fragment>;
     }
-}
-
-function staticEvalTextNode(node : HibikiNode, dataenv : DataEnvironment) : string {
-    let ctx = makeCustomDBCtx(node, dataenv, null);
-    let tagName = ctx.node.tag;
-    if (tagName == "#text") {
-        return node.text;
-    }
-    if (tagName != "h-text") {
-        return nodeStr(node);
-    }
-    let [ifVal, exists] = ctx.resolveConditionAttr("if");
-    if (exists && !ifVal) {
-        return null;
-    }
-    // TODO foreach
-    let rtn = NodeUtils.renderTextData(ctx, true);
-    return rtn;
 }
 
 const NO_WHITESPACE_TAGS = {
@@ -289,17 +273,17 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
         ctx.handleMountEvent();
     }
 
-    @boundMethod handleFileOnChange(e : any) {
+    @boundMethod handleFileOnChange(reactEvent : any) {
         let ctx = makeDBCtx(this);
         let isMultiple = !!ctx.resolveAttrStr("multiple");
         let valueLV = ctx.resolveLValueAttr("value");
-        let p = convertBlobArray(e.target.files);
+        let p = convertBlobArray(reactEvent.target.files);
         p.then((hblobArr) => {
             if (isMultiple) {
                 if (hblobArr.length == 0) {
                     hblobArr = null;
                 }
-                ctx.handleOnChange(hblobArr);
+                ctx.handleOnChange(reactEvent, hblobArr);
                 if (valueLV != null) {
                     valueLV.set(hblobArr);
                 }
@@ -309,7 +293,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
                 if (hblobArr.length > 0) {
                     blob = hblobArr[0];
                 }
-                ctx.handleOnChange(blob);
+                ctx.handleOnChange(reactEvent, blob);
                 if (valueLV != null) {
                     valueLV.set(blob);
                 }
@@ -317,53 +301,53 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
         });
     }
 
-    @boundMethod handleSelectOnChange(e : any) {
+    @boundMethod handleSelectOnChange(reactEvent : any) {
         let ctx = makeDBCtx(this);
         let valueLV = ctx.resolveLValueAttr("value");
         let isMulti = !!ctx.resolveAttrStr("multiple");
         let newValue : (string | string[]) = null;
         if (isMulti) {
-            newValue = Array.from(e.target.selectedOptions, (option : HTMLOptionElement) => option.value);
+            newValue = Array.from(reactEvent.target.selectedOptions, (option : HTMLOptionElement) => option.value);
         }
         else {
-            newValue = e.target.value;
+            newValue = reactEvent.target.value;
         }
-        ctx.handleOnChange(newValue);
+        ctx.handleOnChange(reactEvent, newValue);
         if (valueLV != null) {
             valueLV.set(newValue);
         }
     }
 
-    @boundMethod handleValueOnChange(e : any) {
+    @boundMethod handleValueOnChange(reactEvent : any) {
         let ctx = makeDBCtx(this);
         let valueLV = ctx.resolveLValueAttr("value");
-        let newValue = e.target.value;
+        let newValue = reactEvent.target.value;
         NodeUtils.handleConvertType(ctx, newValue);
-        ctx.handleOnChange(newValue);
+        ctx.handleOnChange(reactEvent, newValue);
         if (valueLV != null) {
             valueLV.set(newValue);
         }
-        ctx.handleAfterChange(newValue);
+        ctx.handleAfterChange(reactEvent, newValue);
     }
 
-    @boundMethod handleRadioOnChange(e : any) {
+    @boundMethod handleRadioOnChange(reactEvent : any) {
         let ctx = makeDBCtx(this);
         let formValueLV = ctx.resolveLValueAttr("formvalue");
-        let newValue = e.target.checked;
-        ctx.handleOnChange(newValue);
+        let newValue = reactEvent.target.checked;
+        ctx.handleOnChange(reactEvent, newValue);
         if (formValueLV != null) {
             let radioValue = ctx.resolveAttrStr("value") ?? "on";
             formValueLV.set(radioValue);
         }
-        ctx.handleAfterChange(newValue);
+        ctx.handleAfterChange(reactEvent, newValue);
     }
 
-    @boundMethod handleCheckboxOnChange(e : any) {
+    @boundMethod handleCheckboxOnChange(reactEvent : any) {
         let ctx = makeDBCtx(this);
         let checkedLV = ctx.resolveLValueAttr("checked");
         let formValueLV = ctx.resolveLValueAttr("formvalue");
-        let newValue = e.target.checked;
-        ctx.handleOnChange(newValue);
+        let newValue = reactEvent.target.checked;
+        ctx.handleOnChange(reactEvent, newValue);
         if (checkedLV != null) {
             checkedLV.set(newValue);
         }
@@ -378,7 +362,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
                 formValueLV.set(newFormValue);
             }
         }
-        ctx.handleAfterChange(newValue);
+        ctx.handleAfterChange(reactEvent, newValue);
     }
 
     setupManagedValue(ctx : DBCtx, elemProps : Record<string, any>) {
@@ -516,6 +500,12 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
         let typeAttr = DataCtx.valToAttrStr(attrVals["type"]);
         let managedType = NodeUtils.getManagedType(tagName, typeAttr);
         let managedAttrs = NodeUtils.MANAGED_ATTRS[managedType] ?? {};
+        for (let [k,v] of Object.entries(attrVals)) {
+            if (k.startsWith("html-")) {
+                delete attrVals[k];
+                attrVals[k.substr(5)] = v;
+            }
+        }
         for (let [k,v] of Object.entries(attrVals)) {
             k = k.toLowerCase();
             if (NodeUtils.SPECIAL_ATTRS[k] || managedAttrs[k]) {
@@ -660,7 +650,7 @@ class CustomNode extends React.Component<HibikiReactProps & {component : Compone
             let childEnv = this.makeCustomChildEnv(false);
             let implNode = this.props.component.node;
             let implCtx = makeCustomDBCtx(implNode, childEnv, null);
-            prtn = implCtx.handleEvent("mount", null);
+            prtn = implCtx.handleEvent(null, "mount", null);
         }
         if (prtn == null) {
             prtn = Promise.resolve(true);
@@ -712,19 +702,20 @@ class ScriptNode extends React.Component<HibikiReactProps, {}> {
         let ctx = makeDBCtx(this);
         let srcAttr = ctx.resolveAttrVal("src");
         let isSync = !ctx.resolveAttrStr("async")
+        let scriptType = ctx.resolveAttrStr("type");
         if (srcAttr == null) {
             let scriptText = textContent(ctx.node);
             if (scriptText == null || scriptText.trim() == "") {
                 return null;
             }
-            ctx.dataenv.dbstate.queueScriptText(scriptText, isSync);
+            ctx.dataenv.dbstate.queueScriptText(scriptText, scriptType, isSync);
             return null;
         }
         if (srcAttr instanceof DataCtx.HibikiBlob) {
-            ctx.dataenv.dbstate.queueScriptSrc(srcAttr.makeDataUrl(), isSync);
+            ctx.dataenv.dbstate.queueScriptSrc(srcAttr.makeDataUrl(), scriptType, isSync);
         }
         else {
-            ctx.dataenv.dbstate.queueScriptSrc(DataCtx.valToAttrStr(srcAttr), isSync);
+            ctx.dataenv.dbstate.queueScriptSrc(DataCtx.valToAttrStr(srcAttr), scriptType, isSync);
         }
         return null;
     }
@@ -799,7 +790,7 @@ class WatcherNode extends React.Component<HibikiReactProps, {}> {
         }
         if (updated) {
             setTimeout(() => {
-                ctx.handleEvent("update", {value: bindVal});
+                ctx.handleEvent(null, "update", {value: bindVal});
             }, 0);
         }
         return null;
@@ -851,7 +842,7 @@ class SimpleQueryNode extends React.Component<HibikiReactProps, {}> {
                 if (outputLV != null) {
                     outputLV.set(queryRtn);
                 }
-                setTimeout(() => ctx.handleEvent("load", {value: queryRtn}), 10);
+                setTimeout(() => ctx.handleEvent(null, "load", {value: queryRtn}), 10);
             }).catch((e) => {
                 let errObj = new HibikiError(e.toString(), e, rtctx);
                 dbstate.reportErrorObj(errObj);

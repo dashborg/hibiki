@@ -51,7 +51,7 @@
     }
   </define-handler>
 
-  <script>
+  <script type="module">
     function makeIFrame(req) {
         let iframeUrl = (req.data.bulma ? "/playground-iframe-bulma.html" : "/playground-iframe-clean.html");
         fetch(iframeUrl).then((resp) => {

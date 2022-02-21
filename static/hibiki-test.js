@@ -42,10 +42,14 @@ function testMode() {
 }
 
 if (testMode() == "test") {
+    window.HibikiGlobalConfig = {
+        libraryRoot: "http://localhost:5005/libs/",
+        useDevLibraryBuilds: true,
+    };
     scriptQueue.push("/dist/hibiki-dev.js");
 }
 else {
-    scriptQueue.push("https://cdn.hibikihtml.com/hibiki/latest/hibiki-prod.min.js");
+    scriptQueue.push("https://cdn.hibikihtml.com/hibiki/v0.3.1/hibiki-prod.min.js");
 }
 loadScriptQueue();
 writeStyleSheet("https://cdn.jsdelivr.net/npm/bulma@0.9.2/css/bulma.min.css");

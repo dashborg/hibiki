@@ -4,7 +4,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-import {isObject, unpackPositionalArgs, stripAtKeys, getHibiki, fullPath, getSS, setSS, smartEncodeParam, unpackArg, unpackAtArgs, base64ToArray, callHook, validateModulePath} from "./utils";
+import {isObject, getHibiki, fullPath, getSS, setSS, smartEncodeParam, callHook, validateModulePath} from "./utils";
 import {sprintf} from "sprintf-js";
 import type {HibikiState} from "./state";
 import type {FetchHookFn, Hibiki, HibikiAction, HandlerPathType, HibikiExtState, HttpConfig, HibikiActionString, HibikiVal, HibikiValObj} from "./types";
@@ -15,16 +15,49 @@ import * as mobx from "mobx";
 
 let VALID_METHODS : Record<string, boolean> = {"GET": true, "POST": true, "PUT": true, "PATCH": true, "DELETE": true};
 
-function handleFetchResponse(url : URL, resp : any) : Promise<any> {
-    if (!resp.ok) {
-        throw new Error(sprintf("Bad status code response from fetch '%s': %d %s", url.toString(), resp.status, resp.statusText));
-    }
+function fetchDataObj(url : URL, resp : any, inErrorHandler : boolean) : Promise<HibikiVal> {
     let contentType = resp.headers.get("Content-Type");
     if (contentType != null && contentType.startsWith("application/json")) {
-        return resp.json();
+        return resp.text().then((textData) => {
+            try {
+                return JSON.parse(textData);
+            }
+            catch (err) {
+                let blobRtn = new DataCtx.HibikiBlob("text/json-unparseable", btoa(textData));
+                if (inErrorHandler) {
+                    return blobRtn;
+                }
+                let errMsg = sprintf("Unparseable JSON: " + err.message);
+                let rtnErr = new Error(errMsg);
+                rtnErr["hibikiErrorType"] = "http";
+                rtnErr["hibikiErrorData"] = {status: resp.status, statustext: resp.statusText, data: blobRtn};
+                throw rtnErr;
+            }
+        });
     }
     let blobp = resp.blob();
     return blobp.then((blob) => DataCtx.BlobFromBlob(blob));
+}
+
+function handleFetchResponse(url : URL, resp : any) : Promise<any> {
+    if (!resp.ok) {
+        let errMsg = sprintf("Bad status code response from fetch '%s': %d %s", url.toString(), resp.status, resp.statusText);
+        let rtnErr = new Error(errMsg);
+        let dataPromise = fetchDataObj(url, resp, true);
+        return dataPromise.then((data) => {
+            let errData = {status: resp.status, statustext: resp.statusText, data: data};
+            rtnErr["hibikiErrorData"] = errData;
+            rtnErr["hibikiErrorType"] = "http";
+            throw rtnErr;
+        });
+    }
+    return fetchDataObj(url, resp, false);
+}
+
+function handleFetchFail(err : Error) : Promise<any> {
+    err["hibikiErrorType"] = "http";
+    err["hibikiErrorData"] = {status: 599, statustext: "Network Error"};
+    throw err;
 }
 
 function convertHeaders(...headersObjArr : any[]) : Headers {
@@ -55,15 +88,7 @@ function formDataConvertVal(val : any, inArray? : boolean) : any {
         return val;
     }
     if (val instanceof DataCtx.HibikiBlob) {
-        let binaryArr = base64ToArray(val.data);
-        if (val.name != null) {
-            let blob = new File([binaryArr], val.name, {type: val.mimetype});
-            return blob;
-        }
-        else {
-            let blob = new Blob([binaryArr], {type: val.mimetype});
-            return blob;
-        }
+        return val.asJsBlob();
     }
     if (!inArray && mobx.isArrayLike(val)) {
         let rtn = [];
@@ -146,14 +171,8 @@ function jsonReplacer(key : string, value : any) : any {
         throw new Error(sprintf("Cannot serialize Blob %s with json encoding (use 'multipart' encoding)", DataCtx.blobPrintStr(this[key])));
     }
     if (this[key] instanceof DataCtx.HibikiBlob) {
-        let val = this[key];
-        let blob : Record<string, any> = {};
-        blob.mimetype = val.mimetype;
-        blob.data = val.data;
-        if (val.name != null) {
-            blob.name = val.name;
-        }
-        return blob;
+        let hblob : DataCtx.HibikiBlob = this[key];
+        return hblob.asJson();
     }
     return DataCtx.JsonReplacerFn.bind(this)(key, value);
 }
@@ -168,19 +187,17 @@ function DefaultCsrfValueFn() {
     if (csrfMetaElem != null) {
         csrfToken = (csrfMetaElem as any).content;
     }
-    return csrfToken;   
+    return csrfToken;
 }
 
-function setParams(method : string, url : URL, fetchInit : Record<string, any>, data : any) {
-    if (data == null || !isObject(data)) {
-        return;
-    }
-    let atData = unpackArg(data, "@data");
-    if (atData != null && !isObject(atData)) {
+function setParams(method : string, url : URL, fetchInit : Record<string, any>, data : DataCtx.HibikiParamsObj) {
+    let atData = data.getArg("@data");
+    let [atDataObj, isAtDataObj] = DataCtx.asPlainObject(atData, true);
+    if (!isAtDataObj) {
         throw new Error("Invalid @data, must be an object: type=" + DataCtx.hibikiTypeOf(atData));
     }
-    let params = Object.assign({}, fetchInit["csrfParams"], (atData ?? {}), stripAtKeys(data));
-    let encoding = DataCtx.valToString(unpackArg(data, "@encoding"));
+    let params = Object.assign({}, fetchInit["csrfParams"], (atDataObj ?? {}), data.getPlainArgs());
+    let encoding = DataCtx.valToString(data.getArg("@encoding"));
     if (method == "GET" || method == "DELETE") {
         if (encoding != null && encoding != "url") {
             console.log(sprintf("WARNING, @encoding=%s is ignored for GET/DELETE requests, only 'url' is supported", encoding));
@@ -219,7 +236,7 @@ function setParams(method : string, url : URL, fetchInit : Record<string, any>, 
     return;
 }
 
-function evalCsrfHExpr(hexpr : DataCtx.HExpr, state : HibikiState, datacontext : Record<string, HibikiVal>) : string {
+function evalCsrfHExpr(hexpr : DataCtx.HExpr, state : HibikiState, datacontext : HibikiValObj) : string {
     if (hexpr == null) {
         return null;
     }
@@ -235,7 +252,7 @@ function setCsrf(req : HibikiRequest, url : URL, fetchInit : Record<string, any>
     if (opts.csrfAllowedOrigins.indexOf("*") == -1 && opts.csrfAllowedOrigins.indexOf(url.origin)) {
         return;
     }
-    let csrfToken : string = DataCtx.valToString(unpackArg(req.data, "@csrf"));
+    let csrfToken : string = DataCtx.valToString(req.params.getArg("@csrf"));
     if (csrfToken == null && opts.compiledCsrfToken != null) {
         let token = opts.compiledCsrfToken;
         if (typeof(token) === "string") {
@@ -245,7 +262,7 @@ function setCsrf(req : HibikiRequest, url : URL, fetchInit : Record<string, any>
             csrfToken = callHook("CSRFValue", token);
         }
         else if (isObject(token) && "etype" in token) {
-            let val = evalCsrfHExpr(token, hibikiState(req.state), {data: req.data, url: url.toString()});
+            let val = evalCsrfHExpr(token, hibikiState(req.state), {data: req.params.params, url: url.toString()});
         }
     }
     if (csrfToken == null) {
@@ -263,14 +280,14 @@ function setCsrf(req : HibikiRequest, url : URL, fetchInit : Record<string, any>
 }
 
 function makeFetchInit(req : HibikiRequest, url : URL, opts : HttpConfig) : Record<string, any> {
-    let {mode: dataMode, init: dataInitArg, headers: dataHeaders, credentials: dataCredentials} = unpackAtArgs(req.data);
+    let {mode: dataMode, init: dataInitArg, headers: dataHeaders, credentials: dataCredentials} = req.params.getAtArgs();
     let [dataInit, _] = DataCtx.asPlainObject(dataInitArg, false);
     let method = getMethod(req);
     if (!VALID_METHODS[method]) {
         throw new Error(sprintf("Invalid method '%s' passed to http handler %s", method, fullPath(req.callpath)));
     }
     let fetchInit = Object.assign({}, opts.defaultInit, dataInit);
-    let defaultHeaders = evalHExprMap(opts.compiledHeaders, hibikiState(req.state), {data: req.data, url: url.toString()});
+    let defaultHeaders = evalHExprMap(opts.compiledHeaders, hibikiState(req.state), {data: req.params.params, url: url.toString()});
     fetchInit.headers = convertHeaders(fetchInit.headers, defaultHeaders, (dataInit ?? {}).headers, dataHeaders);
     fetchInit.method = method;
     if (dataMode != null) {
@@ -280,7 +297,7 @@ function makeFetchInit(req : HibikiRequest, url : URL, opts : HttpConfig) : Reco
         fetchInit.credentials = dataCredentials;
     }
     setCsrf(req, url, fetchInit, opts);
-    setParams(method, url, fetchInit, req.data);
+    setParams(method, url, fetchInit, req.params);
     if (opts.fetchHookFn != null) {
         callHook("FetchHook", opts.fetchHookFn, url, fetchInit);
     }
@@ -359,7 +376,7 @@ class HttpModule {
             throw new Error(sprintf("Invalid URL for %s handler '%s': %s", modName, fullPath(req.callpath), e.toString()));
         }
         let fetchInit = makeFetchInit(req, url, this.opts);
-        let p = fetch(url.toString(), fetchInit).then((resp) => handleFetchResponse(url, resp));
+        let p = fetch(url.toString(), fetchInit).catch((resp) => handleFetchFail(resp)).then((resp) => handleFetchResponse(url, resp));
         return p;
     }
 }
@@ -382,12 +399,11 @@ function getMethod(req : HibikiRequest) : string {
     if (method != null && method != "DYN") {
         return method.toUpperCase();
     }
-    if (req.data != null) {
-        let dataMethod = DataCtx.valToString(unpackArg(req.data, "@method"));
-        if (dataMethod != null) {
-            return dataMethod.toUpperCase();
-        }
+    let dataMethod = DataCtx.valToString(req.params.getArg("@method"));
+    if (dataMethod != null) {
+        return dataMethod.toUpperCase();
     }
+
     return "GET";
 }
 
@@ -409,7 +425,8 @@ class LocalModule {
         if (handler == null) {
             throw new Error(sprintf("Local handler '%s' not found", req.callpath.url));
         }
-        req.data = DataCtx.DeepCopy(req.data, {resolve: true}) as HibikiValObj;
+        req.params.deepCopy({resolve: true});
+        req.data = req.params.getPlainArgs();
         let rtn = handler(req);
         let p = Promise.resolve(rtn).then((rtnVal) => {
             if (rtnVal != null) {
@@ -443,7 +460,8 @@ class LibModule {
         if (handler == null) {
             throw new Error(sprintf("Lib '%s' handler '%s' not found", libContext, req.callpath.url));
         }
-        req.data = DataCtx.DeepCopy(req.data, {resolve: true}) as HibikiValObj;
+        req.params.deepCopy({resolve: true});
+        req.data = req.params.getPlainArgs();
         let rtn = handler(req);
         let p = Promise.resolve(rtn).then((rtnVal) => {
             if (rtnVal != null) {

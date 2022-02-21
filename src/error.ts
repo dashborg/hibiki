@@ -8,6 +8,8 @@ import {v4 as uuidv4} from 'uuid';
 import type {DataEnvironment} from "./state";
 import {sprintf} from "sprintf-js";
 import type {HibikiNode} from "./html-parser";
+import {HibikiWrappedObj} from "./utils";
+import type {HibikiVal} from "./types";
 
 type RtContextItem = {
     desc : string,
@@ -98,7 +100,7 @@ class RtContext {
 
     pushErrorContext(err : any) {
         let emsg = err.toString();
-        emsg.replaceAll("\n", "\\n");
+        emsg = emsg.replace(/\n/g, "\\n");
         if (emsg.length > 80) {
             emsg = emsg.substr(0, 77) + "...";
         }
@@ -148,25 +150,52 @@ const ERROR_ALLOWED_GETTERS : Record<string, boolean> = {
     "stack": true,
     "jsstack": true,
     "message": true,
+    "type": true,
+    "data": true,
 };
 
-class HibikiError {
+class HibikiError extends HibikiWrappedObj {
     _type : "HibikiError";
     message : string;
     rtctx : RtContext;
     err : any;
+    errorType : string;
+    errorData : HibikiVal;
     
     constructor(msg : string, err? : any, rtctx? : RtContext) {
+        super();
         this._type = "HibikiError";
+        this.errorType = "base";
         this.message = msg;
         this.err = err;
         if (rtctx != null) {
             this.rtctx = rtctx.copy();
         }
+        this.errorData = null;
+        if (this.err != null && this.err instanceof Error) {
+            if (this.err["hibikiErrorType"] != null) {
+                this.errorType = this.err["hibikiErrorType"];
+            }
+            if (this.err["hibikiErrorData"] != null) {
+                this.errorData = this.err["hibikiErrorData"];
+            }
+        }
     }
 
-    allowedGetters(key : string) : boolean {
+    allowedGetters() : string[] {
+        return Object.keys(ERROR_ALLOWED_GETTERS);
+    }
+
+    isAllowedGetter(key : string) : boolean {
         return ERROR_ALLOWED_GETTERS[key];
+    }
+
+    get type() : string {
+        return this.errorType;
+    }
+
+    get data() : HibikiVal {
+        return this.errorData;
     }
 
     get event() : string {
@@ -196,7 +225,7 @@ class HibikiError {
     }
 
     get stack() : string {
-        let errStr = "Hibiki Error | " + this.message + "\n";
+        let errStr = sprintf("Hibiki Error (%s) | %s\n", this.errorType, this.message);
         if (this.rtctx != null) {
             errStr += this.rtctx.asString("> ") + "\n";
         }
@@ -214,10 +243,23 @@ class HibikiError {
         }
         return errStr;
     }
+
+    asString() : string {
+        let emsg = this.message;
+        emsg = emsg.replace(/\n/g, "\\n");
+        if (emsg.length > 80) {
+            emsg = emsg.substr(0, 77) + "...";
+        }
+        return sprintf("[error:%s]", emsg);
+    }
+
+    hibikiTypeOf() : string {
+        return "hibiki:error";
+    }
 }
 
-function getShortEMsg(e : any) {
-    let emsg = e.toString();
+function getShortEMsg(err : any) {
+    let emsg = err.toString();
     emsg = emsg.replace(/ Instead, I was(.|\n)*/, "");
     return emsg;
 }

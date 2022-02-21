@@ -7,7 +7,6 @@
 import * as mobx from "mobx";
 import {Hibiki, HandlerPathType, HibikiVal, HibikiValObj, JSFuncStr} from "./types";
 import {sprintf} from "sprintf-js";
-import type {HibikiBlob} from "./datactx";
 import type {HibikiNode, NodeAttrType} from "./html-parser";
 
 declare var window : any;
@@ -15,6 +14,13 @@ declare var window : any;
 const ssFeClientIdKey = "hibiki-feclientid";
 const SYM_PROXY = Symbol("proxy");
 const SYM_FLATTEN = Symbol("flatten");
+
+abstract class HibikiWrappedObj {
+    abstract allowedGetters() : string[];
+    abstract isAllowedGetter(key : string) : boolean;
+    abstract asString() : string;
+    abstract hibikiTypeOf() : string;
+}
 
 function spliceCopy(arr : any[], ...rest : any[]) {
     if (arr == null || !mobx.isArrayLike(arr)) {
@@ -26,7 +32,7 @@ function spliceCopy(arr : any[], ...rest : any[]) {
     return newArr;
 }
 
-function addToArrayDupCheck(arr : HibikiVal, val : any) : HibikiVal[] {
+function addToArrayDupCheck(arr : HibikiVal, val : HibikiVal) : HibikiVal[] {
     if (arr == null || !mobx.isArrayLike(arr)) {
         arr = [];
     }
@@ -39,9 +45,9 @@ function addToArrayDupCheck(arr : HibikiVal, val : any) : HibikiVal[] {
     return arr;
 }
 
-function removeFromArray(arr : HibikiVal, val : any) : HibikiVal {
+function removeFromArray(arr : HibikiVal, val : HibikiVal) : HibikiVal[] {
     if (arr == null || !mobx.isArrayLike(arr)) {
-        return arr;
+        return [];
     }
     for (let i=0; i<arr.length; i++) {
         if (arr[i] == val) {
@@ -52,7 +58,7 @@ function removeFromArray(arr : HibikiVal, val : any) : HibikiVal {
     return arr;
 }
 
-function valInArray(arr : HibikiVal, val : any) : boolean {
+function valInArray(arr : HibikiVal, val : HibikiVal) : boolean {
     if (arr == null || !mobx.isArrayLike(arr)) {
         return false;
     }
@@ -390,66 +396,6 @@ function nodeStr(node : HibikiNode) : string {
     return "<" + node.tag + extraStr + ">";
 }
 
-function unpackArg(data : HibikiValObj, argName : string, pos? : number) : HibikiVal {
-    if (data == null) {
-        return null;
-    }
-    if (argName != null) {
-        if (argName in data) {
-            return data[argName];
-        }
-    }
-    if (pos == null) {
-        return null;
-    }
-    let posArgs = data["*args"] as HibikiVal[];
-    if (posArgs == null || posArgs.length <= pos) {
-        return null;
-    }
-    return posArgs[pos];
-}
-
-function unpackAtArgs(data : HibikiValObj) : HibikiValObj {
-    if (data == null) {
-        return {};
-    }
-    let rtn : Record<string, any> = {};
-    for (let key in data) {
-        if (key.startsWith("@")) {
-            rtn[key.substr(1)] = data[key];
-        }
-    }
-    return rtn;
-}
-
-function unpackPositionalArgs(data : HibikiValObj, posArgNames : string[]) : HibikiValObj {
-    if (data == null) {
-        return {};
-    }
-    let posArgs = data["*args"];
-    if (posArgs == null || !mobx.isArrayLike(posArgs) || posArgs.length == 0 || posArgNames == null || posArgNames.length == 0) {
-        return data;
-    }
-    let rtn = {...data};
-    for (let i=0; i<posArgs.length && i<posArgNames.length; i++) {
-        if (rtn[posArgNames[i]] == null) {
-            rtn[posArgNames[i]] = posArgs[i];
-        }
-    }
-    return rtn;
-}
-
-function unpackPositionalArgArray(data : HibikiValObj) : HibikiVal[] {
-    if (data == null) {
-        return [];
-    }
-    let posArgs = data["*args"];
-    if (posArgs == null || !mobx.isArrayLike(posArgs)) {
-        return [];
-    }
-    return posArgs;
-}
-
 function callHook(hookName : string, hookFn : JSFuncStr | Function, ...rest : any[]) : any {
     if (hookFn == null) {
         return null;
@@ -469,20 +415,6 @@ function callHook(hookName : string, hookFn : JSFuncStr | Function, ...rest : an
         }
     }
     return realHookFn(...rest);
-}
-
-function stripAtKeys(obj : HibikiValObj) : HibikiValObj {
-    if (obj == null) {
-        return null;
-    }
-    let rtn : HibikiValObj = {};
-    for (let key in obj) {
-        if (key.startsWith("@")) {
-            continue;
-        }
-        rtn[key] = obj[key];
-    }
-    return rtn;
 }
 
 function fullPath(hpath : HandlerPathType) : string {
@@ -819,5 +751,5 @@ function compareVersions(v1 : string, v2 : string) : number {
     return 0;
 }
 
-export {jsonRespHandler, parseUrlParams, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, evalDeepTextContent, jseval, nodeStr, unpackPositionalArgs, callHook, stripAtKeys, getHibiki, parseHandler, fullPath, smartEncodeParam, unpackArg, unpackAtArgs, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy, valInArray, rawAttrFromNode, STYLE_UNITLESS_NUMBER, subMapKey, subArrayIndex, unbox, splitTrim, bindLibContext, unpackPositionalArgArray, cnArrToClassAttr, classStringToCnArr, isClassStringLocked, joinClassStrs, attrBaseName, cnArrToLosslessStr, parseAttrName, nsAttrName, validateModulePath, compareVersions};
+export {jsonRespHandler, parseUrlParams, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, evalDeepTextContent, jseval, nodeStr, callHook, getHibiki, parseHandler, fullPath, smartEncodeParam, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy, valInArray, rawAttrFromNode, STYLE_UNITLESS_NUMBER, subMapKey, subArrayIndex, unbox, splitTrim, bindLibContext, cnArrToClassAttr, classStringToCnArr, isClassStringLocked, joinClassStrs, attrBaseName, cnArrToLosslessStr, parseAttrName, nsAttrName, validateModulePath, compareVersions, HibikiWrappedObj};
 

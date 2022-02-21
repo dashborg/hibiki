@@ -10,7 +10,7 @@ import { v4 as uuidv4 } from 'uuid';
 import {DataEnvironment} from "./state";
 import {sprintf} from "sprintf-js";
 import {boundMethod} from 'autobind-decorator'
-import type {HibikiVal, HibikiValObj, HibikiReactProps, StyleMapType, AutoMergeExpr} from "./types";
+import type {HibikiVal, HibikiValObj, HibikiReactProps, StyleMapType, AutoMergeExpr, EventType} from "./types";
 import type {NodeAttrType} from "./html-parser";
 import {HibikiNode} from "./html-parser";
 import * as NodeUtils from "./nodeutils";
@@ -18,14 +18,15 @@ import {nodeStr, isObject, attrBaseName, cnArrToClassAttr, classStringToCnArr, n
 import {RtContext} from "./error";
 import type {EHandlerType} from "./state";
 
-async function convertFormData(formData : FormData) : Promise<Record<string, any>> {
-    let params = {};
+async function convertFormData(formData : FormData) : Promise<HibikiValObj> {
+    let params : HibikiValObj = {};
     for (let key of (formData as any).keys()) {
         let arrVal = formData.getAll(key);
         if (arrVal.length == 0) {
             continue;
         }
         else if (arrVal.length == 1 && (arrVal[0] instanceof Blob) && arrVal[0].size == 0 && !arrVal[0].name) {
+            // weird FormData quirk, for multi-file we have a 'null' instance of Blob
             continue;
         }
         else if (arrVal.length == 1) {
@@ -83,7 +84,7 @@ function createInjectObj(ctx : DBCtx, child : HibikiNode, nodeDataenv : DataEnvi
 
 function _assignToArgsRootNs(argsRoot : HibikiValObj, key : string, val : HibikiVal, forced : boolean) {
     let [ns, baseName] = parseAttrName(key);
-    if (baseName === "") {
+    if (baseName === "" || ns === "h" || ns === "hibiki") {
         return;
     }
     if (argsRoot["@ns"][ns] == null) {
@@ -397,6 +398,16 @@ class DBCtx {
         return this.node.tag === "#text" && (this.node.text == null || this.node.text.trim() === "");
     }
 
+    evalAsText() : string {
+        if (this.node.tag === "#text") {
+            return this.node.text;
+        }
+        if (this.node.tag === "h-text") {
+            return NodeUtils.renderTextData(this, true);
+        }
+        return nodeStr(this.node);
+    }
+
     resolvePath(path : string, opts? : {rtContext? : string}) : HibikiVal {
         opts = opts ?? {};
         let rtContext = opts.rtContext ?? "DBCtx.resolvePath";
@@ -608,51 +619,58 @@ class DBCtx {
             innerhtml: this.node.innerhtml,
             outerhtml: this.node.outerhtml,
         };
-        return this.handleEvent("mount", context);
+        return this.handleEvent(null, "mount", context);
     }
 
-    @boundMethod handleEvent(event : string, datacontext? : Record<string, any>) : Promise<any> {
+    @boundMethod handleEvent(reactEvent : any, event : string, datacontext? : Record<string, any>) : Promise<any> {
         let eventDataenv = this.getEventDataenv();
         let rtctx = new RtContext();
         rtctx.pushContext(sprintf("Firing native '%s' event on %s (in %s)", event, nodeStr(this.node), this.dataenv.getHtmlContext()), null);
-        let eventObj = {event: event, bubble: false, datacontext: datacontext, native: true};
+        let eventObj : EventType = {event: event, bubble: false, datacontext: datacontext, native: true};
+        if (reactEvent != null) {
+            eventObj.hibikiEvent = new DataCtx.HibikiReactEvent(reactEvent);
+        }
         let prtn = DataCtx.FireEvent(eventObj, eventDataenv, rtctx, false);
         return prtn;
     }
 
-    @boundMethod handleOnSubmit(e : any) : boolean {
-        if (e != null) {
-            let actionAttr = this.resolveAttrStr("action");
-            if (actionAttr == null || actionAttr === "#") {
-                e.preventDefault();
+    @boundMethod handleOnSubmit(reactEvent : any) : boolean {
+        if (reactEvent != null) {
+            if (this.getHtmlTagName() === "form") {
+                let actionAttr = this.resolveAttrStr("action");
+                if (actionAttr == null || actionAttr === "#") {
+                    reactEvent.preventDefault();
+                }
             }
         }
-        let formData = new FormData(e.target);
+        let formData = new FormData(reactEvent.target);
         let paramsPromise = convertFormData(formData);
         paramsPromise.then((params) => {
-            this.handleEvent("submit", {formdata: params});
+            this.handleEvent(reactEvent, "submit", {formdata: params});
         });
         return false;
     }
 
-    @boundMethod handleOnClick(e : any) : boolean {
-        if (e != null) {
-            let hrefAttr = this.resolveAttrStr("href");
-            if (hrefAttr == null || hrefAttr === "#") {
-                e.preventDefault();
+    @boundMethod handleOnClick(reactEvent : any) : boolean {
+        if (reactEvent != null) {
+            if (this.getHtmlTagName() === "a") {
+                let hrefAttr = this.resolveAttrStr("href");
+                if (hrefAttr == null || hrefAttr === "#") {
+                    reactEvent.preventDefault();
+                }
             }
         }
-        this.handleEvent("click");
+        this.handleEvent(reactEvent, "click");
         return true;
     }
 
-    @boundMethod handleOnChange(newVal : HibikiVal) : boolean {
-        this.handleEvent("change", {value: newVal});
+    @boundMethod handleOnChange(reactEvent : any, newVal : HibikiVal) : boolean {
+        this.handleEvent(reactEvent, "change", {value: newVal});
         return false;
     }
 
-    @boundMethod handleAfterChange(newVal : HibikiVal) : boolean {
-        this.handleEvent("afterchange", {value: newVal});
+    @boundMethod handleAfterChange(reactEvent, newVal : HibikiVal) : boolean {
+        this.handleEvent(reactEvent, "afterchange", {value: newVal});
         return false;
     }
 
@@ -677,7 +695,7 @@ class DBCtx {
         let box = this.dataenv.dbstate.NodeDataMap.get(this.uuid);
         if (box == null) {
             let uuidName = "id_" + this.uuid.replace(/-/g, "_");
-            let nodeData = Object.assign({}, defaultsObj, {_hibiki: {"customtag": compName, uuid: this.uuid}});
+            let nodeData = Object.assign({}, defaultsObj, {"@hibiki": {"customtag": compName, uuid: this.uuid}});
             box = mobx.observable.box(nodeData, {name: uuidName});
             this.dataenv.dbstate.NodeDataMap.set(this.uuid, box);
         }
@@ -708,12 +726,24 @@ class DBCtx {
 
     // returns [val, exists]
     resolveConditionAttr(attrName : string) : [boolean, boolean] {
-        let exists = this.hasRawAttr(attrName);
-        if (!exists) {
+        let rawExists = this.hasRawAttr(attrName);
+        let hattrExists = this.hasRawAttr("h:" + attrName);
+        let hibikiExists = this.hasRawAttr("hibiki:" + attrName);
+        if (!rawExists && !hattrExists && !hibikiExists) {
             return [false, false];
         }
-        let val = DataCtx.valToBool(this.resolveAttrVal(attrName));
-        return [val, true];
+        if (hibikiExists) {
+            let val = DataCtx.valToBool(this.resolveAttrVal("hibiki:" + attrName));
+            return [val, true];
+        }
+        else if (hattrExists) {
+            let val = DataCtx.valToBool(this.resolveAttrVal("h:" + attrName));
+            return [val, true];
+        }
+        else {
+            let val = DataCtx.valToBool(this.resolveAttrVal(attrName));
+            return [val, true];
+        }
     }
 
     makeChildrenVar() : DataCtx.ChildrenVar {

@@ -67,9 +67,7 @@ let lexer = moo.states({
                         KW_INVALIDATE: "invalidate",
                         KW_FIRE: "fire",
                         KW_NOP: "nop",
-                        KW_BUBBLE: "bubble",
                         KW_LOG: "log",
-                        KW_ALERT: "alert",
                         KW_EXPR: "expr",
                         KW_LOCAL: "local",
                         KW_IF: "if",
@@ -78,6 +76,7 @@ let lexer = moo.states({
                         KW_REF: "ref",
                         KW_ISREF: "isref",
                         KW_REFINFO: "refinfo",
+                        KW_DEREF: "deref",
                         KW_RAW: "raw",
                         KW_IN: "in",
                         KW_INVOKE: "invoke",
@@ -188,9 +187,7 @@ statement ->
     | assignmentStatement   {% id %}
     | invalidateStatement   {% id %}
     | fireStatement         {% id %}
-    | bubbleStatement       {% id %}
     | logStatement          {% id %}
-    | alertStatement        {% id %}
     | exprStatement         {% id %}
     | throwStatement        {% id %}
     | returnStatement       {% id %}
@@ -292,11 +289,7 @@ innerNamedCallParams ->
 
 callParams -> %LPAREN literalArrayElements:? %RPAREN {% (data) => data[1] %}
 
-optCallParams -> callParams:? {% (data) => data[0] %}
-
 callParamsSingle -> %LPAREN fullExpr:? %RPAREN {% (data) => data[1] %}
-
-optCallParamsSingle -> callParamsSingle:? {% (data) => data[0] %}
 
 assignmentStatement ->
       lvalue %EQUAL fullExpr {% (data) => {
@@ -305,24 +298,14 @@ assignmentStatement ->
 
 exprStatement -> %KW_EXPR fullExpr {% (data) => ({actiontype: "setdata", data: data[1]}) %}
 
-invalidateStatement -> %KW_INVALIDATE optCallParams {% (data) => {
+invalidateStatement -> %KW_INVALIDATE namedCallParams {% (data) => {
         if (data[1] == null) {
             return {actiontype: "invalidate"};
         }
-        return {actiontype: "invalidate", data: {etype: "array", exprs: data[1]}};
+        return {actiontype: "invalidate", data: data[1]};
     } %}
 
 nopStatement -> %KW_NOP (%LPAREN %RPAREN):? {% (data) => ({actiontype: "nop"}) %}
-
-bubbleStatement ->
-    %KW_BUBBLE %DASHGT (idOrKeyword %COLON):? idOrKeyword namedCallParams {% (data) => {
-        let eventName = data[3].value;
-        if (data[2] != null) {
-            eventName = data[2][0].value + ":" + eventName;
-        }
-        let rtn = {actiontype: "fireevent", bubble: true, event: {etype: "literal", val: eventName}, data: data[4]};
-        return rtn;
-    } %}
 
 fireStatement ->
     %KW_FIRE %DASHGT (idOrKeyword %COLON):? idOrKeyword namedCallParams {% (data) => {
@@ -335,8 +318,6 @@ fireStatement ->
     } %}
 
 logStatement -> %KW_LOG namedCallParams {% (data) => ({actiontype: "log", data: data[1]}) %}
-
-alertStatement -> %KW_ALERT namedCallParams {% (data) => ({actiontype: "log", alert: true, data: data[1]}) %}
 
 # [setop : string, PathType]
 lvalue ->
@@ -366,7 +347,7 @@ ternaryPathExpr ->
 filterExpr -> 
       ternaryExpr {% id %}
     | ternaryExpr %PIPE idOrKeyword namedCallParams {% (data) => {
-          return {etype: "filter", filter: data[2].value, exprs: [data[0], data[3]]};
+          return {etype: "filter", filter: data[2].value, params: data[3], exprs: [data[0]]};
       } %}
 
 ternaryExpr ->
@@ -429,7 +410,7 @@ primaryExpr ->
     | invokeExpr      {% id %}
     | lambdaExpr      {% id %}
     | refExpr         {% id %}
-    | isNoAttrExpr    {% id %}
+    | isNoAttrExpr   
     | %LPAREN fullExpr %RPAREN {% (data) => data[1] %}
     | pathExprNonTerm {% id %}
 
@@ -446,6 +427,7 @@ refExpr ->
     | %KW_ISREF %LPAREN fullExpr %RPAREN {% (data) => ({etype: "isref", exprs: [data[2]]}) %}
     | %KW_REFINFO %LPAREN fullExpr %RPAREN {% (data) => ({etype: "refinfo", exprs: [data[2]]}) %}
     | %KW_RAW %LPAREN fullPathExpr %RPAREN {% (data) => ({etype: "raw", exprs: [data[2]]}) %}
+    | %KW_DEREF %LPAREN fullExpr %RPAREN {% (data) => ({etype: "deref", exprs: [data[2]]}) %}
 
 invokeExpr -> %KW_INVOKE %LPAREN fullExpr (%COMMA innerNamedCallParams):? %RPAREN {% (data) => {
           let rtn = {etype: "invoke", exprs: [data[2]], params: null};
@@ -581,9 +563,7 @@ idOrKeyword ->
     | %KW_NOATTR {% id %}
     | %KW_FIRE   {% id %}
     | %KW_NOP    {% id %}
-    | %KW_BUBBLE {% id %}
     | %KW_LOG    {% id %}
-    | %KW_ALERT  {% id %}
     | %KW_EXPR   {% id %}
     | %KW_LOCAL  {% id %}
     | %KW_IF     {% id %}
@@ -591,6 +571,7 @@ idOrKeyword ->
     | %KW_THROW  {% id %}
     | %KW_RAW    {% id %}
     | %KW_REF    {% id %}
+    | %KW_DEREF  {% id %}
     | %KW_ISREF  {% id %}
     | %KW_REFINFO     {% id %}
     | %KW_SETRETURN   {% id %}

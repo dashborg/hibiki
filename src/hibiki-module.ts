@@ -7,7 +7,7 @@
 import {sprintf} from "sprintf-js";
 import * as DataCtx from "./datactx";
 import type {HibikiRequest} from "./request";
-import {unpackPositionalArgs, stripAtKeys, getHibiki, fullPath, getSS, setSS, unpackArg, unpackAtArgs, smartEncodeParam, validateModulePath, unpackPositionalArgArray} from "./utils";
+import {getHibiki, fullPath, getSS, setSS, smartEncodeParam, validateModulePath} from "./utils";
 import type {HibikiExtState} from "./types";
 import type {HibikiState} from "./state";
 import {RtContext} from "./error";
@@ -59,7 +59,7 @@ class HibikiModule {
     }
 
     sleep(req : HibikiRequest) : Promise<any> {
-        let sleepMs = DataCtx.valToNumber(unpackArg(req.data, "ms", 0));
+        let sleepMs = DataCtx.valToNumber(req.params.getArg("ms", 0));
         if (sleepMs == null || typeof(sleepMs) !== "number") {
             throw new Error("sleep requires 'ms' parameter (must be number)");
         }
@@ -72,7 +72,7 @@ class HibikiModule {
     }
 
     getSS(req : HibikiRequest) : Promise<any> {
-        let key = DataCtx.valToString(unpackArg(req.data, "key", 0));
+        let key = DataCtx.valToString(req.params.getArg("key", 0));
         if (key == null) {
             throw new Error("get-session-storage requires 'key' parameter");
         }
@@ -80,17 +80,17 @@ class HibikiModule {
     }
 
     setSS(req : HibikiRequest) : Promise<any> {
-        let key = DataCtx.valToString(unpackArg(req.data, "key", 0));
+        let key = DataCtx.valToString(req.params.getArg("key", 0));
         if (key == null) {
             throw new Error("set-session-storage requires 'key' parameter");
         }
-        let val = DataCtx.demobx(unpackArg(req.data, "value", 1));
+        let val = DataCtx.demobx(req.params.getArg("value", 1));
         setSS(key, val);
         return null;
     }
 
     setTitle(req : HibikiRequest) : Promise<any> {
-        let title = unpackArg(req.data, "title", 0);
+        let title = req.params.getArg("title", 0);
         if (title == null) {
             throw new Error("set-title requires 'title' parameter");
         }
@@ -100,8 +100,8 @@ class HibikiModule {
     }
 
     updateUrl(req : HibikiRequest) : Promise<any> {
-        let data = stripAtKeys(req.data);
-        let {path: urlStrArg, raw: isRaw, replace, title} = unpackAtArgs(req.data);
+        let data = req.params.getPlainArgs();
+        let {path: urlStrArg, raw: isRaw, replace, title} = req.params.getAtArgs();
         let titleStr = DataCtx.valToString(title);
         let isRawBool = DataCtx.valToBool(isRaw);
         let urlStr = DataCtx.valToString(urlStrArg);
@@ -128,8 +128,8 @@ class HibikiModule {
     }
 
     navigate(req : HibikiRequest) : Promise<any> {
-        let data = stripAtKeys(req.data);
-        let {path: urlStrArg, raw: isRawArg} = unpackAtArgs(req.data);
+        let data = req.params.getPlainArgs();
+        let {path: urlStrArg, raw: isRawArg} = req.params.getAtArgs();
         let urlStr = DataCtx.valToString(urlStrArg);
         let isRaw = DataCtx.valToBool(isRawArg);
         let url = new URL((urlStr ?? ""), window.location.href);
@@ -147,13 +147,13 @@ class HibikiModule {
     }
 
     setTimeout(req : HibikiRequest) : Promise<any> {
-        let posArgs = unpackPositionalArgArray(req.data);
+        let posArgs = req.params.posArgs;
         if (posArgs.length != 2 || typeof(posArgs[0]) !== "string" || typeof(posArgs[1]) !== "number") {
             throw new Error("Invalid call to setTimeout.  You must provide two positional args setTimeout(eventName : string, timeoutMs : number).");
         }
         let eventName = posArgs[0];
         let timeoutMs = posArgs[1];
-        let datacontext = stripAtKeys(req.data);
+        let datacontext = req.params.getPlainArgs();
         let timeoutId = setTimeout(() => {
             let state = hibikiState(req.state);
             let eventObj = {event: eventName, native: true, bubble: false, datacontext: datacontext};
@@ -165,13 +165,13 @@ class HibikiModule {
     }
 
     setInterval(req : HibikiRequest) : Promise<any> {
-        let posArgs = unpackPositionalArgArray(req.data);
+        let posArgs = req.params.posArgs;
         if (posArgs.length != 2 || typeof(posArgs[0]) !== "string" || typeof(posArgs[1]) !== "number") {
             throw new Error("Invalid call to setInterval.  You must provide two positional args setInterval(eventName : string, intervalMs : number).");
         }
         let eventName = posArgs[0];
         let intervalMs = posArgs[1];
-        let datacontext = stripAtKeys(req.data);
+        let datacontext = req.params.getPlainArgs();
         let intervalId = setInterval(() => {
             let state = hibikiState(req.state);
             let eventObj = {event: eventName, native: true, bubble: false, datacontext: datacontext};
@@ -183,7 +183,7 @@ class HibikiModule {
     }
 
     clearInterval(req : HibikiRequest) : Promise<any> {
-        let posArgs = unpackPositionalArgArray(req.data);
+        let posArgs = req.params.posArgs;
         if (posArgs.length != 1) {
             throw new Error("Invalid call to clearInterval.  You must provide one positional arg setInterval(intervalId).  intervalId is returned from //@hibiki/setInterval()");
         }

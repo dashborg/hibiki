@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <script src="/hibiki-test.js"></script>
-<body hibiki class="hibiki-cloak">
+<body><template hibiki>
   <hibiki-data>
     {"color": "blue", "name": "mike", "PI": 3.14159, "x": 55, "idx": 2, "arr": [1,1,2,3,5,8],
     "point": {"x": 5, "y": 2}, "fruits1": ["apple"]}
@@ -9,6 +9,7 @@
     $.noattr = noattr;
     $.lv = ref($.point);
     $.fn = lambda(@v ? 'v-true' : 'v-false');
+    $.objak = {x: 10, y:20, "@test": true};
   </define-handler>
   <div class="container m-4" style="min-width: 1400px;">
     <h1 class="title">Test Basic</h1>
@@ -22,13 +23,13 @@
           </tr>
         </thead>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             {{ $.name }}
           </td>
           <td slot="result">mike</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             <div style="height: 30px; background-color: *$.color;"></div>
           </td>
           <td slot="result">
@@ -36,61 +37,61 @@
           </td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             <h-text bind="$.PI" format="%0.2f"></h-text>
           </td>
           <td slot="result">3.14</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             <h-text bind="$.PI" format="%0.3f"></h-text>
           </td>
           <td slot="result">3.142</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             <h-text bind="$.PI" format="%0.2f" style="font-weight: bold;"></h-text>
           </td>
           <td slot="result"><span style="font-weight: bold;">3.14</span></td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             <h-text bind="$.PI" format="%0.2f" class="has-text-weight-bold"></h-text>
           </td>
           <td slot="result"><span class="has-text-weight-bold">3.14</span></td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             <h-text bind="$.empty" nulltext="(is empty)"></h-text>
           </td>
           <td slot="result">(is empty)</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             <h-text bind="$.empty" nulltext="(is empty)" style="font-weight: bold;"></h-text>
           </td>
           <td slot="result"><span style="font-weight: bold">(is empty)</span></td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             {{ [1,2,3] }}
           </td>
           <td slot="result">1,2,3</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             {{ {x: 55, "name": "mike"} }}
           </td>
           <td slot="result">[object]</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             {{ {x: 55, "name": "mike"} | format("json-compact") }}
           </td>
           <td slot="result">{"x":55,"name","mike"}</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml style="text-align: left;">
+          <td slot="test" hibiki:innerhtml style="text-align: left;">
             <pre>{{ {x: 55, "name": "mike"} | format("json") }}</pre>
           </td>
           <td slot="result" style="text-align: left;">
@@ -101,19 +102,19 @@
           </td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             {{ noattr }} | {{ $.noattr.foo | format("json-noresolve") }} | {{ !!noattr }}
           </td>
           <td slot="result">null | "[noattr]" | false</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             {{ $.lv }} | {{ $.lv.x }}
           </td>
           <td slot="result">[object] | 5</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             {{ invoke($.fn) }} | {{ invoke($.fn, v=true) }}
           </td>
           <td slot="result">v-false | v-true</td>
@@ -131,46 +132,46 @@
           </tr>
         </thead>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>{{ 2 + 4 }}</td>
+          <td slot="test" hibiki:innerhtml>{{ 2 + 4 }}</td>
           <td slot="result">6</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>{{ 2 * 4 }}</td>
+          <td slot="test" hibiki:innerhtml>{{ 2 * 4 }}</td>
           <td slot="result">8</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>{{ 2 / 4 }}</td>
+          <td slot="test" hibiki:innerhtml>{{ 2 / 4 }}</td>
           <td slot="result">0.5</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>{{ 2 / 0 }}</td>
+          <td slot="test" hibiki:innerhtml>{{ 2 / 0 }}</td>
           <td slot="result">Infinity</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>{{ 7 % 2 }}</td>
+          <td slot="test" hibiki:innerhtml>{{ 7 % 2 }}</td>
           <td slot="result">1</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             {{ 5 > 2 }} | {{ 5 < 2 }} | {{ 5 >= 2 }}<br>
 {{ 5<= 2 }} | {{ 5 == 2 }} | {{ 5 != 2 }}
           </td>
           <td slot="result">true | false | true<br>false | false | true</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>{{ "2" == 2 ? "true" : "false" }} | {{ 2 != 1+1 ? "true" : "false" }}</td>
+          <td slot="test" hibiki:innerhtml>{{ "2" == 2 ? "true" : "false" }} | {{ 2 != 1+1 ? "true" : "false" }}</td>
           <td slot="result">true | false</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>{{ null ?? "5" ?? "7" }}</td>
+          <td slot="test" hibiki:innerhtml>{{ null ?? "5" ?? "7" }}</td>
           <td slot="result">5</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>{{ -5.2 }} | {{-5.2-1+1}} | {{+"5"+5}}</td>
+          <td slot="test" hibiki:innerhtml>{{ -5.2 }} | {{-5.2-1+1}} | {{+"5"+5}}</td>
           <td slot="result">-5.2 | -5.2 | 10</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>{{ 5 <=> 2 }} | {{ "7" <=> 2 }} | {{ "mike" <=> "xavier" }}<br>
+          <td slot="test" hibiki:innerhtml>{{ 5 <=> 2 }} | {{ "7" <=> 2 }} | {{ "mike" <=> "xavier" }}<br>
 {{ null <=> 5 }} | {{ 5 <=> null }} | {{ null <=> noattr }}<br>
 {{ fn:compare("TeSt", "test") }} | {{ fn:compare("TeSt", "test", nocase=true) }}<br>
 {{ fn:compare("5", 10) }} | {{ fn:compare("5", 10, type="numeric") }}<br>
@@ -179,17 +180,17 @@
           <td slot="result">1 | 1 | -1<br>-1 | 1 | 0<br>1 | 0<br>1 | -1<br>1 | 0</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>{{ noattr }}</td>
+          <td slot="test" hibiki:innerhtml>{{ noattr }}</td>
           <td slot="result">null</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             <span foreach="@v in $.arr">{{ @v }} </span>
           </td>
           <td slot="result">1 1 2 3 5 8</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
 <span foreach="(@v,@idx) in $.arr" if="@v != 2">
   {{ @v }}{{ (@idx != fn:len($.arr)-1) ? "," : "" }}
 </span>
@@ -197,7 +198,14 @@
           <td slot="result">1, 1, 3, 5, 8</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
+            <span foreach="(@v, @k) in $.objak" hibiki:ws>{{ @k + ":" + @v }} </span><br>
+<span foreach="@k in fn:objallkeys($.objak)" hibiki:ws>{{ @k + ":" + $.objak[@k] }} </span><br>
+          </td>
+          <td slot="result">x:10 y:20<br>x:10 y:20 @test:true</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" hibiki:innerhtml>
 <input type="checkbox" checked.bindpath="$.checked"><br>
 <span if="$.checked">(checked)</span>
 <span if="!$.checked">(not checked)</span>
@@ -217,151 +225,163 @@
           </tr>
         </thead>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>{{ fn:len($.arr) }}</td>
+          <td slot="test" hibiki:innerhtml>{{ fn:len($.arr) }}</td>
           <td slot="result">6</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>{{ fn:indexof("hello", "ll") }} | {{ fn:indexof("hello", "bar") }}</td>
+          <td slot="test" hibiki:innerhtml>{{ fn:indexof("hello", "ll") }} | {{ fn:indexof("hello", "bar") }}</td>
           <td slot="result">2 | -1</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>{{ fn:min(88, 22, 5, 7) }}</td>
+          <td slot="test" hibiki:innerhtml>{{ fn:min(88, 22, 5, 7) }}</td>
           <td slot="result">5</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>{{ fn:max(5+3, 2, -77, 0) }}</td>
+          <td slot="test" hibiki:innerhtml>{{ fn:max(5+3, 2, -77, 0) }}</td>
           <td slot="result">8</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             {{ fn:splice($.arr, 1, 2) }}
           </td>
           <td slot="result">1,3,5,8</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             {{ fn:slice($.arr, 3, 5) }}
           </td>
           <td slot="result">3,5</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             {{ fn:push([], 8, 12) }}
           </td>
           <td slot="result">8, 12</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             {{ fn:pop(fn:pop($.arr)) }}
           </td>
           <td slot="result">1,1,2,3</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             {{ fn:slice($.arr, 3) }}<br>{{ fn:slice($.arr) }}
           </td>
           <td slot="result">3,5,8<br>1,1,2,3,5,8</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             {{ fn:setadd($.fruits1, "apple") }}<br>
 {{ fn:setadd($.fruits1, "banana") }}
           </td>
           <td slot="result">apple<br>apple,banana</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             {{ fn:setremove($.fruits1, "apple") | format("json-compact") }}
           </td>
           <td slot="result">[]</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
-            {{ fn:sethas($.fruits1, "apple") }} | {{ fn:sethas($.fruits1, "banana") }}
+          <td slot="test" hibiki:innerhtml>
+            {{ fn:sethas($.fruits1, "apple") }} | {{ fn:sethas($.fruits1, "banana") }}<br>
+{{ fn:sethas("grape", "grape", @multi=false) }}
           </td>
-          <td slot="result">true | false</td>
+          <td slot="result">true | false<br>true</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
+            {{ fn:setupdate($.fruits1, "banana", true) }}<br>
+{{ fn:setupdate($.fruits1, "apple", false) | format("json") }}<br>
+{{ fn:setupdate($.fruits1, "grape", true, @multi=false) }}<br>
+{{ fn:setupdate($.fruits1, "grape", false, @multi=false) }}
+          </td>
+          <td slot="result">
+            apple,bannna<br>[]<br>grape<br>null
+          </td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" hibiki:innerhtml>
             {{ fn:bool(5) }} | {{ fn:bool("") }}
           </td>
           <td slot="result">true | false</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             {{ fn:jsonparse("[1,2,3]") }}
           </td>
           <td slot="result">1,2,3</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             {{fn:json({x: 22})}}
           </td>
           <td slot="result">{"x":22}</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             {{fn:merge({x: 55, z:10}, {y:22, z:5}) | format("json-compact")}}
           </td>
           <td slot="result">{"x":55,"z":5,"y":22}</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             {{fn:startswith("banana", "ba")}} | {{fn:startswith("apple", "ba")}}
           </td>
           <td slot="result">true | false</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             {{fn:endswith("banana", "na")}} | {{fn:endswith("apple", "na")}}
           </td>
           <td slot="result">true | false</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             {{fn:substr("banana", 2, 3)}}
           </td>
           <td slot="result">nan</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             {{fn:sprintf("PI is %0.2f", $.PI)}}
           </td>
           <td slot="result">PI is 3.14</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             {{fn:match("xyz58tt", "\\d+")}}<br>
 {{fn:match("xyz58tt", "(\\d)", "g")}}
           </td>
           <td slot="result">58<br>5,8</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             {{fn:substr(fn:uuid(), 0, 8)}}
           </td>
           <td slot="result">xxxxxxxx</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             {{fn:split("red,blue", ",") | format("json-compact")}}
           </td>
           <td slot="result">["red","blue"]</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             {{ fn:uppercase("Test") }} | {{ fn:lowercase("Test") }}
           </td>
           <td slot="result">TEST | test</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             {{ fn:floor(5.5) }} | {{ fn:ceil(5.5) }}
           </td>
           <td slot="result">5 | 6</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             {{ fn:sort([5, 8, 1, 2, 25, 20]) }}<br>
 {{ fn:sort([5, 8, 1, 2, 25, 20], type="string") }}<br>
 {{ fn:sort([5, 8, 1, 2, 25, 20], slice=[1,3]) }}            
@@ -369,13 +389,13 @@
           <td slot="result">1,2,5,8,20,25<br>1,2,20,25,5,8<br>2,5</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             {{ fn:sort([{x: 5}, {x: 2}, {x: -5}], field="x") | format("json-compact") }}
           </td>
           <td slot="result">[{"x":-5},{"x":2},{"x":5}]</td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             {{ fn:sort([{x: 5}, {x: 2}, {x: -5}],
    sortexpr=lambda(@b.x <=> @a.x)) | format("json-compact") }}
           </td>
@@ -394,7 +414,7 @@
           </tr>
         </thead>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             <div class="box" class.bg-blue="1"></div>
           </td>
           <td slot="result">
@@ -402,7 +422,7 @@
           </td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
             <div class="box" class.has-background-info-light="0"></div>
           </td>
           <td slot="result">
@@ -410,7 +430,7 @@
           </td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
 <div class="box bold !bold" class.bg-green="*$.x == 55">
   green              
 </div>
@@ -420,7 +440,7 @@
           </td>
         </tr>
         <tr component="local-test-tr">
-          <td slot="test" innerhtml>
+          <td slot="test" hibiki:innerhtml>
 <div class="box bg-green !bg-green" class.bold="1">
   bold
 </div>
@@ -440,4 +460,4 @@
       <h-children bind="@children.byslot.test"></h-children>
     </html-tr>
   </define-component>
-</body>
+</template></body>
