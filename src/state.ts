@@ -403,6 +403,32 @@ class DataEnvironment {
     }
 }
 
+function makeLibraryUrlFromSpec(libSpec : string) : string {
+    let match = libSpec.match(/^(.*)@(.*)$/);
+    if (match == null) {
+        throw new Error(sprintf("Invalid library spec, format is '[libname]@[libversion]' (e.g. 'hibiki/bulma@v0.1.0'), got: '%s'", libSpec));
+    }
+    let [libName, libVersion] = [match[1], match[2]];
+    if (libName.startsWith("/") || libName.endsWith("/")) {
+        throw new Error(sprintf("Invalid library name, cannot start or end with '/': '%s'", libName));
+    }
+    if (!libName.match(/^([a-zA-Z0-9/-])+$/)) {
+        throw new Error(sprintf("Invalid library name, only [a-zA-Z0-9/-] characters allowed: '%s'", libName));
+    }
+    if (!libVersion.match(/^v\d+\.\d+\.\d+$/)) {
+        throw new Error(sprintf("Invalid version number, must begin with 'v' and have 3 numeric parts (e.g. v0.1.0): '%s'", libVersion));
+    }
+    let libBaseNameMatch = libName.match("([a-zA-Z0-9-]+)$");
+    if (libBaseNameMatch == null) {
+        throw new Error(sprintf("Invalid library name, no base name detected (after final '/'): '%s'", libName));
+    }
+    let libBaseName = libBaseNameMatch[1];
+    let hibiki = getHibiki();
+    let ext = (hibiki.GlobalConfig.useDevLibraryBuilds ? ".dev.html" : ".html");
+    let url = hibiki.GlobalConfig.libraryRoot + match[1] + "/" + match[2] + "/" + libBaseName + ext;
+    return url;
+}
+
 class ComponentLibrary {
     libs : Record<string, LibraryType>;               // name -> library
     importedUrls : Record<string, boolean>;
@@ -732,19 +758,33 @@ class ComponentLibrary {
         for (let i=0; i<importTags.length; i++) {
             let itag = importTags[i];
             let attrs = NodeUtils.getRawAttrs(itag);
-            if (attrs.src == null || attrs.src === "") {
-                console.log("Invalid <import-library> tag, no src attribute");
+            if (attrs.src == null && attrs.lib == null) {
+                console.log("Invalid <import-library> tag, no 'src' or 'lib' attribute");
+                continue;
+            }
+            if (attrs.src != null && attrs.lib != null) {
+                console.log("Invalid <import-library> tag (ambiguous), has both 'src' and 'lib' attributes");
                 continue;
             }
             if (attrs.prefix == null || attrs.prefix === "") {
-                console.log(sprintf("Invalid <import-library> tag src[%s], no prefix attribute", itag.attrs.src));
+                console.log(sprintf("Invalid <import-library> tag [%s], no prefix attribute", attrs.lib ?? attrs.src));
                 continue;
             }
-            let libUrl = attrs.src;
+            let libUrl : string = null;
+            if (attrs.lib != null) {
+                libUrl = makeLibraryUrlFromSpec(attrs.lib);
+            }
+            else {
+                if (attrs.src === "") {
+                    console.log("Invalid <import-library> tag, src is empty");
+                    continue;
+                }
+                libUrl = attrs.src;
+            }
             if (attrs.relative) {
                 libUrl = new URL(libUrl, srcUrl).toString();
             }
-            let p = this.state.ComponentLibrary.buildLibraryFromUrl(attrs.src);
+            let p = this.state.ComponentLibrary.buildLibraryFromUrl(libUrl);
             let afterImportP = p.then((importedLibObj) => {
                 if (importedLibObj != null) {
                     this.importLibrary(libName, importedLibObj.name, attrs.prefix);
