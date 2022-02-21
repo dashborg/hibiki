@@ -32,6 +32,7 @@ templates and instructions on how to build custom libraries that integrate exist
 * if http module encounters unparsable json, it will throw an error, and set error.data.data to a blob with mimetype 'text/json-unparseable'
 * http network errors get error.data.status set to 599, and err.data.statustext to 'Network Error'
 * attributes prefixed with 'html-' will overwrite non-prefixed attributes in HTML nodes.  workaround for chrome/firefox issues where &lt;img&gt; src tags are getting preloaded, even in &lt;template&gt; or AJAX requests.  now you can write &lt;img html-src="*..."&gt; without causing an extra browser request.
+* assignment to a ref will set data one-level deep (will not recursively traverse refs), use deref() manually to set deep refs
 * internal: new HibikiParamsObj to manage position/named params in a more structured way
 * internal: HibikiParamsObj passed to jsfuncs
 * internal: HibikiParamsObj available in HibikiRequest object
