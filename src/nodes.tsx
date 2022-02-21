@@ -501,6 +501,12 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
         let managedType = NodeUtils.getManagedType(tagName, typeAttr);
         let managedAttrs = NodeUtils.MANAGED_ATTRS[managedType] ?? {};
         for (let [k,v] of Object.entries(attrVals)) {
+            if (k.startsWith("html-")) {
+                delete attrVals[k];
+                attrVals[k.substr(5)] = v;
+            }
+        }
+        for (let [k,v] of Object.entries(attrVals)) {
             k = k.toLowerCase();
             if (NodeUtils.SPECIAL_ATTRS[k] || managedAttrs[k]) {
                 continue;

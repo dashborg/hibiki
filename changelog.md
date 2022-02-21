@@ -2,14 +2,17 @@
 
 ## v0.3.1
 
+More internal changes and features to support complex UI component libraries.
+Start a set of standard versioned Hibiki HTML libraries that can be loaded using a special &lt;import-library lib="..."&gt; syntax.
+Standard library source code is available on GitHub at https://github.com/dashborg/hibiki-libs with 
+templates and instructions on how to build custom libraries that integrate existing JS libraries and React controls.
+
+* import Standard Hibiki HTML libraries using &lt;import-library lib="[LIBRARY-NAME]@[VERSION]"&gt;&lt;/import-library&gt;
 * removed 'alert' statement, use log(..., @alert=true);
 * removed 'bubble' statement, use fire->event(..., @bubble=true);
 * allow 'fire' statement to take nodeuuid as at-arg, fire->event(..., @nodeuuid="expr");
-* new HibikiParamsObj to manage position/named params in a more structured way
-* HibikiParamsObj passed to jsfuncs
-* HibikiParamsObj available in HibikiRequest object
-* HibikiRequest.data is now params stripped of at-args (and positional args)
 * added 'nosort' option to fn:sort()
+* HibikiRequest.data is now params stripped of at-args (and positional args)
 * added deref() expression which removes one level of ref()
 * allow getters on HibikiBlob oject (mimetype, bloblen, name, base64), fn:blob funcs are now obsolete
 * new @event context var passed to all native handlers (and propagated if events are re-fired) that wraps react synthetic event
@@ -28,6 +31,10 @@
 * http module errors set error.type to 'http' and error.data to an object with 'status', 'statustext', and 'data' (parsed error response).  can be used to inspect and use error responses (e.g. JSON error bodies with non-200 status codes)
 * if http module encounters unparsable json, it will throw an error, and set error.data.data to a blob with mimetype 'text/json-unparseable'
 * http network errors get error.data.status set to 599, and err.data.statustext to 'Network Error'
+* attributes prefixed with 'html-' will overwrite non-prefixed attributes in HTML nodes.  workaround for chrome/firefox issues where &lt;img&gt; src tags are getting preloaded, even in &lt;template&gt; or AJAX requests.  now you can write &lt;img html-src="*..."&gt; without causing an extra browser request.
+* internal: new HibikiParamsObj to manage position/named params in a more structured way
+* internal: HibikiParamsObj passed to jsfuncs
+* internal: HibikiParamsObj available in HibikiRequest object
 * bugfix: inconsistencies in accessing getters on HibikiNode object
 * bugfix: more consistent handling of noattr args in jsfuncs (stripped out by HibikiParamsObj)
 * bugfix: rendering of text inside of html option tag

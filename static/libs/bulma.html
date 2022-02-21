@@ -45,7 +45,7 @@
 
   <define-component name="image">
     <figure class="image" automerge="@all|-src">
-      <img src="*$args.src">
+      <img automerge="img" html-src="*$args.src">
     </figure>
   </define-component>
 
