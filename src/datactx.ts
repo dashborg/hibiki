@@ -113,7 +113,11 @@ class HibikiReactEvent extends HibikiWrappedObj {
         this.event = event;
     }
 
-    allowedGetters(key : string) : boolean {
+    allowedGetters() : string[] {
+        return Object.keys(EVENT_ALLOWED_GETTERS);
+    }
+
+    isAllowedGetter(key : string) : boolean {
         return EVENT_ALLOWED_GETTERS[key];
     }
 
@@ -267,7 +271,11 @@ class ChildrenVar extends HibikiWrappedObj {
         this.boundNodes = boundNodes ?? [];
     }
 
-    allowedGetters(key : string) : boolean {
+    allowedGetters() : string[] {
+        return Object.keys(CHILDRENVAR_ALLOWED_GETTERS);
+    }
+
+    isAllowedGetter(key : string) : boolean {
         return CHILDRENVAR_ALLOWED_GETTERS[key];
     }
 
@@ -472,7 +480,11 @@ class HibikiBlob extends HibikiWrappedObj {
         return "data:" + this.mimetypeIv + ";base64," + this.dataIv;
     }
 
-    allowedGetters(key : string) : boolean {
+    allowedGetters() : string[] {
+        return Object.keys(BLOB_ALLOWED_GETTERS);
+    }
+
+    isAllowedGetter(key : string) : boolean {
         return BLOB_ALLOWED_GETTERS[key];
     }
 
@@ -824,7 +836,9 @@ function makeIteratorFromValue(bindVal : HibikiVal) : [any, boolean] {
     }
     let [plainObj, isObj] = asPlainObject(bindVal, false);
     if (isObj) {
-        return [Object.entries(plainObj), true];
+        let entries = Object.entries(plainObj);
+        entries = entries.filter(([k,v]) => !k.startsWith("@"));
+        return [entries, true];
     }
     else {
         return [[bindVal], false];
@@ -1268,7 +1282,7 @@ function internalResolvePath(path : PathType, irData : HibikiVal, dataenv : Data
             return null;
         }
         if (irData instanceof HibikiWrappedObj) {
-            if (!irData.allowedGetters(pp.pathkey)) {
+            if (!irData.isAllowedGetter(pp.pathkey)) {
                 return null;
             }
             return internalResolvePath(path, irData[pp.pathkey], dataenv, resolveType, level+1);

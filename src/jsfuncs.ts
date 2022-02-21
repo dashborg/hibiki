@@ -7,7 +7,7 @@
 import * as mobx from "mobx";
 import type {JSFuncType, HibikiVal, HibikiValObj} from "./types";
 import {sprintf} from "sprintf-js";
-import {isObject, addToArrayDupCheck, removeFromArray, valInArray} from "./utils";
+import {isObject, addToArrayDupCheck, removeFromArray, valInArray, HibikiWrappedObj} from "./utils";
 import {v4 as uuidv4} from 'uuid';
 import * as DataCtx from "./datactx";
 import type {DataEnvironment} from "./state";
@@ -353,6 +353,39 @@ function jsBlobName(blob : HibikiVal) : string {
     return null;
 }
 
+function jsObjKeys(val : HibikiVal) : string[] {
+    let rtn = jsObjAllKeys(val);
+    if (rtn == null) {
+        return null;
+    }
+    rtn = rtn.filter((k) => !k.startsWith("@"));
+    return rtn;
+}
+
+function jsObjAllKeys(val : HibikiVal) : string[] {
+    if (val == null) {
+        return null;
+    }
+    let [plainObj, isObj] = DataCtx.asPlainObject(val, false);
+    if (isObj) {
+        let rtn = Object.keys(val);
+        return rtn;
+    }
+    if (val instanceof HibikiWrappedObj) {
+        return val.allowedGetters();
+    }
+    return null;
+}
+
+function jsObjAtKeys(val : HibikiVal) : string[] {
+    let rtn = jsObjAllKeys(val);
+    if (rtn == null) {
+        return null;
+    }
+    rtn = rtn.filter((k) => k.startsWith("@"));
+    return rtn;
+}
+
 function jsUuid() : string {
     return uuidv4();
 }
@@ -559,6 +592,11 @@ reg("splice", jsSplice, true);
 regParamFn("slice", jsSlice);
 reg("push", jsPush, true);
 reg("pop", jsPop, true);
+
+// obj functions
+reg("objkeys", jsObjKeys, true);
+reg("objatkeys", jsObjAtKeys, true);
+reg("objallkeys", jsObjAllKeys, true);
 
 // string functions
 reg("substr", jsSubstr, true);

@@ -167,7 +167,11 @@ class HibikiError extends HibikiWrappedObj {
         }
     }
 
-    allowedGetters(key : string) : boolean {
+    allowedGetters() : string[] {
+        return Object.keys(ERROR_ALLOWED_GETTERS);
+    }
+
+    isAllowedGetter(key : string) : boolean {
         return ERROR_ALLOWED_GETTERS[key];
     }
 

@@ -16,7 +16,8 @@ const SYM_PROXY = Symbol("proxy");
 const SYM_FLATTEN = Symbol("flatten");
 
 abstract class HibikiWrappedObj {
-    abstract allowedGetters(key : string) : boolean;
+    abstract allowedGetters() : string[];
+    abstract isAllowedGetter(key : string) : boolean;
     abstract asString() : string;
     abstract hibikiTypeOf() : string;
 }

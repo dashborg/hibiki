@@ -78,7 +78,11 @@ class HibikiNode extends HibikiWrappedObj {
         }
     }
 
-    allowedGetters(key : string) : boolean {
+    allowedGetters() : string[] {
+        return Object.keys(NODE_ALLOWED_GETTERS);
+    }
+
+    isAllowedGetter(key : string) : boolean {
         return NODE_ALLOWED_GETTERS[key];
     }
 

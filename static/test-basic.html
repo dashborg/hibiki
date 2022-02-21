@@ -9,6 +9,7 @@
     $.noattr = noattr;
     $.lv = ref($.point);
     $.fn = lambda(@v ? 'v-true' : 'v-false');
+    $.objak = {x: 10, y:20, "@test": true};
   </define-handler>
   <div class="container m-4" style="min-width: 1400px;">
     <h1 class="title">Test Basic</h1>
@@ -195,6 +196,13 @@
 </span>
           </td>
           <td slot="result">1, 1, 3, 5, 8</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" hibiki:innerhtml>
+            <span foreach="(@v, @k) in $.objak" hibiki:ws>{{ @k + ":" + @v }} </span><br>
+<span foreach="@k in fn:objallkeys($.objak)" hibiki:ws>{{ @k + ":" + $.objak[@k] }} </span><br>
+          </td>
+          <td slot="result">x:10 y:20<br>x:10 y:20 @test:true</td>
         </tr>
         <tr component="local-test-tr">
           <td slot="test" hibiki:innerhtml>

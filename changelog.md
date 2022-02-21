@@ -22,6 +22,8 @@
 * added aliases for 'foreach', 'automerge', 'if', and 'unwrap' attributes in hibiki namespace: e.g. 'hibiki:foreach', 'hibiki:automerge', 'h:unwrap'
 * allow script type="module" for inline hibiki script nodes
 * no longer allow rendering Hibiki HTML directly to 'body' tag (bad interactions with 3rd party libraries)
+* 'foreach' will now skip keys that start with '@' on ojects.  to iterate over them, use fn:objallkeys().
+* added fn:objkeys(), fn:objatkeys() and fn:objallkeys() to return object keys (also work with HibikiWrappedObj).  objkeys omits any keys starting with '@', objallkeys returns all keys (include @), and objatkeys only returns @ keys.
 * bugfix: inconsistencies in accessing getters on HibikiNode object
 * bugfix: more consistent handling of noattr args in jsfuncs (stripped out by HibikiParamsObj)
 * bugfix: rendering of text inside of html option tag
