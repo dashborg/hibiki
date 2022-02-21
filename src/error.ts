@@ -9,6 +9,7 @@ import type {DataEnvironment} from "./state";
 import {sprintf} from "sprintf-js";
 import type {HibikiNode} from "./html-parser";
 import {HibikiWrappedObj} from "./utils";
+import type {HibikiVal} from "./types";
 
 type RtContextItem = {
     desc : string,
@@ -149,6 +150,8 @@ const ERROR_ALLOWED_GETTERS : Record<string, boolean> = {
     "stack": true,
     "jsstack": true,
     "message": true,
+    "type": true,
+    "data": true,
 };
 
 class HibikiError extends HibikiWrappedObj {
@@ -156,14 +159,26 @@ class HibikiError extends HibikiWrappedObj {
     message : string;
     rtctx : RtContext;
     err : any;
+    errorType : string;
+    errorData : HibikiVal;
     
     constructor(msg : string, err? : any, rtctx? : RtContext) {
         super();
         this._type = "HibikiError";
+        this.errorType = "base";
         this.message = msg;
         this.err = err;
         if (rtctx != null) {
             this.rtctx = rtctx.copy();
+        }
+        this.errorData = null;
+        if (this.err != null && this.err instanceof Error) {
+            if (this.err["hibikiErrorType"] != null) {
+                this.errorType = this.err["hibikiErrorType"];
+            }
+            if (this.err["hibikiErrorData"] != null) {
+                this.errorData = this.err["hibikiErrorData"];
+            }
         }
     }
 
@@ -173,6 +188,14 @@ class HibikiError extends HibikiWrappedObj {
 
     isAllowedGetter(key : string) : boolean {
         return ERROR_ALLOWED_GETTERS[key];
+    }
+
+    get type() : string {
+        return this.errorType;
+    }
+
+    get data() : HibikiVal {
+        return this.errorData;
     }
 
     get event() : string {
@@ -202,7 +225,7 @@ class HibikiError extends HibikiWrappedObj {
     }
 
     get stack() : string {
-        let errStr = "Hibiki Error | " + this.message + "\n";
+        let errStr = sprintf("Hibiki Error (%s) | %s\n", this.errorType, this.message);
         if (this.rtctx != null) {
             errStr += this.rtctx.asString("> ") + "\n";
         }

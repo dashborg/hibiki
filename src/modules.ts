@@ -15,16 +15,49 @@ import * as mobx from "mobx";
 
 let VALID_METHODS : Record<string, boolean> = {"GET": true, "POST": true, "PUT": true, "PATCH": true, "DELETE": true};
 
-function handleFetchResponse(url : URL, resp : any) : Promise<any> {
-    if (!resp.ok) {
-        throw new Error(sprintf("Bad status code response from fetch '%s': %d %s", url.toString(), resp.status, resp.statusText));
-    }
+function fetchDataObj(url : URL, resp : any, inErrorHandler : boolean) : Promise<HibikiVal> {
     let contentType = resp.headers.get("Content-Type");
     if (contentType != null && contentType.startsWith("application/json")) {
-        return resp.json();
+        return resp.text().then((textData) => {
+            try {
+                return JSON.parse(textData);
+            }
+            catch (err) {
+                let blobRtn = new DataCtx.HibikiBlob("text/json-unparseable", btoa(textData));
+                if (inErrorHandler) {
+                    return blobRtn;
+                }
+                let errMsg = sprintf("Unparseable JSON: " + err.message);
+                let rtnErr = new Error(errMsg);
+                rtnErr["hibikiErrorType"] = "http";
+                rtnErr["hibikiErrorData"] = {status: resp.status, statustext: resp.statusText, data: blobRtn};
+                throw rtnErr;
+            }
+        });
     }
     let blobp = resp.blob();
     return blobp.then((blob) => DataCtx.BlobFromBlob(blob));
+}
+
+function handleFetchResponse(url : URL, resp : any) : Promise<any> {
+    if (!resp.ok) {
+        let errMsg = sprintf("Bad status code response from fetch '%s': %d %s", url.toString(), resp.status, resp.statusText);
+        let rtnErr = new Error(errMsg);
+        let dataPromise = fetchDataObj(url, resp, true);
+        return dataPromise.then((data) => {
+            let errData = {status: resp.status, statustext: resp.statusText, data: data};
+            rtnErr["hibikiErrorData"] = errData;
+            rtnErr["hibikiErrorType"] = "http";
+            throw rtnErr;
+        });
+    }
+    return fetchDataObj(url, resp, false);
+}
+
+function handleFetchFail(err : Error) : Promise<any> {
+    err["hibikiErrorType"] = "http";
+    err["hibikiErrorData"] = {status: 599, statustext: "Network Error"};
+    throw err;
 }
 
 function convertHeaders(...headersObjArr : any[]) : Headers {
@@ -154,7 +187,7 @@ function DefaultCsrfValueFn() {
     if (csrfMetaElem != null) {
         csrfToken = (csrfMetaElem as any).content;
     }
-    return csrfToken;   
+    return csrfToken;
 }
 
 function setParams(method : string, url : URL, fetchInit : Record<string, any>, data : DataCtx.HibikiParamsObj) {
@@ -343,7 +376,7 @@ class HttpModule {
             throw new Error(sprintf("Invalid URL for %s handler '%s': %s", modName, fullPath(req.callpath), e.toString()));
         }
         let fetchInit = makeFetchInit(req, url, this.opts);
-        let p = fetch(url.toString(), fetchInit).then((resp) => handleFetchResponse(url, resp));
+        let p = fetch(url.toString(), fetchInit).catch((resp) => handleFetchFail(resp)).then((resp) => handleFetchResponse(url, resp));
         return p;
     }
 }
