@@ -534,6 +534,9 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
                 elemProps["download"] = "";
                 continue;
             }
+            if (k === "colspan") {
+                k = "colSpan";
+            }
             elemProps[k] = strVal;
         }
         if (!managedAttrs["value"] && elemProps["value"] == null && ctx.getRawAttr("value") == "") {
@@ -899,12 +902,12 @@ class SimpleQueryNode extends React.Component<HibikiReactProps, {}> {
 
 function addCoreComponent(name : string, impl : any) {
     let comp : LibComponentType = {componentType: "hibiki-native"};
-    comp.impl = mobx.observable.box(impl, {name: "@hibiki/core/" + name});
+    comp.impl = mobx.observable.box(impl, {name: "hibiki/core/" + name});
     CORE_LIBRARY.libComponents[name] = comp;
 }
 
 let CORE_LIBRARY : LibraryType = {
-    name: "@hibiki/core",
+    name: "hibiki/core",
     libNode: new HibikiNode("#def", {list: []}),
     libComponents: {},
     importedComponents: {},
