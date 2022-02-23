@@ -1,6 +1,6 @@
 {
   "name": "hibiki",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Hibiki HTML",
   "main": "dist/hibiki.js",
   "repository": "https://github.com/sawka/hibiki",
