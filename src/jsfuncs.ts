@@ -288,6 +288,40 @@ function jsTrim(str : HibikiVal) : string {
     return str.trim();
 }
 
+function jsTrimIndent(str : HibikiVal) : string {
+    if (typeof(str) !== "string") {
+        return null;
+    }
+    let lines = str.split(/\r?\n/);
+    let minIndent = null;
+    for (let i=0; i<lines.length; i++) {
+        let match = lines[i].match(/^\s*\S/);
+        if (match == null) {
+            continue;
+        }
+        if (minIndent == null || match[0].length-1 < minIndent) {
+            minIndent = match[0].length-1;
+        }
+    }
+    if (minIndent == null || minIndent === 0) {
+        return str;
+    }
+    let indentStr = " ".repeat(minIndent);
+    let rtn = [];
+    for (let i=0; i<lines.length; i++) {
+        if ((i === 0 || i === lines.length-1) && lines[i].trim() === "") {
+            continue;
+        }
+        if (lines[i].startsWith(indentStr)) {
+            rtn.push(lines[i].substr(minIndent));
+        }
+        else {
+            rtn.push(lines[i]);
+        }
+    }
+    return rtn.join("\n");
+}
+
 function jsStartsWith(str : HibikiVal, ...rest : any[]) : boolean {
     if (str == null || typeof(str) !== "string") {
         return false;
@@ -316,6 +350,32 @@ function jsMatch(str : HibikiVal, regex : HibikiVal, ...rest : any[]) : any {
     }
     let re = new RegExp(regex, ...rest);
     return str.match(re);
+}
+
+function jsReplace(str : HibikiVal, findStr : HibikiVal, replaceStr : HibikiVal) : string {
+    if (typeof(str) !== "string") {
+        return null;
+    }
+    if (typeof(findStr) !== "string") {
+        return str;
+    }
+    if (typeof(replaceStr) !== "string") {
+        replaceStr = DataCtx.valToString(replaceStr);
+    }
+    return str.replace(findStr, replaceStr);
+}
+
+function jsReplaceAll(str : HibikiVal, findStr : HibikiVal, replaceStr : HibikiVal) : string {
+    if (typeof(str) !== "string") {
+        return null;
+    }
+    if (typeof(findStr) !== "string") {
+        return str;
+    }
+    if (typeof(replaceStr) !== "string") {
+        replaceStr = DataCtx.valToString(replaceStr);
+    }
+    return str.replaceAll(findStr, replaceStr);
 }
 
 function jsBlobAsText(blob : HibikiVal) : string {
@@ -609,6 +669,9 @@ reg("startswith", jsStartsWith, true);
 reg("endswith", jsEndsWith, true);
 reg("match", jsMatch, true);
 reg("split", jsSplit, true);
+reg("replace", jsReplace, true);
+reg("replaceall", jsReplaceAll, true);
+reg("trimindent", jsTrimIndent, true);
 
 // math functions
 reg("min", jsMin, false);

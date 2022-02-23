@@ -1,5 +1,12 @@
 # Change Log
 
+## v0.3.2
+
+* fn:trimindent() to detect and remove constant number of spaces from lines
+* fn:replace(), fn:replaceall() for string replacement (no regex support yet)
+* special syntax to turn html comments to hibiki text nodes using "hibiki:text" or "hibiki:rawtext"
+* bugfix: fix isnoattr() to not throw errors
+
 ## v0.3.1
 
 More internal changes and features to support complex UI component libraries.
