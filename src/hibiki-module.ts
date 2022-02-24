@@ -8,7 +8,7 @@ import {sprintf} from "sprintf-js";
 import * as DataCtx from "./datactx";
 import type {HibikiRequest} from "./request";
 import {getHibiki, fullPath, getSS, setSS, smartEncodeParam, validateModulePath} from "./utils";
-import type {HibikiExtState} from "./types";
+import type {HibikiExtState, HibikiVal} from "./types";
 import type {HibikiState} from "./state";
 import {RtContext} from "./error";
 
@@ -26,36 +26,53 @@ class HibikiModule {
     callHandler(req : HibikiRequest) : Promise<any> {
         validateModulePath("hibiki", req.callpath);
         let handlerName = req.callpath.url;
-        if (handlerName == "/get-session-storage") {
+        if (handlerName === "/get-session-storage") {
             return this.getSS(req);
         }
-        else if (handlerName == "/set-session-storage") {
+        else if (handlerName === "/set-session-storage") {
             return this.setSS(req);
         }
-        else if (handlerName == "/set-title") {
+        else if (handlerName === "/set-title") {
             return this.setTitle(req);
         }
-        else if (handlerName == "/update-url") {
+        else if (handlerName === "/update-url") {
             return this.updateUrl(req);
         }
-        else if (handlerName == "/sleep") {
+        else if (handlerName === "/sleep") {
             return this.sleep(req);
         }
-        else if (handlerName == "/navigate") {
+        else if (handlerName === "/navigate") {
             return this.navigate(req);
         }
-        else if (handlerName == "/setTimeout") {
+        else if (handlerName === "/setTimeout" || handlerName === "/set-timeout") {
             return this.setTimeout(req);
         }
-        else if (handlerName == "/setInterval") {
+        else if (handlerName === "/setInterval" || handlerName === "/set-interval") {
             return this.setInterval(req);
         }
-        else if (handlerName == "/clearInterval") {
+        else if (handlerName === "/clearInterval" || handlerName === "/clear-interval" || handlerName === "/clearTimeout" || handlerName === "/clear-timeout") {
             return this.clearInterval(req);
+        }
+        else if (handlerName === "/confirm") {
+            return this.callConfirm(req);
+        }
+        else if (handlerName === "/alert") {
+            return this.callAlert(req);
         }
         else {
             throw new Error("Invalid Hibiki Module handler: " + fullPath(req.callpath));
         }
+    }
+
+    callConfirm(req : HibikiRequest) : Promise<HibikiVal> {
+        let str = DataCtx.valToString(req.params.getArg(null, 0));
+        return Promise.resolve(confirm(str));
+    }
+
+    callAlert(req : HibikiRequest) : Promise<HibikiVal> {
+        let str = DataCtx.valToString(req.params.getArg(null, 0));
+        alert(str);
+        return null;
     }
 
     sleep(req : HibikiRequest) : Promise<any> {
