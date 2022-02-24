@@ -2,6 +2,8 @@
 
 ## v0.3.2
 
+* new array functions: fn:filter(), fn:map(), fn:find(), fn:findindex(), fn:reduce(), fn:reverse(), fn:every(), fn:some(), fn:concat(), fn:join(), fn:shift(), fn:unshift()
+* fn:indexof() now works for both strings and arrays
 * fn:trimindent() to detect and remove constant number of spaces from lines
 * fn:replace(), fn:replaceall() for string replacement (no regex support yet)
 * special syntax to turn html comments to hibiki text nodes using "hibiki:text" or "hibiki:rawtext"

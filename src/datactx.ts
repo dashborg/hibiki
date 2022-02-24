@@ -2215,7 +2215,7 @@ function callFn(fnName : string, params : HibikiParamsObj, dataenv : DataEnviron
         return stateFn.fn(...params.posArgs);
     }
     else {
-        throw new Error(sprintf("Invalid function: '%s', no function defined", fnAst.fn));
+        throw new Error(sprintf("Invalid function: '%s', no function defined", fnName));
     }
 }
 
