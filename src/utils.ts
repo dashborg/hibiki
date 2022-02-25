@@ -472,8 +472,8 @@ function parseHandler(handlerPath : string) : HandlerPathType {
         catch (e) {
             throw new Error("Invalid handler path, bad module URL: " + handlerPath);
         }
-        if (testUrl.protocol != "http:" && testUrl.protocol != "https:") {
-            throw new Error("Invalid handler path, invalid protocol: " + handlerPath);
+        if (!protocolOk(testUrl)) {
+            throw new Error(sprintf("Invalid handler path, invalid protocol[%s]: %s", testUrl.protocol, handlerPath));
         }
         return {module: match[1], url: urlStr, method: method};
     }
@@ -483,8 +483,8 @@ function parseHandler(handlerPath : string) : HandlerPathType {
     catch (e) {
         throw new Error("Invalid handler path, bad URL: " + handlerPath);
     }
-    if (testUrl.protocol != "http:" && testUrl.protocol != "https:") {
-        throw new Error("Invalid handler path, invalid protocol: " + handlerPath);
+    if (!protocolOk(testUrl)) {
+        throw new Error(sprintf("Invalid handler path, invalid protocol[%s]: %s", testUrl.protocol, handlerPath));
     }
     return {module: "http", url: handlerPath, method: method};
 }
@@ -749,6 +749,12 @@ function compareVersions(v1 : string, v2 : string) : number {
         return -1;
     }
     return 0;
+}
+
+function protocolOk(url : URL) {
+    return (url.protocol === "http:"
+         || url.protocol === "https:"
+         || (window.location.protocol === "file:" && url.protocol === "file:"));
 }
 
 export {jsonRespHandler, parseUrlParams, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, evalDeepTextContent, jseval, nodeStr, callHook, getHibiki, parseHandler, fullPath, smartEncodeParam, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy, valInArray, rawAttrFromNode, STYLE_UNITLESS_NUMBER, subMapKey, subArrayIndex, unbox, splitTrim, bindLibContext, cnArrToClassAttr, classStringToCnArr, isClassStringLocked, joinClassStrs, attrBaseName, cnArrToLosslessStr, parseAttrName, nsAttrName, validateModulePath, compareVersions, HibikiWrappedObj};
