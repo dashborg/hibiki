@@ -256,7 +256,7 @@
           <td slot="test" hibiki:innerhtml>
             {{ fn:push([], 8, 12) }}
           </td>
-          <td slot="result">8, 12</td>
+          <td slot="result">8,12</td>
         </tr>
         <tr component="local-test-tr">
           <td slot="test" hibiki:innerhtml>
@@ -269,6 +269,58 @@
             {{ fn:slice($.arr, 3) }}<br>{{ fn:slice($.arr) }}
           </td>
           <td slot="result">3,5,8<br>1,1,2,3,5,8</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" hibiki:innerhtml>
+            {{ fn:filter($.arr, lambda(@elem % 2 == 0)) }}<br>
+{{ fn:map($.arr, lambda(@elem*10)) }}<br>
+{{ fn:reduce($.arr, lambda(@value+@elem)) }}<br>
+{{ fn:findindex($.arr, lambda(@elem == 8)) }}<br>
+{{ fn:find($.arr, lambda(@index == 5)) }}
+          </td>
+          <td slot="result">
+            2,8<br>
+            10,10,20,30,50,80<br>
+            20<br>
+            5<br>
+            8
+          </td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" hibiki:innerhtml>
+            {{ fn:shift($.arr) }}<br>{{ fn:shift($.arr, 2) }}<br>
+{{ fn:unshift($.arr, 88) }}
+          </td>
+          <td slot="result">
+            1,2,3,5,8<br>2,3,5,8<br>88,1,1,2,3,5,8
+          </td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" hibiki:innerhtml>
+            {{ fn:some($.arr, lambda(@elem > 5)) }}<br>
+{{ fn:some($.arr, lambda(@elem > 50)) }}<br>
+{{ fn:every($.arr, lambda(@elem < 10)) }}<br>
+{{ fn:every($.arr, lambda(@elem < 5)) }}
+          </td>
+          <td slot="result">
+            true<br>false<br>true<br>false
+          </td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" hibiki:innerhtml>
+            {{ fn:join($.arr, "*") }}
+          </td>
+          <td slot="result">
+            1*1*2*3*5*8
+          </td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" hibiki:innerhtml>
+            {{ fn:concat($.arr, [1,22]) }}
+          </td>
+          <td slot="result">
+            1,1,2,3,5,8,1,22
+          </td>
         </tr>
         <tr component="local-test-tr">
           <td slot="test" hibiki:innerhtml>

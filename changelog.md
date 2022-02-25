@@ -1,5 +1,16 @@
 # Change Log
 
+## v0.3.2
+
+* new array functions: fn:filter(), fn:map(), fn:find(), fn:findindex(), fn:reduce(), fn:reverse(), fn:every(), fn:some(), fn:concat(), fn:join(), fn:shift(), fn:unshift()
+* fn:indexof() now works for both strings and arrays
+* fn:trimindent() to detect and remove constant number of spaces from lines
+* fn:replace(), fn:replaceall() for string replacement (no regex support yet)
+* add //@hibiki/confirm() and //@hibiki/alert()
+* rename //@hibiki/setInterval and //@hibiki/setTimeout to //@hibiki/set-interval and //@hibiki/set-timeout (old names still work).  add //@hibiki/clear-timeout
+* special syntax to turn html comments to hibiki text nodes using "hibiki:text" or "hibiki:rawtext"
+* bugfix: fix isnoattr() to not throw errors
+
 ## v0.3.1
 
 More internal changes and features to support complex UI component libraries.

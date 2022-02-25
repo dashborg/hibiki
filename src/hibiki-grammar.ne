@@ -410,7 +410,7 @@ primaryExpr ->
     | invokeExpr      {% id %}
     | lambdaExpr      {% id %}
     | refExpr         {% id %}
-    | isNoAttrExpr   
+    | isNoAttrExpr    {% id %}
     | %LPAREN fullExpr %RPAREN {% (data) => data[1] %}
     | pathExprNonTerm {% id %}
 

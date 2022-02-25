@@ -144,6 +144,24 @@ class DataEnvironment {
         return rtn;
     }
 
+    callFn(fnName : string, p1 : HibikiVal[] | HibikiValObj, p2 : HibikiValObj) : HibikiVal {
+        let plainObj : HibikiValObj = null;
+        let [p1Obj, p1IsObj] = DataCtx.asPlainObject(p1, false);
+        if (p1IsObj) {
+            plainObj = p1Obj;
+        }
+        else {
+            let [p1Arr, p1IsArr] = DataCtx.asArray(p1, false);
+            let [p2Obj, p2IsObj] = DataCtx.asPlainObject(p2, false);
+            plainObj = (p2IsObj ? p2Obj : {});
+            if (p1IsArr) {
+                plainObj["*args"] = p1Arr;
+            }
+        }
+        let paramsObj = new DataCtx.HibikiParamsObj(plainObj);
+        return DataCtx.callFn(fnName, paramsObj, this);
+    }
+
     resolveRoot(rootName : string, opts?: {caret? : number}) : HibikiValObj | HibikiVal[] {
         opts = opts || {};
         if (opts.caret != null && opts.caret < 0 || opts.caret > 1) {
@@ -753,7 +771,7 @@ class ComponentLibrary {
         else {
             libObj.modules["lib"] = new mreg["lib"](this.state, {libContext: libName});
         }
-        this.importLibrary(libName, "@hibiki/core", null, true);
+        this.importLibrary(libName, "hibiki/core", null, true);
         let importTags = subNodesByTag(libNode, "import-library");
         for (let i=0; i<importTags.length; i++) {
             let itag = importTags[i];

@@ -594,7 +594,14 @@ class HtmlParser {
             return this.parseText(parentTag, htmlNode.textContent, pctx);
         }
         if (htmlNode.nodeType === 8) { // COMMENT_NODE
-            return new HibikiNode("#comment", {text: htmlNode.textContent});
+            let text = htmlNode.textContent;
+            if (text.startsWith("hibiki:text[") && text.endsWith("]")) {
+                return this.parseText(parentTag, text, pctx);
+            }
+            if (text.startsWith("hibiki:rawtext[") && text.endsWith("]")) {
+                return new HibikiNode("#text", {text: text});
+            }
+            return new HibikiNode("#comment", {text: text});
         }
         if (htmlNode.nodeType !== 1) { // ELEMENT_NODE
             return null;
@@ -742,24 +749,28 @@ class HtmlParser {
             return list;
         }
         if (wsMode === "trim-nl") {
-            let firstNode = list[0];
-            let shouldTrim = false;
-            if (firstNode.tag === "#text") {
-                firstNode.text = trimToNl(firstNode.text);
-                shouldTrim = shouldTrim || (firstNode.text === "");
-            }
-            let lastNode = list[list.length-1];
-            if (lastNode.tag === "#text") {
-                lastNode.text = trimFromNl(lastNode.text);
-                shouldTrim = shouldTrim || (lastNode.text === "");
-            }
-            if (shouldTrim) {
-                list = list.filter((subNode) => !subNode.isEmptyText());
-            }
-            return list;
+            return wsTrimNl(list);
         }
         return list;
     }
+}
+
+function wsTrimNl(list : HibikiNode[]) : HibikiNode[] {
+    let firstNode = list[0];
+    let shouldTrim = false;
+    if (firstNode.tag === "#text") {
+        firstNode.text = trimToNl(firstNode.text);
+        shouldTrim = shouldTrim || (firstNode.text === "");
+    }
+    let lastNode = list[list.length-1];
+    if (lastNode.tag === "#text") {
+        lastNode.text = trimFromNl(lastNode.text);
+        shouldTrim = shouldTrim || (lastNode.text === "");
+    }
+    if (shouldTrim) {
+        list = list.filter((subNode) => !subNode.isEmptyText());
+    }
+    return list;
 }
 
 function parseHtml(input : string | HTMLElement, sourceName? : string, opts? : HtmlParserOpts) : HibikiNode {

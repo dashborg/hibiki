@@ -360,7 +360,7 @@ var grammar = {
     {"name": "primaryExpr", "symbols": ["invokeExpr"], "postprocess": id},
     {"name": "primaryExpr", "symbols": ["lambdaExpr"], "postprocess": id},
     {"name": "primaryExpr", "symbols": ["refExpr"], "postprocess": id},
-    {"name": "primaryExpr", "symbols": ["isNoAttrExpr"]},
+    {"name": "primaryExpr", "symbols": ["isNoAttrExpr"], "postprocess": id},
     {"name": "primaryExpr", "symbols": [(lexer.has("LPAREN") ? {type: "LPAREN"} : LPAREN), "fullExpr", (lexer.has("RPAREN") ? {type: "RPAREN"} : RPAREN)], "postprocess": (data) => data[1]},
     {"name": "primaryExpr", "symbols": ["pathExprNonTerm"], "postprocess": id},
     {"name": "fnExpr", "symbols": [(lexer.has("FN") ? {type: "FN"} : FN), "namedCallParams"], "postprocess":  (data) => {

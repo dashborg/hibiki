@@ -2189,37 +2189,33 @@ function JsonStringify(v : HibikiVal, opts? : {space? : number, noresolve? : boo
 }
 
 function evalFnAst(fnAst : any, dataenv : DataEnvironment) : HibikiVal {
-    let state = dataenv.dbstate;
-    let stateFn : JSFuncType = null;
     let fnName = fnAst.fn.toLowerCase();
+    let params = evalExprParams(fnAst.params, dataenv);
+    return callFn(fnName, params, dataenv);
+}
+
+function callFn(fnName : string, params : HibikiParamsObj, dataenv : DataEnvironment) : HibikiVal {
     if (fnName.startsWith("fn:")) {
         fnName = fnName.substr(3);
-        stateFn = DefaultJSFuncs[fnName];
     }
-    else if (fnName.startsWith("fnx:")) {
-        fnName = fnName.substr(4);
-        stateFn = state.JSFuncs[fnName];
+    let stateFn = DefaultJSFuncs[fnName];
+    if (stateFn == null) {
+        throw new Error(sprintf("Invalid function: '%s'", fnName));
     }
-    if (stateFn != null) {
-        let params = evalExprParams(fnAst.params, dataenv);
-        if (!stateFn.native) {
-            params.deepCopy({resolve: true});
-        }
-        else if (!stateFn.retainNoAttr) {
-            params.stripNoAttrs();
-        }
-        if (stateFn.paramFn != null) {
-            return stateFn.paramFn(params, dataenv);
-        }
-        else if (stateFn.fn != null) {
-            return stateFn.fn(...params.posArgs);
-        }
-        else {
-            throw new Error(sprintf("Invalid function: '%s', no function defined", fnAst.fn));
-        }
+    if (!stateFn.native) {
+        params.deepCopy({resolve: true});
+    }
+    else if (!stateFn.retainNoAttr) {
+        params.stripNoAttrs();
+    }
+    if (stateFn.paramFn != null) {
+        return stateFn.paramFn(params, dataenv);
+    }
+    else if (stateFn.fn != null) {
+        return stateFn.fn(...params.posArgs);
     }
     else {
-        throw new Error(sprintf("Invalid function: '%s'", fnAst.fn));
+        throw new Error(sprintf("Invalid function: '%s', no function defined", fnName));
     }
 }
 
@@ -2627,7 +2623,6 @@ function evalExprAstInternal(exprAst : HExpr, dataenv : DataEnvironment, rtype :
     }
     else {
         console.log("BAD ETYPE", exprAst);
-        console.trace();
         throw new Error(sprintf("Invalid expression etype: '%s'", exprAst.etype));
     }
 }
@@ -3370,7 +3365,7 @@ function compareVals(v1 : HibikiVal, v2 : HibikiVal, opts? : CompareOpts) : numb
     return sv1.localeCompare(sv2, locale, {numeric: numeric, sensitivity: sensitivity});
 }
 
-export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, StringPath, JsonStringify, EvalSimpleExpr, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, DeepCopy, CleanVal, DeepCopyTypeSafe, CheckCycle, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, makeIteratorFromExpr, rawAttrStr, getUnmergedAttributeStr, getUnmergedAttributeValPair, SYM_NOATTR, HActionBlock, valToString, valToBool, compileActionStr, FireEvent, makeErrorObj, OpaqueValue, ChildrenVar, Watcher, LambdaValue, blobPrintStr, valToNumber, hibikiTypeOf, JsonReplacerFn, valToAttrStr, resolveLValue, resolveUnmergedCnArray, isUnmerged, resolveUnmergedStyleMap, asStyleMap, asStyleMapFromPair, EvalContextVarsThrow, compareVals, asPrimitive, asArray, asPlainObject, HibikiParamsObj, stripNoAttrShallow, HibikiReactEvent};
+export {ParsePath, ResolvePath, SetPath, ParsePathThrow, ResolvePathThrow, StringPath, JsonStringify, EvalSimpleExpr, ParseSetPathThrow, ParseSetPath, HibikiBlob, ObjectSetPath, DeepEqual, DeepCopy, CleanVal, DeepCopyTypeSafe, CheckCycle, LValue, BoundLValue, ObjectLValue, ReadOnlyLValue, getShortEMsg, CreateReadOnlyLValue, demobx, BlobFromRRA, ExtBlobFromRRA, isObject, convertSimpleType, ParseStaticCallStatement, evalExprAst, BlobFromBlob, formatVal, ExecuteHandlerBlock, ExecuteHAction, makeIteratorFromExpr, rawAttrStr, getUnmergedAttributeStr, getUnmergedAttributeValPair, SYM_NOATTR, HActionBlock, valToString, valToBool, compileActionStr, FireEvent, makeErrorObj, OpaqueValue, ChildrenVar, Watcher, LambdaValue, blobPrintStr, valToNumber, hibikiTypeOf, JsonReplacerFn, valToAttrStr, resolveLValue, resolveUnmergedCnArray, isUnmerged, resolveUnmergedStyleMap, asStyleMap, asStyleMapFromPair, EvalContextVarsThrow, compareVals, asPrimitive, asArray, asPlainObject, HibikiParamsObj, stripNoAttrShallow, HibikiReactEvent, callFn};
 
 export type {PathType, HAction, HExpr, HIteratorExpr, ContextVarType, CompareOpts};
 

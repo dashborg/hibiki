@@ -408,6 +408,10 @@ class DBCtx {
         return nodeStr(this.node);
     }
 
+    textContent() : string {
+        return textContent(this.node);
+    }
+
     resolvePath(path : string, opts? : {rtContext? : string}) : HibikiVal {
         opts = opts ?? {};
         let rtContext = opts.rtContext ?? "DBCtx.resolvePath";
