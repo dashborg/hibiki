@@ -1,5 +1,10 @@
 # Change Log
 
+## v0.3.3
+
+* HibikiGlobalConfig preRenderHook and postRenderHook (receives state and DOM node)
+* Added getStateName() to HibikiState (set from 'name' attribute on hibiki template element)
+
 ## v0.3.2
 
 * new array functions: fn:filter(), fn:map(), fn:find(), fn:findindex(), fn:reduce(), fn:reverse(), fn:every(), fn:some(), fn:concat(), fn:join(), fn:shift(), fn:unshift()

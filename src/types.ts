@@ -111,6 +111,7 @@ type FetchHookFn = JSFuncStr | ((url : URL, fetchInit : Record<string, any>) => 
 type CsrfHookFn = JSFuncStr | ((url : URL) => string);
 type ErrorCallbackFn = JSFuncStr | ((err : HibikiError) => boolean);
 type EventCallbackFn = JSFuncStr | ((event : EventType) => void);
+type RenderHookFn = JSFuncStr | ((state : HibikiExtState, elem : HTMLElement) => void);
 
 type ModuleConfig = Record<string, any>;
 
@@ -146,6 +147,8 @@ type HibikiGlobalConfig = {
     noWelcomeMessage : boolean,
     libraryRoot : string,
     useDevLibraryBuilds : boolean,
+    preRenderHook : RenderHookFn,
+    postRenderHook : RenderHookFn,
 };
 
 type HibikiConfig = {
@@ -154,6 +157,7 @@ type HibikiConfig = {
     modules? : Record<string, ModuleConfig>,
     httpConfig? : HttpConfig;
     unhandledErrorHook? : ErrorCallbackFn;
+    stateName? : string;
 };
 
 type PathUnionType = string | PathType;

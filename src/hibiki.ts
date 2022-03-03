@@ -13,7 +13,7 @@ import {parseHtml} from "./html-parser";
 import {HibikiState, DataEnvironment} from "./state";
 import * as ReactDOM from "react-dom";
 import {HibikiRootNode, CORE_LIBRARY} from "./nodes";
-import {deepTextContent, evalDeepTextContent, isObject, bindLibContext} from "./utils";
+import {deepTextContent, evalDeepTextContent, isObject, bindLibContext, callHook} from "./utils";
 import merge from "lodash/merge";
 import type {HibikiConfig, Hibiki, HibikiExtState, ReactClass, LibraryType, HibikiGlobalConfig} from "./types";
 import type {HibikiNode} from "./html-parser";
@@ -33,12 +33,15 @@ function errorWithCause(message : string, cause : Error) {
     throw new Error(message, {cause: cause}); // ES6 error with cause
 }
 
+
 function getGlobalConfig() : HibikiGlobalConfig {
     let rtn : HibikiGlobalConfig = {
         noUsagePing: false,
         noWelcomeMessage: false,
         libraryRoot: DEFAULT_LIBRARY_ROOT,
         useDevLibraryBuilds: false,
+        preRenderHook: null,
+        postRenderHook: null,
     };
     if (window.HibikiGlobalConfig != null && typeof(window.HibikiGlobalConfig) === "object") {
         rtn = Object.assign(rtn, window.HibikiGlobalConfig);
@@ -88,6 +91,9 @@ function readHibikiConfigFromOuterHtml(htmlElem : string | HTMLElement) : Hibiki
     if (htmlElem.hasAttribute("nodatamergefromhtml")) {
         rtn.noDataMergeFromHtml = true;
     }
+    if (htmlElem.hasAttribute("name")) {
+        rtn.stateName = htmlElem.getAttribute("name");
+    }
     return rtn;
 }
 
@@ -115,14 +121,21 @@ let createState = function createState(config : HibikiConfig, html : string | HT
         initialData = merge((hibikiOpts.initialData ?? {}), initialData);
     }
     state.setGlobalData(initialData);
+    if (state.getStateName() != null) {
+        window.Hibiki.States[state.getStateName()] = state;
+    }
     return state.getExtState();
 }
 createState = mobx.action(createState);
 
 function render(elem : HTMLElement, state : HibikiExtState) {
     let parentHtmlTag = elem.parentElement.tagName.toLowerCase();
-    let props = {hibikiState: state, parentHtmlTag: parentHtmlTag};
+    let props = {hibikiState: state, parentHtmlTag: parentHtmlTag, htmlElem: elem};
     let reactElem = React.createElement(HibikiRootNode, props, null);
+    let gc = getGlobalConfig();
+    if (gc.preRenderHook != null) {
+        callHook("preRenderHook", gc.preRenderHook, state, elem);
+    }
     state.setInitCallback(() => {
         ReactDOM.render(reactElem, elem);
         elem.classList.remove("hibiki-cloak");
@@ -180,9 +193,6 @@ function autoloadTags() : void {
             continue;
         }
         let state = loadTag(elem);
-        if (elem.hasAttribute("name")) {
-            window.Hibiki.States[elem.getAttribute("name")] = state;
-        }
         window.HibikiState = state;
     }
 }

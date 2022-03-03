@@ -16,7 +16,7 @@ import type {ComponentType, LibraryType, HibikiExtState, LibComponentType, Hibik
 import {DBCtx, makeDBCtx, makeCustomDBCtx, InjectedAttrsObj, createInjectObj, resolveArgsRoot, bindNodeList, expandChildrenNode} from "./dbctx";
 import * as DataCtx from "./datactx";
 import {HibikiState, DataEnvironment} from "./state";
-import {resolveNumber, isObject, textContent, SYM_PROXY, SYM_FLATTEN, jseval, nodeStr, getHibiki, addToArrayDupCheck, removeFromArray, valInArray, subMapKey, unbox, bindLibContext, cnArrToClassAttr} from "./utils";
+import {resolveNumber, isObject, textContent, SYM_PROXY, SYM_FLATTEN, jseval, nodeStr, getHibiki, addToArrayDupCheck, removeFromArray, valInArray, subMapKey, unbox, bindLibContext, cnArrToClassAttr, callHook} from "./utils";
 import {parseHtml, HibikiNode, NodeAttrType} from "./html-parser";
 import * as NodeUtils from "./nodeutils";
 import {RtContext, HibikiError} from "./error";
@@ -35,7 +35,7 @@ class ErrorMsg extends React.Component<{message: string}, {}> {
 }
 
 @mobxReact.observer
-class HibikiRootNode extends React.Component<{hibikiState : HibikiExtState, parentHtmlTag : string}, {}> {
+class HibikiRootNode extends React.Component<{hibikiState : HibikiExtState, parentHtmlTag : string, htmlElem : HTMLElement}, {}> {
     constructor(props : any) {
         super(props);
     }
@@ -50,6 +50,13 @@ class HibikiRootNode extends React.Component<{hibikiState : HibikiExtState, pare
     
     getHibikiNode() : HibikiNode {
         return this.getHibikiState().findCurrentPage();
+    }
+
+    componentDidMount() {
+        let hibiki = getHibiki();
+        if (hibiki.GlobalConfig.postRenderHook != null) {
+            callHook("postRenderHook", hibiki.GlobalConfig.postRenderHook, this.props.hibikiState, this.props.htmlElem);
+        }
     }
     
     render() : React.ReactNode {

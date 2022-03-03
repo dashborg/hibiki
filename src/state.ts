@@ -885,6 +885,10 @@ class HibikiExtState {
         this.state.initialize(force);
     }
 
+    getStateName() : string {
+        return this.state.getStateName();
+    }
+
     setHtml(html : string | HTMLElement) : void {
         let htmlObj = parseHtml(html);
         bindLibContext(htmlObj, "main");
@@ -964,6 +968,7 @@ class HibikiState {
     JSFuncs : Record<string, JSFuncType>;
     NodeUuidMap : Map<string, DBCtx> = new Map();
     DataRoots : Record<string, mobx.IObservableValue<HibikiVal>>;
+    StateName : string;
 
     constructor() {
         this.DataRoots = {};
@@ -971,9 +976,14 @@ class HibikiState {
         this.DataRoots["state"] = mobx.observable.box({}, {name: "AppState"})
         this.ComponentLibrary = new ComponentLibrary(this);
         this.InitCallbacks = [];
+        this.StateName = null;
         let hibiki = getHibiki();
         this.JSFuncs = hibiki.JSFuncs;
         window.addEventListener("popstate", this.popStateHandler);
+    }
+
+    getStateName() : string {
+        return this.StateName;
     }
     
     @boundMethod popStateHandler() {
