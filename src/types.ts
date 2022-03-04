@@ -158,6 +158,8 @@ type HibikiConfig = {
     httpConfig? : HttpConfig;
     unhandledErrorHook? : ErrorCallbackFn;
     stateName? : string;
+    initialData? : HibikiVal;
+    htmlSrc? : string;
 };
 
 type PathUnionType = string | PathType;
@@ -205,8 +207,8 @@ type LibraryType = {
 type ReactClass = new(props : any) => React.Component<any, any>;
 
 interface Hibiki {
-    autoloadTags() : void;
-    loadTag(elem: HTMLElement) : HibikiExtState;
+    autoloadTags() : Promise<boolean>;
+    loadTag(elem: HTMLElement) : Promise<HibikiExtState>;
     render(elem : HTMLElement, state : HibikiExtState) : void;
     createState(config : HibikiConfig, html : string | HTMLElement, initialData : any) : HibikiExtState;
     registerLocalJSHandler(path : string, fn : (req : HibikiRequest) => any) : void;

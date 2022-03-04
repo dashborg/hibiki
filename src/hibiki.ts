@@ -105,20 +105,24 @@ let createState = function createState(config : HibikiConfig, html : string | HT
     config = config || {};
     initialData = initialData || {};
     let htmlObj : HibikiNode = null;
-    if (html != null) {
+    if (config.htmlSrc != null) {
+        htmlObj = parseHtml(config.htmlSrc);
+        bindLibContext(htmlObj, "main");
+    }
+    else if (html != null) {
         htmlObj = parseHtml(html);
         bindLibContext(htmlObj, "main");
     }
     state.setHtml(htmlObj);
     let configFromOuterHtml = readHibikiConfigFromOuterHtml(html);
-    config = merge(config, configFromOuterHtml);
+    config = merge({}, config, configFromOuterHtml);
     let hibikiOpts = readHibikiOptsFromHtml(htmlObj);
     if (!config.noConfigMergeFromHtml) {
-        config = merge((hibikiOpts.config ?? {}), config);
+        config = merge({}, (hibikiOpts.config ?? {}), config);
     }
     state.setConfig(config);
     if (!config.noDataMergeFromHtml) {
-        initialData = merge((hibikiOpts.initialData ?? {}), initialData);
+        initialData = merge({}, (config.initialData ?? {}), (hibikiOpts.initialData ?? {}), initialData);
     }
     state.setGlobalData(initialData);
     if (state.getStateName() != null) {
@@ -143,7 +147,7 @@ function render(elem : HTMLElement, state : HibikiExtState) {
     state.initialize(false);
 }
 
-function loadTag(elem : HTMLElement) : HibikiExtState {
+async function loadTag(elem : HTMLElement) : Promise<HibikiExtState> {
     if (elem.hasAttribute("loaded")) {
         console.log("Hibiki tag already loaded", elem);
         return null;
@@ -153,9 +157,10 @@ function loadTag(elem : HTMLElement) : HibikiExtState {
         console.log("Hibiki cannot render directly into <body> tag, create a tag under <body> to render to");
         return null;
     }
+
+    let renderNode : HTMLElement = null;
     if (elem.tagName.toLowerCase() === "template" || elem.tagName.toLowerCase() === "script") {
         let forElemId = elem.getAttribute("for");
-        let renderNode = null;
         if (forElemId != null) {
             renderNode = document.getElementById(forElemId);
         }
@@ -174,27 +179,80 @@ function loadTag(elem : HTMLElement) : HibikiExtState {
                 elem.parentNode.insertBefore(renderNode, elem.nextSibling); // insert after elem
             }
         }
-        let state = createState({}, elem, null);
-        render(renderNode, state);
-        return state;
     }
     else {
-        let state = createState({}, elem, null);
-        render(elem, state);
-        return state;
+        renderNode = elem;
     }
+    let config : HibikiConfig = {};
+    let psrcs = fetchRemoteSrcs(config, elem);
+    if (psrcs != null) {
+        await psrcs;
+    }
+    let state = createState(config, elem, null);
+    render(renderNode, state);
+    return state;
 }
 
-function autoloadTags() : void {
+function fetchRemoteSrcs(config : HibikiConfig, elem : HTMLElement) : Promise<any> {
+    let srcAttr = elem.getAttribute("hibikisrc") ?? elem.getAttribute("src");
+    let dataAttr = elem.getAttribute("datasrc");
+    if (srcAttr == null && dataAttr == null) {
+        return null;
+    }
+    let parr : Promise<any>[] = [];
+    if (srcAttr != null) {
+        let psrc = fetch(srcAttr).then((resp) => {
+            if (!resp.ok) {
+                throw new Error(sprintf("Bad fetch response for hibiki src url '%s': %d %s", srcAttr, resp.status, resp.statusText));
+            }
+            let ctype = resp.headers.get("Content-Type");
+            if (!ctype.startsWith("text/")) {
+                throw new Error(sprintf("Bad fetch response for hibiki src url '%s', non-text mime-type: '%s'", srcAttr, ctype));
+            }
+            return resp.text();
+        }).then((text) => {
+            config.htmlSrc = text;
+        });
+        parr.push(psrc);
+    }
+    if (dataAttr != null) {
+        let pdata = fetch(dataAttr).then((resp) => {
+            if (!resp.ok) {
+                throw new Error(sprintf("Bad fetch response for hibiki data url '%s': %d %s", dataAttr, resp.status, resp.statusText));
+            }
+            let ctype = resp.headers.get("Content-Type");
+            if (!ctype.startsWith("application/json")) {
+                throw new Error(sprintf("Bad fetch response for hibiki data url '%s', non 'application/json' type: '%s'", dataAttr, ctype));
+            }
+            return resp.json();
+        }).then((data) => {
+            config.initialData = data;
+        });
+        parr.push(pdata);
+    }
+    return Promise.all(parr);
+}
+
+async function autoloadTagsAsync() : Promise<void> {
     let elems = document.querySelectorAll("hibiki, template[hibiki], script[type='text/hibiki-html']");
     for (let i=0; i<elems.length; i++) {
         let elem : HTMLElement = elems[i] as HTMLElement;
         if (elem.hasAttribute("noautoload")) {
             continue;
         }
-        let state = loadTag(elem);
+        let state = await loadTag(elem);
         window.HibikiState = state;
     }
+    return;
+}
+
+function autoloadTags() : Promise<boolean> {
+    let p = autoloadTagsAsync()
+    return p.then(() => { return true; })
+    .catch((e) => {
+        console.log("ERROR calling Hibiki.autoloadTags", e);
+        return false;
+    });
 }
 
 let LocalHandlers : Record<string, (HibikiRequest) => any> = {};
