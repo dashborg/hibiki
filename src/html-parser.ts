@@ -705,7 +705,11 @@ class HtmlParser {
 
     parseHtml(input : string | HTMLElement, sourceName? : string) : HibikiNode {
         let elem = null;
-        if (input instanceof HTMLElement) {
+        if (input instanceof HTMLElement && input.tagName.toLowerCase() === "script") {
+            elem = document.createElement("div");
+            elem.innerHTML = input.textContent;
+        }
+        else if (input instanceof HTMLElement) {
             elem = input;
         }
         else {

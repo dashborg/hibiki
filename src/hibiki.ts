@@ -153,7 +153,7 @@ function loadTag(elem : HTMLElement) : HibikiExtState {
         console.log("Hibiki cannot render directly into <body> tag, create a tag under <body> to render to");
         return null;
     }
-    if (elem.tagName.toLowerCase() === "template") {
+    if (elem.tagName.toLowerCase() === "template" || elem.tagName.toLowerCase() === "script") {
         let forElemId = elem.getAttribute("for");
         let renderNode = null;
         if (forElemId != null) {
@@ -186,7 +186,7 @@ function loadTag(elem : HTMLElement) : HibikiExtState {
 }
 
 function autoloadTags() : void {
-    let elems = document.querySelectorAll("hibiki, template[hibiki]");
+    let elems = document.querySelectorAll("hibiki, template[hibiki], script[type='text/hibiki-html']");
     for (let i=0; i<elems.length; i++) {
         let elem : HTMLElement = elems[i] as HTMLElement;
         if (elem.hasAttribute("noautoload")) {

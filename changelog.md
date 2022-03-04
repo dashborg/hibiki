@@ -4,6 +4,7 @@
 
 * HibikiGlobalConfig preRenderHook and postRenderHook (receives state and DOM node)
 * Added getStateName() to HibikiState (set from 'name' attribute on hibiki template element)
+* Allow a 'script' tag with type="text/hibiki-html" to be used in place of a 'template' tag (SEO concerns)
 
 ## v0.3.2
 
