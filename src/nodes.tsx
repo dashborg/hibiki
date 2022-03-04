@@ -514,7 +514,6 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
             }
         }
         for (let [k,v] of Object.entries(attrVals)) {
-            k = k.toLowerCase();
             if (NodeUtils.SPECIAL_ATTRS[k] || managedAttrs[k]) {
                 continue;
             }
@@ -715,7 +714,7 @@ class ScriptNode extends React.Component<HibikiReactProps, {}> {
         let scriptType = ctx.resolveAttrStr("type");
         if (srcAttr == null) {
             let scriptText = textContent(ctx.node);
-            if (scriptText == null || scriptText.trim() == "") {
+            if (scriptText == null || scriptText.trim() === "") {
                 return null;
             }
             ctx.dataenv.dbstate.queueScriptText(scriptText, scriptType, isSync);
