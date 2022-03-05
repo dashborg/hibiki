@@ -975,7 +975,6 @@ class HibikiState {
         this.DataRoots["state"] = mobx.observable.box({}, {name: "AppState"})
         this.ComponentLibrary = new ComponentLibrary(this);
         this.InitCallbacks = [];
-        this.StateName = null;
         let hibiki = getHibiki();
         this.JSFuncs = hibiki.JSFuncs;
         window.addEventListener("popstate", this.popStateHandler);
