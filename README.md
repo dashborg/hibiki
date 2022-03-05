@@ -250,6 +250,18 @@ and import ReactJS components.
 ```
 (Playground Link - https://playground.hibikihtml.com/?codeid=readme-comps-1)
 
+## Bulma UI Component Library
+
+I've released a Hibiki wrappers for the excellent [Bulma UI Library](https://bulma.io).
+It can easily be included in any Hibiki template by adding:
+```
+<import-library lib="hibiki/bulma@v0.1.0" prefix="b"></import-library>
+```
+
+Documentation for the Hibiki+Bulma library can be found at https://libs.hibikihtml.com/test-bulma.html .
+It includes many interactive controls including tabs, menus, cards, dropdowns, form controls, and
+a data table that supports sorting and pagination.
+
 ## Interactive Tutorial
 
 Want to learn more?  Check out the [Interactive Tutorial](https://playground.hibikihtml.com/tutorial/).
