@@ -372,6 +372,102 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
         ctx.handleAfterChange(reactEvent, newValue);
     }
 
+    @boundMethod handleDragOver(reactEvent : any) {
+        let ctx = makeDBCtx(this);
+        reactEvent.preventDefault();
+
+        let dropEffect = ctx.resolveAttrStr("dropeffect");
+        if (dropEffect != null) {
+            reactEvent.dataTransfer.dropEffect = dropEffect;
+        }
+    }
+
+    @boundMethod handleOnDrop(reactEvent : any) {
+        let ctx = makeDBCtx(this);
+        reactEvent.preventDefault();
+        let textData = reactEvent.dataTransfer.getData("text");
+        let data = {value: textData};
+        let blobp : Promise<DataCtx.HibikiBlob[]> = null;
+        if (reactEvent.dataTransfer.files.length > 0) {
+            blobp = convertBlobArray(reactEvent.dataTransfer.files);
+        }
+        Promise.resolve(blobp).then((blobs) => {
+            if (blobs != null) {
+                data["dragfiles"] = blobs;
+            }
+            let allTypes = {};
+            for (let tname of reactEvent.dataTransfer.types) {
+                allTypes[tname] = reactEvent.dataTransfer.getData(tname);
+            }
+            data["dragtypes"] = allTypes;
+            ctx.handleEvent(reactEvent, "drop", data);
+        });
+    }
+
+    @boundMethod handleDragStart(reactEvent : any) {
+        let ctx = makeDBCtx(this);
+        let dragValue = DataCtx.resolveLValue(ctx.resolveAttrVal("dragvalue"));
+        if (dragValue != null) {
+            let [dragObj, isObj] = DataCtx.asPlainObject(dragValue, false);
+            if (isObj) {
+                for (let key in dragObj) {
+                    let strVal = DataCtx.valToString(dragObj[key]);
+                    if (strVal != null) {
+                        reactEvent.dataTransfer.setData(key, strVal);
+                    }
+                }
+            }
+            else {
+                let dragStrVal = DataCtx.valToString(dragValue);
+                reactEvent.dataTransfer.setData("text", dragStrVal);
+            }
+        }
+        let dragEffectAllowed = ctx.resolveAttrStr("drageffectallowed");
+        if (dragEffectAllowed != null) {
+            reactEvent.dataTransfer.dragEffectAllowed = dragEffectAllowed;
+        }
+        let dragImageVal = DataCtx.resolveLValue(ctx.resolveAttrVal("dragimage"));
+        if (dragImageVal != null) {
+            let [dragImageArr, isArr] = DataCtx.asArray(dragImageVal, false);
+            if (!isArr) {
+                dragImageArr = [dragImageVal];
+            }
+            let [dragImage, offsetXRaw, offsetYRaw] = dragImageArr;
+            let offsetX : number = (offsetXRaw == null ? undefined : DataCtx.valToNumber(offsetXRaw));
+            let offsetY : number = (offsetYRaw == null ? undefined : DataCtx.valToNumber(offsetYRaw));
+            let imgUrl : string = null;
+            if (dragImage instanceof DataCtx.HibikiBlob) {
+                if (dragImage.mimetype.startsWith("image/")) {
+                    imgUrl = dragImage.makeDataUrl();
+                }
+            }
+            else {
+                imgUrl = DataCtx.valToString(dragImage);
+            }
+            if (imgUrl != null) {
+                if (imgUrl.startsWith("#")) {
+                    let img = document.getElementById(imgUrl.substr(1));
+                    reactEvent.dataTransfer.setDragImage(img, offsetX, offsetY);
+                }
+                else {
+                    let img = new Image();
+                    img.src = imgUrl;
+                    reactEvent.dataTransfer.setDragImage(img, offsetX, offsetY);
+                }
+            }
+        }
+        ctx.handleEvent(reactEvent, "dragstart", {value: dragValue});
+    }
+
+    setupDraggable(ctx : DBCtx, elemProps : Record<string, any>) {
+        elemProps["onDragStart"] = this.handleDragStart;
+    }
+
+    setupDroppable(ctx : DBCtx, elemProps : Record<string, any>) {
+        elemProps["onDragOver"] = this.handleDragOver;
+        elemProps["onDrop"] = this.handleOnDrop;
+    }
+
     setupManagedValue(ctx : DBCtx, elemProps : Record<string, any>) {
         let isBound = !!ctx.resolveAttrStr("bound");
         let valueLV = ctx.resolveLValueAttr("value");
@@ -513,6 +609,8 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
                 attrVals[k.substr(5)] = v;
             }
         }
+        let draggable = false;
+        let droppable = false;
         for (let [k,v] of Object.entries(attrVals)) {
             if (NodeUtils.SPECIAL_ATTRS[k] || managedAttrs[k]) {
                 continue;
@@ -538,6 +636,29 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
             let strVal = DataCtx.valToAttrStr(v);
             if (k === "download" && strVal === "1") {
                 elemProps["download"] = "";
+                continue;
+            }
+            if (k === "draggable" || k === "droppable") {
+                if (strVal === "0") {
+                    strVal = "false";
+                }
+                else if (strVal === "1") {
+                    strVal = "true";
+                }
+                else {
+                    strVal = (DataCtx.valToBool(v) ? "true" : "false");
+                }
+                if (k === "draggable") {
+                    if (strVal === "true") {
+                        draggable = true;
+                    }
+                    elemProps["draggable"] = strVal;
+                }
+                else if (k === "droppable") {
+                    if (strVal === "true") {
+                        droppable = true;
+                    }
+                }
                 continue;
             }
             if (k === "colspan") {
@@ -584,6 +705,12 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
             else {
                 console.log("Invalid managedType", managedType);
             }
+        }
+        if (draggable) {
+            this.setupDraggable(ctx, elemProps);
+        }
+        if (droppable) {
+            this.setupDroppable(ctx, elemProps);
         }
 
         let style = ctx.resolveStyleMap();

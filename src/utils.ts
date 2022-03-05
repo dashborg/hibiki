@@ -358,7 +358,7 @@ function parseTextData(str : string, ctype : string, contextStr : string) : any 
         let yamlData = yamlParser.load(str);
         return yamlData;
     }
-    throw new Error("Invalid content-type%s, must be JSON (application/json), JavaScript (application/javascript), or YAML(application/yaml)", contextStr);
+    throw new Error(sprintf("Invalid content-type%s, must be JSON (application/json), JavaScript (application/javascript), or YAML(application/yaml)", contextStr));
 }
 
 function evalDeepTextContent(node : HibikiNode, throwError : boolean) : any {
@@ -781,7 +781,7 @@ function protocolOk(url : URL) {
          || (window.location.protocol === "file:" && url.protocol === "file:"));
 }
 
-function getYamlParser() : {load: ((str : string, opts : any) => any)} {
+function getYamlParser() : {load: ((str : string, opts? : any) => any)} {
     let rtn = window.jsyaml;
     if (rtn == null || typeof(rtn) !== "object") {
         return null;
