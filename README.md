@@ -46,6 +46,22 @@ Note that all these code examples can be viewed and edited in the
 ```
 (Playground Link - https://playground.hibikihtml.com/?codeid=readme-gs)
 
+As of v0.3.3, you may also wrap your Hibiki code in a &lt;script type="text/hibiki-html"&gt; tag and optionally reference your Hibiki src code and initial data as remote URLs:
+
+```
+<!-- standard way with template tag -->
+<template hibiki> ... Hibiki HTML code here </template>
+
+<!-- inline code, wrapped in script tag (protected from crawler indexing) -->
+<script type="text/hibiki-html"> ... Hibiki HTML code here ... </script>
+
+<!-- load code from remote URL -->
+<script type="text/hibiki-html" src="/url/to/hibiki/src.html"></script>
+
+<!-- load code and data from remote URLs (data must be type 'application/json') -->
+<script type="text/hibiki-html" src="/url/to/hibiki/src.html" datasrc="/url/to/data.json"></script>
+```
+
 ## Data / Rendering Dynamic Content
 
 Hibiki HTML applications have a built-in frontend data model.  You can initialize it with
