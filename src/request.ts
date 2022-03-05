@@ -37,18 +37,6 @@ class HibikiRequest {
         });
     }
 
-    invalidate(...regexArr : string[]) {
-        if (regexArr == null || regexArr.length == 0) {
-            this.actions.push({actiontype: "invalidate"});
-        }
-        else {
-            this.actions.push({
-                actiontype: "invalidate",
-                data: regexArr,
-            });
-        }
-    }
-
     setHtml(html : string) {
         this.actions.push({
             actiontype: "html",

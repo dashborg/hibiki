@@ -16,7 +16,7 @@ import type {ComponentType, LibraryType, HibikiExtState, LibComponentType, Hibik
 import {DBCtx, makeDBCtx, makeCustomDBCtx, InjectedAttrsObj, createInjectObj, resolveArgsRoot, bindNodeList, expandChildrenNode} from "./dbctx";
 import * as DataCtx from "./datactx";
 import {HibikiState, DataEnvironment} from "./state";
-import {resolveNumber, isObject, textContent, SYM_PROXY, SYM_FLATTEN, jseval, nodeStr, getHibiki, addToArrayDupCheck, removeFromArray, valInArray, subMapKey, unbox, bindLibContext, cnArrToClassAttr} from "./utils";
+import {resolveNumber, isObject, textContent, SYM_PROXY, SYM_FLATTEN, jseval, nodeStr, getHibiki, addToArrayDupCheck, removeFromArray, valInArray, subMapKey, unbox, bindLibContext, cnArrToClassAttr, callHook} from "./utils";
 import {parseHtml, HibikiNode, NodeAttrType} from "./html-parser";
 import * as NodeUtils from "./nodeutils";
 import {RtContext, HibikiError} from "./error";
@@ -35,7 +35,7 @@ class ErrorMsg extends React.Component<{message: string}, {}> {
 }
 
 @mobxReact.observer
-class HibikiRootNode extends React.Component<{hibikiState : HibikiExtState, parentHtmlTag : string}, {}> {
+class HibikiRootNode extends React.Component<{hibikiState : HibikiExtState, parentHtmlTag : string, htmlElem : HTMLElement}, {}> {
     constructor(props : any) {
         super(props);
     }
@@ -50,6 +50,13 @@ class HibikiRootNode extends React.Component<{hibikiState : HibikiExtState, pare
     
     getHibikiNode() : HibikiNode {
         return this.getHibikiState().findCurrentPage();
+    }
+
+    componentDidMount() {
+        let hibiki = getHibiki();
+        if (hibiki.GlobalConfig.postRenderHook != null) {
+            callHook("postRenderHook", hibiki.GlobalConfig.postRenderHook, this.props.hibikiState, this.props.htmlElem);
+        }
     }
     
     render() : React.ReactNode {
@@ -123,7 +130,7 @@ function renderCtx(ctx : DBCtx, index : number, parentHtmlTag : string) : React.
 }
 
 function renderCtxList(ctxList : DBCtx[], parentHtmlTag : string) : React.ReactNode[] {
-    if (ctxList == null || ctxList.length == 0) {
+    if (ctxList == null || ctxList.length === 0) {
         return null;
     }
     let rtn : React.ReactNode[] = [];
@@ -184,14 +191,14 @@ class AnyNode extends React.Component<HibikiReactProps, {}> {
             return <FragmentNode key={nodeKey} node={node} dataenv={dataenv} injectedAttrs={ctx.injectedAttrs} parentHtmlTag={this.props.parentHtmlTag}/>;
         }
         if (component != null) {
-            if (component.componentType == "react-custom") {
+            if (component.componentType === "react-custom") {
                 this.nodeType = "react-component";
                 return <CustomReactNode key={nodeKey} component={component} node={node} dataenv={dataenv} injectedAttrs={ctx.injectedAttrs} parentHtmlTag={this.props.parentHtmlTag}/>;
             }
-            else if (component.componentType == "hibiki-native") {
+            else if (component.componentType === "hibiki-native") {
                 this.nodeType = "component";
                 let ImplNode = component.impl.get();
-                if (ImplNode == null && component.libName == "main") {
+                if (ImplNode == null && component.libName === "main") {
                     ImplNode = getHibiki().LocalNativeComponents.get(component.name);
                 }
                 if (ImplNode == null) {
@@ -199,7 +206,7 @@ class AnyNode extends React.Component<HibikiReactProps, {}> {
                 }
                 return <ImplNode key={nodeKey} node={node} dataenv={dataenv} parentHtmlTag={this.props.parentHtmlTag}/>;
             }
-            else if (component.componentType == "hibiki-html") {
+            else if (component.componentType === "hibiki-html") {
                 this.nodeType = "hibiki-html-component";
                 return <CustomNode key={nodeKey} component={component} node={node} dataenv={dataenv} injectedAttrs={ctx.injectedAttrs} parentHtmlTag={this.props.parentHtmlTag}/>;
             }
@@ -208,7 +215,7 @@ class AnyNode extends React.Component<HibikiReactProps, {}> {
                 return <div key={nodeKey}>&lt;{compName}&gt;</div>;
             }
         }
-        if (compName.startsWith("html-") || compName.indexOf("-") == -1) {
+        if (compName.startsWith("html-") || compName.indexOf("-") === -1) {
             this.nodeType = "rawhtml";
             return <RawHtmlNode key={nodeKey} node={node} dataenv={dataenv} injectedAttrs={ctx.injectedAttrs} parentHtmlTag={this.props.parentHtmlTag}/>
         }
@@ -236,7 +243,7 @@ class CustomReactNode extends React.Component<HibikiReactProps & {component : Co
         let component = this.props.component;
         let implBox = component.reactimpl;
         let reactImpl = implBox.get();
-        if (reactImpl == null && component.libName == "main") {
+        if (reactImpl == null && component.libName === "main") {
             reactImpl = getHibiki().LocalReactComponents.get(component.name);
         }
         if (reactImpl == null) {
@@ -280,7 +287,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
         let p = convertBlobArray(reactEvent.target.files);
         p.then((hblobArr) => {
             if (isMultiple) {
-                if (hblobArr.length == 0) {
+                if (hblobArr.length === 0) {
                     hblobArr = null;
                 }
                 ctx.handleOnChange(reactEvent, hblobArr);
@@ -507,7 +514,6 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
             }
         }
         for (let [k,v] of Object.entries(attrVals)) {
-            k = k.toLowerCase();
             if (NodeUtils.SPECIAL_ATTRS[k] || managedAttrs[k]) {
                 continue;
             }
@@ -530,7 +536,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
                 continue;
             }
             let strVal = DataCtx.valToAttrStr(v);
-            if (k == "download" && strVal == "1") {
+            if (k === "download" && strVal === "1") {
                 elemProps["download"] = "";
                 continue;
             }
@@ -539,40 +545,40 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
             }
             elemProps[k] = strVal;
         }
-        if (!managedAttrs["value"] && elemProps["value"] == null && ctx.getRawAttr("value") == "") {
+        if (!managedAttrs["value"] && elemProps["value"] == null && ctx.getRawAttr("value") === "") {
             elemProps["value"] = "";
         }
         
         // forms are managed if submit.handler
-        if (tagName == "form" && ctx.hasHandler("submit")) {
+        if (tagName === "form" && ctx.hasHandler("submit")) {
             elemProps.onSubmit = ctx.handleOnSubmit;
         }
         
         if (ctx.hasHandler("click")) {
             elemProps.onClick = ctx.handleOnClick;
             // anchors with click.handler work like links (not locations)
-            if (tagName == "a" && elemProps["href"] == null) {
+            if (tagName === "a" && elemProps["href"] == null) {
                 elemProps["href"] = "#";
             }
         }
             
         if (managedType != null) {
-            if (managedType == "value") {
+            if (managedType === "value") {
                 this.setupManagedValue(ctx, elemProps);
             }
-            else if (managedType == "radio") {
+            else if (managedType === "radio") {
                 this.setupManagedRadio(ctx, elemProps);
             }
-            else if (managedType == "checkbox") {
+            else if (managedType === "checkbox") {
                 this.setupManagedCheckbox(ctx, elemProps);
             }
-            else if (managedType == "file") {
+            else if (managedType === "file") {
                 this.setupManagedFile(ctx, elemProps);
             }
-            else if (managedType == "select") {
+            else if (managedType === "select") {
                 this.setupManagedSelect(ctx, elemProps);
             }
-            else if (managedType == "hidden") {
+            else if (managedType === "hidden") {
                 this.setupManagedHidden(ctx, elemProps);
             }
             else {
@@ -708,7 +714,7 @@ class ScriptNode extends React.Component<HibikiReactProps, {}> {
         let scriptType = ctx.resolveAttrStr("type");
         if (srcAttr == null) {
             let scriptText = textContent(ctx.node);
-            if (scriptText == null || scriptText.trim() == "") {
+            if (scriptText == null || scriptText.trim() === "") {
                 return null;
             }
             ctx.dataenv.dbstate.queueScriptText(scriptText, scriptType, isSync);

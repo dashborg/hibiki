@@ -885,6 +885,10 @@ class HibikiExtState {
         this.state.initialize(force);
     }
 
+    getStateName() : string {
+        return this.state.getStateName();
+    }
+
     setHtml(html : string | HTMLElement) : void {
         let htmlObj = parseHtml(html);
         bindLibContext(htmlObj, "main");
@@ -974,6 +978,10 @@ class HibikiState {
         let hibiki = getHibiki();
         this.JSFuncs = hibiki.JSFuncs;
         window.addEventListener("popstate", this.popStateHandler);
+    }
+
+    getStateName() : string {
+        return this.Config.stateName;
     }
     
     @boundMethod popStateHandler() {

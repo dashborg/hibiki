@@ -5,7 +5,7 @@ const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const LodashModuleReplacementPlugin = require('lodash-webpack-plugin');
 const moment = require("dayjs");
 const fs = require("fs");
-const VERSION = "v0.3.2";
+const VERSION = "v0.3.3";
 
 function makeBuildStr() {
     let buildStr = moment().format("YYYYMMDD-HHmmss");

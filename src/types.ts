@@ -111,6 +111,7 @@ type FetchHookFn = JSFuncStr | ((url : URL, fetchInit : Record<string, any>) => 
 type CsrfHookFn = JSFuncStr | ((url : URL) => string);
 type ErrorCallbackFn = JSFuncStr | ((err : HibikiError) => boolean);
 type EventCallbackFn = JSFuncStr | ((event : EventType) => void);
+type RenderHookFn = JSFuncStr | ((state : HibikiExtState, elem : HTMLElement) => void);
 
 type ModuleConfig = Record<string, any>;
 
@@ -146,6 +147,8 @@ type HibikiGlobalConfig = {
     noWelcomeMessage : boolean,
     libraryRoot : string,
     useDevLibraryBuilds : boolean,
+    preRenderHook : RenderHookFn,
+    postRenderHook : RenderHookFn,
 };
 
 type HibikiConfig = {
@@ -154,6 +157,9 @@ type HibikiConfig = {
     modules? : Record<string, ModuleConfig>,
     httpConfig? : HttpConfig;
     unhandledErrorHook? : ErrorCallbackFn;
+    stateName? : string;
+    initialData? : HibikiVal;
+    htmlSrc? : string;
 };
 
 type PathUnionType = string | PathType;
@@ -201,8 +207,8 @@ type LibraryType = {
 type ReactClass = new(props : any) => React.Component<any, any>;
 
 interface Hibiki {
-    autoloadTags() : void;
-    loadTag(elem: HTMLElement) : HibikiExtState;
+    autoloadTags() : Promise<boolean>;
+    loadTag(elem: HTMLElement) : Promise<HibikiExtState>;
     render(elem : HTMLElement, state : HibikiExtState) : void;
     createState(config : HibikiConfig, html : string | HTMLElement, initialData : any) : HibikiExtState;
     registerLocalJSHandler(path : string, fn : (req : HibikiRequest) => any) : void;
