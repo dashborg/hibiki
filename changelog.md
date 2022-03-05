@@ -1,5 +1,12 @@
 # Change Log
 
+## v0.3.4
+
+* Allow parsing of YAML data if js-yaml UMD package is manually included (window.jsyaml is set)
+* do not fire welcome message until DOMContentLoaded event
+* bugfix: reload HibikiGlobalConfig after DOMContentLoaded event
+* bugfix: Hibiki.States was not holding the correct HibikiExtState object
+
 ## v0.3.3
 
 * HibikiGlobalConfig preRenderHook and postRenderHook (receives state and DOM node)
