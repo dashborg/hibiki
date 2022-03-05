@@ -968,7 +968,6 @@ class HibikiState {
     JSFuncs : Record<string, JSFuncType>;
     NodeUuidMap : Map<string, DBCtx> = new Map();
     DataRoots : Record<string, mobx.IObservableValue<HibikiVal>>;
-    StateName : string;
 
     constructor() {
         this.DataRoots = {};
@@ -983,7 +982,7 @@ class HibikiState {
     }
 
     getStateName() : string {
-        return this.StateName;
+        return this.Config.stateName;
     }
     
     @boundMethod popStateHandler() {
