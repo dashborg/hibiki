@@ -270,6 +270,8 @@ async function convertBlobArray(blobArr : Blob[]) : Promise<DataCtx.HibikiBlob[]
 
 @mobxReact.observer
 class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
+    dragDepth : number = 0;
+    
     constructor(props : any) {
         super(props);
         let ctx = makeDBCtx(this);
@@ -391,6 +393,11 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
         if (reactEvent.dataTransfer.files.length > 0) {
             blobp = convertBlobArray(reactEvent.dataTransfer.files);
         }
+        this.dragDepth = 0;
+        let targetLV = ctx.resolveLValueAttr("dragtargeting");
+        if (targetLV != null) {
+            targetLV.set(false);
+        }
         Promise.resolve(blobp).then((blobs) => {
             if (blobs != null) {
                 data["dragfiles"] = blobs;
@@ -402,6 +409,32 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
             data["dragtypes"] = allTypes;
             ctx.handleEvent(reactEvent, "drop", data);
         });
+    }
+
+    @boundMethod handleDragEnd(reactEvent : any) {
+        let ctx = makeDBCtx(this);
+        let draggingLV = ctx.resolveLValueAttr("dragging");
+        if (draggingLV != null) {
+            draggingLV.set(false);
+        }
+    }
+
+    @boundMethod handleDragEnter(reactEvent : any) {
+        let ctx = makeDBCtx(this);
+        this.dragDepth++;
+        let targetLV = ctx.resolveLValueAttr("dragtargeting");
+        if (targetLV != null) {
+            targetLV.set(true);
+        }
+    }
+
+    @boundMethod handleDragLeave(reactEvent : any) {
+        let ctx = makeDBCtx(this);
+        this.dragDepth--;
+        let targetLV = ctx.resolveLValueAttr("dragtargeting");
+        if (targetLV != null && this.dragDepth <= 0) {
+            targetLV.set(false);
+        }
     }
 
     @boundMethod handleDragStart(reactEvent : any) {
@@ -456,16 +489,23 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
                 }
             }
         }
+        let draggingLV = ctx.resolveLValueAttr("dragging");
+        if (draggingLV != null) {
+            draggingLV.set(true);
+        }
         ctx.handleEvent(reactEvent, "dragstart", {value: dragValue});
     }
 
     setupDraggable(ctx : DBCtx, elemProps : Record<string, any>) {
         elemProps["onDragStart"] = this.handleDragStart;
+        elemProps["onDragEnd"] = this.handleDragEnd;
     }
 
     setupDroppable(ctx : DBCtx, elemProps : Record<string, any>) {
         elemProps["onDragOver"] = this.handleDragOver;
         elemProps["onDrop"] = this.handleOnDrop;
+        elemProps["onDragEnter"] = this.handleDragEnter;
+        elemProps["onDragLeave"] = this.handleDragLeave;
     }
 
     setupManagedValue(ctx : DBCtx, elemProps : Record<string, any>) {
