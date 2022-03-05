@@ -339,11 +339,14 @@ hideStyleSheet.innerHTML = ".hibiki-cloak { display: none }";
 document.querySelector("head").appendChild(hideStyleSheet);
 
 if (document.readyState == "loading") {
-    document.addEventListener("DOMContentLoaded", () => autoloadTags());
+    document.addEventListener("DOMContentLoaded", () => {
+        hibiki.GlobalConfig = getGlobalConfig();
+        fireWelcomeMessage();
+        autoloadTags()
+    });
 }
 else {
+    fireWelcomeMessage();
     autoloadTags();
 }
-
-fireWelcomeMessage();
 
