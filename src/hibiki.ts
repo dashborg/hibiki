@@ -125,10 +125,11 @@ let createState = function createState(config : HibikiConfig, html : string | HT
         initialData = merge({}, (config.initialData ?? {}), (hibikiOpts.initialData ?? {}), initialData);
     }
     state.setGlobalData(initialData);
+    let extState = state.getExtState();
     if (state.getStateName() != null) {
-        window.Hibiki.States[state.getStateName()] = state;
+        (window.Hibiki as Hibiki).States[state.getStateName()] = extState;
     }
-    return state.getExtState();
+    return extState;
 }
 createState = mobx.action(createState);
 
