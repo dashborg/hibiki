@@ -703,18 +703,24 @@ class HtmlParser {
         return rtn;
     }
 
+    // create our element in a different document so <img> tags aren't pre-fetched
+    makeVirtualElement(str : string) : HTMLElement {
+        let vdoc = document.implementation.createHTMLDocument("virtual");
+        let elem = vdoc.createElement("div");
+        elem.innerHTML = str;
+        return elem;
+    }
+
     parseHtml(input : string | HTMLElement, sourceName? : string) : HibikiNode {
         let elem = null;
         if (input instanceof HTMLElement && input.tagName.toLowerCase() === "script") {
-            elem = document.createElement("div");
-            elem.innerHTML = input.textContent;
+            elem = this.makeVirtualElement(input.textContent);
         }
         else if (input instanceof HTMLElement) {
             elem = input;
         }
         else {
-            elem = document.createElement("div");
-            elem.innerHTML = input;
+            elem = this.makeVirtualElement(input);
         }
         let pctx = {sourceName : sourceName, tagStack: []};
         let rootNode = (elem.tagName.toLowerCase() === "template" ? elem.content : elem);
