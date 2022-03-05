@@ -13,7 +13,7 @@ import {parseHtml} from "./html-parser";
 import {HibikiState, DataEnvironment} from "./state";
 import * as ReactDOM from "react-dom";
 import {HibikiRootNode, CORE_LIBRARY} from "./nodes";
-import {deepTextContent, evalDeepTextContent, isObject, bindLibContext, callHook} from "./utils";
+import {deepTextContent, evalDeepTextContent, isObject, bindLibContext, callHook, parseTextData} from "./utils";
 import merge from "lodash/merge";
 import type {HibikiConfig, Hibiki, HibikiExtState, ReactClass, LibraryType, HibikiGlobalConfig} from "./types";
 import type {HibikiNode} from "./html-parser";
@@ -222,10 +222,10 @@ function fetchRemoteSrcs(config : HibikiConfig, elem : HTMLElement) : Promise<an
                 throw new Error(sprintf("Bad fetch response for hibiki data url '%s': %d %s", dataAttr, resp.status, resp.statusText));
             }
             let ctype = resp.headers.get("Content-Type");
-            if (!ctype.startsWith("application/json")) {
-                throw new Error(sprintf("Bad fetch response for hibiki data url '%s', non 'application/json' type: '%s'", dataAttr, ctype));
-            }
-            return resp.json();
+            let contextStr = sprintf("for hibiki data url '%s'", dataAttr);
+            return resp.text().then((text) => {
+                return parseTextData(text, ctype, contextStr);
+            });
         }).then((data) => {
             config.initialData = data;
         });

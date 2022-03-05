@@ -340,18 +340,42 @@ function jseval(text : string) : any {
     return evalVal;
 }
 
+function parseTextData(str : string, ctype : string, contextStr : string) : any {
+    if (contextStr !== "") {
+        contextStr = " " + contextStr;
+    }
+    if (ctype == null || ctype.startsWith("application/json")) {
+        return JSON.parse(str);
+    }
+    if (ctype.startsWith("text/javascript") || ctype.startsWith("application/javascript")) {
+        return jseval(str);
+    }
+    if (isYamlContentType(ctype)) {
+        let yamlParser = getYamlParser();
+        if (yamlParser == null) {
+            throw new Error(sprintf("Cannot parse YAML%s.  No YAML parser was found.  To allow YAML parsing, please include a UMD version of the js-yaml package, such as 'https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js' before loading hibiki-prod.min.js", contextStr));
+        }
+        let yamlData = yamlParser.load(str);
+        return yamlData;
+    }
+    throw new Error("Invalid content-type%s, must be JSON (application/json), JavaScript (application/javascript), or YAML(application/yaml)", contextStr);
+}
+
 function evalDeepTextContent(node : HibikiNode, throwError : boolean) : any {
     let text = deepTextContent(node).trim();
-    if (text == "") {
+    if (text === "") {
         return null;
     }
     let format = rawAttrFromNode(node, "format");
     try {
-        if (format == null || format == "json") {
+        if (format == null || format === "json") {
             return JSON.parse(text);
         }
-        else if (format == "jseval") {
+        else if (format === "jseval") {
             return jseval(text);
+        }
+        else if (format === "yaml") {
+            return parseTextData(text, "application/yaml", "");
         }
         else {
             if (throwError) {
@@ -757,5 +781,23 @@ function protocolOk(url : URL) {
          || (window.location.protocol === "file:" && url.protocol === "file:"));
 }
 
-export {jsonRespHandler, parseUrlParams, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, evalDeepTextContent, jseval, nodeStr, callHook, getHibiki, parseHandler, fullPath, smartEncodeParam, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy, valInArray, rawAttrFromNode, STYLE_UNITLESS_NUMBER, subMapKey, subArrayIndex, unbox, splitTrim, bindLibContext, cnArrToClassAttr, classStringToCnArr, isClassStringLocked, joinClassStrs, attrBaseName, cnArrToLosslessStr, parseAttrName, nsAttrName, validateModulePath, compareVersions, HibikiWrappedObj};
+function getYamlParser() : {load: ((str : string, opts : any) => any)} {
+    let rtn = window.jsyaml;
+    if (rtn == null || typeof(rtn) !== "object") {
+        return null;
+    }
+    if (typeof(rtn.load) !== "function") {
+        return null;
+    }
+    return rtn;
+}
+
+function isYamlContentType(ctype : string) : boolean {
+    if (ctype == null) {
+        return false;
+    }
+    return ctype.startsWith("text/yaml") || ctype.startsWith("application/yaml") || ctype.startsWith("application/x-yaml");
+}
+
+export {jsonRespHandler, parseUrlParams, valToInt, valToFloat, resolveNumber, isObject, getSS, setSS, hasRole, parseDisplayStr, smartEncodeParams, smartDecodeParams, textContent, deepTextContent, SYM_PROXY, SYM_FLATTEN, evalDeepTextContent, jseval, nodeStr, callHook, getHibiki, parseHandler, fullPath, smartEncodeParam, base64ToArray, addToArrayDupCheck, removeFromArray, spliceCopy, valInArray, rawAttrFromNode, STYLE_UNITLESS_NUMBER, subMapKey, subArrayIndex, unbox, splitTrim, bindLibContext, cnArrToClassAttr, classStringToCnArr, isClassStringLocked, joinClassStrs, attrBaseName, cnArrToLosslessStr, parseAttrName, nsAttrName, validateModulePath, compareVersions, HibikiWrappedObj, getYamlParser, isYamlContentType, parseTextData};
 
