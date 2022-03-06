@@ -248,6 +248,12 @@
         </tr>
         <tr component="local-test-tr">
           <td slot="test" hibiki:innerhtml>
+            {{ fn:moveitem($.arr, 4, 1) }}
+          </td>
+          <td slot="result">1,5,1,2,3,8</td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" hibiki:innerhtml>
             {{ fn:slice($.arr, 3, 5) }}
           </td>
           <td slot="result">3,5</td>

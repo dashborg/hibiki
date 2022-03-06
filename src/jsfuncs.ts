@@ -106,6 +106,34 @@ function jsSplice(val : HibikiVal, ...rest : any[]) {
     return newArr;
 }
 
+function jsMoveItem(val : HibikiVal, fromIndexVal : HibikiVal, toIndexVal : HibikiVal) {
+    let [arrObj, isArr] = DataCtx.asArray(val, false);
+    if (!isArr) {
+        return null;
+    }
+    let fromIndex = parseInt(DataCtx.valToNumber(fromIndexVal));
+    let toIndex = parseInt(DataCtx.valToNumber(toIndexVal));
+    if (isNaN(fromIndex)) {
+        throw new Error(sprintf("fn:moveitem 'fromindex' is NaN, type=%s", DataCtx.hibikiTypeOf(fromIndexVal)));
+    }
+    if (isNaN(toIndex)) {
+        throw new Error(sprintf("fn:moveitem 'toindex' is NaN, type=%s", DataCtx.hibikiTypeOf(toIndexVal)));
+    }
+    if (fromIndex < 0 || toIndex < 0 || fromIndex >= arrObj.length || toIndex >= arrObj.length) {
+        throw new Error(sprintf("fn:moveitem from/to indexes are out-of-bounds.  from=%d to=%d len=%d", fromIndex, toIndex, arrObj.length));
+    }
+    let newArr = [...arrObj];
+    if (fromIndex === toIndex) {
+        return newArr;
+    }
+    let elems = newArr.splice(fromIndex, 1);
+    if (toIndex > fromIndex) {
+        toIndex = toIndex - 1;
+    }
+    newArr.splice(toIndex, 0, elems[0]);
+    return newArr;
+}
+
 function processSliceArgs(arg : HibikiVal, fnName : string) : [number, number] {
     if (arg == null) {
         return null;
@@ -949,6 +977,7 @@ regParamFn("reverse", jsArrReverse);
 regParamFn("every", jsArrEvery);
 regParamFn("some", jsArrSome);
 reg("concat", jsArrConcat, true);
+reg("moveitem", jsMoveItem, true);
 
 // concat
 
