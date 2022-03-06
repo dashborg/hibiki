@@ -127,9 +127,6 @@ function jsMoveItem(val : HibikiVal, fromIndexVal : HibikiVal, toIndexVal : Hibi
         return newArr;
     }
     let elems = newArr.splice(fromIndex, 1);
-    if (toIndex > fromIndex) {
-        toIndex = toIndex - 1;
-    }
     newArr.splice(toIndex, 0, elems[0]);
     return newArr;
 }

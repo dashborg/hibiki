@@ -394,7 +394,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
             blobp = convertBlobArray(reactEvent.dataTransfer.files);
         }
         this.dragDepth = 0;
-        let targetLV = ctx.resolveLValueAttr("dragtargeting");
+        let targetLV = ctx.resolveLValueAttr("droptargeting");
         if (targetLV != null) {
             targetLV.set(false);
         }
@@ -415,25 +415,32 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
         let ctx = makeDBCtx(this);
         let draggingLV = ctx.resolveLValueAttr("dragging");
         if (draggingLV != null) {
-            draggingLV.set(false);
+            draggingLV.set(null);
         }
+        ctx.handleEvent(reactEvent, "dragend", {});
     }
 
     @boundMethod handleDragEnter(reactEvent : any) {
         let ctx = makeDBCtx(this);
         this.dragDepth++;
-        let targetLV = ctx.resolveLValueAttr("dragtargeting");
+        let targetLV = ctx.resolveLValueAttr("droptargeting");
         if (targetLV != null) {
             targetLV.set(true);
+        }
+        if (this.dragDepth === 1) {
+            ctx.handleEvent(reactEvent, "dragenter", {});
         }
     }
 
     @boundMethod handleDragLeave(reactEvent : any) {
         let ctx = makeDBCtx(this);
         this.dragDepth--;
-        let targetLV = ctx.resolveLValueAttr("dragtargeting");
+        let targetLV = ctx.resolveLValueAttr("droptargeting");
         if (targetLV != null && this.dragDepth <= 0) {
             targetLV.set(false);
+        }
+        if (this.dragDepth === 0) {
+            ctx.handleEvent(reactEvent, "dragleave", {});
         }
     }
 
@@ -491,7 +498,13 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
         }
         let draggingLV = ctx.resolveLValueAttr("dragging");
         if (draggingLV != null) {
-            draggingLV.set(true);
+            let [draggingVal, hasDraggingVal] = ctx.resolveAttrValPair("draggingvalue");
+            if (hasDraggingVal) {
+                draggingLV.set(draggingVal);
+            }
+            else {
+                draggingLV.set(true);
+            }
         }
         ctx.handleEvent(reactEvent, "dragstart", {value: dragValue});
     }
@@ -501,7 +514,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
         elemProps["onDragEnd"] = this.handleDragEnd;
     }
 
-    setupDroppable(ctx : DBCtx, elemProps : Record<string, any>) {
+    setupDropTarget(ctx : DBCtx, elemProps : Record<string, any>) {
         elemProps["onDragOver"] = this.handleDragOver;
         elemProps["onDrop"] = this.handleOnDrop;
         elemProps["onDragEnter"] = this.handleDragEnter;
@@ -650,7 +663,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
             }
         }
         let draggable = false;
-        let droppable = false;
+        let isDropTarget = false;
         for (let [k,v] of Object.entries(attrVals)) {
             if (NodeUtils.SPECIAL_ATTRS[k] || managedAttrs[k]) {
                 continue;
@@ -678,7 +691,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
                 elemProps["download"] = "";
                 continue;
             }
-            if (k === "draggable" || k === "droppable") {
+            if (k === "draggable" || k === "droptarget") {
                 if (strVal === "0") {
                     strVal = "false";
                 }
@@ -694,9 +707,9 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
                     }
                     elemProps["draggable"] = strVal;
                 }
-                else if (k === "droppable") {
+                else if (k === "droptarget") {
                     if (strVal === "true") {
-                        droppable = true;
+                        isDropTarget = true;
                     }
                 }
                 continue;
@@ -749,8 +762,8 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
         if (draggable) {
             this.setupDraggable(ctx, elemProps);
         }
-        if (droppable) {
-            this.setupDroppable(ctx, elemProps);
+        if (isDropTarget) {
+            this.setupDropTarget(ctx, elemProps);
         }
 
         let style = ctx.resolveStyleMap();
