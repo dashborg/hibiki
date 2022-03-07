@@ -805,6 +805,21 @@ function bindSingleNode(node : HibikiNode, dataenv : DataEnvironment, injectedAt
     return [rtnCtx, false, null];
 }
 
+function expandForeach(ctx : DBCtx) : DBCtx[] {
+    let rtnList : DBCtx[] = [];
+    let node = ctx.node;
+    let iterator = DataCtx.makeIteratorFromExpr(node.foreachAttr, ctx.dataenv);
+    let index = 0;
+    for (let ctxVars of iterator) {
+        let htmlContext = sprintf("%s:%d", nodeStr(ctx.node), index);
+        let childEnv = ctx.dataenv.makeChildEnv(ctxVars, {htmlContext: htmlContext});
+        let childCtx = makeCustomDBCtx(node, childEnv, null);
+        rtnList.push(childCtx);
+        index++;
+    }
+    return rtnList;
+}
+
 function bindNodeList(list : HibikiNode[], dataenv : DataEnvironment, isRoot : boolean) : DBCtx[] {
     if (list == null || list.length == 0) {
         return null;
@@ -818,6 +833,10 @@ function bindNodeList(list : HibikiNode[], dataenv : DataEnvironment, isRoot : b
                 if (boundChildren != null) {
                     rtn.push(...boundChildren);
                 }
+            }
+            else if (ctx.node.foreachAttr != null) {
+                let expanded = expandForeach(ctx);
+                rtn.push(...expanded);
             }
             else {
                 rtn.push(ctx);

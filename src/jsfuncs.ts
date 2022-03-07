@@ -111,8 +111,8 @@ function jsMoveItem(val : HibikiVal, fromIndexVal : HibikiVal, toIndexVal : Hibi
     if (!isArr) {
         return null;
     }
-    let fromIndex = parseInt(DataCtx.valToNumber(fromIndexVal));
-    let toIndex = parseInt(DataCtx.valToNumber(toIndexVal));
+    let fromIndex = Math.trunc(DataCtx.valToNumber(fromIndexVal));
+    let toIndex = Math.trunc(DataCtx.valToNumber(toIndexVal));
     if (isNaN(fromIndex)) {
         throw new Error(sprintf("fn:moveitem 'fromindex' is NaN, type=%s", DataCtx.hibikiTypeOf(fromIndexVal)));
     }

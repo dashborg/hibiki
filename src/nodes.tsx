@@ -147,24 +147,6 @@ function renderCtxList(ctxList : DBCtx[], parentHtmlTag : string) : React.ReactN
 class AnyNode extends React.Component<HibikiReactProps, {}> {
     nodeType : string = "unknown";
 
-    renderForeach(ctx : DBCtx) : any {
-        let node = ctx.node;
-        let iterator = DataCtx.makeIteratorFromExpr(node.foreachAttr, ctx.dataenv);
-        let rtnContent = [];
-        let index = 0;
-        for (let ctxVars of iterator) {
-            let htmlContext = sprintf("%s:%d", nodeStr(ctx.node), index);
-            let childEnv = ctx.dataenv.makeChildEnv(ctxVars, {htmlContext: htmlContext});
-            let childCtx = makeCustomDBCtx(node, childEnv, this.props.injectedAttrs);
-            let content = this.renderInner(childCtx, true, index);
-            if (content != null) {
-                rtnContent.push(content);
-            }
-            index++;
-        }
-        return rtnContent
-    }
-    
     renderInner(ctx : DBCtx, iterating : boolean, keyIndex? : number) : any {
         let node = ctx.node;
         let tagName = ctx.node.tag;
@@ -178,9 +160,6 @@ class AnyNode extends React.Component<HibikiReactProps, {}> {
         let dbstate = dataenv.dbstate;
         let compName = ctx.resolveAttrStr("component") ?? tagName;
         let component = dbstate.ComponentLibrary.findComponent(compName, node.libContext);
-        if (!iterating && node.foreachAttr != null) {
-            return this.renderForeach(ctx);
-        }
         let [ifVal, ifExists] = ctx.resolveConditionAttr("if");
         if (ifExists && !ifVal) {
             return null;
@@ -800,7 +779,7 @@ class CustomNode extends React.Component<HibikiReactProps & {component : Compone
         let eventCtx = sprintf("%s", nodeStr(ctx.node));
         let eventDE = ctx.dataenv.makeChildEnv(null, {eventBoundary: "hard", handlers: ctxHandlers, htmlContext: eventCtx});
         let specials : Record<string, any> = {};
-        specials.children = ctx.makeChildrenVar();
+        specials.children = nodeVar.children;
         specials.node = nodeVar;
         let argsRoot = resolveArgsRoot(ctx);
         let handlers = NodeUtils.makeHandlers(implNode, null, component.libName, ["event"]);

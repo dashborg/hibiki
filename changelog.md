@@ -5,6 +5,7 @@
 * Allow parsing of YAML data if js-yaml UMD package is manually included (window.jsyaml is set)
 * do not fire welcome message until DOMContentLoaded event
 * new function js:moveitem(arr, from-index, to-index)
+* expand foreach inside of \@children
 * bugfix: reload HibikiGlobalConfig after DOMContentLoaded event
 * bugfix: Hibiki.States was not holding the correct HibikiExtState object
 
