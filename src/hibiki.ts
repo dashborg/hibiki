@@ -14,6 +14,7 @@ import {HibikiState, DataEnvironment} from "./state";
 import * as ReactDOM from "react-dom";
 import {HibikiRootNode, CORE_LIBRARY} from "./nodes";
 import {deepTextContent, evalDeepTextContent, isObject, bindLibContext, callHook, parseTextData} from "./utils";
+import * as HibikiUtilsModule from "./utils";
 import merge from "lodash/merge";
 import type {HibikiConfig, Hibiki, HibikiExtState, ReactClass, LibraryType, HibikiGlobalConfig} from "./types";
 import type {HibikiNode} from "./html-parser";
@@ -307,6 +308,7 @@ let hibiki : Hibiki = {
         mobxReact: mobxReact,
         HibikiDataCtx: DataCtx,
         HibikiDBCtx: DBCtxModule,
+        HibikiUtils: HibikiUtilsModule,
     },
     LibraryCallbacks: {},
     States: {},
