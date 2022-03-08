@@ -353,31 +353,13 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
         ctx.handleAfterChange(reactEvent, newValue);
     }
 
-    @boundMethod handleDragOver(reactEvent : any) {
-        let ctx = makeDBCtx(this);
-        reactEvent.preventDefault();
-
-        let dropEffect = ctx.resolveAttrStr("dropeffect");
-        if (dropEffect != null) {
-            reactEvent.dataTransfer.dropEffect = dropEffect;
-        }
-    }
-
-    @boundMethod handleOnDrop(reactEvent : any) {
-        let ctx = makeDBCtx(this);
-        reactEvent.preventDefault();
-        let textData = reactEvent.dataTransfer.getData("text");
-        let data = {value: textData};
+    dragDataContext(reactEvent : any) : Promise<HibikiValObj> {
         let blobp : Promise<DataCtx.HibikiBlob[]> = null;
         if (reactEvent.dataTransfer.files.length > 0) {
             blobp = convertBlobArray(reactEvent.dataTransfer.files);
         }
-        this.dragDepth = 0;
-        let targetLV = ctx.resolveLValueAttr("droptargeting");
-        if (targetLV != null) {
-            targetLV.set(false);
-        }
-        Promise.resolve(blobp).then((blobs) => {
+        return Promise.resolve(blobp).then((blobs) => {
+            let data = {};
             if (blobs != null) {
                 data["dragfiles"] = blobs;
             }
@@ -386,7 +368,30 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
                 allTypes[tname] = reactEvent.dataTransfer.getData(tname);
             }
             data["dragtypes"] = allTypes;
-            ctx.handleEvent(reactEvent, "drop", data);
+            data["value"] = reactEvent.dataTransfer.getData("text");
+            return data;
+        });
+    }
+
+    dragDataContextMini(reactEvent : any) : HibikiValObj {
+        let dragTypes : HibikiValObj = {};
+        for (let tname of reactEvent.dataTransfer.types) {
+            dragTypes[tname] = true;
+        }
+        return {dragtypes: dragTypes};
+    }
+
+    @boundMethod handleOnDrop(reactEvent : any) {
+        let ctx = makeDBCtx(this);
+        reactEvent.preventDefault();
+        this.dragDepth = 0;
+        let targetLV = ctx.resolveLValueAttr("droptargeting");
+        if (targetLV != null) {
+            targetLV.set(false);
+        }
+        let datacontextPromise = this.dragDataContext(reactEvent);
+        return datacontextPromise.then((datacontext) => {
+            ctx.handleEvent(reactEvent, "drop", datacontext);
         });
     }
 
@@ -399,32 +404,123 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
         ctx.handleEvent(reactEvent, "dragend", {});
     }
 
+    getDropTargetTypes(ctx : DBCtx) : string[] {
+        let ddTypes = ctx.resolveAttrVal("droptarget");
+        if (ddTypes === "1" || ddTypes === true) {
+            return ["*"];
+        }
+        if (ddTypes === "0" || ddTypes === false) {
+            return [];
+        }
+        let [primVal, isPrim] = DataCtx.asPrimitive(ddTypes);
+        if (isPrim) {
+            if (typeof(primVal) === "string" || typeof(primVal) === "number") {
+                return [DataCtx.valToString(ddTypes)];
+            }
+            return [];
+        }
+        let [arrVal, isArr] = DataCtx.asArray(ddTypes, false);
+        if (isArr) {
+            let rtn : string[] = [];
+            for (let i=0; i<arrVal.length; i++) {
+                rtn.push(DataCtx.valToString(arrVal[i]));
+            }
+            return rtn;
+        }
+        let [objVal, isObj] = DataCtx.asPlainObject(ddTypes, false);
+        if (isObj) {
+            let rtn : string[] = [];
+            for (let key in objVal) {
+                let val = objVal[key];
+                if (val) {
+                    rtn.push(key);
+                }
+            }
+            return rtn;
+        }
+        else {
+            return [];
+        }
+    }
+
+    getHibikiDragType(reactEvent : any) : string {
+        let types = reactEvent.dataTransfer.types;
+        if (types == null) {
+            return "*";
+        }
+        let found = types.find((t) => t.startsWith("hibiki/"));
+        if (found == null) {
+            return "*";
+        }
+        return found.substr(7);
+    }
+
+    isDragTypeAllowed(ctx : DBCtx, reactEvent : any) : boolean {
+        let ddTypes = this.getDropTargetTypes(ctx);
+        if (ddTypes.indexOf("*") >= 0) {
+            return true;
+        }
+        let ddType = this.getHibikiDragType(reactEvent);
+        if (ddType == null || ddType === "") {
+            ddType = "*";
+        }
+        let ddIdx = ddTypes.indexOf(ddType);
+        return ddIdx !== -1;
+    }
+
+    @boundMethod handleDragOver(reactEvent : any) {
+        let ctx = makeDBCtx(this);
+        if (!this.isDragTypeAllowed(ctx, reactEvent)) {
+            return;
+        }
+        reactEvent.preventDefault();
+        let dropEffect = ctx.resolveAttrStr("dropeffect");
+        if (dropEffect != null) {
+            reactEvent.dataTransfer.dropEffect = dropEffect;
+        }
+        let datacontext = this.dragDataContextMini(reactEvent);
+        ctx.handleEvent(reactEvent, "dragover", datacontext);
+    }
+
     @boundMethod handleDragEnter(reactEvent : any) {
         let ctx = makeDBCtx(this);
         this.dragDepth++;
+        if (!this.isDragTypeAllowed(ctx, reactEvent)) {
+            return;
+        }
         let targetLV = ctx.resolveLValueAttr("droptargeting");
         if (targetLV != null) {
             targetLV.set(true);
         }
         if (this.dragDepth === 1) {
-            ctx.handleEvent(reactEvent, "dragenter", {});
+            let datacontext = this.dragDataContextMini(reactEvent);
+            ctx.handleEvent(reactEvent, "dragenter", datacontext);
         }
     }
 
     @boundMethod handleDragLeave(reactEvent : any) {
         let ctx = makeDBCtx(this);
         this.dragDepth--;
+        if (!this.isDragTypeAllowed(ctx, reactEvent)) {
+            return;
+        }
         let targetLV = ctx.resolveLValueAttr("droptargeting");
         if (targetLV != null && this.dragDepth <= 0) {
-            targetLV.set(false);
+            targetLV.set(null);
         }
         if (this.dragDepth === 0) {
-            ctx.handleEvent(reactEvent, "dragleave", {});
+            let datacontext = this.dragDataContextMini(reactEvent);
+            ctx.handleEvent(reactEvent, "dragleave", datacontext);
         }
     }
 
     @boundMethod handleDragStart(reactEvent : any) {
         let ctx = makeDBCtx(this);
+        let dragType = ctx.resolveAttrStr("draggable");
+        if (dragType == null || dragType === "1") {
+            dragType = "*";
+        }
+        reactEvent.dataTransfer.setData("hibiki/" + dragType, "1");
         let dragValue = DataCtx.resolveLValue(ctx.resolveAttrVal("dragvalue"));
         if (dragValue != null) {
             let [dragObj, isObj] = DataCtx.asPlainObject(dragValue, false);
@@ -671,11 +767,8 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
                 continue;
             }
             if (k === "draggable" || k === "droptarget") {
-                if (strVal === "0") {
+                if (strVal == null || strVal === "0") {
                     strVal = "false";
-                }
-                else if (strVal === "1") {
-                    strVal = "true";
                 }
                 else {
                     strVal = (DataCtx.valToBool(v) ? "true" : "false");
