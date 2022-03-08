@@ -22,6 +22,8 @@ import {doParse} from "./hibiki-parser";
 
 import {parseHtml} from "./html-parser";
 
+let SHARED_ROOT = mobx.observable.box({}, {name: "SharedState"})
+
 type CallHandlerOptsType = {
     dataenv? : DataEnvironment,
     rtContext? : RtContext,
@@ -172,6 +174,9 @@ class DataEnvironment {
         }
         if (rootName === "state") {
             return unbox(this.dbstate.DataRoots["state"]);
+        }
+        if (rootName === "shared") {
+            return unbox(this.dbstate.DataRoots["shared"]);
         }
         if (rootName === "null") {
             return null;
@@ -971,8 +976,9 @@ class HibikiState {
 
     constructor() {
         this.DataRoots = {};
-        this.DataRoots["global"] = mobx.observable.box({}, {name: "GlobalData"})
-        this.DataRoots["state"] = mobx.observable.box({}, {name: "AppState"})
+        this.DataRoots["global"] = mobx.observable.box({}, {name: "GlobalData"});
+        this.DataRoots["state"] = mobx.observable.box({}, {name: "AppState"});
+        this.DataRoots["shared"] = SHARED_ROOT;
         this.ComponentLibrary = new ComponentLibrary(this);
         this.InitCallbacks = [];
         let hibiki = getHibiki();
