@@ -1388,7 +1388,12 @@ function setPathWrapper(op : string, path : PathType, dataenv : DataEnvironment,
     }
     if ((rootpp.pathkey === "global") || (rootpp.pathkey === "data") || (rootpp.pathkey === "shared")) {
         if (path.length === 1 && op === "set") {
-            dataenv.dbstate.DataRoots["global"].set(setData);
+            let drkey = (rootpp.pathkey === "shared" ? "shared" : "global");
+            let [_, isObj] = asPlainObject(setData, false);
+            if (!isObj) {
+                throw new Error(sprintf("%s data root can only be set to an object, got type=%s", drkey, hibikiTypeOf(setData)));
+            }
+            dataenv.dbstate.DataRoots[drkey].set(setData);
             return;
         }
         let irData = dataenv.resolveRoot(rootpp.pathkey);

@@ -1138,6 +1138,13 @@ class HibikiState {
     }
 
     @mobx.action setGlobalData(globalData : any) {
+        if (globalData == null) {
+            return;
+        }
+        let [_, isObj] = DataCtx.asPlainObject(globalData, false);
+        if (!isObj) {
+            throw new Error(sprintf("Initial global data object must be an object, got type=%s", DataCtx.hibikiTypeOf(globalData)));
+        }
         this.DataRoots["global"].set(globalData);
     }
 
