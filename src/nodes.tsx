@@ -254,6 +254,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
     elemRef : React.RefObject<any> = null;
 
     handleScroll : (reactEvent : any) => void;
+    resizeObs : ResizeObserver = null;
     
     constructor(props : any) {
         super(props);
@@ -269,6 +270,33 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
         let scrollTopVal = ctx.resolveAttrVal("scrolltop");
         if (scrollTopVal instanceof DataCtx.LValue && this.elemRef != null && this.elemRef.current != null) {
             scrollTopVal.set(this.elemRef.current.scrollTop);
+        }
+
+        let hasGeo = this.updateGeo();
+        if (hasGeo) {
+            this.resizeObs = new ResizeObserver((entries) => {
+                this.updateGeo();
+            });
+            this.resizeObs.observe(this.elemRef.current);
+        }
+    }
+
+    updateGeo() : boolean {
+        let ctx = makeDBCtx(this);
+        let geoLV = ctx.resolveLValueAttr("geo");
+        if (geoLV == null) {
+            return false;
+        }
+        let geo = this.makeElemGeo();
+        if (geo != null) {
+            geoLV.set(geo);
+        }
+        return true;
+    }
+
+    componentWillUnmount() {
+        if (this.resizeObs != null) {
+            this.resizeObs.disconnect();
         }
     }
 
@@ -525,7 +553,24 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
         }
     }
 
-    @boundMethod handleScroll_debounced(reactEvent : any) {
+    makeElemGeo() : HibikiValObj {
+        if (this.elemRef == null || this.elemRef.current == null) {
+            return null;
+        }
+        let elem = this.elemRef.current;
+        let geo : HibikiValObj = {};
+        geo["offsettop"] = elem.offsetTop;
+        geo["offsetleft"] = elem.offsetLeft;
+        geo["scrolltop"] = elem.scrollTop;
+        geo["clientheight"] = elem.clientHeight;
+        geo["offsetheight"] = elem.offsetHeight;
+        geo["scrollheight"] = elem.scrollHeight;
+        geo["clientwidth"] = elem.clientWidth;
+        geo["offsetwidth"] = elem.offsetwidth;
+        return geo;
+    }
+
+    @boundMethod @mobx.action handleScroll_debounced(reactEvent : any) {
         if (this.elemRef == null || this.elemRef.current == null) {
             return;
         }
@@ -536,15 +581,11 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
             scrollTopVal.set(elem.scrollTop);
         }
         if (ctx.hasHandler("scroll")) {
-            let geo : HibikiValObj = {};
-            geo["offsettop"] = elem.offsetTop;
-            geo["offsetleft"] = elem.offsetLeft;
-            geo["scrolltop"] = elem.scrollTop;
-            geo["clientheight"] = elem.clientHeight;
-            geo["offsetheight"] = elem.offsetHeight;
-            geo["scrollheight"] = elem.scrollHeight;
-            geo["clientwidth"] = elem.clientWidth;
-            geo["offsetwidth"] = elem.offsetwidth;
+            let geo = this.makeElemGeo();
+            let geoLV = ctx.resolveLValueAttr("geo");
+            if (geoLV != null) {
+                geoLV.set(geo);
+            }
             ctx.handleEvent(reactEvent, "scroll", {value: this.elemRef.current.scrollTop, geo: geo});
         }
     }
@@ -888,6 +929,10 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
                     setTimeout(() => { this.elemRef.current.scrollTop = scrollTopNum }, 5);
                 }
             }
+        }
+        let geo = ctx.resolveLValueAttr("geo");
+        if (geo != null) {
+            this.ensureRef();
         }
         let style = ctx.resolveStyleMap();
         let cnArr = ctx.resolveCnArray();
