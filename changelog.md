@@ -9,6 +9,8 @@
 * add new shared root ($shared) that allows data to be shared between Hibiki templates on the same page
 * added drag and drop support, handlers/properties (html5)
 * export HibikiUtils module for libraries
+* new element geometry tracking: geo.bindpath (client/offset height/width, and scrolltop)
+* (beta) new scroll tracking: scrolltop.bindpath, and scroll.handler (debounced)
 * bugfix: reload HibikiGlobalConfig after DOMContentLoaded event
 * bugfix: Hibiki.States was not holding the correct HibikiExtState object
 
