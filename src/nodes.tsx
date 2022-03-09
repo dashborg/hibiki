@@ -11,6 +11,7 @@ import {sprintf} from "sprintf-js";
 import {boundMethod} from 'autobind-decorator'
 import {If, For, When, Otherwise, Choose} from "tsx-control-statements/components";
 import {v4 as uuidv4} from 'uuid';
+import debounce from "lodash/debounce";
 
 import type {ComponentType, LibraryType, HibikiExtState, LibComponentType, HibikiVal, HibikiValObj, HibikiReactProps} from "./types";
 import {DBCtx, makeDBCtx, makeCustomDBCtx, InjectedAttrsObj, createInjectObj, resolveArgsRoot, bindNodeList, expandChildrenNode} from "./dbctx";
@@ -250,15 +251,25 @@ async function convertBlobArray(blobArr : Blob[]) : Promise<DataCtx.HibikiBlob[]
 @mobxReact.observer
 class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
     dragDepth : number = 0;
+    elemRef : React.RefObject<any> = null;
+
+    handleScroll : (reactEvent : any) => void;
     
     constructor(props : any) {
         super(props);
         let ctx = makeDBCtx(this);
+        this.handleScroll = debounce((reactEvent : any) => {
+            this.handleScroll_debounced(reactEvent);
+        }, 200).bind(this);
     }
 
     componentDidMount() {
         let ctx = makeDBCtx(this);
         ctx.handleMountEvent();
+        let scrollTopVal = ctx.resolveAttrVal("scrolltop");
+        if (scrollTopVal instanceof DataCtx.LValue && this.elemRef != null && this.elemRef.current != null) {
+            scrollTopVal.set(this.elemRef.current.scrollTop);
+        }
     }
 
     @boundMethod handleFileOnChange(reactEvent : any) {
@@ -514,6 +525,30 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
         }
     }
 
+    @boundMethod handleScroll_debounced(reactEvent : any) {
+        if (this.elemRef == null || this.elemRef.current == null) {
+            return;
+        }
+        let ctx = makeDBCtx(this);
+        let elem = this.elemRef.current;
+        let scrollTopVal = ctx.resolveAttrVal("scrolltop");
+        if (scrollTopVal instanceof DataCtx.LValue) {
+            scrollTopVal.set(elem.scrollTop);
+        }
+        if (ctx.hasHandler("scroll")) {
+            let geo : HibikiValObj = {};
+            geo["offsettop"] = elem.offsetTop;
+            geo["offsetleft"] = elem.offsetLeft;
+            geo["scrolltop"] = elem.scrollTop;
+            geo["clientheight"] = elem.clientHeight;
+            geo["offsetheight"] = elem.offsetHeight;
+            geo["scrollheight"] = elem.scrollHeight;
+            geo["clientwidth"] = elem.clientWidth;
+            geo["offsetwidth"] = elem.offsetwidth;
+            ctx.handleEvent(reactEvent, "scroll", {value: this.elemRef.current.scrollTop, geo: geo});
+        }
+    }
+
     @boundMethod handleDragStart(reactEvent : any) {
         let ctx = makeDBCtx(this);
         let dragType = ctx.resolveAttrStr("draggable");
@@ -722,6 +757,12 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
             elemProps["onChange"] = this.handleSelectOnChange;
         }
     }
+
+    ensureRef() {
+        if (this.elemRef == null) {
+            this.elemRef = React.createRef();
+        }
+    }
     
     render() : React.ReactNode {
         let ctx = makeDBCtx(this);
@@ -807,7 +848,7 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
                 elemProps["href"] = "#";
             }
         }
-            
+
         if (managedType != null) {
             if (managedType === "value") {
                 this.setupManagedValue(ctx, elemProps);
@@ -837,7 +878,17 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
         if (isDropTarget) {
             this.setupDropTarget(ctx, elemProps);
         }
-
+        let scrollTop = attrVals["scrolltop"];
+        if (scrollTop != null) {
+            this.ensureRef();
+            elemProps["onScroll"] = this.handleScroll;
+            if (this.elemRef != null && this.elemRef.current != null) {
+                let scrollTopNum = DataCtx.valToNumber(scrollTop);
+                if (scrollTop != null && !isNaN(scrollTopNum) && this.elemRef.current.scrollTop != scrollTopNum) {
+                    setTimeout(() => { this.elemRef.current.scrollTop = scrollTopNum }, 5);
+                }
+            }
+        }
         let style = ctx.resolveStyleMap();
         let cnArr = ctx.resolveCnArray();
         if (Object.keys(style).length > 0) {
@@ -845,6 +896,9 @@ class RawHtmlNode extends React.Component<HibikiReactProps, {}> {
         }
         if (Object.keys(cnArr).length > 0) {
             elemProps["className"] = cnArrToClassAttr(cnArr);
+        }
+        if (this.elemRef != null) {
+            elemProps["ref"] = this.elemRef;
         }
         let elemChildren = ctxRenderHtmlChildren(ctx, tagName);
         return React.createElement(tagName, elemProps, elemChildren);
