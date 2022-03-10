@@ -446,7 +446,7 @@ function jsArrReverse(params : DataCtx.HibikiParamsObj, dataenv : DataEnvironmen
         console.log("WARNING fn:reverse makerefs=true, but data is not a reference");
     }
     if (!makeRefs || !(rawVal instanceof DataCtx.LValue)) {
-        return arrObj.reverse();
+        return arrObj.slice().reverse();
     }
     let rawLv = rawVal as DataCtx.LValue;
     return arrObj.map((_, idx) => rawLv.subArrayIndex(idx)).reverse();
