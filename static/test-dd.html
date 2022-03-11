@@ -23,38 +23,44 @@
     </style>
     <div class="container m-4">
       <h1 class="title">Test Drag & Drop</h1>
-      <local-dbox color="red" dragvalue="red" drageffectallowed="all"></local-dbox>
-      <local-dbox color="blue" dragvalue="blue"></local-dbox>
-
-      <div style="display:flex; flex-direction: row;">
-        <div style="width: 200px; height: 200px; border: * $.t1 ? '5px solid black' : '1px solid black';" droptarget droptargeting.bindpath="$.t1" drop.handler="$.dropval = @value; $.img = @dragfiles[0];">
-          <div>dropval(text)={{ $.dropval }}</div>
-          <img if="$.img" html-src="*$.img">
-          <div class="mt-4">
-            (can drop images)
+      <div class="box" style="display: flex; flex-direction: row;">
+        <div>
+          <local-dbox color="red" dragvalue="red" drageffectallowed="all"></local-dbox>
+          <local-dbox color="blue" dragvalue="blue"></local-dbox>
+        </div>
+        <div style="width: 50px"></div>
+        <div style="display:flex; flex-direction: row;">
+          <div style="width: 200px; height: 200px; border: * $.t1 ? '5px solid black' : '1px solid black';" droptarget droptargeting.bindpath="$.t1" drop.handler="$.dropval = @value; $.img = @dragfiles[0];">
+            <div>dropval={{ $.dropval }}</div>
+            <img if="$.img" html-src="*$.img" style="max-height: 100px;">
+            <div class="mt-4" style="font-size: 12px;">
+              can drag red/blue squares here.  also can drop images.
+            </div>
           </div>
         </div>
       </div>
 
-      <local-draglist move.handler="$.arr = fn:moveitem($.arr, @from, @to)" style="overflow-y: scroll; height: *($.height ?? 300);" scrolltop.bindpath="$.scrolltop" scroll.handler="log('scroll', @geo)" geo.bindpath="$.geo">
-        <div class="test-box m-4" foreach="@item in $.arr" style="height: *@item == 3 ? 200 : 50;">
-          <div>
-            hello: {{ @item }}
+      <div class="box">
+        <p>Can use drag and drop to re-order this list</p>
+        <local-draglist move.handler="$.arr = fn:moveitem($.arr, @from, @to)">
+          <div class="test-box m-4" foreach="@item in $.arr" style="height: *@item == 3 ? 200 : 50;">
+            <div>
+              hello: {{ @item }}
+            </div>
           </div>
-        </div>
-      </local-draglist>
-      <div>scrolltop={{ $.scrolltop }}, geo={{$.geo | format("json")}}</div>
-      <div class="button" click.handler="$.scrolltop = 50;">ScrollTop = 50</div>
-      <div class="button" click.handler="$.height = 350;">Height = 350</div>
-      <div class="button" click.handler="$.height = 250;">Height = 250</div>
+        </local-draglist>
+      </div>
 
-      <local-draglist move.handler="$.arr = fn:moveitem($.arr, @from, @to)" style="display: flex; flex-direction: row; flex-wrap: wrap; width: 600px;">
-        <div class="test-box m-4" foreach="@item in $.arr">
-          <div>
-            hello: {{ @item }}
+      <div class="box">
+        <p>Another drag and drop list, but in two columns (synced with first list)</p>
+        <local-draglist move.handler="$.arr = fn:moveitem($.arr, @from, @to)" style="display: flex; flex-direction: row; flex-wrap: wrap; width: 600px;">
+          <div class="test-box m-4" foreach="@item in $.arr">
+            <div>
+              hello: {{ @item }}
+            </div>
           </div>
-        </div>
-      </local-draglist>
+        </local-draglist>
+      </div>
 
       <div style="height:200px;"></div>
     </div>
@@ -65,7 +71,7 @@
     </define-component>
 
     <define-component name="draglist">
-      <div automerge droptarget="*$c.@hibiki.uuid" drop.handler="if ($c.dragindex != $c.dragpos) { fire->move(from=$c.dragindex, to=$c.dragpos); }" scroll.handler="fire->scroll(value=@value, geo=@geo);">
+      <div automerge droptarget="*$c.@hibiki.uuid" drop.handler="if ($c.dragindex != $c.dragpos) { fire->move(from=$c.dragindex, to=$c.dragpos); }">
         <h-fragment foreach="(@child, @idx) in ($c.dragpos != null ? fn:moveitem(@children.tags.byindex, $c.dragindex, $c.dragpos) : @children.tags.byindex)">
           <h-children bind="@child"
                       inject:class.dragging="*($c.dragpos ?? $c.dragindex) == @idx"
