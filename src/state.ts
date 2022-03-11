@@ -633,7 +633,7 @@ class ComponentLibrary {
             }
             return resp.text();
         }).then((rtext) => {
-            let defNode = parseHtml(rtext, null, {});
+            let defNode = parseHtml(rtext, null, {});  // libraries cannot use alternate delimiters
             libNode = firstSubNodeByTag(defNode, "define-library");
             if (libNode == null) {
                 throw new Error(sprintf("No top-level <define-library> found for library url '%s'", srcUrl));
@@ -894,8 +894,9 @@ class HibikiExtState {
         return this.state.getStateName();
     }
 
-    setHtml(html : string | HTMLElement) : void {
-        let htmlObj = parseHtml(html);
+    setHtml(html : string | HTMLElement, opts? : HtmlParserOpts) : void {
+        let fullOpts : HtmlParserOpts = Object.assign({}, this.state.getParserOpts(), opts);
+        let htmlObj = parseHtml(html, "state.setHtml", fullOpts);
         bindLibContext(htmlObj, "main");
         this.state.setHtml(htmlObj);
     }
@@ -988,6 +989,14 @@ class HibikiState {
 
     getStateName() : string {
         return this.Config.stateName;
+    }
+
+    getParserOpts() : HtmlParserOpts {
+        let rtn : HtmlParserOpts = {};
+        if (this.Config.textDelimiters != null) {
+            rtn.textDelimiters = this.Config.textDelimiters;
+        }
+        return rtn;
     }
     
     @boundMethod popStateHandler() {

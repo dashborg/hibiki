@@ -30,6 +30,12 @@
         </tr>
         <tr component="local-test-tr">
           <td slot="test" hibiki:innerhtml>
+            {\{\{ ... }\}\}
+          </td>
+          <td slot="result"><script type="text/plain">{{{ ... }}}</script></td>
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" hibiki:innerhtml>
             <div style="height: 30px; background-color: *$.color;"></div>
           </td>
           <td slot="result">
@@ -506,7 +512,15 @@
           <td slot="result">
             <div class="box bold">bold</div>
           </td>
-        </tr>        
+        </tr>
+        <tr component="local-test-tr">
+          <td slot="test" hibiki:innerhtml>
+            <h-dyn bind="'hello {{ 2 + 2 }}'"></h-dyn>
+          </td>
+          <td slot="result">
+            hello 4
+          </td>
+        </tr>
       </table>
     </div>
   </div>

@@ -2852,7 +2852,7 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
         return null;
     }
     else if (action.actiontype === "html") {
-        let htmlObj = parseHtml(action.html);
+        let htmlObj = parseHtml(action.html, "action.html", dataenv.dbstate.getParserOpts());
         bindLibContext(htmlObj, (action.libcontext ?? "main"));
         if (htmlObj != null) {
             dataenv.dbstate.setHtml(htmlObj);

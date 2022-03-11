@@ -116,7 +116,7 @@ type RenderHookFn = JSFuncStr | ((state : HibikiExtState, elem : HTMLElement) =>
 type ModuleConfig = Record<string, any>;
 
 type HtmlParserOpts = {
-    noInlineText? : boolean,
+    textDelimiters? : "none" | "default" | "alt",
 };
 
 type HttpConfig = {
@@ -160,6 +160,7 @@ type HibikiConfig = {
     stateName? : string;
     initialData? : HibikiVal;
     htmlSrc? : string;
+    textDelimiters? : "none" | "default" | "alt";
 };
 
 type PathUnionType = string | PathType;

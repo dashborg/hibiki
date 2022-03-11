@@ -1116,7 +1116,7 @@ class DynNode extends React.Component<HibikiReactProps, {}> {
             this.curHtml = bindVal;
             this.curHtmlObj = null;
             try {
-                this.curHtmlObj = parseHtml(bindVal);
+                this.curHtmlObj = parseHtml(bindVal, nodeStr(ctx.node), ctx.dataenv.dbstate.getParserOpts());
                 bindLibContext(this.curHtmlObj, (ctx.resolveAttrStr("libcontext") ?? "main"));
             }
             catch (e) {
