@@ -1386,9 +1386,14 @@ function setPathWrapper(op : string, path : PathType, dataenv : DataEnvironment,
     if (rootpp.pathtype !== "root") {
         throw new Error(sprintf("Invalid non-rooted path expression [[%s]]", StringPath(path)));
     }
-    if ((rootpp.pathkey === "global") || (rootpp.pathkey === "data")) {
+    if ((rootpp.pathkey === "global") || (rootpp.pathkey === "data") || (rootpp.pathkey === "shared")) {
         if (path.length === 1 && op === "set") {
-            dataenv.dbstate.DataRoots["global"].set(setData);
+            let drkey = (rootpp.pathkey === "shared" ? "shared" : "global");
+            let [_, isObj] = asPlainObject(setData, false);
+            if (!isObj) {
+                throw new Error(sprintf("%s data root can only be set to an object, got type=%s", drkey, hibikiTypeOf(setData)));
+            }
+            dataenv.dbstate.DataRoots[drkey].set(setData);
             return;
         }
         let irData = dataenv.resolveRoot(rootpp.pathkey);
@@ -1425,10 +1430,10 @@ function setPathWrapper(op : string, path : PathType, dataenv : DataEnvironment,
     }
     else {
         if (allowContext) {
-            throw new Error(sprintf("Cannot SetPath except $data ($), $state, $args, $c, or $context (@) roots, path=%s", StringPath(path)));
+            throw new Error(sprintf("Cannot SetPath except $data ($), $state, $shared, $args, $c, or $context (@) roots, path=%s", StringPath(path)));
         }
         else {
-            throw new Error(sprintf("Cannot SetPath except $data ($), $state, $args, or $c, path=%s", StringPath(path)));
+            throw new Error(sprintf("Cannot SetPath except $data ($), $state, $shared, $args, or $c, path=%s", StringPath(path)));
         }
     }
     
@@ -2847,7 +2852,7 @@ async function ExecuteHAction(action : HAction, pure : boolean, dataenv : DataEn
         return null;
     }
     else if (action.actiontype === "html") {
-        let htmlObj = parseHtml(action.html);
+        let htmlObj = parseHtml(action.html, "action.html", dataenv.dbstate.getParserOpts());
         bindLibContext(htmlObj, (action.libcontext ?? "main"));
         if (htmlObj != null) {
             dataenv.dbstate.setHtml(htmlObj);

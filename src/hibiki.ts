@@ -13,9 +13,10 @@ import {parseHtml} from "./html-parser";
 import {HibikiState, DataEnvironment} from "./state";
 import * as ReactDOM from "react-dom";
 import {HibikiRootNode, CORE_LIBRARY} from "./nodes";
-import {deepTextContent, evalDeepTextContent, isObject, bindLibContext, callHook} from "./utils";
+import {deepTextContent, evalDeepTextContent, isObject, bindLibContext, callHook, parseTextData} from "./utils";
+import * as HibikiUtilsModule from "./utils";
 import merge from "lodash/merge";
-import type {HibikiConfig, Hibiki, HibikiExtState, ReactClass, LibraryType, HibikiGlobalConfig} from "./types";
+import type {HibikiConfig, Hibiki, HibikiExtState, ReactClass, LibraryType, HibikiGlobalConfig, HtmlParserOpts} from "./types";
 import type {HibikiNode} from "./html-parser";
 import {LocalModule, HttpModule, LibModule} from "./modules";
 import {HibikiModule} from "./hibiki-module";
@@ -94,6 +95,15 @@ function readHibikiConfigFromOuterHtml(htmlElem : string | HTMLElement) : Hibiki
     if (htmlElem.hasAttribute("name")) {
         rtn.stateName = htmlElem.getAttribute("name");
     }
+    if (htmlElem.hasAttribute("textdelimiters")) {
+        let delimType = htmlElem.getAttribute("textdelimiters");
+        if (delimType === "none" || delimType === "default" || delimType === "alt") {
+            rtn.textDelimiters = delimType;
+        }
+        else {
+            console.log(sprintf("Invalid 'textdelimiters' attribute on hibiki tag, allowed values are 'none', 'default', or 'alt', got='%s'", delimType));
+        }
+    }
     return rtn;
 }
 
@@ -101,21 +111,26 @@ function readHibikiConfigFromOuterHtml(htmlElem : string | HTMLElement) : Hibiki
 let createState = function createState(config : HibikiConfig, html : string | HTMLElement, initialData : any) : HibikiExtState {
     let state = new HibikiState();
     state.ComponentLibrary.addLibrary(CORE_LIBRARY);
+
+    let configFromOuterHtml = readHibikiConfigFromOuterHtml(html);
+    config = merge({}, configFromOuterHtml, config);
     
-    config = config || {};
     initialData = initialData || {};
     let htmlObj : HibikiNode = null;
+    let parserOpts : HtmlParserOpts = {};
+    if (config.textDelimiters != null) {
+        parserOpts.textDelimiters = config.textDelimiters;
+    }
     if (config.htmlSrc != null) {
-        htmlObj = parseHtml(config.htmlSrc);
+        htmlObj = parseHtml(config.htmlSrc, "config.htmlSrc", parserOpts);
         bindLibContext(htmlObj, "main");
     }
     else if (html != null) {
-        htmlObj = parseHtml(html);
+        let sourceName = (typeof(html) === "string" ? "html-string" : sprintf("<%s>", html.tagName.toLowerCase()));
+        htmlObj = parseHtml(html, sourceName, parserOpts);
         bindLibContext(htmlObj, "main");
     }
     state.setHtml(htmlObj);
-    let configFromOuterHtml = readHibikiConfigFromOuterHtml(html);
-    config = merge({}, config, configFromOuterHtml);
     let hibikiOpts = readHibikiOptsFromHtml(htmlObj);
     if (!config.noConfigMergeFromHtml) {
         config = merge({}, (hibikiOpts.config ?? {}), config);
@@ -222,10 +237,10 @@ function fetchRemoteSrcs(config : HibikiConfig, elem : HTMLElement) : Promise<an
                 throw new Error(sprintf("Bad fetch response for hibiki data url '%s': %d %s", dataAttr, resp.status, resp.statusText));
             }
             let ctype = resp.headers.get("Content-Type");
-            if (!ctype.startsWith("application/json")) {
-                throw new Error(sprintf("Bad fetch response for hibiki data url '%s', non 'application/json' type: '%s'", dataAttr, ctype));
-            }
-            return resp.json();
+            let contextStr = sprintf("for hibiki data url '%s'", dataAttr);
+            return resp.text().then((text) => {
+                return parseTextData(text, ctype, contextStr);
+            });
         }).then((data) => {
             config.initialData = data;
         });
@@ -307,6 +322,7 @@ let hibiki : Hibiki = {
         mobxReact: mobxReact,
         HibikiDataCtx: DataCtx,
         HibikiDBCtx: DBCtxModule,
+        HibikiUtils: HibikiUtilsModule,
     },
     LibraryCallbacks: {},
     States: {},

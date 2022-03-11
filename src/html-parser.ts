@@ -262,7 +262,21 @@ function parseAutoFire(amAttr : string) : AutoFireExpr[] {
     return rtn;
 }
 
-function escapeBrackets(text : string) {
+function escapeBrackets(text : string, delimType : "none" | "default" | "alt") : string {
+    if (delimType === "none") {
+        return text;
+    }
+    if (delimType === "alt") {
+        let lbpos = text.indexOf("{\\|");
+        let rbpos = text.indexOf("|\\}");
+        if (lbpos !== -1) {
+            text = text.replace(/{\\\|/g, "{|");
+        }
+        if (rbpos !== -1) {
+            text = text.replace(/\|\\}/g, "|}");
+        }
+        return text;
+    }
     let lbpos = text.indexOf("{\\{");
     let rbpos = text.indexOf("}\\}");
     if (lbpos !== -1) {
@@ -332,17 +346,19 @@ class HtmlParser {
         if (text == null || text === "") {
             return null;
         }
-        if (this.opts.noInlineText
-            || parentTag === "script" || parentTag === "define-handler" || parentTag.startsWith("hibiki-")) {
+        let delimType = this.opts.textDelimiters ?? "default";
+        if (delimType === "none" || parentTag === "script" || parentTag === "define-handler" || parentTag.startsWith("hibiki-")) {
             return new HibikiNode("#text", {text: text});
         }
-        if (text.indexOf("{{") === -1) {
-            return new HibikiNode("#text", {text: escapeBrackets(text)});
+        let startDelim = (delimType === "alt" ? "{|" : "{{");
+        let endDelim   = (delimType === "alt" ? "|}" : "}}");
+        if (text.indexOf(startDelim) === -1) {
+            return new HibikiNode("#text", {text: escapeBrackets(text, delimType)});
         }
-        let textParts = parseDelimitedSections(text, "{{", "}}");
+        let textParts = parseDelimitedSections(text, startDelim, endDelim);
         let parts : HibikiNode[] = textParts.map((part) => {
             if (part.parttype === "plain") {
-                let tval = escapeBrackets(part.text);
+                let tval = escapeBrackets(part.text, delimType);
                 return new HibikiNode("#text", {text: tval});
             }
             else {
@@ -786,11 +802,6 @@ function wsTrimNl(list : HibikiNode[]) : HibikiNode[] {
 function parseHtml(input : string | HTMLElement, sourceName? : string, opts? : HtmlParserOpts) : HibikiNode {
     if (input == null) {
         return null;
-    }
-    if (opts == null) {
-        if ((window as any).HibikiParserOpts != null) {
-            opts = (window as any).HibikiParserOpts;
-        }
     }
     opts = opts ?? {};
     let parser = new HtmlParser(opts);

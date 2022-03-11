@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<script src="/hibiki-test.js"></script>
+<body><template hibiki>
+    <hibiki-data>
+      {"arr": [1,2,3,4,5]}
+    </hibiki-data>
+    <style>
+      .dragging {
+          opacity: 0.5;
+          background-color: #fee;
+      }
+
+      .test-box {
+          width: 200px;
+          height: 50px;
+          font-weight: bold;
+          border: 1px solid black;
+          display: flex;
+          flex-direction: row;
+          align-items: center;
+          justify-content: center;
+      }
+    </style>
+    <div class="container m-4">
+      <h1 class="title">Test Drag & Drop</h1>
+      <local-dbox color="red" dragvalue="red" drageffectallowed="all"></local-dbox>
+      <local-dbox color="blue" dragvalue="blue"></local-dbox>
+
+      <div style="display:flex; flex-direction: row;">
+        <div style="width: 200px; height: 200px; border: * $.t1 ? '5px solid black' : '1px solid black';" droptarget droptargeting.bindpath="$.t1" drop.handler="$.dropval = @value; $.img = @dragfiles[0];">
+          <div>dropval(text)={{ $.dropval }}</div>
+          <img if="$.img" html-src="*$.img">
+          <div class="mt-4">
+            (can drop images)
+          </div>
+        </div>
+      </div>
+
+      <local-draglist move.handler="$.arr = fn:moveitem($.arr, @from, @to)" style="overflow-y: scroll; height: *($.height ?? 300);" scrolltop.bindpath="$.scrolltop" scroll.handler="log('scroll', @geo)" geo.bindpath="$.geo">
+        <div class="test-box m-4" foreach="@item in $.arr" style="height: *@item == 3 ? 200 : 50;">
+          <div>
+            hello: {{ @item }}
+          </div>
+        </div>
+      </local-draglist>
+      <div>scrolltop={{ $.scrolltop }}, geo={{$.geo | format("json")}}</div>
+      <div class="button" click.handler="$.scrolltop = 50;">ScrollTop = 50</div>
+      <div class="button" click.handler="$.height = 350;">Height = 350</div>
+      <div class="button" click.handler="$.height = 250;">Height = 250</div>
+
+      <local-draglist move.handler="$.arr = fn:moveitem($.arr, @from, @to)" style="display: flex; flex-direction: row; flex-wrap: wrap; width: 600px;">
+        <div class="test-box m-4" foreach="@item in $.arr">
+          <div>
+            hello: {{ @item }}
+          </div>
+        </div>
+      </local-draglist>
+
+      <div style="height:200px;"></div>
+    </div>
+
+    <define-component name="dbox">
+      <div class="box" draggable="dbox" dragging.bindpath="$c.dragging" automerge style="height: 100px; width: 100px; background-color: *$args.color; opacity: *$c.dragging ? 0.5 : 1.0;">
+      </div>
+    </define-component>
+
+    <define-component name="draglist">
+      <div automerge droptarget="*$c.@hibiki.uuid" drop.handler="if ($c.dragindex != $c.dragpos) { fire->move(from=$c.dragindex, to=$c.dragpos); }" scroll.handler="fire->scroll(value=@value, geo=@geo);">
+        <h-fragment foreach="(@child, @idx) in ($c.dragpos != null ? fn:moveitem(@children.tags.byindex, $c.dragindex, $c.dragpos) : @children.tags.byindex)">
+          <h-children bind="@child"
+                      inject:class.dragging="*($c.dragpos ?? $c.dragindex) == @idx"
+                      inject:draggable="*$c.@hibiki.uuid" inject:dragging.bindpath="$c.dragindex" inject:draggingvalue="*@idx" inject:dragvalue="*$c.@hibiki.uuid + ':' + @idx"
+                      inject:dragend.handler="$c.dragpos = null; $c.lastdragpos = null;"
+
+                      inject:droptarget="*$c.@hibiki.uuid"
+                      inject:dragenter.handler="if ($c.lastdragpos == null || $c.lastdragpos != @idx) { $c.lastdragpos = $c.dragpos ?? $c.dragindex; $c.dragpos = @idx; }"
+                      inject:dragleave.handler="$c.lastdragpos = null;"
+                      >
+          </h-children>
+        </h-fragment>
+      </div>
+      <div>
+        dragindex={{$c.dragindex}}, dragpos={{$c.dragpos}}, lastdragpos={{$c.lastdragpos}}
+      </div>
+    </define-component>
+</template></body>

@@ -22,6 +22,8 @@ import {doParse} from "./hibiki-parser";
 
 import {parseHtml} from "./html-parser";
 
+let SHARED_ROOT = mobx.observable.box({}, {name: "SharedState"})
+
 type CallHandlerOptsType = {
     dataenv? : DataEnvironment,
     rtContext? : RtContext,
@@ -172,6 +174,9 @@ class DataEnvironment {
         }
         if (rootName === "state") {
             return unbox(this.dbstate.DataRoots["state"]);
+        }
+        if (rootName === "shared") {
+            return unbox(this.dbstate.DataRoots["shared"]);
         }
         if (rootName === "null") {
             return null;
@@ -628,7 +633,7 @@ class ComponentLibrary {
             }
             return resp.text();
         }).then((rtext) => {
-            let defNode = parseHtml(rtext, null, {});
+            let defNode = parseHtml(rtext, null, {});  // libraries cannot use alternate delimiters
             libNode = firstSubNodeByTag(defNode, "define-library");
             if (libNode == null) {
                 throw new Error(sprintf("No top-level <define-library> found for library url '%s'", srcUrl));
@@ -889,8 +894,9 @@ class HibikiExtState {
         return this.state.getStateName();
     }
 
-    setHtml(html : string | HTMLElement) : void {
-        let htmlObj = parseHtml(html);
+    setHtml(html : string | HTMLElement, opts? : HtmlParserOpts) : void {
+        let fullOpts : HtmlParserOpts = Object.assign({}, this.state.getParserOpts(), opts);
+        let htmlObj = parseHtml(html, "state.setHtml", fullOpts);
         bindLibContext(htmlObj, "main");
         this.state.setHtml(htmlObj);
     }
@@ -971,8 +977,9 @@ class HibikiState {
 
     constructor() {
         this.DataRoots = {};
-        this.DataRoots["global"] = mobx.observable.box({}, {name: "GlobalData"})
-        this.DataRoots["state"] = mobx.observable.box({}, {name: "AppState"})
+        this.DataRoots["global"] = mobx.observable.box({}, {name: "GlobalData"});
+        this.DataRoots["state"] = mobx.observable.box({}, {name: "AppState"});
+        this.DataRoots["shared"] = SHARED_ROOT;
         this.ComponentLibrary = new ComponentLibrary(this);
         this.InitCallbacks = [];
         let hibiki = getHibiki();
@@ -982,6 +989,14 @@ class HibikiState {
 
     getStateName() : string {
         return this.Config.stateName;
+    }
+
+    getParserOpts() : HtmlParserOpts {
+        let rtn : HtmlParserOpts = {};
+        if (this.Config.textDelimiters != null) {
+            rtn.textDelimiters = this.Config.textDelimiters;
+        }
+        return rtn;
     }
     
     @boundMethod popStateHandler() {
@@ -1132,6 +1147,13 @@ class HibikiState {
     }
 
     @mobx.action setGlobalData(globalData : any) {
+        if (globalData == null) {
+            return;
+        }
+        let [_, isObj] = DataCtx.asPlainObject(globalData, false);
+        if (!isObj) {
+            throw new Error(sprintf("Initial global data object must be an object, got type=%s", DataCtx.hibikiTypeOf(globalData)));
+        }
         this.DataRoots["global"].set(globalData);
     }
 
