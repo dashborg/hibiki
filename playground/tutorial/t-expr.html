@@ -54,6 +54,7 @@
 <ul class="monospace example-list">
   <li>There are {\{$.numlights}\} light{\{$.numlights > 1 ? 's' : ''}\}
   <li>&lt;button class="button" class.is-primary="*$.isprimary"&gt;
+  <li>&lt;div class="* 'button ' + ($.isprimary ? 'is-primary' : '')"&gt;
   <li>{\{ $.pi | format("%.2f") }\}
 </ul>
 
