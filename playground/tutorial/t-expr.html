@@ -43,7 +43,9 @@
   Instead of writing out
   <code>&lt;h-text bind="<i>expr</i>"&gt;&lt;/h-text&gt;</code>
   you can use <code>{\{ <i>expr</i> }\}</code> with an optional trailing
-  format specification.
+  format specification.  If you use Django or Flask templates,
+  you can use <code>{| <i>expr</i> |}</code> by setting
+  <code>&lt;template hibiki textdelimiters="alt"&gt;</code>.
 </p>
 <p>
   Additional classes can be turned on/off using the shorthand attribute syntax
