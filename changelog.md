@@ -1,5 +1,10 @@
 # Change Log
 
+## v0.3.5
+
+* Added hibiki:id attribute
+* Allow parsed attributes can have a "*" prefix (will be ignored, no longer a parser error)
+
 ## v0.3.4
 
 * Allow parsing of YAML data if js-yaml UMD package is manually included (window.jsyaml is set)

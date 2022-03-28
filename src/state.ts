@@ -9,7 +9,7 @@ import md5 from "md5";
 import {sprintf} from "sprintf-js";
 import {boundMethod} from 'autobind-decorator'
 import {v4 as uuidv4} from 'uuid';
-import type {ComponentType, LibraryType, HibikiConfig, HibikiHandlerModule, HibikiAction, EventType, HandlerValType, JSFuncType, Hibiki, ErrorCallbackFn, HtmlParserOpts, HandlerBlock, HibikiVal, HibikiValObj} from "./types";
+import type {ComponentType, LibraryType, HibikiConfig, HibikiHandlerModule, HibikiAction, EventType, HandlerValType, JSFuncType, Hibiki, ErrorCallbackFn, HtmlParserOpts, HandlerBlock, HibikiVal, HibikiValObj, LibComponentType} from "./types";
 import type {HibikiNode, NodeAttrType} from "./html-parser";
 import * as DataCtx from "./datactx";
 import {isObject, textContent, SYM_PROXY, SYM_FLATTEN, nodeStr, callHook, getHibiki, parseHandler, fullPath, parseUrlParams, smartDecodeParams, unbox, bindLibContext, compareVersions} from "./utils";
@@ -551,6 +551,10 @@ class ComponentLibrary {
     }
 
     findComponent(tagName : string, libContext : string) : ComponentType {
+        let m = tagName.match(/^\[(.*?)\]\:(.*)$/);
+        if (m != null) {
+            
+        }
         if (tagName.startsWith("local-")) {
             let localTagName = tagName.substr(6);
             let libObj = this.libs[libContext];
@@ -872,11 +876,16 @@ class ComponentLibrary {
                 console.log(sprintf("Conflicting import %s %s:%s (discarding %s:%s)", importName, origComp.libName, origComp.name, libName, name));
                 continue;
             }
-            let ctype = {componentType: newComp.componentType, libName: libName, name: name, impl: newComp.impl, reactimpl: newComp.reactimpl, node: newComp.node};
+            let ctype = libCompToComp(name, libName, newComp);
             ctxLib.importedComponents[importName] = ctype;
         }
         this.makeLocalModule(libContext, libName, prefix);
     }
+}
+
+function libCompToComp(name : string, libName : string, lc : LibComponentType) : ComponentType {
+    let ctype : ComponentType = {componentType: lc.componentType, libName: libName, name: name, impl: lc.impl, reactimpl: lc.reactimpl, node: lc.node};
+    return ctype;
 }
 
 class HibikiExtState {
@@ -1434,5 +1443,5 @@ function hasHtmlRR(rra : any[]) : boolean {
 }
 
 
-export {HibikiState, DataEnvironment, HibikiExtState};
+export {HibikiState, DataEnvironment, HibikiExtState, libCompToComp};
 export type {EHandlerType, DataEnvironmentOpts};

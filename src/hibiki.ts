@@ -346,7 +346,7 @@ function fireWelcomeMessage() {
     if (!hibiki.UsageFired && !globalConfig.noUsagePing) {
         let versionStr = hibiki.VERSION + "|" + hibiki.BUILD;
         let usageImg = new Image();
-        usageImg.src = sprintf("https://hibikihtml.com/hibiki-usage.gif?version=%s&build=%s", hibiki.VERSION, hibiki.BUILD);
+        usageImg.src = sprintf("https://ping.hibikihtml.com/hibiki-usage.gif?version=%s&build=%s", hibiki.VERSION, hibiki.BUILD);
         usageImg.onload = function() {};
     }
 }

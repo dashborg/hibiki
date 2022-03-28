@@ -77,8 +77,8 @@ type HandlerBlock =
     | {hibikiactions: HibikiAction[], hibikicontext?: Record<string, any>, libContext?: string}
     | HActionBlock;
 
-type HibikiActionValue = HibikiVal | {hibikiexpr : string};
-type HibikiActionString   = string | {hibikiexpr : string};
+type HibikiActionValue  = HibikiVal | {hibikiexpr : string};
+type HibikiActionString = string | {hibikiexpr : string};
 
 type HibikiAction = {
     actiontype    : string,
@@ -92,7 +92,8 @@ type HibikiAction = {
     callpath?     : HibikiActionString,
     data?         : HibikiActionValue,
     exithandler?  : boolean,             // for type=setreturn
-    html?         : string,              // for type=html
+    html?         : HibikiActionHtml,    // for type=html
+    htmlaction?   : string,              // for type=html
     libcontext?   : string,              // for type=html
     nodeuuid?     : string,              // for type=fireevent
     actions?      : Record<string, HibikiAction[]>,
@@ -100,6 +101,19 @@ type HibikiAction = {
     blockctx?     : string,              // for type=block
     blobbase64?   : string,              // for type=setpath (blobs)
     blobmimetype? : string,              // for type=setpath (blobs)
+};
+
+type HibikiActionNodeHandler = string | HandlerBlock;
+type HibikiActionHtml = string | HibikiActionNode;
+
+type HibikiActionNode = {
+    libname? : string,
+    tag : string,
+    text? : string,
+    attrs? : Record<string, HibikiActionString>,
+    handlers? : Record<string, HibikiActionNodeHandler>,
+    children? : HibikiActionHtml[],
+    rawElem? : Element,
 };
 
 type HibikiHandlerModule = {
@@ -246,5 +260,5 @@ interface HibikiExtState {
     makeWatcher(exprStr : string, callback : (v : HibikiVal) => void) : (() => void);
 };
 
-export type {HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, ComponentType, LibraryType, HibikiRequest, Hibiki, HibikiAction, HibikiActionString, HibikiActionValue, HibikiExtState, EventType, HandlerValType, JSFuncType, FetchHookFn, CsrfHookFn, ReactClass, HandlerPathType, ErrorCallbackFn, EventCallbackFn, HtmlParserOpts, LibComponentType, HandlerBlock, HibikiVal, HibikiValObj, AutoMergeExpr, AutoFireExpr, HibikiReactProps, HttpConfig, JSFuncStr, HibikiSpecialVal, HibikiPrimitiveVal, StyleMapType, HibikiGlobalConfig};
+export type {HibikiConfig, HibikiHandlerModule, PathPart, PathType, PathUnionType, ComponentType, LibraryType, HibikiRequest, Hibiki, HibikiAction, HibikiActionString, HibikiActionValue, HibikiExtState, EventType, HandlerValType, JSFuncType, FetchHookFn, CsrfHookFn, ReactClass, HandlerPathType, ErrorCallbackFn, EventCallbackFn, HtmlParserOpts, LibComponentType, HandlerBlock, HibikiVal, HibikiValObj, AutoMergeExpr, AutoFireExpr, HibikiReactProps, HttpConfig, JSFuncStr, HibikiSpecialVal, HibikiPrimitiveVal, StyleMapType, HibikiGlobalConfig, HibikiActionNode, HibikiActionHtml, HibikiActionNodeHandler};
 

@@ -11,7 +11,7 @@ import {sprintf} from "sprintf-js";
 import {parseHtml, HibikiNode} from "./html-parser";
 import {RtContext, getShortEMsg, HibikiError} from "./error";
 import {SYM_PROXY, SYM_FLATTEN, isObject, nodeStr, parseHandler, fullPath, STYLE_UNITLESS_NUMBER, splitTrim, bindLibContext, classStringToCnArr, cnArrToClassAttr, cnArrToLosslessStr, attrBaseName, parseAttrName, nsAttrName, getHibiki, HibikiWrappedObj, base64ToArray} from "./utils";
-import {PathPart, PathType, PathUnionType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue, HandlerBlock, HibikiVal, HibikiValObj, JSFuncType, HibikiSpecialVal, HibikiPrimitiveVal, StyleMapType} from "./types";
+import {PathPart, PathType, PathUnionType, EventType, HandlerValType, HibikiAction, HibikiActionString, HibikiActionValue, HandlerBlock, HibikiVal, HibikiValObj, JSFuncType, HibikiSpecialVal, HibikiPrimitiveVal, StyleMapType, HibikiActionNode} from "./types";
 import type {NodeAttrType} from "./html-parser";
 import {HibikiRequest} from "./request";
 import type {EHandlerType} from "./state";
@@ -82,6 +82,7 @@ type HAction = {
     callpath?  : HExpr,
     data?      : HExpr,
     html?      : string,
+    htmlaction? : string,
     libcontext? : string,
     nodeuuid?  : string,
     actions?   : Record<string, HAction[]>,
@@ -462,6 +463,7 @@ const BLOB_ALLOWED_GETTERS : Record<string, boolean> = {
     "bloblen": true,
     "name": true,
     "base64": true,
+    "text": true,
 };
 
 class HibikiBlob extends HibikiWrappedObj {
@@ -2904,6 +2906,50 @@ function validateAction(action : HAction) : string {
     return null;
 }
 
+function convertActionNode(node : HibikiActionNode, state : HibikiState) : HibikiNode {
+    if (node == null) {
+        throw new Error("Invalid HibikiActionNode, cannot be null");
+    }
+    if (node.tag === null) {
+        throw new Error("Invalid HibikiActionNode, 'tag' attribute must be set");
+    }
+    if (typeof(node.tag) !== "string" || (node.libname != null && typeof(node.libname) !== "string")) {
+        throw new Error("Invalid HibikiActionNode, 'tag' and 'libname' attributes must be strings");
+    }
+    if (node.tag === "#text") {
+        if (node.text == null || typeof(node.text) !== "string") {
+            throw new Error("Invalid HibikiActionNode, for tag '#text', text attribute must not be null, and must be a string");
+        }
+        return new HibikiNode("#text", {text: node.text});
+    }
+    if (node.tag.startsWith("#")) {
+        throw new Error(sprintf("Invalid HibikiActionNode, only '#text' is supported for '#' tags, got=%s", node.tag));
+    }
+    let rtn : HibikiNode = null;
+    if (node.libname != null) {
+        let clib = state.ComponentLibrary;
+        let libObj = this.libs[node.libname];
+        if (libObj == null) {
+            throw new Error(sprintf("Invalid HibikiActionNode, libname '%s' was not found", node.libname));
+        }
+        let comp = libObj.libComponents[node.tag];
+        if (comp == null) {
+            throw new Error(sprintf("Invalid HibikiActionNode, tag '%s' was not found in library '%s'", node.tag, node.libname));
+        }
+        rtn = new HibikiNode(sprintf("[%s]:%s", node.libname, node.tag), {attrs: {}});
+    }
+    else {
+        if (!node.tag.startsWith("html-") && node.tag.indexOf("-") !== -1) {
+            let comp = state.ComponentLibrary.findComponent(node.tag, "main");
+            if (comp == null) {
+                throw new Error(sprintf("Invalid HibikiActionNode, tag '%s' was not found", node.tag));
+            }
+        }
+        rtn = new HibikiNode(node.tag, {attrs: {}});
+    }
+    return rtn;
+}
+
 function convertAction(action : HibikiAction) : HAction {
     if (action.actiontype == null) {
         throw new Error("Invalid HibikiAction, no actiontype field | " + JSON.stringify(action));
@@ -2935,6 +2981,9 @@ function convertAction(action : HibikiAction) : HAction {
     }
     if (action.html != null && typeof(action.html) === "string") {
         rtn.html = action.html;
+    }
+    if (action.htmlaction != null && typeof(action.htmlaction) === "string") {
+        rtn.htmlaction = action.htmlaction;
     }
     if (action.libcontext != null && typeof(action.libcontext) === "string") {
         rtn.libcontext = action.libcontext;

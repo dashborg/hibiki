@@ -976,9 +976,6 @@ regParamFn("some", jsArrSome);
 reg("concat", jsArrConcat, true);
 reg("moveitem", jsMoveItem, true);
 
-// concat
-
-
 // obj functions
 reg("objkeys", jsObjKeys, true);
 reg("objatkeys", jsObjAtKeys, true);

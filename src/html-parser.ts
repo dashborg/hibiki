@@ -5,7 +5,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 import camelCase from "camelcase";
-import type {HtmlParserOpts, PathType, AutoMergeExpr, AutoFireExpr} from "./types";
+import type {HtmlParserOpts, PathType, AutoMergeExpr, AutoFireExpr, HibikiActionNode, HibikiActionHtml} from "./types";
 import merge from "lodash/merge";
 import {sprintf} from "sprintf-js";
 import {doParse} from "./hibiki-parser";
@@ -26,6 +26,8 @@ const NODE_ALLOWED_GETTERS : Record<string, boolean> = {
 type WSMode = "none" | "all" | "trim" | "trim-nl";
 
 const DEFAULT_WS_MODE = "trim";
+
+let globalVDoc : Document = null;
 
 const HTML_WS_MODES : Record<string, WSMode> = {
     "pre": "all",
@@ -60,6 +62,7 @@ class HibikiNode extends HibikiWrappedObj {
     contextVars? : ContextVarType[];
     mark? : boolean;
     wsMode? : WSMode;
+    hibikiId? : string;
 
     constructor(tag : string, opts? : {text? : string, list? : HibikiNode[], attrs? : Record<string, NodeAttrType>}) {
         super();
@@ -467,7 +470,7 @@ class HtmlParser {
         if (!isParsed && (!value.startsWith("*") || value === "*" || value === "**")) {
             return value;
         }
-        let exprStr = (isParsed ? value : value.substr(1).trim());
+        let exprStr = (value.startsWith("*") ? value.substr(1).trim() : value); 
         try {
             let exprAst : HExpr = doParse(exprStr, "ext_fullExpr");
             exprAst.sourcestr = value;
@@ -507,6 +510,9 @@ class HtmlParser {
         if (attrName === "h:outerhtml" || attrName == "hibiki:outerhtml") {
             node.outerhtml = htmlElem.outerHTML;
             return true;
+        }
+        if (attrName === "h:id" || attrName === "hibiki:id") {
+            node.hibikiId = attrValue;
         }
         if (attrName === "h:ws" || attrName == "hibiki:ws") {
             if (attrValue === "") {
@@ -605,6 +611,135 @@ class HtmlParser {
         }
     }
 
+    htmlNodeToHAN(htmlNode : Node) : HibikiActionNode {
+        if (htmlNode.nodeType === 3 || htmlNode.nodeType === 4) {  // TEXT_NODE, CDATA_SECTION_NODE
+            return {tag: "#text", text: htmlNode.textContent};
+        }
+        if (htmlNode.nodeType === 8) { // COMMENT_NODE
+            return {tag: "#comment", text: htmlNode.textContent};
+        }
+        if (htmlNode.nodeType !== 1) { // ELEMENT_NODE
+            return null;
+        }
+        let htmlElem : Element = htmlNode as Element;
+        let rtn : HibikiActionNode = {tag: htmlElem.tagName.toLowerCase(), rawElem: htmlElem};
+        let nodeAttrs = htmlElem.attributes;
+        if (nodeAttrs.length > 0) {
+            rtn.attrs = {};
+        }
+        for (let i=0; i<nodeAttrs.length; i++) {
+            let attr = nodeAttrs.item(i);
+            rtn.attrs[attr.name.toLowerCase()] = attr.value;
+        }
+        let nodeChildren = htmlNode.childNodes;
+        if (nodeChildren.length > 0) {
+            rtn.children = [];
+        }
+        for (let i=0; i<nodeChildren.length; i++) {
+            let childNode = nodeChildren[i];
+            let han = this.htmlNodeToHAN(childNode);
+            if (han == null) {
+                continue;
+            }
+            rtn.children.push(han);
+        }
+        return rtn;
+    }
+
+    parseHAN(parentTag : string, han : HibikiActionNode, pctx : ParseContext) : HibikiNode | HibikiNode[] {
+        if (han.tag === "#text") {
+            return this.parseText(parentTag, han.text, pctx);
+        }
+        if (han.tag === "#comment") {
+            let text = han.text;
+            if (text.startsWith("hibiki:text[") && text.endsWith("]")) {
+                return this.parseText(parentTag, text, pctx);
+            }
+            if (text.startsWith("hibiki:rawtext[") && text.endsWith("]")) {
+                return new HibikiNode("#text", {text: text});
+            }
+            return new HibikiNode("#comment", {text: text});
+        }
+        pctx.tagStack.push(sprintf("<%s>", han.tag));
+        let node : HibikiNode = new HibikiNode(han.tag);
+        if (han.attrs != null) {
+            node.attrs = {};
+        }
+        let attrs = han.attrs;
+        for (let attrName in attrs) {
+            let rawValue = attrs[attrName];
+            let attrValue : string = null;
+            if (rawValue == null) {
+                continue;
+            }
+            else if (typeof(rawValue) === "string") {
+                attrValue = rawValue;
+            }
+            else {
+                attrValue = "*" + rawValue.hibikiexpr;
+            }
+            if (this.parseRawTagAttr(node, attrName, attrValue, pctx)) {
+                continue;
+            }
+            if (this.parseHibikiSpecialAttrs(han.rawElem, node, attrName, attrValue)) {
+                continue;
+            }
+            if (this.parseStyleAttr(node, attrName, attrValue, pctx)) {
+                continue;
+            }
+            else if (this.parseHandlerAttr(node, attrName, attrValue, pctx)) {
+                continue;
+            }
+            else if (this.parseBindPathAttr(node, attrName, attrValue, pctx)) {
+                continue;
+            }
+            else if (this.parseCCAttr(node, attrName, attrValue, pctx)) {
+                continue;
+            }
+            else if (this.parseAutoAttrs(node, attrName, attrValue, pctx)) {
+                continue;
+            }
+            else if (this.parseForeachAttr(node, attrName, attrValue, pctx)) {
+                continue;
+            }
+            this.parseStandardAttr(node, attrName, attrValue, pctx);
+        }
+        let list = this.parseHANChildren(han.tag, han, pctx);
+        if (list != null) {
+            list = this.trimWs(node, list);
+            node.list = list;
+        }
+        if (node.tag === "script" && node.attrs != null && (node.attrs["type"] === "application/json" || node.attrs["type"] === "text/plain") && node.list != null && node.list.length === 1 && node.list[0].tag === "#text") {
+            pctx.tagStack.pop();
+            return node.list[0];
+        }
+        if (node.tag === "define-handler") {
+            this.parseHandlerText(node);
+        }
+        // contextVars
+        if (node.tag === "define-vars") {
+            let textFrom = "<define-vars datacontext>";
+            let ctxStr = rawAttrFromNode(node, "datacontext");
+            if (ctxStr == null) {
+                textFrom = "<define-vars>:text";
+                ctxStr = textContent(node);
+            }
+            node.contextVars = this.parseContextVars(ctxStr, textFrom);
+        }
+        else if (node.tag === "define-component") {
+            let ctxStr = rawAttrFromNode(node, "componentdata");
+            if (ctxStr != null) {
+                node.contextVars = this.parseContextVars(ctxStr, nodeStr(node) + ":componentdata");
+            }
+        }
+        else if (rawAttrFromNode(node, "datacontext") != null) {
+            let ctxStr = rawAttrFromNode(node, "datacontext");
+            node.contextVars = this.parseContextVars(ctxStr, nodeStr(node) + ":datacontext");
+        }
+        pctx.tagStack.pop();
+        return node;
+    }
+
     parseHtmlNode(parentTag : string, htmlNode : Node, pctx : ParseContext) : HibikiNode | HibikiNode[] {
         if (htmlNode.nodeType === 3 || htmlNode.nodeType === 4) {  // TEXT_NODE, CDATA_SECTION_NODE
             return this.parseText(parentTag, htmlNode.textContent, pctx);
@@ -623,10 +758,10 @@ class HtmlParser {
             return null;
         }
         let htmlElem : Element = htmlNode as Element;
-        let tagName = (htmlNode as Element).tagName.toLowerCase();
+        let tagName = htmlElem.tagName.toLowerCase();
         pctx.tagStack.push(sprintf("<%s>", tagName));
         let node : HibikiNode = new HibikiNode(tagName);
-        let nodeAttrs = (htmlNode as Element).attributes;
+        let nodeAttrs = htmlElem.attributes;
         if (nodeAttrs.length > 0) {
             node.attrs = {};
         }
@@ -697,6 +832,28 @@ class HtmlParser {
         return node;
     }
 
+    parseHANChildren(parentTag : string, han : HibikiActionNode, pctx : ParseContext) : HibikiNode[] {
+        if (han.children == null || han.children.length === 0) {
+            return null;
+        }
+        let rtn : HibikiNode[] = [];
+        let children = this.convertHANList(han.children);
+        for (let i=0; i<children.length; i++) {
+            let child = children[i];
+            let hnode = this.parseHAN(parentTag, child, pctx);
+            if (hnode == null) {
+                continue;
+            }
+            else if (Array.isArray(hnode)) {
+                rtn.push(...hnode);
+            }
+            else {
+                rtn.push(hnode);
+            }
+        }
+        return rtn;
+    }
+    
     parseNodeChildren(parentTag : string, htmlNode : Node, pctx : ParseContext) : HibikiNode[] {
         let nodeChildren = htmlNode.childNodes;
         if (nodeChildren.length === 0) {
@@ -721,10 +878,39 @@ class HtmlParser {
 
     // create our element in a different document so <img> tags aren't pre-fetched
     makeVirtualElement(str : string) : HTMLElement {
-        let vdoc = document.implementation.createHTMLDocument("virtual");
-        let elem = vdoc.createElement("div");
+        if (globalVDoc == null) {
+            globalVDoc = document.implementation.createHTMLDocument("virtual");
+        }
+        let elem = globalVDoc.createElement("div");
         elem.innerHTML = str;
         return elem;
+    }
+
+    convertHANList(list : HibikiActionHtml[]) : HibikiActionNode[] {
+        let rtn : HibikiActionNode[] = [];
+        if (list == null) {
+            return rtn;
+        }
+        for (let i=0; i<list.length; i++) {
+            let child = list[i];
+            if (child == null) {
+                continue;
+            }
+            if (typeof(child) === "string") {
+                let childHANs = this.stringToHANs(child);
+                rtn.push(...childHANs);
+            }
+            else {
+                rtn.push(child);
+            }
+        }
+        return rtn;
+    }
+
+    stringToHANs(str : string) : HibikiActionNode[] {
+        let elem = this.makeVirtualElement(str);
+        let han = this.htmlNodeToHAN(elem);
+        return han.children as HibikiActionNode[];
     }
 
     parseHtml(input : string | HTMLElement, sourceName? : string) : HibikiNode {
