@@ -1,8 +1,8 @@
 # Hibiki HTML
 
-Hibiki HTML is a powerful new web framework for creating
-modern, dynamic, frontend applications *without* JavaScript, that can be
-fully [scripted and controlled by backend code](#hibiki-actions).
+Hibiki HTML is a new web framework for creating modern front-end applications,
+without scaffolding or setting up a JavaScript stack,
+that can be fully [scripted and controlled by backend code](#hibiki-actions).
 
 Hibiki HTML is compatible with any backend language or framework, any
 CSS framework, and any existing backend template language.
