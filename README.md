@@ -21,6 +21,8 @@ For an interactive walkthrough please check out the
 * **Reference Documentation** - https://docs.hibikihtml.com
 * **Join Discord for Questions** - https://discord.gg/zbWV6ueED7
 
+Hibiki was featured in [Console](https://console.substack.com/p/console-99), a great newsletter for learning about open-source projects!
+
 ## Getting Started
 
 Getting started is easy.  There is no JavaScript stack to set up, no boilerplate/scaffolding, and
